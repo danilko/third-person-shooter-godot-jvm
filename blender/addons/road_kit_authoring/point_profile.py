@@ -351,7 +351,7 @@ def stations(points, is_loop=False, end_axes=None):
     profiles, _bases = chain_profiles(points, is_loop)
     end_axes = end_axes or {}
     out = []
-    for p, prof in zip(points, profiles):
+    for k, (p, prof) in enumerate(zip(points, profiles)):
         # THE BRIDGE. This line used to read `tangent = None`, unconditionally -- which made
         # `tangent_mode = MANUAL` and both handle lengths dead state: declared in the field table,
         # honoured by `road_points`, and never reachable, so rotating a point did nothing.
@@ -371,6 +371,16 @@ def stations(points, is_loop=False, end_axes=None):
             if flat > 1e-9:
                 dz = (d[2] / flat) * (1.0 if p is points[0] else -1.0)
             mode, tan = pm.MANUAL, (ax[0], ax[1], dz)
+        elif mode == pm.MANUAL and tan is not None and tan[2] == 0.0 and 0 < k < len(points) - 1:
+            # ...AND SO IS AN INTERIOR FACING'S. A facing stored as a PLAN direction (z exactly 0: a frozen joint, a
+            # station given its design tangent) would otherwise hold the deck LEVEL at the station, and the Hermite
+            # then climbs each span as a smoothstep -- 1.5x the grade mid-span, flat at every station: a washboard on
+            # any graded stretch (review P1-3, 2026-10-01, when C1's and the Wangan's stations took their exact
+            # tangents). The climb is the chain's own, across the station's two neighbours.
+            a, b = points[k - 1].pos, points[k + 1].pos
+            flat = math.hypot(b[0] - a[0], b[1] - a[1])
+            if flat > 1e-9:
+                tan = (tan[0], tan[1], (b[2] - a[2]) / flat * math.hypot(tan[0], tan[1]))
         out.append(rp.Station(p.pos, prof, tangent_mode=mode, tangent=tan,
                               roll=float(p.roll), name=p.uid,
                               handle_in=float(p.handle_in), handle_out=float(p.handle_out)))

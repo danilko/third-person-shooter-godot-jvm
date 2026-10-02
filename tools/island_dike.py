@@ -189,6 +189,10 @@ def _level_at_crossings(net, road, order, jz):
     5 % ramp puts them 0.2 m apart in height, so the road stands proud of one (probe_rail_track's gauge on
     nishi_dori__9, 2026-09-26). Every station within LX_HOLD of an at-grade rail sample is pinned to the rail's
     height, and the stations back toward the dike are brought down to it at up to RAMP_STEEP."""
+    if road.startswith("shuto_"):
+        # an EXPRESSWAY has no 踏切: it bridges the rail (the Wangan is a T off the dike road, and pinned where it passes
+        # over the City West line it came down to 0.3 m over chuo_dori, 2026-09-30)
+        return
     P = net.points
     rail = _rail_grade_samples()
     if not rail:
@@ -503,6 +507,17 @@ def rail_lifts(net, dike):
 
 MEET_SKIP = 250.0         # m of an expressway's own approach to a T on the ring: a ramp, not a crossing
 OVER_CLEAR = 7.5          # an expressway deck's surface over the dike road's (roadkit_interchange.CLEARANCE 5.5 + margin)
+#: an expressway road that planned its crossing of the dike road ITSELF, against the raised crest and across the whole
+#: overlap (island_expressway.suburb_exit): its own clearance stands; the 2 m margin above is for decks derived from
+#: ground sampled at their stations, which never see the embankment. At 7.5 the Suburb exit could not reach its
+#: junction at 7 % without moving that junction onto kogai_michi's next one.
+#: It is ACCEPTED here at 6.0 (still over the 5.5 m rule): it is planned at 6.3 on 5 m samples of its own, and a sample
+#: 0.3 m short on the window's edge was enough for this pass to lift the crossing -- and its 4 % cone then carried the
+#: lift down the exit's 6.8 % descent to the mouth, 5.4 m over its junction (2026-10-01: a 74 % pad).
+PLANNED_OVER = {"shuto_sb_off": 6.0}
+#: ...and a lift it still needs (island_grades smoothing lowers a crossing a little) is coned at the road's OWN design
+#: grade: at the general 4 % a 0.5 m top-up over the dike was carried down the whole 7 % descent to the mouth
+PLANNED_GRADE = {"shuto_sb_off": 0.07}
 
 
 def clear_crossings(net):
@@ -533,6 +548,7 @@ def clear_crossings(net):
         # it: that approach is the ramp's business, not a crossing
         meets = [s[i] for i, p in enumerate(ch) if any(l.target in dike for l in p.links)]
         need = []
+        clear = PLANNED_OVER.get(name, OVER_CLEAR)
         for k, (a, b) in enumerate(zip(ch, ch[1:])):
             L = s[k + 1] - s[k]
             for m in range(int(L // 5.0) + 1):
@@ -552,13 +568,13 @@ def clear_crossings(net):
                         continue
                     # above the crest by too little, OR under / through it (the Wangan crossed the south-west
                     # corner at record 4.0 against a 6.4 crest: through the embankment, with no column allowed)
-                    if ze - zd < OVER_CLEAR:
-                        need.append((sk, zd + OVER_CLEAR))
+                    if ze - zd < clear - 0.05:
+                        need.append((sk, zd + clear))
         if not need:
             continue
         worst = 0.0
         for i, p in enumerate(ch):
-            want = max(z - rg.GRADE * abs(s[i] - sn) for sn, z in need)
+            want = max(z - PLANNED_GRADE.get(name, rg.GRADE) * abs(s[i] - sn) for sn, z in need)
             if want > p.pos[2]:
                 worst = max(worst, want - p.pos[2])
                 p.pos = (p.pos[0], p.pos[1], round(want, 3))
@@ -624,6 +640,20 @@ SIDE_STEP = 40.0             # station spacing along it
 SIDE_MIN = 120.0             # a piece between two crossings shorter than this is not built
 SIDE_ANGLE = 45.0            # it only junctions a road crossing it at least this square
 JOIN_GAP = 120.0             # m: two ring corridors across one junction pad
+#: where the 側道 stands further inland than the ramp rule puts it: (record x, y of a ring point, reach m, extra m),
+#: eased in and out with a cosine over the reach. By the Suburb exit (island_expressway.suburb_exit) the side road and
+#: its kogai_michi junction move 25 m inland, so the exit has room to come down off the dike at 7 % (it measured 7.4 %
+#: into the junction where the rule left it, 158 m from the ring).
+SIDE_EXTRA = [(820.0, -672.0, 260.0, 25.0)]
+
+
+def side_extra(x, y):
+    e = 0.0
+    for cx, cy, reach, extra in SIDE_EXTRA:
+        d = math.dist((x, y), (cx, cy))
+        if d < reach:
+            e += extra * 0.5 * (1.0 + math.cos(math.pi * d / reach))
+    return e
 
 
 def sokudo(net, ground):
@@ -692,7 +722,7 @@ def sokudo(net, ground):
             L = math.hypot(tx, ty) or 1.0
             nx, ny = -ty / L, tx / L
             side = 1.0 if dsea(x + nx * 60, y + ny * 60) > dsea(x - nx * 60, y - ny * 60) else -1.0
-            d = max(z, 0.0) / RAMP_GRADE + SIDE_FOOT
+            d = max(z, 0.0) / RAMP_GRADE + SIDE_FOOT + side_extra(x, y)
             off.append((x + side * nx * d, y + side * ny * d))
         # a tight concave bend loops the offset back on itself: drop every offset point whose step runs AGAINST
         # the ring's own direction there (repeatedly, as dropping one can expose the next)

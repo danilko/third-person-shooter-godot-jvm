@@ -110,7 +110,7 @@ STATIONS = {
     "Central":           ("Main line", 782.0, 215.0, "hub", 300.0, "multistorey",
                           "elevated; the hub: the North, South and West lines meet here"),
     "Bay":               ("Main line", 160.0, -190.0, "standard", 90.0, "small_lot", "elevated"),
-    "Waterpark":         ("Main line", 470.0, -460.0, "standard", 90.0, "small_lot", "elevated; the south waterfront park"),
+    "Fish Market":       ("Main line", 470.0, -460.0, "standard", 90.0, "small_lot", "elevated; the fish market by the quay"),
     "Suburb":            ("Main line", 880.0, -460.0, "standard", 90.0, "park_and_ride", "elevated"),
     "Airport":           ("Main line", 1300.0, -1850.0, "standard", 90.0, "park_and_ride", "terminus, elevated"),
     "Castle Town":       ("West line", -620.0, -170.0, "standard", 90.0, "park_and_ride", "elevated; Shuri Castle 0.13 km up"),
@@ -147,7 +147,7 @@ LAYOUTS["hub_at_bay"] = {
                               "elevated; the old Central site (the station reserve stays)"),
         "Central":           ("Main line", 160.0, -120.0, "hub", 230.0, "multistorey",
                               "elevated; the HUB: the Main line and the West Y meet here"),
-        "Waterpark":         ("Main line", 470.0, -460.0, "standard", 90.0, "small_lot", "elevated"),
+        "Fish Market":       ("Main line", 470.0, -460.0, "standard", 90.0, "small_lot", "elevated"),
         "Suburb":            ("Main line", 880.0, -460.0, "standard", 90.0, "park_and_ride", "elevated"),
         "Airport":           ("Main line", 1300.0, -1850.0, "standard", 90.0, "park_and_ride", "terminus, elevated"),
         "Industry Jn":       ("West trunk", -150.0, -550.0, "junction", 120.0, "small_lot",
@@ -168,7 +168,7 @@ LAYOUTS["hub_at_bay"] = {
 
 # `--layout hub_south_of_c1` (user, 2026-09-25: "do B, moved up so the station is not directly under C1; the old
 # Central becomes a smaller station"). The hub stays on the main line's north-south leg at x 160 but stands wholly
-# SOUTH of C1 (platforms y -130..-370): the main line now turns east at y -600 (Waterpark then sits by the waterfront
+# SOUTH of C1 (platforms y -130..-370): the main line now turns east at y -600 (Fish Market then sits by the waterfront
 # park), and the West line runs on south past the hub, splitting from the main line on a flying junction, to a Y at
 # Industry Jn in the industry grid (y -770): Harbour one way, Residential and Castle Town (last) the other.
 _MAIN_S = dict(LINES["Main line"])
@@ -195,7 +195,7 @@ LAYOUTS["hub_south_of_c1"] = {
                               "elevated; the old Central site, a smaller station"),
         "Central":           ("Main line", 160.0, -215.0, "hub", 170.0, "multistorey",
                               "elevated; the HUB, wholly south of C1: the Main line and the West Y meet here"),
-        "Waterpark":         ("Main line", 470.0, -460.0, "standard", 90.0, "small_lot", "elevated"),
+        "Fish Market":       ("Main line", 470.0, -460.0, "standard", 90.0, "small_lot", "elevated"),
         "Suburb":            ("Main line", 880.0, -460.0, "standard", 90.0, "park_and_ride", "elevated"),
         "Airport":           ("Main line", 1300.0, -1850.0, "standard", 90.0, "park_and_ride", "terminus, elevated"),
         "Industry Jn":       ("West trunk", -150.0, -770.0, "junction", 120.0, "small_lot",
@@ -219,7 +219,7 @@ LAYOUTS["hub_south_of_c1"] = {
 
 # `--layout loop` (user, 2026-09-25: "a separate line south from Downtown, and another for the suburb to make a full
 # circle?"). The hub_south_of_c1 layout with the core closed into a LOOP (the Osaka Loop Line idea): Central -> north
-# along x 160 -> east through Downtown -> south along x 1110 -> west through Suburb and Waterpark -> back to Central.
+# along x 160 -> east through Downtown -> south along x 1110 -> west through Suburb and Fish Market -> back to Central.
 # Downtown becomes a junction too (the North line joins the loop at its east throat) and the Airport line leaves the
 # loop east of Suburb. The West Y still leaves Central southwards.
 _HS = LAYOUTS["hub_south_of_c1"]
@@ -245,7 +245,7 @@ LAYOUTS["loop"] = {
         "Harbour branch": _HS["lines"]["Harbour branch"],
     },
     "stations": dict({k: v for k, v in _HS["stations"].items()
-                      if k not in ("Downtown", "Central", "Waterpark", "Suburb", "Farm", "Residential North",
+                      if k not in ("Downtown", "Central", "Fish Market", "Suburb", "Farm", "Residential North",
                                    "Airport")},
                      **{
         "Farm":              ("North line", 1110.0, 1320.0, "small", 90.0, "park_and_ride", "terminus, at grade"),
@@ -254,7 +254,7 @@ LAYOUTS["loop"] = {
                               "elevated; a junction: the North line joins the loop here"),
         "Central":           ("Loop line", 160.0, -215.0, "hub", 170.0, "multistorey",
                               "elevated; the HUB: the loop and the West Y meet here"),
-        "Waterpark":         ("Loop line", 470.0, -460.0, "standard", 90.0, "small_lot", "elevated"),
+        "Fish Market":       ("Loop line", 470.0, -460.0, "standard", 90.0, "small_lot", "elevated"),
         "Suburb":            ("Loop line", 880.0, -460.0, "standard", 90.0, "park_and_ride",
                               "elevated; the Airport line leaves just east of it"),
         "Airport":           ("Airport line", 1300.0, -1850.0, "standard", 90.0, "park_and_ride", "terminus, elevated"),
@@ -262,7 +262,7 @@ LAYOUTS["loop"] = {
     "yard": _HS["yard"],
     "title": "C: B2 + a loop line",
     "notes": ["B2 with the core closed into a LOOP (Osaka Loop idea):",
-              "Central > Downtown > Suburb > Waterpark > Central.",
+              "Central > Downtown > Suburb > Fish Market > Central.",
               "Downtown is a junction too: the North line joins it.",
               "The Airport line leaves the loop east of Suburb."],
     "reserve": _HS["reserve"],
@@ -310,7 +310,7 @@ LAYOUTS["tokyo_hub"] = {
                               "the TERMINAL HUB: Main through; West and Harbour lines start here"),
         "Bay":               ("Main line", 205.0, -190.0, "junction", 120.0, "small_lot",
                               "junction: the Harbour line leaves the Main line here"),
-        "Waterpark":         ("Main line", 470.0, -475.0, "standard", 90.0, "small_lot", ""),
+        "Fish Market":       ("Main line", 470.0, -475.0, "standard", 90.0, "small_lot", ""),
         "Suburb":            ("Main line", 880.0, -475.0, "standard", 90.0, "park_and_ride",
                               "elevated: the climb to the bridge"),
         "Airport":           ("Main line", 1300.0, -1850.0, "standard", 90.0, "park_and_ride", "terminus"),
@@ -369,7 +369,7 @@ LAYOUTS["tokyo_loop"] = {
                               "the TERMINAL HUB: Main through; the Loop and Harbour lines start here"),
         "Bay":               ("Main line", 205.0, -190.0, "junction", 120.0, "small_lot",
                               "junction: Main, Loop and Harbour lines"),
-        "Waterpark":         _TH["stations"]["Waterpark"],
+        "Fish Market":       _TH["stations"]["Fish Market"],
         "Suburb":            _TH["stations"]["Suburb"],
         "Airport":           _TH["stations"]["Airport"],
         "City West":         ("Loop line", -115.0, 20.0, "standard", 90.0, "small_lot", ""),
@@ -435,7 +435,7 @@ LAYOUTS["tokyo_branches"] = {
         "Central":           ("Main line", 782.0, 215.0, "hub", 300.0, "multistorey",
                               "the TERMINAL HUB: Main through; the Blue and Harbour lines start here"),
         "Bay":               ("Main line", 205.0, -190.0, "junction", 120.0, "small_lot", "junction: Main and Harbour lines"),
-        "Waterpark":         _TH["stations"]["Waterpark"],
+        "Fish Market":       _TH["stations"]["Fish Market"],
         "Suburb":            _TH["stations"]["Suburb"],
         "Airport":           _TH["stations"]["Airport"],
         "City West":         ("Blue line", -115.0, 20.0, "standard", 90.0, "small_lot", ""),
@@ -517,7 +517,7 @@ LAYOUTS["tokyo_straight"] = {
         "Residential North": _TH["stations"]["Residential North"],
         "Central":           _TB["stations"]["Central"],
         "Bay":               _TB["stations"]["Bay"],
-        "Waterpark":         _TH["stations"]["Waterpark"],
+        "Fish Market":       _TH["stations"]["Fish Market"],
         "Suburb":            _TH["stations"]["Suburb"],
         "Airport":           _TH["stations"]["Airport"],
         "City West":         _TB["stations"]["City West"],
@@ -538,7 +538,7 @@ LAYOUTS["tokyo_straight"] = {
     "freight_gate": True,
     # the compressed world puts these pairs under Tokyo's ~500 m: accepted by the user on the 2026-09-25 review
     # ("5 short gaps (accepted)"), written down here so the check reports them as accepted, not as clean or silent
-    "accept_gaps": [("Bay", "Waterpark"), ("Waterpark", "Suburb"), ("City West", "Castle Town"),
+    "accept_gaps": [("Bay", "Fish Market"), ("Fish Market", "Suburb"), ("City West", "Castle Town"),
                     ("Residential", "Light Industry"), ("Bay", "Industry"), ("Industry", "Harbour")],
     "title": "Tokyo hub, straight Harbour",
     "notes": ["The Harbour line runs straight down the street-free",
@@ -567,7 +567,7 @@ ACCEPT_GAPS = set()      # (a, b) station pairs closer than STATION_MIN_GAP that
 #      every arterial it meets is crossed on the straight.
 #   2. MAIN LINE: its curve from southbound to eastbound ran along wangan_dori and across its nishi_hondori__s junction.
 #      It now turns east NORTH of wangan_dori (a 100 m station-throat curve out of Bay's south end), along y -400, so
-#      nishi_hondori__s is crossed square; Waterpark and Suburb move with the leg.
+#      nishi_hondori__s is crossed square; Fish Market and Suburb move with the leg.
 #   3. CASTLE: the Blue line's west corner moves to x -800, so nishi_dori is crossed on the straight; Residential and
 #      Light Industry move with the leg. City West moves onto the westbound leg at grade (-100, -160) and Castle Town
 #      to (-560, -160), right below the castle: the castle approach (`island_site_access` jokamachi_sando) ends at the
@@ -631,7 +631,7 @@ _R0["stations"]["City West"] = ("Blue line", -100.0, -160.0, "standard", 90.0, "
 _R0["stations"]["Castle Town"] = ("Blue line", -540.0, -160.0, "standard", 90.0, "park_and_ride",
                                   "right below the castle: its approach (jokamachi_sando) ends at the station's south "
                                   "forecourt, and the castle is a walk up from the north exit")
-_R0["stations"]["Waterpark"] = ("Main line", 470.0, -400.0) + tuple(_TS["stations"]["Waterpark"][3:])
+_R0["stations"]["Fish Market"] = ("Main line", 470.0, -400.0) + tuple(_TS["stations"]["Fish Market"][3:])
 _R0["stations"]["Suburb"] = ("Main line", 880.0, -400.0) + tuple(_TS["stations"]["Suburb"][3:])
 _R0["stations"]["Residential"] = ("Blue line", -800.0, -520.0) + tuple(_TS["stations"]["Residential"][3:])
 _R0["stations"]["Light Industry"] = ("Blue line", -800.0, -960.0) + tuple(_TS["stations"]["Light Industry"][3:])
@@ -766,7 +766,7 @@ HUB_ACCESS = {
     "Industry": dict(from_road="kojo_waku", at=(110.0, -650.0), via=[(128.0, -688.5)], mode="head", side="right",
                      park="left"),
     # off eki_minami_dori along the north face, past the door; the car park north of it (it faced open ground)
-    "Waterpark": dict(from_road="eki_minami_dori", at=(532.0, -330.0), via=[(510.0, -367.5)], mode="face",
+    "Fish Market": dict(from_road="eki_minami_dori", at=(532.0, -330.0), via=[(510.0, -367.5)], mode="face",
                       past=14.0, park="right"),
     # a T off wangan_dori's diagonal south-east of the station, north to the south face and west along it past both
     # south doors; the car park south of it. (A fourth arm of the wangan_dori x kogai_michi junction west of the
@@ -1702,7 +1702,7 @@ def reserve(res, out):
     crest = rg.Ground()          # with the dike: a ring stretch on the dike is no at-grade frontage (it is 12 m up)
     art_pts = [q for q in art_pts if crest.z(*q) - gnd.z(*q) < 1.0]
     # the arterials' PAVED footprint (centreline samples every 4 m with the road's own half width + 1 m), so a station
-    # building or car park is never laid across one (probe_road_clear, 2026-09-26: the Bay and Waterpark buildings
+    # building or car park is never laid across one (probe_road_clear, 2026-09-26: the Bay and Fish Market buildings
     # stood on rinkai_dori and wangan_dori)
     art_paved = {}
     try:
@@ -1807,7 +1807,7 @@ def reserve(res, out):
         door = None
         def b_clear(cx, cy, ux_, uy_, ha, hc):
             # an arterial's paved footprint carries a 1 m margin; a station building may stand at the footway's
-            # back edge (its street face IS on the pavement), so it keeps 0.5 m, not 1.5 (Waterpark's south
+            # back edge (its street face IS on the pavement), so it keeps 0.5 m, not 1.5 (Fish Market's south
             # platform: wangan_dori's footway 1 m past the building)
             return (box_clear(cx, cy, ux_, uy_, ha, hc - 1.0, [ln.line for ln in sl.lanes] or st["line"])
                     and gnd.z(cx, cy) > -1.0

@@ -201,6 +201,11 @@ def _sites():
             if rid.startswith(("military", "resort_hotel", "logistics", "central_forecourt", "airport_")):
                 _SITES.append(("reserve:" + rid, (x0 + x1) / 2.0, -(z0 + z1) / 2.0, 1.0, 0.0,
                                (x1 - x0) / 2.0 + SITE_CLEAR, (z1 - z0) / 2.0 + SITE_CLEAR))
+        # the strip between each diamond ramp and C1: a ramp comes down to the ground there, so no block street may run
+        # under it (machi_732 crossed the S diamond's east pair at 4.6 m)
+        for k, (x0, z0, x1, z1) in enumerate(_PL.diamond_strips()):
+            _SITES.append(("reserve:diamond_%d" % k, (x0 + x1) / 2.0, -(z0 + z1) / 2.0, 1.0, 0.0,
+                           (x1 - x0) / 2.0, (z1 - z0) / 2.0))
         # the PHASE-2 WANGAN corridor and its T beside the spur (island_plan.PHASE2_*, PLAN.md NEXT 2026-09-29): held
         # for the Wangan's waterfront continuation -- the street planner routes round it
         for k, box in enumerate(_PL.phase2_boxes(SITE_CLEAR)):

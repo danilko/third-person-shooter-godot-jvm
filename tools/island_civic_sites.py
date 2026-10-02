@@ -88,7 +88,7 @@ PLOTS = (
     ("koban_residential", "koban", "交番", 8.0, 10.0, 1, "station:Residential"),
     ("koban_city_west", "koban", "交番", 8.0, 10.0, 1, "station:City West"),
     # leisure, the neighbourhood and the shore
-    ("water_resort", "water_resort", "温浴・プールリゾート", 150.0, 120.0, 1, "station:Waterpark"),
+    ("water_resort", "water_resort", "温浴・プールリゾート", 150.0, 120.0, 1, "station:Fish Market"),
     ("shrine_city", "shrine", "神社", 50.0, 60.0, 1, (-250.0, 50.0)),
     ("temple_west", "temple", "寺", 50.0, 50.0, 1, (-1450.0, -450.0)),
     ("park_west", "park", "公園", 60.0, 60.0, 1, (-800.0, -800.0)),

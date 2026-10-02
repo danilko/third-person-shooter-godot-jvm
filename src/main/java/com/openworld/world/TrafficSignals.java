@@ -59,6 +59,10 @@ import java.util.Set;
  *     flashing for its last {@link SignalTiming#PED_FLASH} s. Far junctions cost nothing: their nodes are freed;</li>
  * <li>the NAME PLATES (the kit's "E 12 St" is gone from the .blend): a blue plate on each vehicle signal's arm with
  *     the name of the street being CROSSED, in kanji and romaji ({@link StreetNames}).</li>
+ * <li>the EXPRESSWAY GUIDE SIGNS (PLAN.md item 1g): white text on the green panel of each baked sign piece, from
+ *     {@code <network>.signs.json} ({@code point_furniture.expressway_sign_plan}) -- 出口 EXIT + the street an exit
+ *     lands on, JCT + the expressway a junction ramp leads to, 入口 ENTRANCE + the route at an on-ramp. Names come
+ *     from {@link StreetNames} (fictional on purpose).</li>
  * </ul>
  * Pedestrians do not cross streets yet (the crowd walks the footways and turns at their ends), so the pedestrian
  * lights are shown, not obeyed. {@link #enabled} off is the control: no lamps, and traffic ignores the lights.
@@ -72,6 +76,8 @@ public class TrafficSignals extends Node3D {
 
     /** Junctions within this of the camera have their lamps and plates built (m). */
     @Export public float visualRadius = 160.0f;
+    /** Expressway guide signs within this of the camera have their text built (m): read from far off at speed. */
+    @Export public float signRadius = 350.0f;
     /** Seconds between lamp updates. */
     @Export public float evalInterval = 0.1f;
     /** A car stops at the stop line on a yellow only when it can at this deceleration (m/s^2). */
@@ -92,6 +98,8 @@ public class TrafficSignals extends Node3D {
                                       double yaw; int head; String lamps; BreakableProps props; int poleIndex = -1; }
     private static final class Plate { int arm; String cross; Vector3 pos; Vector3 normal; double w, h; Vector3 pole; boolean built; }
 
+    private static final class Sign { String kind, dest, route; Vector3 pos, normal; double w, h; Node3D view; }
+
     private static final class Junction {
         String id;
         Vector3 centre;
@@ -108,6 +116,7 @@ public class TrafficSignals extends Node3D {
     }
 
     private final List<Junction> junctions = new ArrayList<>();
+    private final List<Sign> signs = new ArrayList<>();
     private final Map<String, Object[]> laneArm = new HashMap<>();        // lane id -> {Junction, Arm}
     private double green = 22.0, yellow = 3.0, allRed = 2.0;
     private String signature = "";
@@ -157,7 +166,10 @@ public class TrafficSignals extends Node3D {
         sceneId = sid;
         signature = sig.toString();
         clear();
-        for (Map.Entry<String, Transform3D> e : nets.entrySet()) load(e.getKey(), e.getValue());
+        for (Map.Entry<String, Transform3D> e : nets.entrySet()) {
+            load(e.getKey(), e.getValue());
+            loadSigns(e.getKey(), e.getValue());
+        }
         if (!junctions.isEmpty())
             GD.print("TrafficSignals: " + junctions.size() + " signalised junction(s), " + laneArm.size()
                     + " signalled lane(s) from " + nets.size() + " network(s)");
@@ -230,6 +242,30 @@ public class TrafficSignals extends Node3D {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    private void loadSigns(String prefix, Transform3D frame) {
+        String path = "res://assets/world_source/pieces/" + prefix + ".signs.json";
+        if (!FileAccess.fileExists(path)) return;
+        try {
+            Map<String, Object> doc = (Map<String, Object>) MiniJson.parse(FileAccess.getFileAsString(path));
+            for (Object so : (List<Object>) doc.get("signs")) {
+                Map<String, Object> m = (Map<String, Object>) so;
+                Sign g = new Sign();
+                g.kind = String.valueOf(m.get("kind"));
+                g.dest = String.valueOf(m.get("dest"));
+                g.route = String.valueOf(m.get("route"));
+                g.pos = frame.times(vec(m.get("pos")));
+                g.normal = frame.getBasis().times(vec(m.get("normal"))).normalized();
+                List<Object> sz = (List<Object>) m.get("size");
+                g.w = num(sz.get(0), 5.0);
+                g.h = num(sz.get(1), 2.5);
+                signs.add(g);
+            }
+        } catch (IllegalArgumentException | ClassCastException e) {
+            GD.printErr("TrafficSignals: " + path + ": " + e.getMessage());
+        }
+    }
+
     private static double num(Object o, double d) { return o instanceof Number n ? n.doubleValue() : d; }
 
     @SuppressWarnings("unchecked")
@@ -241,6 +277,8 @@ public class TrafficSignals extends Node3D {
     private void clear() {
         for (Junction j : junctions) freeView(j);
         junctions.clear();
+        for (Sign g : signs) freeSign(g);
+        signs.clear();
         laneArm.clear();
         litNow = 0;
     }
@@ -300,10 +338,17 @@ public class TrafficSignals extends Node3D {
         Camera3D cam = getViewport() != null ? getViewport().getCamera3d() : null;
         if (!enabled || cam == null || !GD.isInstanceValid(cam)) {
             for (Junction j : junctions) freeView(j);
+            for (Sign g : signs) freeSign(g);
             litNow = 0;
             return;
         }
         Vector3 c = cam.getGlobalPosition();
+        double sr2 = signRadius * (double) signRadius;
+        for (Sign g : signs) {
+            double dx = g.pos.getX() - c.getX(), dz = g.pos.getZ() - c.getZ();
+            if (dx * dx + dz * dz > sr2) freeSign(g);
+            else if (g.view == null) buildSign(g);
+        }
         double t = now();
         boolean blink = (t * 2.0) % 1.0 < 0.5;
         int n = 0, nv = 0;
@@ -507,6 +552,58 @@ public class TrafficSignals extends Node3D {
         if (en != null) parent.addChild(label(en, font, 32, 0.075 / 32.0, base, -0.13));
     }
 
+    /** A Japanese expressway guide sign's text on its baked green panel: a small tag top-left (出口 EXIT / JCT /
+     *  入口 ENTRANCE), then the destination in kanji, large, and in romaji under it, each shrunk to fit the panel. */
+    private void buildSign(Sign g) {
+        String name = "entrance".equals(g.kind) ? g.route : g.dest;
+        String ja = StreetNames.ja(name), en = StreetNames.en(name);
+        if (ja == null) ja = name;
+        FontFile font = StreetNames.font();
+        Node3D v = new Node3D();
+        addChild(v);
+        g.view = v;
+        Vector3 z = g.normal;
+        Vector3 x = new Vector3(0, 1, 0).cross(z).normalized();
+        Vector3 y = z.cross(x);
+        Transform3D base = new Transform3D(new Basis(x, y, z), g.pos);
+        if ("lanes".equals(g.kind)) {
+            // A LANE-DESIGNATION sign (方面別車線案内, review P1-4): one column per lane, left to right, each its
+            // destination and an arrow down onto that lane
+            String[] dests = g.dest.split("\\|");
+            double colW = g.w / dests.length;
+            for (int i = 0; i < dests.length; i++) {
+                String dja = StreetNames.ja(dests[i]), den = StreetNames.en(dests[i]);
+                if (dja == null) dja = dests[i];
+                Transform3D col = new Transform3D(base.getBasis(), base.getOrigin().plus(x.times(-0.5 * g.w + colW * (i + 0.5))));
+                double bigC = Math.min(0.22 * g.h, 0.86 * colW / Math.max(1, dja.length()));
+                v.addChild(label(dja, font, 64, bigC / 64.0, col, 0.2 * g.h));
+                if (den != null) {
+                    double smallC = Math.min(0.11 * g.h, 0.9 * colW / Math.max(1, 0.55 * den.length()));
+                    v.addChild(label(den, font, 32, smallC / 32.0, col, -0.02 * g.h));
+                }
+                v.addChild(label("↓", font, 64, 0.26 * g.h / 64.0, col, -0.28 * g.h));
+            }
+            return;
+        }
+        String tag = "exit".equals(g.kind) ? "出口 EXIT" : "jct".equals(g.kind) ? "JCT" : "入口 ENTRANCE";
+        double tagH = 0.16 * g.h;
+        Label3D t = label(tag, font, 48, tagH / 48.0, base, 0.34 * g.h);
+        t.setHorizontalAlignment(godot.core.HorizontalAlignment.LEFT);
+        t.setTransform(t.getTransform().translated(x.times(-0.45 * g.w)));
+        v.addChild(t);
+        double bigH = Math.min(0.3 * g.h, 0.86 * g.w / Math.max(1, ja.length()));
+        v.addChild(label(ja, font, 64, bigH / 64.0, base, 0.02 * g.h));
+        if (en != null) {
+            double smallH = Math.min(0.13 * g.h, 0.9 * g.w / Math.max(1, 0.55 * en.length()));
+            v.addChild(label(en, font, 32, smallH / 32.0, base, -0.3 * g.h));
+        }
+    }
+
+    private static void freeSign(Sign g) {
+        if (g.view != null && GD.isInstanceValid(g.view)) g.view.queueFree();
+        g.view = null;
+    }
+
     private static Label3D label(String text, FontFile font, int size, double pixel, Transform3D base, double up) {
         Label3D l = new Label3D();
         l.setText(text);
@@ -532,6 +629,30 @@ public class TrafficSignals extends Node3D {
     }
 
     // ── probe readouts ────────────────────────────────────────────────────────
+
+    /** Expressway guide signs loaded, and how many have their text built near the camera. */
+    @Register public int expresswaySignsNow() { return signs.size(); }
+
+    @Register public int builtSignsNow() {
+        int n = 0;
+        for (Sign g : signs) if (g.view != null) n++;
+        return n;
+    }
+
+    /** The text of the built sign nearest `(x, z)`, "" when none: tag|kanji|romaji. */
+    @Register public String signTextNear(double x, double z) {
+        Sign best = null;
+        double bd = 1e18;
+        for (Sign g : signs) {
+            if (g.view == null) continue;
+            double d = Math.hypot(g.pos.getX() - x, g.pos.getZ() - z);
+            if (d < bd) { bd = d; best = g; }
+        }
+        if (best == null) return "";
+        StringBuilder sb = new StringBuilder();
+        for (Node c : best.view.getChildren()) if (c instanceof Label3D l) sb.append(l.getText()).append('|');
+        return sb.toString();
+    }
 
     /** Signalised junctions loaded. */
     @Register public int junctionsNow() { return junctions.size(); }

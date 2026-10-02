@@ -101,6 +101,7 @@ CARRIER_ATTRS = (
     Attr("rka_shift",   "m", 0.0, "paved centre, signed lateral offset from the divide"),
     Attr("rka_med_h",   "m", 0.0, "median half-width"),
     Attr("rka_med_z",   "m", 0.0, "median top height (raised median = kerb height)"),
+    Attr("rka_med_c",   "m", 0.0, "median centre, across the road from the station (left +)"),
     Attr("rka_walk_cl", "m", 0.0, "left footway centre"),
     Attr("rka_walk_hl", "m", 0.0, "left footway half-width"),
     Attr("rka_walk_zl", "m", 0.0, "left footway level"),
@@ -567,6 +568,9 @@ def solve_road(net, road, uids=None, ground_fn=None):
         else:
             v["rka_med_h"] = med_w / 2.0
             v["rka_med_z"] = kh_l if med_w > 0.0 else 0.0
+        # where the divide's CENTRE is, across the road from the station (left positive): what a pier standing IN the
+        # median of a road it runs over asks (`point_mesh.pier_on_road`, PLAN.md item 1 R3)
+        v["rka_med_c"] = lp.slot_offset(prof, mi) if (mi is not None and med_w > 0.0) else 0.0
 
         # ---- the footways, read off their own slots so a walk that tapers away tapers here too
         for sid, cw, hw, zk, sign in (("SW_L", "rka_walk_cl", "rka_walk_hl", "rka_walk_zl", 1),

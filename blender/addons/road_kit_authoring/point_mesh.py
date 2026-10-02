@@ -458,7 +458,21 @@ PIER_ROAD_CLEAR = 3.0
 PIER_ROAD_DZ = 4.0
 
 
-def pier_on_road(bands, top, fwd, half):
+def pier_shaft(pier):
+    """`(half across, half along)` of a pier asset's SHAFT -- the part below its rigid cap (`stretch_z`), which is all
+    that stands on the ground (a cap reaching over a carriageway at deck height is not "on" it)."""
+    sz = float(pier.get("stretch_z", 0.0))
+    xs, ys = [], []
+    for ts in pier.get("tris", {}).values():
+        for t in ts:
+            for k in (0, 3, 6):
+                if t[k + 2] < sz - 0.05:
+                    xs.append(abs(t[k]))
+                    ys.append(abs(t[k + 1]))
+    return (max(xs) if xs else 0.0), (max(ys) if ys else 0.0)
+
+
+def pier_on_road(bands, top, fwd, half, shaft=None):
     """Would a column at `top` (the soffit), `half` wide across `fwd`, stand on or beside a paved band that runs more
     than `PIER_ROAD_DZ` below it?
 
@@ -477,8 +491,17 @@ def pier_on_road(bands, top, fwd, half):
     reach = half + PIER_ROAD_CLEAR
     n = max(1, int(math.ceil(2.0 * half / 2.0)))
     probes = [(top[0] + rx * (-half + 2.0 * half * k / n), top[1] + ry * (-half + 2.0 * half * k / n)) for k in range(n + 1)]
+    # the shaft's own footprint, when the caller knows it: a column wholly inside a road's RAISED median stands on that
+    # median, not on the road (PLAN.md item 1 R3: an expressway over a national road's median, the Tokyo image)
+    foot = None
+    if shaft is not None:
+        sx_, sy_ = shaft
+        foot = [(top[0] + rx * a_ + fwd[0] * b_, top[1] + ry * a_ + fwd[1] * b_)
+                for a_ in (-sx_, 0.0, sx_) for b_ in (-sy_, 0.0, sy_)]
     for b in bands:
         if not b.bbox_hit(top[0], top[1], reach):
+            continue
+        if foot is not None and b.medians and all(b.in_median(x, y) for x, y in foot):
             continue
         for x, y in probes:
             if ped._signed_depth(b.poly, x, y) > -PIER_ROAD_CLEAR and b.lowest_surface_z(x, y) < top[2] - PIER_ROAD_DZ:
@@ -966,8 +989,11 @@ def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=
                 _add(objs, name + "__shed", SHED_LAMP_MATERIAL, sh["lamps"])
                 _add(objs, collision_name(name + "_shed", COL_ROAD, False), NO_MATERIAL, sh["concrete"])
             if any(float(v.get("rka_pillar_param", 0.0)) > 0.0 for v in values):
+                shaft = pier_shaft(style.pier()) if style.pier() else None
                 cols, over, dropped = pillars(pts, values, lats, style.pier(), ground,
-                                              blocked=lambda top, fwd, half: pier_on_road(list(bands) + foreign, top, fwd, half))
+                                              blocked=lambda top, fwd, half: pier_on_road(
+                                                  list(bands) + foreign, top, fwd, half,
+                                                  shaft=shaft if shaft else (half, half)))
                 if dropped and report is not None:
                     report.setdefault("pier_on_road", []).append((name, dropped))
                 for mat, tris in cols.items():
@@ -1198,6 +1224,14 @@ def self_test():
     assert twice.surface_z(100.0, 0.0) == 10.0                           # control: the nearest sample is the deck
     # a portal pier 16 m across, centred 12 m off the street, still reaches over it
     assert pier_on_road([street], (100.0, 12.0, 10.0), (0.0, 1.0, 0.0), 8.0)
+    # PLAN.md item 1 R3: a column wholly inside a road's RAISED median stands on the median, not the road -- the cap
+    # (8 m half) reaching over the carriageway at deck height is fine; a column beside the median is still refused.
+    med = ped.Band("avenue", street.poly, street.spine,
+                   medians=[(100.0, float(y), 0.0, 1.0, 0.0, 2.0) for y in range(-200, 201, 10)])
+    assert not pier_on_road([med], (100.0, 0.0, 10.0), (0.0, 1.0, 0.0), 8.0, shaft=(1.3, 1.0))
+    assert pier_on_road([med], (103.0, 0.0, 10.0), (0.0, 1.0, 0.0), 8.0, shaft=(1.3, 1.0))
+    assert pier_on_road([street], (100.0, 0.0, 10.0), (0.0, 1.0, 0.0), 8.0, shaft=(1.3, 1.0))   # control: no median
+    print("OK: a pier may stand in another road's raised median (its shaft wholly inside it), never beside it")
     # A barrier edge run carries a car wall on the same line, CAR_WALL_HEIGHT tall from the barrier's foot; none without.
     objs = {}
     run = [(0.0, 0.0, 5.0), (10.0, 0.0, 5.0), (20.0, 0.0, 5.0)]

@@ -10771,6 +10771,29 @@ line. Weapons keep `fire_audio` / `reload_audio` in their scenes. `assets/audio/
 ships, what is wired but missing a file (`glass_shatter`, `hit_marker`) and what is not wired yet; `SoundTest`
 checks its "Wired in code" table against the enum. Licence rule as for art: CC0 / MIT / public domain, credited.
 
+## Expressway guide signs, and every displayed name is fictional (2026-09-30)
+
+- **Names shown to a player are FICTIONAL, for legal reasons (user decision).** The expressway brand is 海都高速
+  "Kaito Expwy" (環状線 Loop, 潮風線 Shiokaze, 空港連絡線 Airport Link), never 首都高 / Shuto or a real route name;
+  famous real Tokyo road names (山手通り, 明治通り, 昭和通り, 春日通り, 白山通り, 公園通り, 湾岸通り, 臨海通り, 海岸通り, Tokyo's
+  中央通り) were renamed in `tools/island_street_names.py`; the map says "Seagate Bridge" and "Hilltop Castle"
+  (`island_buildings.SITE_PLACES`). Generic Japanese street words (駅前通り, 本町通り, 桜通り) stay. Internal ids
+  (`shuto_*`, `RainbowBridge`, `ShuriCastle`) are never shown and are left alone. New names go through the same table.
+- **Green signs, Japanese convention** (PLAN.md item 1g): white letters on green. `point_furniture.expressway_sign_sites`
+  finds every ramp from the LANE GRAPH (`road_class` "ramp"): fed by an expressway lane it is an EXIT (出口 EXIT +
+  the street it lands on) or a JCT ramp (JCT + the expressway it leads to), and an `expwy_sign` F-type cantilever
+  stands `expwy_sign_before` (120 m) before the diverge at the LEFT edge, its panel over the lanes; fed by a street
+  junction's connector it is an ENTRANCE, and an `expwy_entrance_sign` (入口 ENTRANCE + the route) stands roadside
+  `expwy_entrance_in` up the ramp. A diamond's exit is not mistaken for its U-turn back up the entrance ramp: at a
+  junction the connector into a street wins (`_destination`).
+- **The panel is measured off the model** (`Table` reads the bounds of the piece's `MI_ExpwyGreen` faces), so an
+  artist may move or resize it in `library.blend` (`Sign_ExpwyCantilever`, `Sign_ExpwyEntrance`, placeholders in
+  `library_civic.py`) with nothing else to update. The TEXT is drawn at run time: `roadkit_cli gltf` writes
+  `<network>.signs.json` (`expressway_sign_plan`, network-wide, beside `.signals.json`) and `world.TrafficSignals`
+  builds each sign's labels within `signRadius` (350 m), in the sign font (`make_jp_font.py`, whose `chars` now include
+  the sign words). Probe readouts: `expressway_signs_now`, `built_signs_now`, `sign_text_near`. Self-test in
+  `point_furniture.py`; pictures with `tools/godot/shot_city.gd` (display).
+
 ## Known Quirks / Gotchas
 
 - **Godot re-imports a glTF only when the `.gltf` FILE changes; it never hashes the `.bin`** (2026-09-29). A
@@ -11498,3 +11521,79 @@ stacked 15 % ramps: up west, down east), `AirportControlTower` (civil, lift to a
   after the re-sites here `water_resort` went 746 m away (its old plot cut by the dike side road `teibo_sokudo_3`),
   and one more layout + `--resite=water_resort --avoid-streets` found it a plot 117 m from Waterpark station on
   wangan_dori. Re-run `island_civic_sites.py --check` after every layout and re-site what it names.
+
+## The expressway as of 2026-10-01: a complete Wangan, a lane-split T at the spur, all four movements at both JCTs
+
+`tools/island_expressway.py` (numbers in `tools/island_plan.py`; PLAN.md item 1 is the running record):
+- **`shuto_wangan` is the MAINLINE**: one divided road from the west-coast T along the whole south coast (over Harbour
+  station at 18 m: there is 16 m between the container terminal's stacks/cranes and the station), up the waterfront
+  to a joint by the airport spur (`WG_MAIN`). Its profile is FIXED (12 m, 18 m at the east end): `deck_profile` reads
+  the coastal dike's crest as ground and put the whole coast at 17 m.
+- **At the spur the Wangan ENDS IN A LANE SPLIT (分岐 / 合流, `t_split`, 2026-10-01)**: at J0 (`WG_J0`, on the
+  straight waterfront diagonal) each carriageway splits lane by lane into four ONE-lane ramps, NW -> SE T3 (EB -> spur
+  NB) | T1 (EB -> spur SB, the airport) | T4 (spur SB -> WB) | T2 (spur NB -> WB): no forced merge anywhere, every
+  movement exists. Rules it cost, each a measured defect first:
+  * **Separate sideways before vertically.** Two ramps beside each other at different heights read as a step (the
+    gate's 4 m / 1 m crossing rule): the WB pair (T4 + T2) peels off south-east at J0 at ONE height while the EB pair
+    (T1 + T3) stays level `T_HOLD` m and climbs together; only then does T4 turn north-east UNDER T1, nearly square.
+  * **A shallow crossing over a road you must then merge into does not fit**: a single round curve over the spur stayed
+    ~120 m over it and could not come down before the bridge (measured; the user chose square crossings).
+  * `point_export.wire_joints` takes each lane's NEAREST head over all roads on one joint (per link, the last road
+    asked won and a lane went nowhere).
+  * A ramp's crossing heights are the MEASURED overlap span (`_overlap_spans`) as minimum-height cones (`_heights`),
+    never fixed +-15 m windows or a knot list (a knot list stepped 2.2 m in 7 m between two windows).
+- **`shuto_wangan_c1`, the connector to C1 west, is a BRANCH**: its south joint parts into Y1 (Wangan EB ->) and Y2
+  (-> Wangan WB, a flyover); Y4 (-> Wangan EB) and Y3 (Wangan WB -> it: off the mainline ON LAND at x 220, west of
+  the bay, one R ~222 m right turn over the mainline, Y4 and the connector, each crossing at that road's height +
+  6.3 m) complete it. Y3 crosses the Wangan at a SHALLOW angle, so it keeps beside it for `Y3_CLIMB` m first (it was
+  over the Wangan's deck 80 m after its gore with +-15 m windows hiding it: 4.9 m on the built mesh).
+- **The Suburb exit** (`shuto_sb_off`): Wangan EB -> the ground, an S of two R 353 m arcs beside the mainline, level
+  over ring_kita (the dike road) then 7 % (the 40 km/h ramp limit) into the teibo_sokudo_2 / kogai_michi junction by
+  Suburb station as its 4th arm, ONE lane. The mainline has joints at WG_CUT_X / WG_CUT3_X / WG_CUT2_X so each EB/WB
+  run carries one ramp per carriageway.
+- **A city entrance merges as ONE lane** (`ENTRY_LANES`: the diamond entrances, Y3, Y4); an exit, and a JCT ramp that IS
+  a carriageway at a joint (W1/W2/E1/E2/Y1/Y2), stays two lanes. Ramp arcs are drawn at a 4 m step
+  (`rounded_polygon(arc_step=)`): the 30 m default kinked every ramp curve.
+- **C1 meets the connector only on its west side (W1, W2) and the spur only on its east side (E1, E2)** -- one access
+  per side, by decision; corner turn-backs were built and removed. E1 comes straight onto the spur's line (no curve back
+  in); the spur's joint is at y -45.
+- The west end runs UP THE WEST COAST (user, 2026-10-02): the T is on the west coast road's north-south stretch, and
+  the mainline runs down the land strip outside the dike through `island_plan.WG_WEST_PATH`'s corners (R ~34 at the T,
+  posted 40), then along the bay's north shore. That keeps the bay and the military pier's approach clear (210 m off
+  the pier, 184 m of deck over water against the old hook's 617 m). The airport end (peel R ~45, U-turn R ~38 into the
+  forecourt) is kept.
+- Ramps are straights and constant arcs with the LARGEST radius that fits: `two_arc` (exactly two equal arcs and a
+  straight, solved; T3, Y3, Suburb exit), `designed_ramp` (a gentle diverge + two arcs, searched; W1, W2, E1, E2 --
+  each starts its curve AT the gore via `on_curve`, so branch_ramp's offset station no longer makes a kink),
+  `best_corner` (Y1, Y2). Ground exits may be tighter. Both diamonds land on naka_hondori: eki_minami_dori's stretch
+  under C1 (y 126 -> -230) was removed from the arterials input.
+- The diamonds are TIGHT: junctions 37 m off C1 (`DIAMOND_J`, `S_DIAMOND_*_Y`), their ramps 40 m longer than the first
+  build (`DIAMOND_X` 295/305/895/905) and climbing from where their band parts from C1's (`DIAMOND_PART`): 5.8 %. And `island_plan.diamond_strips()` keeps
+  generated buildings out of the ground between each ramp and the viaduct.
+- The Suburb exit plans its dike crossing by the dike step's own reach rule at 6.3 m (`SB_CLEAR`), and
+  `island_dike.PLANNED_OVER` (6.0, a tolerance) lets that stand, with any lift coned at its own 7 % (`PLANNED_GRADE`):
+  at the general 4 % a 0.3 m top-up was carried down the whole descent and left the exit 5 m over its junction; the side road by Suburb station sits 25 m further inland
+  (`island_dike.SIDE_EXTRA`) so the exit lands at 6.9 %. PLAN.md item 1 "THIRD ROUND" has the open review items.
+- Rules this cost: a taper that closes AT a joint cannot hand its lane over (flow `broken`) -- give it a station
+  short of the joint; a ramp crossing a road while still climbing measures short after the grade
+  smoothing -- reach the height before the crossing; one divided road splitting into two ramps at a joint is welded
+  twice, so keep the grade break there small (`WG_EAST_Z`).
+- **Lane balance (review P1, 2026-10-02):** a C1 entrance followed by an exit is ONE added lane carried across the
+  corner joint between them (`AUX_CARRY`, `lane_balance`); a JCT entrance's added lane runs on across its joint into
+  the next ramp and drops there (T3 -> E2, the connector entrance -> W1), never inside that ramp's gore-hold zone
+  (`_carry_room`: `island_grades.level_gores` would insert a station into the one-span taper).
+- **C1 and the Wangan mainline sweep their DESIGN arcs:** C1's arcs at 10 m (`C1_ARC_STEP`), ramp clearances one-sided
+  where a lane is carried through (`island_roadgen.station_at(clear=)`), every station frozen on its design tangent
+  (`plan_face`; `thin` may still drop them). With chord facings C1's R180 corners swept ~5.5 m inside (R 118-122). The
+  kit keeps a flat-stored interior MANUAL facing on the chain's own climb (`point_profile.stations`).
+- **Posted speed = design radius** (`post_speeds`, `SPEED_BY_RADIUS` 170/90/60/30 m -> 80/60/50/40): a tight corner
+  gets its own road at a joint so only it slows (`wangan__1`, `spur__3`).
+- **Ground ramps** (`ground_ramp`): gore along the mainline's axis, two equal arcs to a new T on an arterial (`cut_road`,
+  `_t_arm`), level until the band parts (`part_distance`), one straight grade <= `GROUND_GRADE` 6 %. Built: the
+  connector's half IC (SB exit -> wangan_dori, NB entrance <- rinkai_dori; chuo_dori itself has a junction every
+  25-60 m), the Suburb WB entrance (<- ring_kita east of the crossing), the port WB exit (-> the port loop's west leg).
+- **Lane-designation gantries** before a lane split (`point_furniture.lane_gantry_sites`, sign kind "lanes", one column
+  + ↓ per lane, `TrafficSignals`).
+- **Kit fix:** a REV lane's taper receiver is `opens_from` in chain order (`point_export.build_run`).
+- Iterate with `island_expressway.py <out> --from <base> --fast` (1 s; the base = `island_layout`'s first four
+  steps) and the gate subset in-process; the full gate is `island_layout.py` (~20 min, flow 570 s).

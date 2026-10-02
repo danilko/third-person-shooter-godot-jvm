@@ -372,8 +372,8 @@ PLACE_KINDS = {
 }
 SITE_PLACES = {       # a SiteZones / Landmarks child -> its label (a landmark: always drawn)
     "ContainerTerminal": ("Container Terminal", 2),
-    "ShuriCastle":       ("Shuri Castle", 2),
-    "RainbowBridge":     ("Rainbow Bridge", 2),
+    "ShuriCastle":       ("Hilltop Castle", 2),   # fictional labels (legal, 2026-09-30)
+    "RainbowBridge":     ("Seagate Bridge", 2),
     "TokyoTower":        ("Tower", 2),
     "AirportTerminal_Shop": ("Airport", 2),
     "StationMall":       ("Station Mall", 2),
@@ -837,6 +837,9 @@ def plan_reserves(field):
         field.block_box((x0 + x1) / 2.0, (z0 + z1) / 2.0, 0.0, (x1 - x0) / 2.0, (z1 - z0) / 2.0, hold=True)
     # the PHASE-2 WANGAN corridor + its T (record-frame oriented boxes -> the Godot frame: z = -y, and a box's local x
     # along (cos, sin) in the record is (cos yaw, -sin yaw) in Godot (x, z), i.e. yaw = atan2(sin, cos))
+    # the strip between each diamond ramp and C1 (PLAN.md item 2): no building between a ramp and the viaduct
+    for x0, z0, x1, z1 in PL.diamond_strips():
+        field.block_box((x0 + x1) / 2.0, (z0 + z1) / 2.0, 0.0, (x1 - x0) / 2.0, (z1 - z0) / 2.0, hold=True)
     for cx, cy, c, s_, ha, hc in PL.phase2_boxes():
         field.block_box(cx, -cy, math.atan2(s_, c), ha, hc, hold=True)
     print("island_buildings: %d reserve(s) held for later: %s" % (len(PL.RESERVES),

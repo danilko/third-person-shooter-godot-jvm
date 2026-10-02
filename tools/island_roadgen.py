@@ -126,7 +126,7 @@ class Ground(object):
 
 # ------------------------------------------------------------------------------------------ plan shapes
 
-def rounded_polygon(corners, radius, closed=True):
+def rounded_polygon(corners, radius, closed=True, full_ends=False, arc_step=None):
     """A polyline through `corners` with every interior corner filleted by an arc of `radius` (shrunk to fit the
     spans), sampled every STEP on the straights and ARC_STEP on the arcs. Returns [(x, y)]."""
     n = len(corners)
@@ -143,7 +143,18 @@ def rounded_polygon(corners, radius, closed=True):
             continue
         rad = radius[i] if isinstance(radius, (list, tuple)) else radius
         t = rad / math.tan(ang / 2.0)
-        t = min(t, 0.45 * la, 0.45 * lb)
+        if full_ends:
+            # a straight shared with ANOTHER arc gives each half; one whose far end has no arc gives this arc all of it
+            def _has_arc(j):
+                if not closed and (j <= 0 or j >= n - 1):
+                    return False
+                rj = radius[j % n] if isinstance(radius, (list, tuple)) else radius
+                return rj > 0.0
+            fa = 0.49 if _has_arc(i - 1) else 0.98
+            fb = 0.49 if _has_arc(i + 1) else 0.98
+            t = min(t, fa * la, fb * lb)
+        else:
+            t = min(t, 0.45 * la, 0.45 * lb)
         r = t * math.tan(ang / 2.0)
         s = (p1[0] + a[0] * t, p1[1] + a[1] * t)            # arc start (towards p0)
         e = (p1[0] + b[0] * t, p1[1] + b[1] * t)            # arc end (towards p2)
@@ -165,7 +176,7 @@ def rounded_polygon(corners, radius, closed=True):
         a0 = math.atan2(s[1] - c[1], s[0] - c[0])
         a1 = math.atan2(e[1] - c[1], e[0] - c[0])
         da = (a1 - a0 + math.pi) % (2 * math.pi) - math.pi
-        k = max(2, int(math.ceil(abs(da) * r / ARC_STEP)))
+        k = max(2, int(math.ceil(abs(da) * r / (arc_step or ARC_STEP))))
         for m in range(1, k + 1):
             a = a0 + da * m / k
             out.append((c[0] + r * math.cos(a), c[1] + r * math.sin(a)))
@@ -279,18 +290,33 @@ def freeze(net, uid, direction):
     net.points[uid].tangent_mode, net.points[uid].tangent = pm.MANUAL, (t[0] / L, t[1] / L, 0.0)
 
 
-def station_at(plan_pts, cum, closed, want, loose=()):
+def station_at(plan_pts, cum, closed, want, loose=(), clear=None):
     """Arclengths of the stations: the plan's own vertices, plus the marks. A vertex within MARK_CLEAR of a mark in
     `want` (a ramp or joint station, whose span is a taper) is dropped; one within 15 m of a mark in `loose` (a plain
-    station the caller needs, like an anchorage) is dropped too."""
+    station the caller needs, like an anchorage) is dropped too. `clear` {mark: (before, after)} narrows a mark's
+    clearance on one side: an added lane carried THROUGH a ramp station has no taper on that side (review P1-1), and
+    dropping the vertices there cut C1's corners by 5.5 m (the swept R180 read R 118-122)."""
     marks = sorted(want)
+    clear = clear or {}
+    L = cum[-1] if closed else None
+
+    def off(c, m):
+        d = c - m
+        if L:
+            d = (d + L / 2.0) % L - L / 2.0
+        return d
+
+    def far(c, m):
+        b, a = clear.get(m, (MARK_CLEAR, MARK_CLEAR))
+        d = off(c, m)
+        return d > a if d >= 0.0 else -d > b
     base = cum[:-1] if closed else cum
-    kept = [c for c in base if all(abs(c - m) > MARK_CLEAR for m in marks)
-            and all(abs(c - m) > 15.0 for m in loose)]
+    kept = [c for c in base if all(far(c, m) for m in marks)
+            and all(abs(off(c, m)) > 15.0 for m in loose)]
     return sorted(set(kept + marks + list(loose)))
 
 
-def ring(net, name, plan, ground, marks=(), cut_marks=()):
+def ring(net, name, plan, ground, marks=(), cut_marks=(), clear=None):
     """A CLOSED expressway ring through `plan`: a station at each arclength in `marks` (the JCT's ramp stations), cut
     into roads at joints at each arclength in `cut_marks` (the first is where the ring starts and closes). Returns
     {arclength mark: uid} for every mark."""
@@ -298,7 +324,7 @@ def ring(net, name, plan, ground, marks=(), cut_marks=()):
     L = cum[-1]
     start = cut_marks[0] if cut_marks else 0.0
     # a cut (a joint) is not a taper: it needs only a 15 m clear, so its marks do not chord a corner's arc away
-    ss = station_at(plan, cum, True, list(marks), loose=list(cut_marks))
+    ss = station_at(plan, cum, True, list(marks), loose=list(cut_marks), clear=clear)
     ss = [(v - start) % L for v in ss]
     ss = sorted(set(round(v, 3) for v in ss))
     pts = [at_s(plan, cum, v + start, True) for v in ss]

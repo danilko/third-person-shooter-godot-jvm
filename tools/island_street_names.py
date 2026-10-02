@@ -34,6 +34,10 @@ DEBUG_RECORD = os.path.join(ROOT, "assets/world_source/pieces/DebugRoads.roads.j
 OUT = os.path.join(ROOT, "src/main/resources/com/openworld/world/IslandStreetNames.json")
 
 #: base road name -> (kanji, romaji, kind). kind: expressway / arterial / street / farm / access
+#: FICTIONAL on purpose (user, 2026-09-30, for legal reasons): no displayed name may be a real expressway brand or
+#: route (the expressway is 海都高速 "Kaito Expwy", not 首都高 / Shuto) or a famous real Tokyo road (山手通り, 明治通り,
+#: 昭和通り, 春日通り, 白山通り, 公園通り, 湾岸通り, 臨海通り, 海岸通り and Tokyo's 中央通り were renamed). Generic Japanese
+#: street words (駅前通り, 本町通り, 桜通り) stay: every town has them. Internal road ids (`shuto_*`) are never shown.
 NAMED = {
     # DebugWorld (tools/debug_world_layout.py)
     "w_ring": ("西環状通り", "Nishi-kanjo-dori", "arterial"),
@@ -41,17 +45,17 @@ NAMED = {
     "w_ns": ("南北通り", "Nanboku-dori", "street"),
     "w_ew": ("東西通り", "Tozai-dori", "street"),
     "link": ("連絡橋通り", "Renraku-kyo-dori", "arterial"),
-    "chuo_dori": ("中央通り", "Chuo-dori", "arterial"),
+    "chuo_dori": ("中央大路", "Chuo-oji", "arterial"),
     "nishi_dori": ("西通り", "Nishi-dori", "arterial"),
-    "rinkai_dori": ("臨海通り", "Rinkai-dori", "arterial"),
-    "ring_kita": ("湾岸環状通り", "Wangan-kanjo-dori", "arterial"),
-    "kaigan_dori": ("海岸通り", "Kaigan-dori", "arterial"),
-    "kaigan_machi": ("海岸町通り", "Kaigan-machi-dori", "arterial"),
-    "wangan_dori": ("湾岸通り", "Wangan-dori", "arterial"),
+    "rinkai_dori": ("浜風通り", "Hamakaze-dori", "arterial"),
+    "ring_kita": ("外周環状通り", "Gaishu-kanjo-dori", "arterial"),
+    "kaigan_dori": ("磯辺通り", "Isobe-dori", "arterial"),
+    "kaigan_machi": ("磯辺町通り", "Isobe-machi-dori", "arterial"),
+    "wangan_dori": ("入江通り", "Irie-dori", "arterial"),
     "eki_minami_dori": ("駅南通り", "Eki-minami-dori", "arterial"),
     "ekimae_dori": ("駅前通り", "Ekimae-dori", "arterial"),
-    "yamate_dori": ("山手通り", "Yamate-dori", "arterial"),
-    "yamate_dori_w": ("山手西通り", "Yamate-nishi-dori", "arterial"),
+    "yamate_dori": ("丘手通り", "Okate-dori", "arterial"),
+    "yamate_dori_w": ("丘手西通り", "Okate-nishi-dori", "arterial"),
     "nishi_hondori": ("西本通り", "Nishi-hondori", "arterial"),
     "naka_hondori": ("中本通り", "Naka-hondori", "arterial"),
     "higashi_hondori": ("東本通り", "Higashi-hondori", "arterial"),
@@ -72,14 +76,14 @@ NAMED = {
     "nodo_waku": ("田園通り", "Den-en-dori", "farm"),
     "kojo_waku": ("工場通り", "Kojo-dori", "street"),
     "teibo_sokudo": ("堤防側道", "Teibo-sokudo", "street"),
-    "shuto_c1": ("首都高都心環状線", "Shuto Expwy C1", "expressway"),
-    "shuto_wangan": ("首都高湾岸線", "Shuto Expwy Wangan", "expressway"),
-    "shuto_spur": ("首都高空港線", "Shuto Expwy Airport", "expressway"),
+    "shuto_c1": ("海都高速 環状線", "Kaito Expwy Loop", "expressway"),
+    "shuto_wangan": ("海都高速 潮風線", "Kaito Expwy Shiokaze", "expressway"),
+    "shuto_spur": ("海都高速 空港連絡線", "Kaito Expwy Airport Link", "expressway"),
 }
 #: a generated street's pool by the region its STEM names (`island_plan.STREET_NAMES`)
 POOLS = {
-    "street": [("桜通り", "Sakura-dori"), ("本町通り", "Honcho-dori"), ("昭和通り", "Showa-dori"),
-               ("大正通り", "Taisho-dori"), ("明治通り", "Meiji-dori"), ("平和通り", "Heiwa-dori"),
+    "street": [("桜通り", "Sakura-dori"), ("本町通り", "Honcho-dori"), ("陽光通り", "Yoko-dori"),
+               ("鈴蘭通り", "Suzuran-dori"), ("星見通り", "Hoshimi-dori"), ("平和通り", "Heiwa-dori"),
                ("若葉通り", "Wakaba-dori"), ("緑町通り", "Midoricho-dori"), ("旭通り", "Asahi-dori"),
                ("錦通り", "Nishiki-dori"), ("寿通り", "Kotobuki-dori"), ("八幡通り", "Hachiman-dori"),
                ("稲荷通り", "Inari-dori"), ("弁天通り", "Benten-dori"), ("日の出通り", "Hinode-dori"),
@@ -87,11 +91,11 @@ POOLS = {
                ("仲通り", "Naka-dori"), ("栄通り", "Sakae-dori"), ("銀杏通り", "Icho-dori"),
                ("松原通り", "Matsubara-dori"), ("柳通り", "Yanagi-dori"), ("宮前通り", "Miyamae-dori"),
                ("新町通り", "Shinmachi-dori"), ("元町通り", "Motomachi-dori"), ("東町通り", "Higashimachi-dori"),
-               ("南町通り", "Minamimachi-dori"), ("北町通り", "Kitamachi-dori"), ("春日通り", "Kasuga-dori"),
-               ("白山通り", "Hakusan-dori"), ("天神通り", "Tenjin-dori"), ("大和通り", "Yamato-dori"),
+               ("南町通り", "Minamimachi-dori"), ("北町通り", "Kitamachi-dori"), ("風見通り", "Kazami-dori"),
+               ("月見通り", "Tsukimi-dori"), ("天神通り", "Tenjin-dori"), ("大和通り", "Yamato-dori"),
                ("青葉通り", "Aoba-dori"), ("紅葉通り", "Momiji-dori"), ("梅通り", "Ume-dori"),
                ("藤通り", "Fuji-dori"), ("菊通り", "Kiku-dori"), ("中町通り", "Nakamachi-dori"),
-               ("市場通り", "Ichiba-dori"), ("学園通り", "Gakuen-dori"), ("公園通り", "Koen-dori"),
+               ("市場通り", "Ichiba-dori"), ("学園通り", "Gakuen-dori"), ("桔梗通り", "Kikyo-dori"),
                ("文化通り", "Bunka-dori"), ("商店街通り", "Shotengai-dori"), ("大通り", "O-dori")],
     "industry": [("産業道路", "Sangyo-doro"), ("工業通り", "Kogyo-dori"), ("鉄工通り", "Tekko-dori"),
                  ("運河通り", "Unga-dori"), ("倉庫通り", "Soko-dori"), ("埠頭通り", "Futo-dori"),
@@ -121,7 +125,7 @@ def names_for(bases):
         hit = NAMED.get(b) or next((NAMED[k] for k in sorted(NAMED, key=len, reverse=True) if b.startswith(k + "_")),
                                    None)
         if hit is None and b.startswith("shuto_"):
-            hit = ("首都高速", "Shuto Expwy", "expressway")
+            hit = ("海都高速", "Kaito Expwy", "expressway")
         if hit is not None:
             out[b] = {"ja": hit[0], "en": hit[1], "kind": hit[2]}
             continue
@@ -151,7 +155,8 @@ def main(argv):
         roads = roads + json.load(open(DEBUG_RECORD))["roads"]
     names = names_for({base(r["name"]) for r in roads})
     chars = sorted({c for v in names.values() for c in v["ja"] + v["en"]}
-                   | set("0123456789-丁目交差点前駅入口"))
+                   | set("0123456789-丁目交差点前駅入口出方面料金所終点先")          # + the green expressway signs
+                   | set("EXITENTRANCEJCTkm→←↑↓"))
     doc = {"notes": "Written by tools/island_street_names.py from %s: each road's BASE name (no __ suffix) -> its "
                     "Japanese street name. Read by world.StreetNames." % os.path.relpath(rec, ROOT),
            "roads": names, "chars": "".join(chars)}

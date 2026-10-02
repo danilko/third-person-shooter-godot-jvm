@@ -461,7 +461,6 @@ def phase2_intrusions(path):
     """What stands in the held PHASE-2 ground (island_plan.PHASE2_*, PLAN.md NEXT): [(what, name, detail)].
     * a road running ALONG the corridor or through the T's footprint for more than PHASE2_ALONG (a crossing is allowed:
       the Wangan will be elevated over it); the spur itself is the T's mainline and is allowed there;
-    * a station of the spur's own inside `SPUR_T_CLEAR` (the T's aux slots and taper spans need that stretch clear);
     * a frozen site or a civic plot overlapping it."""
     import island_plan as PL
     import island_core_streets as CS
@@ -478,7 +477,10 @@ def phase2_intrusions(path):
         # what may NOT stand in it is what a later layout can put there: a generated block street, or another
         # expressway road. The roads already there (the ring on its dike, the suburb loop, the arterials) pass UNDER
         # the elevated phase-2 Wangan and are its business to clear, as the spur's are today.
-        if name.startswith("shuto_spur") or not name.split("__")[0].startswith(GENERATED_STREETS + ("shuto_",)) \
+        # phase 2 is BUILT (2026-09-30, the complete Wangan): the corridor is the expressway's own, so no shuto_ road
+        # is an intrusion
+        if name.startswith("shuto_") \
+                or not name.split("__")[0].startswith(GENERATED_STREETS + ("shuto_",)) \
                 or name.split("__")[0] in authored:
             continue
         ps = [net.points[u].pos for u in r.points if u in net.points]
@@ -494,14 +496,6 @@ def phase2_intrusions(path):
             if run > PHASE2_ALONG:
                 out.append(("road", name, "%.0f m inside" % run))
                 break
-    y0, y1 = sorted(PL.SPUR_T_CLEAR)
-    for name, r in net.roads.items():
-        if not name.startswith("shuto_spur"):
-            continue
-        for u in r.points:
-            p = net.points[u]
-            if abs(p.pos[0] - PL.BRIDGE_X) < 30.0 and y0 + 1.0 < p.pos[1] < y1 - 1.0:
-                out.append(("spur station", name, "%s at y %.0f" % (u, p.pos[1])))
     for fn, key in (("IslandSites.json", "sites"), ("IslandCivicSites.json", "plots")):
         fp = os.path.join(ROOT, "assets", "world_source", "buildings", fn)
         if not os.path.exists(fp):

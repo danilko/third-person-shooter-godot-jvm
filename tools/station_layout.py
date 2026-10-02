@@ -84,7 +84,7 @@ FENCE_T = 0.1
 BUILDING_LEN = 22.0                # along the track, from the platform's end to the street face
 BUILDING_D = 9.5                   # across, from the platform's track edge outward (away from the rail): the gate lanes
                                    # (4.3 m with two) and the restroom block (WC_D) side by side; 9.5 is what fits
-                                   # Waterpark, whose south platform has wangan_dori's paved edge ~10 m off it
+                                   # Fish Market, whose south platform has wangan_dori's paved edge ~10 m off it
 BUILDING_H = 3.4                   # the hall's height over its floor (the platform top)
 BUILDING_T = 0.2                   # its walls
 GATE_X = 11.0                      # the fare line, from the platform-end face
@@ -141,14 +141,14 @@ FORMS = ("open_air", "ground_hub", "elevated_hub")
 #: a station whose site does not take its natural form. WATERPARK (2026-09-27): its south platform has wangan_dori (a
 #: 3+3 trunk road) ~6.5 m off it, no room for an open-air end building with gates and restrooms (BUILDING_D), so it is a
 #: one-lane GROUND HUB (橋上駅) -- the concourse over the track, the entrance annex on the open north side.
-FORM_OVERRIDE = {"Waterpark": "ground_hub"}
+FORM_OVERRIDE = {"Fish Market": "ground_hub"}
 #: the forms whose station is laid out from the station kit (the rest still use the rail record's own platforms); an
 #: elevated hub is a kit station only with ONE lane for now (Suburb, Airport) -- Central's three is PLAN.md step 6
 KIT_FORMS = ("open_air", "ground_hub", "elevated_hub")
 #: a station whose site does not take its natural form. WATERPARK (2026-09-27): its south platform has wangan_dori (a
 #: 3+3 trunk road) ~6.5 m off it, no room for an open-air end building with gates and restrooms (BUILDING_D), so it is a
 #: one-lane GROUND HUB (橋上駅) -- the concourse over the track, the entrance annex on the open north side.
-FORM_OVERRIDE = {"Waterpark": "ground_hub"}
+FORM_OVERRIDE = {"Fish Market": "ground_hub"}
 
 # the ground hub's dimensions (橋上駅: a walled CAP over the passenger lanes carrying the airbridge concourse)
 CAP_LEN = 30.0                     # the cap along the track: a whole number of MODULEs, centred on the platform centre
@@ -1343,7 +1343,7 @@ def self_test():
     assert len(shops) == 1 and shops[0].a0 >= CAP_LEN / 2 - 1e-9, shops
     assert annex_span(st6)[1] <= st6.length / 2, "the store reaches past the platform"
     assert store_door_w(5.0) == STORE_DOOR_W2 and store_door_w(3.0) == STORE_DOOR_W1
-    assert not is_large(Station("Waterpark", "standard", 0, 0, 1, 0, 0, 90.0, False, [Lane("L", 0.0)]))
+    assert not is_large(Station("Fish Market", "standard", 0, 0, 1, 0, 0, 90.0, False, [Lane("L", 0.0)]))
     # control: a shop row pulled over the platform stands in the gauge
     els = hub_elements(st6)
     sh = next(e for e in els if e.kind == "store")

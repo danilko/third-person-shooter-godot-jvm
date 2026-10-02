@@ -837,6 +837,49 @@ def shop_vertical_sign(material, Builder):
     return "Sign_ShopVertical", "street", b.mesh()
 
 
+# ── expressway guide signs (PLAN.md item 1g, user 2026-09-30): Japanese convention, white letters on green ──────────
+#: The PANEL of each sign in the GODOT piece frame (x across, y up, z toward the drivers), read by
+#: `point_furniture.expressway_signs` to tell the runtime where to draw the text. Keep these in step with the boxes.
+EXPWY_SIGN_PANELS = {
+    "Sign_ExpwyCantilever": {"centre": [3.9, 6.25, 0.07], "size": [5.0, 2.5]},
+    "Sign_ExpwyEntrance": {"centre": [0.0, 3.3, 0.07], "size": [3.2, 1.8]},
+}
+
+
+def _green_panel(b, x0, x1, z0, z1):
+    """A green sign face at y -0.05 (its face toward -Y = the drivers) with a white inset border, on a grey backing."""
+    b.box((x0, -0.05, z0), (x1, 0.08, z1), "MI_ExpwyGreen")
+    t, e = 0.06, 0.1
+    for (a0, a1, c0, c1) in ((x0 + e, x1 - e, z1 - e - t, z1 - e), (x0 + e, x1 - e, z0 + e, z0 + e + t),
+                             (x0 + e, x0 + e + t, z0 + e, z1 - e), (x1 - e - t, x1 - e, z0 + e, z1 - e)):
+        b.box((a0, -0.065, c0), (a1, -0.05, c1), "MI_PaintWhite")
+
+
+def expwy_cantilever_sign(material, Builder):
+    """A Japanese expressway GUIDE sign on an F-type cantilever (片持ち式): a grey steel post at the carriageway's LEFT
+    edge (keep-left: exits leave on the left), two arms reaching +X over the lanes, and a 5.0 x 2.5 m green panel with
+    its bottom 5.0 m up (the clearance a Japanese road sign keeps over a carriageway). Its face is -Y (Godot +Z): the
+    furniture pass turns the piece so it faces oncoming traffic. The TEXT (出口 EXIT, the destination) is drawn at run
+    time (world.TrafficSignals), so one piece serves every sign. Origin: the post's foot."""
+    b = Builder("Sign_ExpwyCantilever", material)
+    b.box((-0.18, 0.1, 0.0), (0.18, 0.46, 7.6), "MI_PaintedMetal")
+    b.box((-0.35, -0.07, 0.0), (0.35, 0.63, 0.3), "MI_ConcreteSmooth")          # the foot
+    for z in (5.55, 6.95):
+        b.box((0.0, 0.12, z), (6.6, 0.32, z + 0.2), "MI_PaintedMetal")
+    _green_panel(b, 1.4, 6.4, 5.0, 7.5)
+    return "Sign_ExpwyCantilever", "street", b.mesh()
+
+
+def expwy_entrance_sign(material, Builder):
+    """The ENTRANCE sign on the surface street at an on-ramp (入口): a 3.2 x 1.8 m green panel on two posts, its bottom
+    2.4 m up, face -Y. Text (海都高速 入口 + the route) drawn at run time. Origin: between the two posts' feet."""
+    b = Builder("Sign_ExpwyEntrance", material)
+    for x in (-1.2, 1.2):
+        b.box((x - 0.07, 0.1, 0.0), (x + 0.07, 0.24, 4.3), "MI_PaintedMetal")
+    _green_panel(b, -1.6, 1.6, 2.4, 4.2)
+    return "Sign_ExpwyEntrance", "street", b.mesh()
+
+
 CIVIC_NOTES = {
     "Civic_PoliceStation": "Placeholder 警察署, origin = its PLOT centre (40 x 45 m plot, tools/island_civic_sites.py), "
                            "the street at -Y. Keep the building inside the plot and the street face at -Y.",
@@ -875,6 +918,10 @@ CIVIC_NOTES = {
     "Mil_MotorPool": "Placeholder open vehicle shed, 40 x 14 m, open front -Y; trucks are Mil_Truck props.",
     "Mil_PierTerminal": "Placeholder military harbour terminal (36 x 16 m, 2 storeys) at the north pier's root; pier "
                         "side -Y. Composite MilitaryPier.",
+    "Sign_ExpwyCantilever": "Placeholder expressway guide sign (F-type cantilever). The panel's place is "
+                            "EXPWY_SIGN_PANELS in library_civic.py (the runtime draws the text there): move the panel "
+                            "and that table together.",
+    "Sign_ExpwyEntrance": "Placeholder expressway ENTRANCE sign (two posts); panel in EXPWY_SIGN_PANELS.",
     "Mil_Hangar": "Placeholder fighter hangar, 48 x 40 m, open front -Y; two jets stand inside as props (MilitaryBase).",
 }
 
@@ -887,7 +934,8 @@ def build_all(material, Builder):
            taxiway, apron_slab, airliner, airliner_hangar,
            akiba_vertical_sign, akiba_billboard, chochin, noren, shop_vertical_sign,
            detached_house, detached_house_b, sode_kanban, mil_pier_terminal,
-           mil_armoury, mil_motor_pool, mil_truck, mil_parade_ground, mil_helipad, mil_fuel_depot, mil_patrol_ship)
+           mil_armoury, mil_motor_pool, mil_truck, mil_parade_ground, mil_helipad, mil_fuel_depot, mil_patrol_ship,
+           expwy_cantilever_sign, expwy_entrance_sign)
     return [f(material, Builder) for f in fns] + roof_billboards(material, Builder)
 
 

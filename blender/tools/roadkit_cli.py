@@ -534,6 +534,13 @@ def cmd_gltf(a):
             fh.write(json.dumps(plan, indent=1, sort_keys=True, ensure_ascii=False) + "\n")
         signals = {"path": signals, "junctions": len(plan["junctions"]),
                    "lamps": sum(len(j["lamps"]) for j in plan["junctions"])}
+        # the EXPRESSWAY SIGN PLAN (world.TrafficSignals draws their text): only a network that HAS ramps writes one
+        eplan = pfu.expressway_sign_plan(table, lanes_doc)
+        epath = os.path.join(lanekit_dir, a.prefix + ".signs.json")
+        if eplan["signs"] or os.path.exists(epath):
+            with open(epath, "w") as fh:
+                fh.write(json.dumps(eplan, indent=1, sort_keys=True, ensure_ascii=False) + "\n")
+        signals["expressway_signs"] = len(eplan["signs"])
     gate.update({"written": True, "pieces": pieces, "kit_stale": kit.stale(), "kit": kit.path, "signals": signals,
                  "missing_style": sorted(set(tuple(m) for m in report.get("missing_style", []))),
                  "pier_overhang": sorted(set(tuple(m) for m in report.get("pier_overhang", []))),

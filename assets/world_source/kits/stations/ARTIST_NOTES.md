@@ -40,7 +40,7 @@ Shape, detail, materials (any name in the library palette), the shed's and build
   No post in between: the opening is framed only at its two sides, with a guide rail down each and, over it in the
   header, the housing the shutter rolls up into (its bottom bar showing). Keep it clear -- it is the way in. An
   ordinary entrance is 4 m; a LARGE hub's is 11.8 m (`station_layout.LARGE_ENTRANCE_W`). A shutter that comes down at night is a later runtime item.
-* **The large hubs** (every hub but Waterpark, a standard-size station on the hub form) also have STORES. Every station
+* **The large hubs** (every hub but Fish Market, a standard-size station on the hub form) also have STORES. Every station
   store's front is glazed with a SLIDING GLASS door (user, 2026-09-28): a `DOOR_` arrow (style `slide_glass`, `w` 1.6
   = two leaves, 0.9 = one) at the doorway's centre, just inside the fixed glass, pointing out into the hall; the game
   hangs the glass leaves, which slide behind the fixed glass either side -- keep that glass clear of anything solid.

@@ -33,6 +33,7 @@ Everything is DETERMINISTIC (no random phase): a manhole's phase along its lane 
 rebuild of an unchanged record writes the same file, which is what the build digest relies on.
 """
 import fnmatch
+import re
 import hashlib
 import json
 import math
@@ -82,6 +83,27 @@ def _piece_bounds(path):
     return lo, hi
 
 
+#: The material of an expressway sign's FACE: the runtime draws the text on it (world.TrafficSignals).
+SIGN_FACE_MATERIAL = "MI_ExpwyGreen"
+
+
+def _material_bounds(path, material):
+    """(min, max) of the glTF primitives wearing `material` (from the accessors), or None: an expressway sign's PANEL
+    is measured off its own model, so an artist may move or resize it in the library with nothing else to update."""
+    with open(path) as fh:
+        doc = json.load(fh)
+    names = [m.get("name", "") for m in doc.get("materials", ())]
+    lo, hi = [math.inf] * 3, [-math.inf] * 3
+    for m in doc.get("meshes", ()):
+        for p in m.get("primitives", ()):
+            if p.get("material") is None or names[p["material"]].split(".")[0] != material:
+                continue
+            a = doc["accessors"][p["attributes"]["POSITION"]]
+            lo = [min(x, y) for x, y in zip(lo, a["min"])]
+            hi = [max(x, y) for x, y in zip(hi, a["max"])]
+    return None if lo[0] == math.inf else (lo, hi)
+
+
 class Table(object):
     """`furniture.json`, with each asset's res:// path, filesystem path and glTF bounds resolved."""
 
@@ -98,6 +120,13 @@ class Table(object):
             lo, hi = _piece_bounds(fs)
             self.assets[name] = dict(a, res=res, file=fs, lo=lo, hi=hi,
                                      scale=list(a.get("scale", [1.0, 1.0, 1.0])))
+            if a.get("sign_panel"):
+                pb = _material_bounds(fs, SIGN_FACE_MATERIAL)
+                if pb is not None:
+                    plo, phi = pb
+                    # the face is the panel's +Z side (toward the drivers), in the Godot piece frame
+                    self.assets[name]["panel"] = {"centre": [0.5 * (plo[0] + phi[0]), 0.5 * (plo[1] + phi[1]), phi[2]],
+                                                  "size": [phi[0] - plo[0], phi[1] - plo[1]]}
 
     def files(self):
         """Every file the placements depend on: the table and each piece (the digest salts them)."""
@@ -986,6 +1015,9 @@ def place(table, solved, lanes_doc, mine_lane, mine_run, mine_pad, mark_mat, gro
     index = _LaneIndex(dict(lanes, **{"~" + str(l["id"]): l for l in keep_clear or ()}))
     _signals(fur, table, lanes, ordered, mine_lane, ground, index)
     _ped_signals(fur, table, lanes, ordered, mine_lane, ground, index)
+    for site in expressway_sign_sites(table, lanes):
+        if mine_lane(lanes[site["lane"]]) and fur.put(table, site["asset"], site["pos"], site["fwd"], site["road"]):
+            fur.placements[-1].update({k: site[k] for k in ("sign", "dest", "route", "lane")})
     _lane_props(fur, table, dict(sorted(lanes.items())), mine_lane, ground)
     _edge_props(fur, table, solves, jsolves, bands, mine_run, mine_pad, ground, index)
     _lamps(fur, table, solves, bands, mine_run, ground, index)
@@ -994,6 +1026,253 @@ def place(table, solved, lanes_doc, mine_lane, mine_run, mine_pad, mark_mat, gro
     _street_trees(fur, table, solves, bands, mine_run, ground, dict(lanes, **{"~" + str(l["id"]): l for l in keep_clear or ()}))
     _median_walls(fur, table, solves, mine_run)
     return fur
+
+
+# ------------------------------------------------------------------------------------------- expressway signs
+
+def _is_expressway(lane):
+    return lane.get("road_class") in ("expressway", "ramp")
+
+
+def _walk(lanes, preds, lane, dist, back):
+    """The point `dist` m from `lane`'s start (`back` = False: along it and on through its first successor of the same
+    road class) or from its start BACKWARD through its first predecessor (`back` = True), in the KIT frame, with the
+    travel direction there: ((x, y, z), (dx, dy), lane id) or None."""
+    cur, left = lane, dist
+    for _hop in range(40):
+        pts = _lane_kit(cur)
+        if len(pts) < 2:
+            return None
+        seq = list(reversed(pts)) if back else pts
+        cum = _lengths(seq)
+        if cum[-1] >= left:
+            q, d, _i = _at(seq, cum, left)
+            if back:
+                d = (-d[0], -d[1])
+            return (q, d, cur["id"])
+        left -= cum[-1]
+        if back:
+            nxt = [lanes[i] for i in preds.get(cur["id"], ()) if _is_expressway(lanes[i])]
+        else:
+            nxt = [lanes[n] for n in cur.get("next", ()) if n in lanes and _is_expressway(lanes[n])]
+        if not nxt:
+            return None
+        cur = sorted(nxt, key=lambda l: l["id"])[0]
+    return None
+
+
+def _destination(lanes, lane):
+    """Where a ramp leads: the first road that is not a ramp, following the ramp's lanes forward (through a junction's
+    connector to the road it lands on). (road name, is_expressway) or (None, False)."""
+    cur, seen = lane, set()
+    for _hop in range(60):
+        if cur["id"] in seen:
+            break
+        seen.add(cur["id"])
+        if cur.get("road_class") != "ramp" and cur.get("kind") != "connector":
+            return cur.get("road_name"), cur.get("road_class") == "expressway"
+        nxt = [lanes[n] for n in cur.get("next", ()) if n in lanes]
+        if not nxt:
+            break
+        if any(l.get("kind") == "connector" for l in nxt):
+            # a junction: the street the ramp lands on wins over a U-turn back up the other ramp of a diamond
+            def lands(c):
+                t = [lanes[n] for n in c.get("next", ()) if n in lanes]
+                return bool(t) and all(x.get("road_class") not in ("ramp", "expressway") for x in t)
+            street = [c for c in nxt if lands(c)]
+            if street:
+                nxt = street
+        # a connector's straight movement first, else the first
+        cur = sorted(nxt, key=lambda l: (l.get("turn") not in ("S", ""), l["id"]))[0]
+    return None, False
+
+
+def expressway_sign_sites(table, lanes):
+    """Japanese expressway GUIDE signs (PLAN.md item 1g, user 2026-09-30): white letters on green, text drawn at run
+    time. For every RAMP (a lane of `road_class` "ramp" whose own road does not feed it):
+      * fed by an EXPRESSWAY lane (an exit, or a JCT ramp): an `expwy_sign` cantilever on the mainline
+        `expwy_sign_before` m before the diverge, its post at the LEFT edge (keep-left: exits leave on the left) and its
+        panel over the lanes -- 出口 + the destination street, or JCT + the destination expressway;
+      * fed by a STREET junction's connector (an entrance): an `expwy_entrance_sign` `expwy_entrance_in` m up the ramp
+        on its left kerb, facing the traffic turning in -- 入口 + the expressway it joins.
+    Deterministic and network-wide (every piece asks the same question; each keeps the sites on its own lanes)."""
+    if "expwy_sign" not in table.assets and "expwy_entrance_sign" not in table.assets:
+        return []
+    r = table.rules
+    before = float(r.get("expwy_sign_before", 120.0))
+    edge = float(r.get("expwy_sign_edge", 1.2))
+    inset = float(r.get("expwy_entrance_in", 12.0))
+    preds = {}
+    for l in lanes.values():
+        for n in l.get("next", ()):
+            preds.setdefault(n, []).append(l["id"])
+    out, done = [], set()
+    for lid in sorted(lanes):
+        lane = lanes[lid]
+        if lane.get("road_class") != "ramp" or lane.get("kind") == "connector":
+            continue
+        road = lane.get("road_name", "")
+        feeders = [lanes[i] for i in preds.get(lid, ()) if lanes[i].get("road_name") != road]
+        if not feeders or road in done:
+            continue
+        dest, dest_expwy = _destination(lanes, lane)
+        main = [f for f in feeders if f.get("road_class") == "expressway"]
+        street = [f for f in feeders if f.get("kind") == "connector"]
+        if main and "expwy_sign" in table.assets:
+            m = sorted(main, key=lambda l: l["id"])[0]
+            w = _walk(lanes, preds, m, before, back=True)
+            if w is None or dest is None:
+                continue
+            # a LANE SPLIT (分岐, the Wangan's T): two ramps leave the same carriageway at one joint, so both signs would
+            # stand on one spot -- the next one stands `expwy_sign_stagger` m further back, so a driver reads them in turn
+            k = 1
+            while w is not None and any(math.dist(w[0][:2], o["pos"][:2]) < 12.0 for o in out
+                                        if o["asset"] == "expwy_sign"):
+                w = _walk(lanes, preds, m, before + k * float(r.get("expwy_sign_stagger", 60.0)), back=True)
+                k += 1
+            if w is None:
+                continue
+            q, d, at = w
+            half = 0.5 * float(lanes[at].get("lane_width", 4.5))
+            lft = _left(d)
+            pos = (q[0] + lft[0] * (half + edge), q[1] + lft[1] * (half + edge), q[2])
+            out.append({"asset": "expwy_sign", "pos": pos, "fwd": d, "road": m.get("road_name", ""), "lane": m["id"],
+                        "sign": "jct" if dest_expwy else "exit", "dest": dest, "route": m.get("road_name", "")})
+            done.add(road)
+        elif street and "expwy_entrance_sign" in table.assets:
+            w = _walk(lanes, preds, lane, inset, back=False)
+            route = dest if dest_expwy else None
+            if w is None or route is None:
+                continue
+            q, d, at = w
+            half = 0.5 * float(lane.get("lane_width", 4.5))
+            lft = _left(d)
+            # a roadside sign, not an overhang: its whole panel clears the kerb
+            e2 = float(r.get("expwy_entrance_edge", 2.9))
+            pos = (q[0] + lft[0] * (half + e2), q[1] + lft[1] * (half + e2), q[2])
+            out.append({"asset": "expwy_entrance_sign", "pos": pos, "fwd": d, "road": road, "lane": lid,
+                        "sign": "entrance", "dest": route, "route": route})
+            done.add(road)
+    return out
+
+
+_LANE_ID = re.compile(r"_([FR])(\d+)$")
+
+
+def _lane_dest(lanes, lane):
+    """Where a lane at a lane split LEADS, as a driver reads it: the expressway it carries on to. Follow the lane (its
+    chain successor first, then a ramp's) and keep the distinct expressway roads met, by base name; the destination is
+    the SECOND of them when there is one (the T3 lane runs on along the airport link for 300 m and becomes the C1 loop:
+    "Loop"), else the first (the T1 lane IS the airport link and leaves it at the forecourt: "Airport Link")."""
+    cur, seen, bases = lane, set(), []
+    for _hop in range(40):
+        if cur["id"] in seen:
+            break
+        seen.add(cur["id"])
+        if cur.get("road_class") == "expressway" and cur.get("kind") != "connector":
+            b = cur.get("road_name", "").split("__")[0]
+            if not bases or bases[-1] != b:
+                bases.append(b)
+                if len(bases) == 2:
+                    break
+        nxt = [lanes[n] for n in cur.get("next", ()) if n in lanes]
+        if not nxt or not any(l.get("road_class") in ("expressway", "ramp") for l in nxt):
+            break
+        kinds = dict(zip(cur.get("next", ()), cur.get("next_kinds") or ()))
+        nxt = [l for l in nxt if l.get("road_class") in ("expressway", "ramp")]
+        cur = sorted(nxt, key=lambda l: (kinds.get(l["id"]) == "ramp", l["id"]))[0]
+    return bases[-1] if bases else None
+
+
+def lane_splits(lanes):
+    """Every expressway carriageway that ENDS by splitting lane by lane into ramps (分岐, the Wangan's T at J0, review
+    P1-4): [(lead lane, [destination per lane, LEFT to right])]. A carriageway is its road's through lanes of one
+    direction; it splits when each lane hands over to a ramp and the ramps are not all one road."""
+    groups = {}
+    for l in lanes.values():
+        if l.get("road_class") != "expressway" or l.get("kind") == "connector":
+            continue
+        m = _LANE_ID.search(l["id"])
+        if m:                                   # (an aux slot's id, `_AF0`, does not match: through lanes only)
+            groups.setdefault((l.get("road_name"), m.group(1)), []).append(l)
+    out = []
+    for _k, ls in sorted(groups.items()):
+        succ = []
+        for l in ls:
+            rs = [lanes[n] for n in l.get("next", ()) if n in lanes and lanes[n].get("road_class") == "ramp"
+                  and lanes[n].get("road_name") != l.get("road_name")]
+            if len(rs) != 1:
+                break
+            succ.append((l, rs[0]))
+        else:
+            if len(succ) < 2 or len({r.get("road_name") for _l, r in succ}) < 2:
+                continue
+            # left to right at the split: keep-left, the left lane is the one a driver reads first
+            ends = [_lane_kit(l)[-1] for l, _r in succ]
+            q = _lane_kit(succ[0][0])
+            d = _norm2(q[-1][0] - q[-2][0], q[-1][1] - q[-2][1])
+            lf = _left(d)
+            cx = sum(e[0] for e in ends) / len(ends)
+            cy = sum(e[1] for e in ends) / len(ends)
+            order = sorted(succ, key=lambda lr: -((_lane_kit(lr[0])[-1][0] - cx) * lf[0]
+                                                  + (_lane_kit(lr[0])[-1][1] - cy) * lf[1]))
+            dests = [_lane_dest(lanes, r) for _l, r in order]
+            if all(dests) and len(set(dests)) > 1:
+                out.append((order[0][0], dests))
+    return out
+
+
+def lane_gantry_sites(table, lanes, taken=()):
+    """Lane-designation signs (方面別車線案内) before each lane split: an `expwy_sign` cantilever over the carriageway
+    every `expwy_lane_gantries` m back from the split, saying for each lane, left to right, where it goes (kind
+    "lanes", destinations joined by "|")."""
+    if "expwy_sign" not in table.assets:
+        return []
+    r = table.rules
+    edge = float(r.get("expwy_sign_edge", 1.2))
+    preds = {}
+    for l in lanes.values():
+        for n in l.get("next", ()):
+            preds.setdefault(n, []).append(l["id"])
+    out = []
+    for lead, dests in lane_splits(lanes):
+        for back in r.get("expwy_lane_gantries", (300.0, 600.0)):
+            w = _walk(lanes, preds, lead, float(back), back=True)      # measured back from the split
+            if w is None:
+                continue
+            q, d, at = w
+            if any(math.dist(q[:2], o["pos"][:2]) < 30.0 for o in list(taken) + out):
+                continue
+            half = 0.5 * float(lanes[at].get("lane_width", 4.5))
+            lft = _left(d)
+            pos = (q[0] + lft[0] * (half + edge), q[1] + lft[1] * (half + edge), q[2])
+            out.append({"asset": "expwy_sign", "pos": pos, "fwd": d, "road": lead.get("road_name", ""),
+                        "lane": lead["id"], "sign": "lanes", "dest": "|".join(dests),
+                        "route": lead.get("road_name", "")})
+    return out
+
+
+def expressway_sign_plan(table, lanes_doc):
+    """The whole network's expressway signs for the runtime (world.TrafficSignals): each panel's centre and facing in
+    the lanekit's frame (Godot axes), its size, and what it says (kind, destination road, route road)."""
+    lanes = {l["id"]: l for l in lanes_doc.get("lanes", ()) if l.get("road_class") != "rail"}
+    rows = []
+    sites = expressway_sign_sites(table, lanes)
+    sites += lane_gantry_sites(table, lanes, sites)
+    for site in sites:
+        a = table.assets[site["asset"]]
+        panel = a.get("panel")
+        if panel is None:
+            continue
+        lift = float(a.get("lift", 0.0)) - a["lo"][1] * a["scale"][1]
+        pos = (site["pos"][0], site["pos"][1], site["pos"][2] + lift)
+        c = _piece_to_godot(pos, site["fwd"], panel["centre"])
+        n = _dir_to_godot(site["fwd"], (0.0, 0.0, 1.0))
+        rows.append({"kind": site["sign"], "dest": site["dest"], "route": site["route"],
+                     "pos": [round(v, 3) for v in c], "normal": [round(v, 5) for v in n],
+                     "size": [round(v, 3) for v in panel["size"]]})
+    return {"schema": 1, "note": "expressway guide signs (white on green), the lanekit's frame (Godot axes); written "
+                                 "by roadkit_cli gltf, read by world.TrafficSignals", "signs": rows}
 
 
 def crossing_signals(fur, table, crossings):
@@ -1359,6 +1638,30 @@ def self_test():
     assert q is not None and math.hypot(q[0], q[1]) >= t2.rules["ped_signal_pole_clear"] - 1e-9, q
     assert _clear_of_signal(f2, t2, (5.0, 0.0, 0.0), (-1.0, 0.0))[0] == 5.0
     print("OK: every crosswalk end has its own pedestrian pole, clear of the vehicle signal pole")
+    # expressway guide signs: an expressway lane running +x (kit frame; lanekit points are Godot [x, h, -y]) that feeds a
+    # ramp, which lands through a junction connector on a street; and a street connector feeding an on-ramp
+    if "expwy_sign" in table.assets:
+        def ln(i, rc, pts, nxt=(), kind="through", road=None):
+            return {"id": i, "road_class": rc, "kind": kind, "road_name": road or i, "lane_width": 4.5,
+                    "points": [[x, 10.0, -y] for x, y in pts], "next": list(nxt)}
+        L = {l["id"]: l for l in (
+            ln("main", "expressway", [(0, 0), (400, 0)], ["off"], road="shuto_x"),
+            ln("off", "ramp", [(400, 3), (500, 20)], ["conn"]),
+            ln("conn", "street", [(500, 20), (510, 30)], ["street"], kind="connector"),
+            ln("street", "street", [(510, 30), (510, 200)], road="naka"),
+            ln("sconn", "street", [(600, 0), (610, 5)], ["on"], kind="connector"),
+            ln("on", "ramp", [(610, 5), (700, 5)], ["main2"]),
+            ln("main2", "expressway", [(700, 5), (900, 5)], road="shuto_y"))}
+        sites = expressway_sign_sites(table, L)
+        ex = [x for x in sites if x["sign"] == "exit"]
+        en = [x for x in sites if x["sign"] == "entrance"]
+        assert len(ex) == 1 and ex[0]["dest"] == "naka" and ex[0]["route"] == "shuto_x", sites
+        before = float(table.rules.get("expwy_sign_before", 120.0))
+        assert abs(ex[0]["pos"][0] - (400 - before)) < 1.0 and ex[0]["pos"][1] > 2.0, ex[0]   # upstream, on the LEFT
+        assert len(en) == 1 and en[0]["dest"] == "shuto_y", sites
+        plan = expressway_sign_plan(table, {"lanes": list(L.values())})
+        assert len(plan["signs"]) == 2 and all(s_["size"][0] > 2.0 for s_ in plan["signs"]), plan
+        print("OK: an exit sign 120 m before the diverge on the left, naming the street; an entrance sign on the on-ramp")
     print("point_furniture self-test OK")
 
 

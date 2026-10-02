@@ -518,7 +518,13 @@ def build_run(net, road, uids, arm, n_runs):
             "_dir": rt.dir,
             "_entry_uid": uids[0] if fwd else uids[-1],
             "_exit_uid": uids[-1] if fwd else uids[0],
-            "_merge_into": ("%s_%s" % (arm, rt.merge_into)) if rt.merge_into else "",
+            #: The lane this one TAPERS INTO where it ends -- in TRAVEL order. `lane_taper_route` names the receiver
+            #: by CHAIN order (`merge_into` = live up to a sample before the chain's end), and a REV lane travels
+            #: from the chain's end to its start, so its taper into a receiver is the route's `opens_from`. Read off
+            #: `merge_into` for both, a REV lane dying at the chain's START got no successor and came out `broken`
+            #: (an added lane carried across a joint into a one-way ramp, review P1-2, 2026-10-01).
+            "_merge_into": ("%s_%s" % (arm, rt_end)) if (rt_end := (rt.merge_into if fwd else rt.opens_from))
+                           else "",
             #: Is this lane ZERO WIDTH at the run's own ends? A lane that opens inside the run is
             #: not there at the head; one that dies inside it is not there at the tail. A junction
             #: arm may only offer the lanes that exist AT THE STOP LINE -- see `_arm_lanes`.
@@ -796,7 +802,7 @@ def wire_joints(net, lanes, by_uid):
     of how the plan was authored, and the pairing that is always true is that a lane's tail and its
     successor's head are the same physical point.
     """
-    out = {}
+    out, best_d = {}, {}
     seen = set()
     for uid in sorted(net.points):
         road = net.road_of(uid)
@@ -815,8 +821,12 @@ def wire_joints(net, lanes, by_uid):
                         d = _dist3(tail, _end_xyz(dst, 0))
                         if d < bd:
                             best, bd = dst, d
-                    if best is not None:
+                    # A LANE SPLIT (the Wangan's T, 2026-10-01): one station SEGMENT-linked to several one-lane roads.
+                    # Each lane takes its nearest head over ALL of them -- per link, the last road asked won and two
+                    # lanes went to one ramp, leaving the other with no predecessor
+                    if best is not None and bd < best_d.get(src["id"], 1e18):
                         out[src["id"]] = best["id"]
+                        best_d[src["id"]] = bd
     return out
 
 
