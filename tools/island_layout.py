@@ -624,6 +624,25 @@ def main(argv):
             roads = [owner.get(u, u) for u in re.findall(r"p_[0-9a-f]{8}", f["message"])]
             if any(r.split("__")[0] in names for r in roads):
                 print("island_layout: pad_grade on an arterial pad (%s): %s" % (" / ".join(roads), f["message"][:60]))
+    # every expressway ramp's profile, on its EXPORTED lanes: <= 7 % to the ground, <= 6 % between expressways, every
+    # break a vertical curve of K >= 6 (NEXT PASS step 1; island_grades.ramp_curves is the half that makes it so)
+    t0 = time.monotonic()
+    import island_grades as IG
+    import point_export as pe
+    lk = tempfile.mkdtemp()
+    try:
+        lkf = os.path.join(lk, "IslandRoads.lanekit.json")
+        pe.write(pm.load_network(OUTPUT), lkf)
+        ramps = IG.ramp_report(OUTPUT, [lkf])
+    finally:
+        shutil.rmtree(lk)
+    TIMES["check: ramp profiles"] = time.monotonic() - t0
+    rbad = [r for r in ramps if r[3] > (IG.RAMP_GROUND_GRADE if r[1] == "ground" else IG.RAMP_JCT_GRADE) + 1e-4
+            or r[4] < IG.RAMP_K]
+    print("island_layout: %d ramp(s), steepest %.1f %% (%s), flattest curve K %.1f (%s)%s" % (
+        len(ramps), max(r[3] for r in ramps) * 100, max(ramps, key=lambda r: r[3])[0], min(r[4] for r in ramps),
+        min(ramps, key=lambda r: r[4])[0], "" if not rbad else "; %d OVER THE RAMP RULE: %s" % (
+            len(rbad), ", ".join("%s %.1f %% K %.1f" % (r[0], r[3] * 100, r[4]) for r in rbad))))
     t0 = time.monotonic()
     folds = chain_folds(OUTPUT)
     TIMES["check: folds"] = time.monotonic() - t0
@@ -646,7 +665,7 @@ def main(argv):
         len(p2), ", ".join("%s %s %s" % x for x in p2[:10]))))
     print("island_layout: time " + ", ".join("%s %.0f s" % kv for kv in sorted(TIMES.items(), key=lambda kv: -kv[1])))
     print("island_layout: %d step(s) replayed from the cache%s" % (len(HITS), "" if not HITS else " (%s)" % ", ".join(HITS)))
-    if rep["errors"] or any(bad.values()) or low or steep or folds or p2:
+    if rep["errors"] or any(bad.values()) or low or steep or folds or p2 or rbad:
         sys.exit(1)
 
 

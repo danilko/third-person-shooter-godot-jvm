@@ -11621,3 +11621,37 @@ stacked 15 % ramps: up west, down east), `AirportControlTower` (civil, lift to a
 - **Kit fix:** a REV lane's taper receiver is `opens_from` in chain order (`point_export.build_run`).
 - Iterate with `island_expressway.py <out> --from <base> --fast` (1 s; the base = `island_layout`'s first four
   steps) and the gate subset in-process; the full gate is `island_layout.py` (~20 min, flow 570 s).
+- **Every ramp is designed at 40 km/h and every grade break on it is a vertical curve (NEXT PASS step 1,
+  2026-10-02).** The rule: <= 7 % to or from the ground (道路構造令 at 40 km/h), <= 6 % between expressways, every
+  break K >= 6 m/% -- measured on the EXPORTED lanes (`island_grades.py ramps <record> <lanekit>...`, asserted by
+  `island_layout.py`). On the shipped lanekits it found 14 of 26 ramps failing: E2/W2 climbed out of their gores at K
+  1.5, T1 reached 7.2 %. Causes and fixes:
+  * `island_grades.ramp_curves` (in `smooth`, after `level_gores`): each ramp's resolved centreline is sampled every
+    2 m and its profile solved as a SMOOTHING SPLINE -- held spans (gore, mouth, deck, 踏切) fixed, the curvature weight
+    raised until K reaches `RAMP_K_SOLVE` 9 (JCT) / `RAMP_K_GROUND` 6.5 (ground; the grade is its tighter budget),
+    each END continuing what it joins (a joint the joined road's grade, a junction mouth level). The corridor average
+    could never round a break AT an anchor, which is where every gore exit is. Then stations are inserted every
+    `RAMP_STATION` 6 m inside curves and every station's TANGENT carries the solved slope: with chord (AUTO) tangents
+    the Hermite bent its own way between stations (a solved K 8 read K 5.4 on the lanekit). A held station on a held
+    span takes that span's chord slope first, or the Hermite bends up inside the gore (T4). Every ramp station is then
+    held for the corridor average.
+  * **The dike's clearance is a FLOOR in that solve** (`island_dike.crossing_needs(net, every=True)`, a one-sided
+    penalty that only pushes up -- a two-sided spring pulled T2 down into a 22 % step), so the final `island_dike.py
+    raise` has nothing left to cone-lift on a ramp (a cone lift is a kink). Ramps clear the ring at `RAMP_OVER` 6.3 m
+    (solved against the pass's own 5 m samples), not the 7.5 m margin for decks that never see the embankment: at 7.5
+    Y1 and E1 had to climb 1.3 m in the 28 m between their gore and the ring. The Suburb exit plans 5.8 m
+    (`SB_CLEAR`, `PLANNED_OVER`): 12.2 m to lose in 213 m with a curve at each end was 7.1 % at 6.3.
+  * **...and so is every road the ramp flies over, and a CEILING every road it passes under**: the solve lowers a crest
+    and lifts a sag, and without them E2 / W2 came out 4.1 / 4.3 m over C1. A crossing is a sample whose paved band
+    OVERLAPS another road's (`CROSS_OVERLAP`) more than `CROSS_DZ` 3 m above or below; the bound is the profile's own
+    separation clamped to 5.7..5.9 m. Roads joined at the ramp's ends and the other halves of its split are skipped
+    (a one-way band is laid to one side of its stations, so a symmetric half width reads siblings as stacked).
+    Tightest crossing on the island after it: 6.15 m (was 5.9).
+  * `level_gores` no longer inserts the parting station within `GORE_MIN_SPAN` 6 m of the next station (a 4.5 m span
+    no curve fits); T1's base line starts at the end of its level hold (`_heights(hold=)`; it stepped 0.55 m there);
+    `T1_LOOP_Y` -570 -> -545 (its descent into the airport merge had ~70 m for 6 m); `T4_TURN_Y` -300 -> -330 (its 5 %
+    climb to fly over the spur started at its own diverge).
+  * Ramps' `design_speed` is 40 (`RAMP_DESIGN_SPEED`, was the mainline's less 20).
+  * Quick loop: the real derive is `island_layout.derive(out)` (~70 s; the step cache replays unchanged steps), then
+    `point_export.write` (20 s) and `island_grades.py ramps`; the generator alone on the base cannot judge the diamonds
+    (their junctions are cut and set back later).

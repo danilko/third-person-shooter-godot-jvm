@@ -497,11 +497,11 @@ WG_MAIN_R = [90.0, 600.0, 1500.0, 1500.0, 250.0, 200.0, 150.0, 150.0, 120.0, 0.0
 #: then straight down the spur's east side at T1_LEG_X to its merge
 T1_R = 110.0
 T1_LEG_X = 1264.0
-T1_LOOP_Y = -570.0           # T1's circle centre (its apex T1_R north of it, west of the spur)
+T1_LOOP_Y = -545.0  # T1's circle centre (its apex T1_R north of it, west of the spur)
 T1_SWAP = 190.0              # T1 runs this far along J0's line, then turns right OVER T4 (still low there)
 T1_SWAP_R = 100.0
 T3_STRAIGHT = 230.0          # T3 runs on along J0's line this far before its S onto the spur's west side
-T4_TURN_Y = -300.0           # T4 runs down the spur's east side to here before it turns over the spur
+T4_TURN_Y = -330.0           # T4 runs down the spur's east side to here before it turns over the spur
 T_HOLD = 35.0                # the EB pair (T1 + T3) stays level this far past J0 while the WB pair peels away
 T_EAST_Y = -500.0            # the WB pair (T4 + T2) peels off J0 onto this line (record y), so the EB pair climbs alone
 T4_NORTH_X = 1010.0          # where T4 leaves the east line north-east (under T1's lead, nearly square)

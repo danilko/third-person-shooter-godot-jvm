@@ -514,7 +514,11 @@ OVER_CLEAR = 7.5          # an expressway deck's surface over the dike road's (r
 #: It is ACCEPTED here at 6.0 (still over the 5.5 m rule): it is planned at 6.3 on 5 m samples of its own, and a sample
 #: 0.3 m short on the window's edge was enough for this pass to lift the crossing -- and its 4 % cone then carried the
 #: lift down the exit's 6.8 % descent to the mouth, 5.4 m over its junction (2026-10-01: a 74 % pad).
-PLANNED_OVER = {"shuto_sb_off": 6.0}
+PLANNED_OVER = {"shuto_sb_off": 5.8}
+#: EVERY expressway RAMP is solved against this pass's own 5 m samples (`island_grades.ramp_curves` floors its profile
+#: at them), so the 2 m margin for decks that never see the embankment does not apply to it either: at 7.5 Y1 and E1
+#: had to climb 1.3 m in the 28 m between their gore and the ring, which no vertical curve fits (K 2.2 on the lanekits)
+RAMP_OVER = 6.3
 #: ...and a lift it still needs (island_grades smoothing lowers a crossing a little) is coned at the road's OWN design
 #: grade: at the general 4 % a 0.5 m top-up over the dike was carried down the whole 7 % descent to the mouth
 #: (shuto_t2, 2026-10-02: a 2.2 m lift over the ring's rail bridge, coned at 4 %, reached back 190 m down T2's 4.7 %
@@ -522,11 +526,12 @@ PLANNED_OVER = {"shuto_sb_off": 6.0}
 PLANNED_GRADE = {"shuto_sb_off": 0.07, "shuto_t2": 0.06}
 
 
-def clear_crossings(net):
-    """An expressway passing over the ring -- across it, or along the edge of a bend -- stays OVER_CLEAR above its
-    crest: its deck was derived from ground sampled at its own stations, which never see the embankment between
-    them. Wherever an expressway sample (every 5 m) is within both half widths + 4 m of a dike road in plan, the deck
-    is lifted with a cone (rg.GRADE); it is never lowered. Returns [(road, metres lifted)]."""
+def crossing_needs(net, every=False):
+    """{expressway road: (chain, s, [(s at a 5 m sample, the height its surface must reach there)])} -- every sample
+    of an expressway within both half widths + 4 m of a dike road (in plan) whose surface is less than its clearance
+    above that road's: what `clear_crossings` lifts to, and what `island_grades.ramp_curves` solves a ramp ABOVE so
+    that this pass has nothing left to lift on it (a cone lift is a kink). With `every`, every crossing sample is
+    listed with its requirement, met or not."""
     dike = {u for n, r in net.roads.items() if is_dike_road(n) for u in r.points}
     dsegs = []
     for name, r in net.roads.items():
@@ -537,7 +542,7 @@ def clear_crossings(net):
         if is_dike_road(name) or any(l.target in dike for p in ch for l in p.links):
             h = _half(r)
             dsegs += [(a.pos, b.pos, h) for a, b in zip(ch, ch[1:])]
-    out = []
+    out = {}
     for name, r in net.roads.items():
         if not name.startswith(rg.PREFIX):
             continue
@@ -550,7 +555,7 @@ def clear_crossings(net):
         # it: that approach is the ramp's business, not a crossing
         meets = [s[i] for i, p in enumerate(ch) if any(l.target in dike for l in p.links)]
         need = []
-        clear = PLANNED_OVER.get(name, OVER_CLEAR)
+        clear = PLANNED_OVER.get(name, RAMP_OVER if str(r.road_class) == "ramp" else OVER_CLEAR)
         for k, (a, b) in enumerate(zip(ch, ch[1:])):
             L = s[k + 1] - s[k]
             for m in range(int(L // 5.0) + 1):
@@ -570,10 +575,20 @@ def clear_crossings(net):
                         continue
                     # above the crest by too little, OR under / through it (the Wangan crossed the south-west
                     # corner at record 4.0 against a 6.4 crest: through the embankment, with no column allowed)
-                    if ze - zd < clear - 0.05:
+                    if every or ze - zd < clear - 0.05:
                         need.append((sk, zd + clear))
-        if not need:
-            continue
+        if need:
+            out[name] = (ch, s, need)
+    return out
+
+
+def clear_crossings(net):
+    """An expressway passing over the ring -- across it, or along the edge of a bend -- stays OVER_CLEAR above its
+    crest: its deck was derived from ground sampled at its own stations, which never see the embankment between
+    them. Wherever an expressway sample (every 5 m) is within both half widths + 4 m of a dike road in plan, the deck
+    is lifted with a cone (rg.GRADE); it is never lowered. Returns [(road, metres lifted)]."""
+    out = []
+    for name, (ch, s, need) in sorted(crossing_needs(net).items()):
         worst = 0.0
         for i, p in enumerate(ch):
             want = max(z - PLANNED_GRADE.get(name, rg.GRADE) * abs(s[i] - sn) for sn, z in need)

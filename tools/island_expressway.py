@@ -792,6 +792,7 @@ def build(net, ground):
 #: Each pair straddles a C1 corner joint; the lane hands over across it (point_export.wire_joints).
 AUX_CARRY = (("e_fwd_on", "d_fwd_off", "aux_fwd", RAMP_LANES), ("d_fwd_on", "w_fwd_off", "aux_fwd", ENTRY_LANES),
              ("w_bwd_on", "d_bwd_off", "aux_bwd", RAMP_LANES), ("d_bwd_on", "e_bwd_off", "aux_bwd", ENTRY_LANES))
+RAMP_DESIGN_SPEED = 40.0   # km/h: every ramp (point_export.RAMP_SPEED posts them at 40)
 GROUND_GRADE = 0.06    # P2-7: the steepest a ramp to or from the ground climbs (review: <= 6 %)
 MERGE_MIN = 260.0     # P1-2: a JCT entrance's added lane runs at least this far before its taper (review: >= 250 m)
 
@@ -1609,13 +1610,14 @@ def _line_hit(p, u, q, v):
     return (p[0] + u[0] * s, p[1] + u[1] * s)
 
 
-def _heights(path, z0, z1, over, grade=T_GRADE):
-    """z0 -> z1 linear along `path`, raised over every (s_a, s_b, z_min) in `over` with a `grade` cone each way."""
+def _heights(path, z0, z1, over, grade=T_GRADE, hold=0.0):
+    """z0 -> z1 linear along `path` (level for its first `hold` m, the line starting there), raised over every
+    (s_a, s_b, z_min) in `over` with a `grade` cone each way."""
     cum = arclen([q[:2] for q in path], False)
     L = cum[-1]
     out = []
     for c, q in zip(cum, path):
-        z = z0 + (z1 - z0) * c / max(1e-6, L)
+        z = z0 + (z1 - z0) * max(0.0, c - hold) / max(1e-6, L - hold)
         for a, b, zm in over:
             d = 0.0 if a <= c <= b else min(abs(c - a), abs(c - b))
             z = max(z, zm - grade * d)
@@ -1739,8 +1741,10 @@ def t_split(net, wg, spur, spur2):
             if a_ - 6.0 < (z4 + T_FLY - z0) / T_GRADE + PL.T_HOLD:
                 print("island_expressway: WARN T1 crosses T4 %.0f m from J0, wants %.0f m to climb"
                       % (a_, (z4 + T_FLY - z0) / T_GRADE + PL.T_HOLD))
-    t1 = _heights(p1, z0, mp[2], over1)
-    t1 = [(x, y, z0 if c <= PL.T_HOLD else z) for c, (x, y, z) in zip(cum1, t1)]   # level beside the peeling WB pair
+    # level beside the peeling WB pair for T_HOLD, and its base line starts THERE: from J0 it stepped 0.55 m at the
+    # hold's end (the line's own rise over T_HOLD), which T3 copies -- 6.1 % once the break was given a curve
+    t1 = _heights(p1, z0, mp[2], over1, hold=PL.T_HOLD)
+    t1 = [(x, y, z0 if c <= PL.T_HOLD else z) for c, (x, y, z) in zip(cum1, t1)]
     # T3 rides LEVEL with T1 (one carriageway, the split's two lanes) until T1 drifts off at s_a, then on its own
     cum3 = arclen([q[:2] for q in p3], False)
     t1z = [q[2] for q in t1]
@@ -1800,7 +1804,7 @@ def t_split(net, wg, spur, spur2):
 SB_GRADE = 0.06   # the Suburb exit's steepest descent (P2-7: <= 6 %)
 SB_LANDING = 0.0  # a level landing before the stop line: 0 -- a level foot sits inside the dike pass's clearance
                   # zone and island_dike lifted the whole exit 5 m off its junction (layout 2026-10-01: a 74 % pad)
-SB_CLEAR = 6.3    # over the dike road, held across the whole overlap (island_dike.PLANNED_OVER accepts it)
+SB_CLEAR = 5.8    # over the dike road, held across the whole overlap (island_dike.PLANNED_OVER accepts it)
 
 
 def suburb_exit(net, off, ground=None):
@@ -2034,6 +2038,14 @@ def main(argv):
             r.barrier_height = SOUND_WALL      # the city side: 防音壁, sound walls, not a parapet
     for name, R, v in speeds:
         net.roads[name].base.design_speed = v
+    # every ramp is DESIGNED at the speed it is posted at (point_export.RAMP_SPEED): branch_ramp gave it the mainline's
+    # less 20 (60), so its own tapers and checks were sized for a speed nothing drives (NEXT PASS step 1)
+    for name, r in net.roads.items():
+        if name.startswith(PREFIX) and r.road_class == "ramp":
+            r.base.design_speed = RAMP_DESIGN_SPEED
+            for u in r.points:
+                if net.points[u].profile_mode == pm.OVERRIDE:
+                    net.points[u].design_speed = RAMP_DESIGN_SPEED
     print("island_expressway: posted " + ", ".join("%s %d (R %.0f)" % (n_[len(PREFIX):], v, R) for n_, R, v in speeds
                                                      if v < 80.0))
     for name, r in net.roads.items():
