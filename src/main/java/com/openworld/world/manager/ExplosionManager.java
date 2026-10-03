@@ -92,6 +92,9 @@ public class ExplosionManager extends Node {
                                  attackerName, attackerFaction, weaponDisplayName, weaponIcon);
             }
         }
+        // a train's cars are WORLD bodies, not "characters": they take the blast through the train system
+        com.openworld.world.TrainSystem trains = com.openworld.world.TrainSystem.get();
+        if (trains != null) trains.blast(center, radius, maxDamage, weaponDisplayName, attackerName, attackerFaction);
         playBlast(center, vfx, radius, vfxScale);
 
         // EXPLOSION stimulus so nearby AI investigate the blast (PLAN.md E2). triggerExplosion is the

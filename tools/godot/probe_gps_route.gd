@@ -254,6 +254,22 @@ func _initialize() -> void:
 			mini_detail += " heading %+.0f -> (%.1f, %.1f);" % [heading_deg, d.x, d.y]
 	_check("a point 20 m dead ahead lands straight UP on the minimap, whichever way we face",
 		mini_ok, mini_detail)
+	# PLAN.md NEXT item 10: the minimap is a rounded SQUARE and its north marker is always drawn whole, inside it
+	var north_bad := ""
+	for k8 in 8:
+		var hd := deg_to_rad(45.0 * k8 + 10.0)
+		var dir8 := Vector3(sin(hd), 0, -cos(hd))
+		helper.call("set_view", player, rad_to_deg(atan2(-dir8.x, -dir8.z)), 0.0)
+		for k in 8:
+			minimap.queue_redraw()
+			await process_frame
+		var na: Vector2 = minimap.call("north_at_now")
+		var nr: float = minimap.call("north_radius_now")
+		var sz: Vector2 = minimap.size
+		if na.x - nr < 0.0 or na.y - nr < 0.0 or na.x + nr > sz.x or na.y + nr > sz.y:
+			north_bad += " %.0f deg -> (%.1f, %.1f) in %s;" % [45.0 * k8 + 10.0, na.x, na.y, str(sz)]
+	_check("the minimap is a square (%s) and its north marker is inside the frame at 8 headings" % str(minimap.get("square")),
+		bool(minimap.get("square")) and north_bad.is_empty(), north_bad)
 	minimap.set("rotate_with_heading", false)
 	await process_frame
 	var north_w := start + Vector3(0, 0, -20)
@@ -294,7 +310,7 @@ func _initialize() -> void:
 
 	# A GDScript error inside an awaited coroutine aborts THAT coroutine and lets the caller carry on, so a
 	# probe that skipped half its cases can otherwise print PASS. Assert the count.
-	_check("every case ran (%d checks)" % checks, checks >= (26 if which == "island" else 22), "")
+	_check("every case ran (%d checks)" % checks, checks >= (27 if which == "island" else 23), "")
 	print("RESULT %s (%d of %d checks failed)" % ["PASS" if fails == 0 else "FAIL", fails, checks])
 	quit(0 if fails == 0 else 1)
 

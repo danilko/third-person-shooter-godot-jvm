@@ -89,6 +89,9 @@ public class WorldMapManager extends Control {
     @Export public float postalCellLabelPx = 20f;
     /** The building layer ({@link com.openworld.world.BuildingMap}): every footprint, under the roads. */
     @Export public boolean showBuildings = true;
+    /** The rail lines and the trains on them (TrainSystem). */
+    @Export public boolean showRail = true;
+    @Export public float railWidthPx = 3.0f;
     @Export public Color buildingColor = new Color(0.62f, 0.64f, 0.70f, 0.55f);
     private boolean buildingsDrawn = false;
 
@@ -172,6 +175,10 @@ public class WorldMapManager extends Control {
                             // not change with zoom.
                             Places.Place hit = pickPlace(mb.getPosition());
                             pickedPlace = hit == null ? "" : hit.name();
+                            // a STATION opens its departures panel (user, 2026-10-02: "once a station is selected,
+                            // each way's next time"); any other click closes it
+                            selectedStation = hit != null && RoadOverlay.PlaceKind.of(hit) == RoadOverlay.PlaceKind.STATION
+                                    ? hit.at() : null;
                             // then a click on a cell's printed "x-y" is a click on that POSTAL CODE (3.26(c)): the
                             // waypoint goes to the cell's centre (sub-cell 5), exactly as `postal x-y` does
                             int[] code = hit == null && showPostalGrid ? pickPostal(mb.getPosition()) : null;
@@ -301,6 +308,7 @@ public class WorldMapManager extends Control {
         // Roads (4.7b): the baked picture under the whole control, one textured quad.
         mapDrawn = RoadOverlay.drawMap(this, view, center, scale, (float) size.getX(), (float) size.getY(),
                 0f, roadColor);
+        if (showRail) RoadOverlay.drawRail(this, view, center, scale, 0f, railWidthPx, true, 0f);
         if (showPlaces) {
             // EVERY place at every zoom, as its kind's numbered square; names only once zoomed in
             RoadOverlay.drawPlaces(this, visiblePlaces(), view, center, scale, 0f, 0f, placeSizePx,
@@ -311,6 +319,7 @@ public class WorldMapManager extends Control {
                     placeSizePx + 2f);
         }
         RoadOverlay.drawNorth(this, RoadOverlay.mapFont(), new Vector2((float) size.getX() - 30f, 44f), 14f);
+        drawStationPanel();
 
         ZoneManager wzm = (showZoneRings || showZoneIds) ? ZoneManager.get() : null;
         if (wzm != null) {
@@ -394,6 +403,43 @@ public class WorldMapManager extends Control {
         float scale = scale();
         return new Vector2((float) (center.getX() + (world.getX() - viewX) * scale),
                            (float) (center.getY() + (world.getZ() - viewZ) * scale));
+    }
+
+    /** The station whose departures panel is open (world position of its blip), or null. */
+    private Vector3 selectedStation;
+    private String stationPanelText = "";
+    /** How far from a station's blip its platforms may be (m): a station building stands beside its tracks. */
+    @Export public float stationPanelReach = 150f;
+    @Export public int stationPanelFontSize = 15;
+
+    /** The panel's text on the last frame ("" closed) -- a probe readout. */
+    @Register public String stationPanelNow() { return stationPanelText; }
+
+    private void drawStationPanel() {
+        stationPanelText = "";
+        if (selectedStation == null) return;
+        java.util.List<String> lines = com.openworld.world.TrainSystem.stationPanel(selectedStation.getX(),
+                selectedStation.getZ(), stationPanelReach);
+        if (lines.isEmpty()) return;
+        stationPanelText = String.join("\n", lines);
+        godot.api.Font f = com.openworld.world.StreetNames.font();
+        if (f == null) f = RoadOverlay.mapFont();
+        if (f == null) return;
+        int fs = stationPanelFontSize;
+        float w = 0f;
+        for (String l : lines) w = Math.max(w, (float) f.getStringSize(l, godot.core.HorizontalAlignment.LEFT, -1f, fs).getX());
+        float lh = fs + 6f;
+        Vector2 at = worldToScreen(selectedStation).plus(new Vector2(14f, -lh * 0.5f));
+        Vector2 size = getSize();
+        float bw = w + 20f, bh = lh * lines.size() + 10f;
+        float x = (float) Math.min(at.getX(), size.getX() - bw - 6f), y = (float) Math.max(6f, Math.min(at.getY(), size.getY() - bh - 6f));
+        drawRect(new godot.core.Rect2(x, y, bw, bh), new Color(0f, 0f, 0f, 0.8f), true, -1f, false);
+        drawRect(new godot.core.Rect2(x, y, bw, bh), RoadOverlay.PlaceKind.STATION.color, false, 1.5f, false);
+        for (int i = 0; i < lines.size(); i++) {
+            Color c = i == 0 ? new Color(1f, 1f, 1f, 1f) : new Color(1f, 0.72f, 0.25f, 1f);
+            drawString(f, new Vector2(x + 10f, y + 5f + lh * i + fs), lines.get(i), godot.core.HorizontalAlignment.LEFT,
+                    -1f, fs, c);
+        }
     }
 
     /** Invert the north-up map transform: a clicked pixel → world XZ at the player's height. */

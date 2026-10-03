@@ -16,6 +16,8 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, ".."))
 NAMES = os.path.join(ROOT, "src/main/resources/com/openworld/world/IslandStreetNames.json")
+# the stations' names and the board / in-car screen words (world.TrainSystem)
+STATIONS = os.path.join(ROOT, "src/main/resources/com/openworld/world/StationNames.json")
 OUT = os.path.join(ROOT, "src/main/resources/com/openworld/ui/fonts/NotoSansJP-Signs.otf")
 SRC = "/usr/share/fonts/google-noto-sans-cjk-vf-fonts/NotoSansCJK-VF.ttc"
 KANA = "".join(chr(c) for c in range(0x3041, 0x3097)) + "".join(chr(c) for c in range(0x30A1, 0x30FB)) + "ー・、。「」"
@@ -23,7 +25,11 @@ KANA = "".join(chr(c) for c in range(0x3041, 0x3097)) + "".join(chr(c) for c in 
 
 def wanted():
     doc = json.load(open(NAMES))
-    return set(doc["chars"]) | set(chr(c) for c in range(0x20, 0x7F)) | set(KANA)
+    st = json.load(open(STATIONS))
+    chars = set(st["words"])
+    for v in st["stations"].values():
+        chars |= set(v["ja"])
+    return set(doc["chars"]) | chars | set(chr(c) for c in range(0x20, 0x7F)) | set(KANA)
 
 
 def main(argv):

@@ -161,6 +161,16 @@ public class HUDManager extends CanvasLayer {
 	// context switches (FootHUD ↔ VehicleHUD).
 	Node feedNode = getNodeOrNull("Feed");
 	if (feedNode instanceof Feed f) feed = f;
+	// the game clock in the top-right corner (user, 2026-10-02), and the kill feed moved down under it
+	if (getNodeOrNull("GameClock") == null) {
+	  GameClock clock = new GameClock();
+	  clock.setName(new godot.core.StringName("GameClock"));
+	  addChild(clock);
+	}
+	if (feed != null && feed.getNodeOrNull("VBoxContainer") instanceof Control kv) {
+	  kv.setOffset(godot.core.Side.TOP, GameClock.MARGIN + GameClock.H + 8f);
+	  kv.setOffset(godot.core.Side.BOTTOM, GameClock.MARGIN + GameClock.H + 30f);
+	}
 	Node statusFeedNode = getNodeOrNull("StatusFeed");
 	if (statusFeedNode instanceof Feed sf) {
 	  statusFeed = sf;
@@ -246,7 +256,7 @@ public class HUDManager extends CanvasLayer {
 		  || name.equals("WeaponRadialMenu") || name.equals("WeaponProgress")
 		  || name.equals("ScopeOverlay") || name.equals("AreaWarning") || name.equals("HitMarker")
 		  || name.equals("Minimap") || name.equals("WorldMap") || name.equals("GpsArrow")
-		  || name.equals("RaceHUD")) continue;
+		  || name.equals("RaceHUD") || name.equals("GameClock")) continue;
 	  widgets.put(name, c);
 	  if (c instanceof WeaponSlotsUI ws) weaponSlotsUI = ws;
 	  if (c instanceof WeaponHUD wh) weaponHud = wh;

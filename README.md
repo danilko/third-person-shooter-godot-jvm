@@ -425,6 +425,74 @@ range instead of relying on bare fists.
 
 ---
 
+## 🧠 AI usage in this project (Claude)
+
+This project is built with heavy use of **Claude Code** (Anthropic's coding agent), working under the project
+author's direction and review. This section says what that means for the code and the assets, so a reader knows what
+was written by an AI, from what, and what came from somewhere else. It is a description of how the project was made,
+not legal advice.
+
+### What Claude wrote
+
+- **Most of the source code**: the Java gameplay code (`src/main/java/`), the GDScript editor tooling and probes
+  (`addons/road_kit/`, `tools/godot/`), and the Python/Blender build tools (`tools/`, `blender/tools/`,
+  `blender/addons/road_kit_authoring/`).
+- **The generators behind every "built by this project" model.** These models were not drawn by hand. They are
+  produced by scripts that place boxes, prisms, sweeps and cylinders to stated dimensions. Re-running the script
+  rebuilds the model, and each tool states its numbers in the code. Among them:
+  - the train, EMU1 (`blender/tools/make_train.py`), with its doors and interior;
+  - the placeholder cars and craft (`make_placeholder_cars.py`, `make_placeholder_craft.py`);
+  - the library of Japanese street, shop, civic and station pieces and the landmark base models
+    (`library_procedural.py`, `library_civic.py`, `library_landmarks.py`, `library_interiors.py`);
+  - the enterable building interiors and shops (`interior_plans*.py`, `build_interior_blends.py`,
+    `build_shop_blends.py`), and the stations (`build_station_blends.py`, `tools/station_layout.py`);
+  - every road, junction, ramp, bridge pier and rail track (the Road Kit, `point_mesh.py`);
+  - the island's terrain, road network and building placement (`tools/island_*.py`);
+  - generated textures (`tools/make_*_texture.py`), the weapon icons (`render_weapon_icons.py`), and derived
+	animation clips (`derive_gait.py`, `make_dual_pistol_clips.py`).
+
+### Where those dimensions come from
+
+The generated models are sized from **Japanese practice and measurements**, as numbers written into the tools.
+Nothing is copied from another model or scraped from a website. Examples:
+
+- **Trains**: the published envelope of a 20 m, four-door, 1067 mm-gauge commuter car (the JR E231/E233 class sizes:
+  body width, floor and platform heights, door pitch). No line's livery, logo or name is used.
+- **Roads**: keep-left driving, lane widths and grades in the spirit of the Japanese Road Structure Ordinance
+  (道路構造令), signal and sign placement, and expressway ramp design speeds.
+- **Buildings and blocks**: real-world proportions measured locally from **Project PLATEAU** open city data
+  (MLIT, CC BY 4.0). Only the resulting numbers enter the repository, such as typical konbini, station and house
+  footprints and storey heights. No PLATEAU geometry is in the current tree (see CREDITS.md for the history note).
+- **Stations, shops and interiors**: Japanese conventions, such as ticket-gate paid areas, a raised genkan floor,
+  washlets, priority seats, and 優先席 and 吊り革 in trains.
+
+**Every name shown to a player is fictional**: streets, the Kaito expressway, stations and landmark labels. The
+project rule is no real names in game.
+
+### What came from elsewhere
+
+These were **downloaded**, not generated: the CC0 kits and models (Quaternius, 3DModelsCC0, Binbun3D effects,
+ambientCG textures), pixiv's VRoid sample avatars (Sendagaya Shino and Sakurada Fumiriya as CC0, and the other crowd
+bodies under the VRoid Hub licence, which allows modification, redistribution and commercial use), Godot-chan and the base shooter project (Johnny Rouddro, MIT), the Noto Sans CJK JP and Aldrich fonts
+(OFL), and the engine add-ons (godot-jvm, Terrain3D, Sky3D). One car, SPC-1, was modelled by the project author. Each
+is listed with its licence in **[CREDITS.md](CREDITS.md)**. `assets/LICENCE_AUDIT.md` is the file-by-file audit, which
+also records what was REMOVED because its provenance could not be confirmed.
+
+### Things to keep in mind
+
+- **Real-world landmarks.** Some generated base models depict real structures from their public dimensions (a
+  suspension bridge, a lattice tower, a castle keep, a domed station). The game labels them with fictional names, but
+  likeness and trademark rules for famous buildings vary. Check them before a commercial release.
+- **Git history** still contains PLATEAU-derived files from before 2026-09-18, so its CC BY 4.0 attribution stays
+  required for the repository (CREDITS.md).
+- **AI output is reviewed, not assumed correct.** Behaviour is checked by headless probes and pictures
+  (`tools/godot/probe_*.gd`, `shot_*.gd`). Placeholders are marked as placeholders, with artist notes beside them
+  (for example `assets/vehicles/trains/ARTIST_NOTES.md`), for an artist to replace.
+- **`CLAUDE.md`** is the running technical record Claude keeps for itself and for future sessions: every design
+  decision, measurement and trap, with the reason for it.
+
+---
+
 ## 📚 Credits & Assets
 
 All third-party code, assets and data, with their licences and required attribution lines, are

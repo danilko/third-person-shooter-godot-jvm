@@ -77,14 +77,24 @@ public class MinimapController extends Control {
     @Export public float placeSizePx = 9f;
     /** The building layer ({@link com.openworld.world.BuildingMap}), under the roads. */
     @Export public boolean showBuildings = true;
+    /** The rail lines and the trains on them (TrainSystem). */
+    @Export public boolean showRail = true;
+    @Export public float railWidthPx = 3.0f;
     @Export public Color buildingColor = new Color(0.62f, 0.64f, 0.70f, 0.6f);
-    /** An "N" just outside the rim, where north is. */
+    /**
+     * A rounded SQUARE radar (PLAN.md NEXT item 10): it shows more in its corners at the same size. Off = the old
+     * disc (the control).
+     */
+    @Export public boolean square = true;
+    /** An "N" on the frame's edge, where north is -- always drawn whole, inside the frame. */
     @Export public boolean showNorth = true;
     @Export public float northRadiusPx = 8f;
     private Vector2 northAt = new Vector2(0f, 0f);
 
     /** Where the north marker was drawn on the last frame (probe readout, in the control's own pixels). */
     @Register public Vector2 northAtNow() { return northAt; }
+    /** The north marker's radius (probe readout: its rect is northAt +- this). */
+    @Register public float northRadiusNow() { return northRadiusPx; }
     /** PLAN.md 3.26: the postal code under the player ("12-7-5 · Downtown"), inside the disc's bottom edge. */
     @Export public boolean showPostal = true;
     @Export public int postalFontSize = 12;
@@ -152,9 +162,14 @@ public class MinimapController extends Control {
         float radiusPx = Math.min(cx, cy);
         float scale = radiusPx / rangeMeters;   // px per metre
 
-        drawCircle(center, radiusPx, backgroundColor, true, -1f, true);
-        // a thin light rim, so the disc still reads over black (the scope's surround, a night scene)
-        drawArc(center, radiusPx - 0.75f, 0f, (float) (Math.PI * 2), 64, rimColor, 1.5f, true);
+        RoadOverlay.squareClip = square;
+        List<Vector2> frame = RoadOverlay.clipPolygon(cx, cy, radiusPx);
+        drawColoredPolygon(new godot.core.PackedVector2Array(frame), backgroundColor,
+                new godot.core.PackedVector2Array(), null);
+        // a thin light rim, so the frame still reads over black (the scope's surround, a night scene)
+        List<Vector2> rim = new ArrayList<>(RoadOverlay.clipPolygon(cx, cy, radiusPx - 0.75f));
+        rim.add(rim.get(0));
+        drawPolyline(new godot.core.PackedVector2Array(rim), rimColor, 1.5f, true);
 
         if (player == null || !godot.global.GD.isInstanceValid(player)) return;
         Vector3 origin = player.getGlobalPosition();
@@ -170,6 +185,7 @@ public class MinimapController extends Control {
             RoadOverlay.drawBuildings(this, origin, center, scale, 0f, 0f, radiusPx, buildingColor, rot);
         }
         mapDrawn = RoadOverlay.drawMap(this, origin, center, scale, 0f, 0f, radiusPx, roadColor, rot);
+        if (showRail) RoadOverlay.drawRail(this, origin, center, scale, radiusPx, railWidthPx, true, rot);
         if (player instanceof Player pl && pl.characterInfo != null && pl.getWaypoint() != null) {
             com.openworld.world.RoadGraph.Route route = com.openworld.world.RoadMap.routeFor(
                     pl.characterInfo.characterId, origin, pl.getWaypoint());
@@ -188,10 +204,19 @@ public class MinimapController extends Control {
                     origin, center, scale, rot);
             float dx = (float) (n.getX() - center.getX()), dy = (float) (n.getY() - center.getY());
             float len = (float) Math.max(1e-3, Math.hypot(dx, dy));
-            // just OUTSIDE the rim, so it never covers the postal readout inside the disc's bottom edge (facing
-            // south puts north there) nor a blip at the edge
-            float rr = radiusPx + northRadiusPx * 0.5f;
-            northAt = new Vector2(center.getX() + dx / len * rr, center.getY() + dy / len * rr);
+            if (square) {
+                // on the frame's edge in north's direction, pulled in so the whole marker stays inside the frame
+                // (the Control clips anything drawn outside it, which cropped it)
+                float inset = northRadiusPx + 2f;
+                float h = radiusPx - inset;
+                float m = Math.max(Math.abs(dx), Math.abs(dy)) / len;
+                northAt = new Vector2(center.getX() + dx / len * h / m, center.getY() + dy / len * h / m);
+            } else {
+                // just OUTSIDE the rim, so it never covers the postal readout inside the disc's bottom edge (facing
+                // south puts north there) nor a blip at the edge
+                float rr = radiusPx + northRadiusPx * 0.5f;
+                northAt = new Vector2(center.getX() + dx / len * rr, center.getY() + dy / len * rr);
+            }
             RoadOverlay.drawNorth(this, RoadOverlay.mapFont(), northAt, northRadiusPx);
         }
 
@@ -215,7 +240,7 @@ public class MinimapController extends Control {
                 if (n == player || !(n instanceof Node3D n3) || !(n instanceof NameplateTarget nt)) continue;
                 if (!RoadOverlay.worthABlip(player, n)) continue;
                 Vector2 c = worldToScreen(n3.getGlobalPosition(), origin, center, scale, rot);
-                if (distance(c, center) > radiusPx) continue;
+                if (!RoadOverlay.insideClip(c.getX(), c.getY(), cx, cy, radiusPx)) continue;
                 drawCircle(c, blipRadius, nt.getNameplateColor(), true, -1f, true);
             }
         }
@@ -223,7 +248,8 @@ public class MinimapController extends Control {
         // GPS waypoints (local + teammates), clamped to the rim so off-range targets still show direction.
         for (Map.Entry<String, Vector3> e : WaypointStore.entries().entrySet()) {
             Color col = waypointColor(e.getKey());
-            Vector2 c = clampToDisc(worldToScreen(e.getValue(), origin, center, scale, rot), center, radiusPx - 2f);
+            Vector2 c = RoadOverlay.clampToClip(worldToScreen(e.getValue(), origin, center, scale, rot), cx, cy,
+                    radiusPx, 2f);
             drawWaypoint(c, col);
         }
 

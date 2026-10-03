@@ -11111,6 +11111,127 @@ fits any.
 - Pictures: `tools/godot/shot_train_station.gd` (display) -- the set at a station's platforms from the platform, along
   the tracks and from above.
 
+## Trains you can board: doors, an interior, hits, a wreck and a respawn, and the line on the map (2026-10-02)
+
+PLAN.md NEXT items 10 and 11, built beside the island rebuild (runtime and the EMU1 model only, no rebuild).
+`assets/vehicles/trains/ARTIST_NOTES.md` lists every placeholder and the names the game reads.
+- **The model** (`blender/tools/make_train.py`, regenerated once with `--force`; the `.blend` is the owner again):
+  - real door OPENINGS in the side walls, and each doorway's two leaves as their own objects
+    (`<car>_Door_<P|N><i><a|b>`, origin = the leaf's centre when shut, inside the 5 cm wall, sliding 0.62 m into its pocket);
+  - a lined shell with see-through windows (glass alpha 0.35; every train material is double-sided);
+  - an open gangway with bellows and a footplate, so the whole train can be walked;
+  - a Japanese commuter interior in `<car>_Interior`: long benches per seat with red/orange priority seats at each
+    car's −Y end, door partitions, poles (yellow at priority), luggage racks, two grab rails with straps every
+    0.32 m (yellow at priority), two LED light lines plus an AC diffuser, a door-top screen over every door, yellow
+    doorway lines, a wheelchair space on a middle car, and on the cab car a cab behind a partition;
+  - `COL_` / `DOORCOL_` cube Empties (scale = half size) and `LIGHT_` Empties, read back into `EMU1.train.json` per
+    car (`colliders`, `doors` with each leaf's slide in the Godot car frame, `lights`);
+  - every object carries its car's prefix (`Tc_` / `M_`), because object names are global in a .blend.
+
+  The outer envelope is unchanged (1.491 m with the new door frames, 4.05 m), so every station check holds:
+  `probe_train_fit --stations` PASS.
+- **`world.TrainSystem`**:
+  - **Car collision**: each car is built from those boxes. The last car is turned 180 deg, so its x and z are negated.
+  - **Doors**: at each dwell a ray beside each door asks whether a platform stands there (a surface within 0.35 m under
+    the floor). Those doors open over 1.4 s and shut 3.5 s before departure. Someone in the doorway holds them until
+    0.5 s before departure, because the clock-driven timetable never waits. An open door's collider is off.
+  - **Interior lights**: 2 shadowless OmniLights per car, within 140 m of the camera.
+- **A rider rides the AnimatableBody3D floor** (measured: 342 m on DebugWorld's curved line, 0.00 m off the floor).
+  The trap that broke it first: `Transform3D.times` MUTATES its receiver (godot-jvm), so `xf.times(offset)` moved the
+  car frame the rider check then used.
+- **Hits** (`hitAhead`): every car's own box (the lead one grown by this step's travel), on CHARACTER | VEHICLE.
+  - A character standing on that car's floor (|x| < 1.45, 0.8 < y < 3.4) is a rider and is skipped, and so is a seated one.
+  - A character is otherwise hit: damage 1.2 v^2 + 10, and only where damage is (host or single player). If alive it is
+    set clear of the gauge; if dead it is thrown.
+  - A vehicle is shoved (impulse on the peer that simulates it) and damaged 30 v.
+  - Below 2 m/s a hit is a push. A 1 s cooldown applies per target.
+- **Health, destruction, respawn**:
+  - Each car has a code-built `Health` (3000, bullets x0.15, blasts x2.0). A set's health is the lowest of its cars,
+    kept on the set, so freeing and rebuilding the cars with the camera keeps the damage.
+  - `ExplosionManager.triggerExplosion` calls `TrainSystem.blast`, because cars are WORLD bodies and not "characters".
+  - At 0 HP (the authority) the cars become a burnt wreck in place, each with a blast. The set is out of service
+    (no cars, crossings open, off the map) until `TrainTimetable.nextDwellStart(t, 45 s)`, the first platform dwell
+    45 s later, where it reappears whole with its doors opening. Every peer derives that from the destruction time,
+    so `GameManager.WORLD_EVENT_TRAIN_DESTROYED` (13) carries only the track id and the time (as a string arg, since
+    unix time in a float loses minutes). `EventBus.trainDestroyed(trackId)` fires on every peer.
+  - Mission API (registered): `nearest_set_now`, `destroy_set_now`, `set_invulnerable_now`, `set_health_now`,
+    `set_out_of_service_now`, `set_back_at_now`. Not sent to a late joiner.
+- **The map**: `TrainSystem.mapLines` (one polyline per line: a track that runs 80 % within 12 m of one already drawn is
+  not drawn again) and `mapTrains` (head/tail of every set in service, from the clock). `RoadOverlay.drawRail` draws
+  them in JR style, a white band with black dashes, and each train as a white bar with a yellow head. This is on the
+  minimap and the full map (`showRail`), and the legend gains "Rail line" and "Train".
+- **The minimap is a rounded square** (`MinimapController.square`; `RoadOverlay.squareClip` and its `clip*` helpers are
+  the one clip shape). North sits on the frame's edge, always drawn whole.
+- Gates:
+  - `tools/godot/probe_train_board.gd` 11/11. It jumps the timetable with `TrainSystem.clock_offset`, which must never
+    be done while a rider is aboard (it teleports the train). `--control` = `doors_enabled` off.
+  - `probe_trains` PASS on both worlds; `TrainTimetableTest` gains the respawn case; `probe_gps_route` 25/25.
+- **The timetable runs on a STEP clock anchored to the wall clock** (`TrainSystem.tickClock`). On the raw wall
+  clock, two physics steps run in one render frame read nearly the same time, so the train moved 0 and then double.
+  A rider felt every frame as a jolt (user-reported). The clock adds each physics delta and eases toward the wall
+  clock at `CLOCK_EASE` (0.2 of the difference per second), so peers still agree. It snaps only past `CLOCK_SNAP`
+  (20 s), so a game too slow to keep physics at real time eases rather than jumps. Gate
+  `tools/godot/probe_train_smooth.gd` (real time, `--frame-ms=` adds render-frame load): 0 of 300 steps off at
+  0/25/40 ms frames. The raw wall clock is the control: 299 of 300 off at 25 ms.
+- **A double-track line runs as a LOOP, not a shuttle** (user decision, 2026-10-02):
+  - `TrainTimetable.circuit` runs one track end to end, then the other, and loops. Each track carries one direction,
+    keep-left. A terminus stop is two half-stops (`TERMINAL_DWELL` / 2 each), and the set changes track at the
+    halfway point: the cheap turn, as GTA does it.
+  - `TrainSystem.partnerOf` pairs a track with the one running back along it (ends within 60 m).
+  - A loop carries `2 x setsPerWay` sets (1 per way today), evenly spaced in time so they never meet. A lone track is
+    still a one-set shuttle; freight sidings carry none.
+  - **The swap carries riders** (`swapTrack`): the cars are rebuilt on the new track. Anyone standing in a car moves
+    with it: car i becomes car 3 - i, at the same end of the platform. A middle car's frame turns 180°, so the
+    rider's place in it is mirrored, and they move only the ~4 m across to the other track.
+  - **Riders are held through the turn** (user-reported: a rider landed "somewhere invisible"). The way other games
+    move a passenger through a teleport is to move the vehicle and its passengers in the same step and HOLD the
+    passengers until the new collision is in. Here:
+    - a rider is anyone inside the walls, in a doorway (to the door's outer face) or on the gangway;
+    - they are pinned to their place in the new car with no velocity for `PIN_TICKS` (8) physics steps
+      (`pinRiders`, off is the control);
+    - the new cars' platform-side doors stand OPEN at once. Rebuilt shut, a rider in a doorway overlapped the shut
+      door's collider.
+
+    Gate `tools/godot/probe_train_turn.gd` (real time, `--frame-ms=` load; `--walk`, `--at=x,z` a place in the car,
+    `--world=island --set=N`, `--from-track=K` picks which terminus): PASS standing, walking, in a doorway and at both
+    car ends on DebugWorld, and on all three island lines. The reported case, the Main line's turn at Airport with a
+    rider mid-car, also passes: they end on the other Airport platform, 4 m across. `TrainSystem.set_debug_now(i)`
+    prints a set's tracks, ends and stops. The control (`--control`, no pin) also passes there, so the report's exact case is not
+    reproduced headless yet.
+  - Every crossing asks its own track (`crossingClosed(track, ...)`); boards and the map merge every set on a track.
+  - Cost: ~0.1 ms per physics step per set with its cars near the camera; nothing for a far set.
+  - **Trap**: a body just built with `sync_to_physics` reports its new transform only after the next physics sync.
+    So the rider mapping and the door platform rays use `carPose` (the pose computed from the track), never
+    `body.getGlobalTransform()`. Read back, the swap dropped the rider at the world origin and found no platform for
+    the whole stop.
+, owned by TrainSystem, all derived from the timetable):
+  - a departure board (発車標) hung over every platform a set calls at, found by a ray beside the track at the stop,
+    with both faces: 先発 / 次発, the game-time HH:MM, 普通, the destination 行, and まもなく in the last 30 s;
+  - the screen over every door inside a car (ドア上LCD): 次は / Next and the arrival time, or at a stop the station
+    and where the train goes;
+  - the full map: clicking a station blip opens a panel with each way's next two departures
+    (`TrainSystem.stationPanel`).
+
+  Station names are fictional, in `world/StationNames.json` (Japanese + English, plus the board words), and
+  `tools/make_jp_font.py` adds their glyphs to the sign font. `TrainTimetable.calls` / `nextCall` / `terminalFor`
+  are the queries (in `TrainTimetableTest`). A Label3D is centred on its node, so its alignment is CENTER: LEFT
+  starts the text at the node and runs it off the board.
+- **Game time has ONE owner, `world.GameTime`**: Sky3D's TimeOfDay `current_time` at its `minutes_per_day` (48, so a
+  real second is 30 game seconds), falling back to local time. `ui.GameClock` (built in code by HUDManager, top-right,
+  sun or moon mark) shows it, and the kill feed moved down under it. HUDManager's widget registry hides any child it
+  does not list as self-managed, so a new always-on widget must be added to that skip list.
+  **Consequence for the boards:** one set shuttling a DebugWorld line every ~190 real s reads as trains ~95 game
+  minutes apart.
+- **Probe trap:** a node with `process_mode` DISABLED leaves the physics space unless its `disable_mode` is
+  KEEP_ACTIVE, so a frozen dummy on the track was invisible to the hit query.
+
+**A floor finish carries the same holes as its slab** (2026-10-02, user-reported on a ground-hub footbridge: "a mesh
+over the stair, but no collision"). `build_station_blends.cap_top` and the annex mezzanine laid a 1 cm terrazzo finish
+over the whole concourse (visual only) after cutting the stair and lift holes in the slab. It is
+`slab_with_holes(..., collide=False)` now. Measured with a ray grid against the pieces: 2,219 samples of finish over an
+opening in every `GH_Cap*` / `GH_Annex*` piece before, 0 after. A failed Preview (a rail plan mid-edit) no longer
+stops the kit .blend being saved.
+
 ## The large hubs: six-bay roller-shutter entrances and shops along the side (PLAN.md step 6b, 2026-09-28)
 
 **Every station entrance is a roller-shutter opening** (user): no door leaf, open all day, and NO post in between --

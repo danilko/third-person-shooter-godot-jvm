@@ -651,7 +651,9 @@ def cap_top(p, w, openings=()):
     z0, z1 = SL.AF - SL.AF_T, SL.AF
     y0, y1 = -w / 2, w / 2
     slab_with_holes(p, -L / 2, L / 2, y0, y1, z0, z1, list(openings))
-    p.b.box((-L / 2, y0, z1), (L / 2, y1, z1 + 0.01), "MI_Terrazzo")
+    # the floor finish carries the SAME holes as the slab: laid whole, it was a mesh over every stair and lift shaft
+    # with no collision (user-reported: "a mesh blocking the stair, but you can still walk through")
+    slab_with_holes(p, -L / 2, L / 2, y0, y1, z1, z1 + 0.01, list(openings), "MI_Terrazzo", collide=False)
     p.solid((-L / 2, y0, SL.ROOF), (L / 2, y1, SL.ROOF + SL.ROOF_T), "MI_Corrugated")
     for sx in (-1.0, 1.0):
         xa, xb = sorted((sx * L / 2, sx * (L / 2 - 0.2)))
@@ -814,7 +816,7 @@ def annex(hand, large=False):
     lift_shaft(p, lx0, lx1, y0, y0 + sw, (0.0, SL.AF))
     stair_rail(p, [(xt, SL.AF, xb, 0.0)], y0 + sw + 0.03)
     stair_rail(p, [(xt, SL.AF, xb, 0.0)], y0 + 0.05, collide=False)
-    p.b.box((x0, y0, SL.AF), (xt, yg, SL.AF + 0.01), "MI_Terrazzo")
+    slab_with_holes(p, x0, xt, y0, yg, SL.AF, SL.AF + 0.01, [(lx0, lx1, y0, y0 + sw)], "MI_Terrazzo", collide=False)
     railing(p, (x0 + t, yg - 0.05, SL.AF), (xt, yg, SL.AF))
     railing(p, (xt, y0 + sw, SL.AF), (xt + 0.05, yg, SL.AF))
     for xl in (x0 + 4.0, x0 + 12.0):                                     # lights under the mezzanine
@@ -1566,7 +1568,12 @@ def build_form(form):
                 print("[build_station_blends] KEPT %s: retired from the form but edited by hand -- delete it in the "
                       ".blend if it is no longer wanted" % col.name)
     if form in PREVIEW:
-        preview_station(PREVIEW[form])
+        try:
+            preview_station(PREVIEW[form])
+        except SystemExit as e:
+            # the Preview is for the eye only; a rail plan mid-edit (a station that does not fit its modules) must not
+            # stop the kit's pieces being regenerated and saved
+            print("[build_station_blends] Preview skipped: %s" % e)
     else:
         preview({p.name: p for p in pieces})
     readme = bpy.data.texts.get("README_artist") or bpy.data.texts.new("README_artist")

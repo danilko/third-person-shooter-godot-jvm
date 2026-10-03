@@ -76,11 +76,7 @@ final class RoadOverlay {
         if (tex == null || b == null || scale <= 0) return false;
         List<Vector2> pts = new ArrayList<>();
         if (clipRadiusPx > 0) {
-            for (int i = 0; i < DISC_SEGMENTS; i++) {
-                double a = 2 * Math.PI * i / DISC_SEGMENTS;
-                pts.add(new Vector2((float) (center.getX() + Math.cos(a) * clipRadiusPx),
-                        (float) (center.getY() + Math.sin(a) * clipRadiusPx)));
-            }
+            pts.addAll(clipPolygon(center.getX(), center.getY(), clipRadiusPx));
         } else {
             pts.add(new Vector2(0f, 0f));
             pts.add(new Vector2(viewW, 0f));
@@ -125,6 +121,73 @@ final class RoadOverlay {
         }
     }
 
+    static final Color RAIL = new Color(0.96f, 0.96f, 0.94f, 0.95f);
+    static final Color RAIL_DASH = new Color(0.10f, 0.10f, 0.12f, 1f);
+    static final Color TRAIN = new Color(0.98f, 0.98f, 0.98f, 1f);
+    static final Color TRAIN_HEAD = new Color(1f, 0.80f, 0.15f, 1f);
+
+    /**
+     * The rail lines, drawn the way a Japanese map draws a JR line (a white band with black dashes in it, which reads
+     * on a dark map as well as a light one), and every train in service on them as a white bar with a yellow head -- so a player can see where the line goes and
+     * where the next train is. Read from {@link com.openworld.world.TrainSystem}: nothing to draw without trains.
+     */
+    static void drawRail(CanvasItem ci, Vector3 origin, Vector2 center, float scale, float clipRadiusPx,
+                         float widthPx, boolean trains, float rot) {
+        double ox = origin.getX(), oz = origin.getZ();
+        double cx = center.getX(), cy = center.getY();
+        for (double[] xz : com.openworld.world.TrainSystem.mapLines()) {
+            List<Vector2> pts = new ArrayList<>(xz.length / 2);
+            for (int i = 0; i < xz.length; i += 2) pts.add(project(xz[i], xz[i + 1], ox, oz, cx, cy, scale, rot));
+            List<List<Vector2>> runs = clipRadiusPx > 0 ? clipRun(pts, cx, cy, clipRadiusPx) : List.of(pts);
+            for (List<Vector2> run : runs) {
+                if (run.size() < 2) continue;
+                ci.drawPolyline(new PackedVector2Array(run), RAIL, widthPx, true);
+                dashed(ci, run, RAIL_DASH, Math.max(1f, widthPx * 0.45f), widthPx * 2.2f);
+            }
+        }
+        if (!trains) return;
+        for (double[] tr : com.openworld.world.TrainSystem.mapTrains()) {
+            Vector2 h = project(tr[0], tr[1], ox, oz, cx, cy, scale, rot);
+            Vector2 t = project(tr[2], tr[3], ox, oz, cx, cy, scale, rot);
+            if (clipRadiusPx > 0 && (!insideClip(h.getX(), h.getY(), cx, cy, clipRadiusPx)
+                    || !insideClip(t.getX(), t.getY(), cx, cy, clipRadiusPx))) continue;
+            // at least a few pixels long, so a whole-island view still shows the train
+            Vector2 d = h.minus(t);
+            float len = (float) Math.hypot(d.getX(), d.getY());
+            float min = widthPx * 2.5f;
+            if (len < min) {
+                Vector2 dir = len > 1e-3 ? d.div(len) : new Vector2(1, 0);
+                Vector2 mid = h.plus(t).times(0.5);
+                h = mid.plus(dir.times(min / 2));
+                t = mid.minus(dir.times(min / 2));
+            }
+            ci.drawLine(t, h, new Color(0f, 0f, 0f, 0.9f), widthPx * 2.4f, true);
+            ci.drawLine(t, h, TRAIN, widthPx * 1.6f, true);
+            ci.drawCircle(h, widthPx * 1.1f, TRAIN_HEAD, true, -1f, true);
+        }
+    }
+
+    /** Dashes along a screen polyline (period 2 x dash), continuous across its vertices. */
+    private static void dashed(CanvasItem ci, List<Vector2> run, Color col, float width, float dash) {
+        double phase = 0;
+        for (int i = 0; i + 1 < run.size(); i++) {
+            Vector2 a = run.get(i), b = run.get(i + 1);
+            double L = Math.hypot(b.getX() - a.getX(), b.getY() - a.getY());
+            double u = 0;
+            while (u < L) {
+                double inPeriod = phase % (2 * dash);
+                double left = (inPeriod < dash ? dash : 2 * dash) - inPeriod;
+                double step = Math.min(left, L - u);
+                if (inPeriod < dash && L > 1e-6) {
+                    Vector2 p0 = a.lerp(b, (float) (u / L)), p1 = a.lerp(b, (float) ((u + step) / L));
+                    ci.drawLine(p0, p1, col, width, true);
+                }
+                u += step;
+                phase += step;
+            }
+        }
+    }
+
     /** The ONE world→screen mapping of this overlay: a world XZ delta, scaled, turned by {@code rot}. */
     static Vector2 project(double wx, double wz, double ox, double oz, double cx, double cy,
                            double scale, double rot) {
@@ -142,7 +205,7 @@ final class RoadOverlay {
             return true;
         }
         boolean any = false;
-        for (List<Vector2> run : clipToCircle(pts, cx, cy, r)) {
+        for (List<Vector2> run : clipRun(pts, cx, cy, r)) {
             if (run.size() < 2) continue;
             ci.drawPolyline(new PackedVector2Array(run), color, width, true);
             any = true;
@@ -253,10 +316,7 @@ final class RoadOverlay {
         for (Places.Place p : places) {
             if (p.tier() < minTier) continue;
             Vector2 at = project(p.at().getX(), p.at().getZ(), ox, oz, cx, cy, scale, rot);
-            if (clipRadiusPx > 0) {
-                double dx = at.getX() - cx, dy = at.getY() - cy;
-                if (dx * dx + dy * dy > clipRadiusPx * clipRadiusPx) continue;
-            }
+            if (clipRadiusPx > 0 && !insideClip(at.getX(), at.getY(), cx, cy, clipRadiusPx)) continue;
             PlaceKind k = PlaceKind.of(p);
             Color col = k.color;
             float h = sizePx * 0.5f;
@@ -334,13 +394,16 @@ final class RoadOverlay {
     static void drawPlaceLegend(CanvasItem ci, Font font, int fontSize, float x, float bottom, float sizePx) {
         if (font == null) return;
         PlaceKind[] all = PlaceKind.values();
+        // two more rows when there are trains: the rail line and a train on it
+        boolean rail = !com.openworld.world.TrainSystem.mapLines().isEmpty();
+        int rows = all.length + (rail ? 2 : 0);
         float line = Math.max(sizePx, fontSize) + 4f;
         float w = 0f;
         for (PlaceKind k : all) {
             w = Math.max(w, (float) font.getStringSize(k.label, HorizontalAlignment.LEFT, -1f, fontSize).getX());
         }
-        float top = bottom - line * all.length - 8f;
-        ci.drawRect(new Rect2(x - 6f, top, w + sizePx + 22f, line * all.length + 8f), new Color(0f, 0f, 0f, 0.55f),
+        float top = bottom - line * rows - 8f;
+        ci.drawRect(new Rect2(x - 6f, top, w + sizePx + 22f, line * rows + 8f), new Color(0f, 0f, 0f, 0.55f),
                 true, -1f, false);
         float y = top + 4f;
         for (PlaceKind k : all) {
@@ -352,6 +415,20 @@ final class RoadOverlay {
                     HorizontalAlignment.LEFT, -1f, fontSize, new Color(1f, 1f, 1f, 0.9f));
             y += line;
         }
+        if (!rail) return;
+        float my = y + line * 0.5f;
+        List<Vector2> seg = List.of(new Vector2(x - 2f, my), new Vector2(x + sizePx + 2f, my));
+        ci.drawPolyline(new PackedVector2Array(seg), RAIL, 3f, true);
+        dashed(ci, seg, RAIL_DASH, 1.4f, 3f);
+        ci.drawString(font, new Vector2(x + sizePx + 6f, my + fontSize * 0.36f), "Rail line",
+                HorizontalAlignment.LEFT, -1f, fontSize, new Color(1f, 1f, 1f, 0.9f));
+        y += line;
+        my = y + line * 0.5f;
+        ci.drawLine(new Vector2(x - 2f, my), new Vector2(x + sizePx + 2f, my), new Color(0f, 0f, 0f, 0.9f), 6f, true);
+        ci.drawLine(new Vector2(x - 2f, my), new Vector2(x + sizePx + 2f, my), TRAIN, 4f, true);
+        ci.drawCircle(new Vector2(x + sizePx - 1f, my), 3f, TRAIN_HEAD, true, -1f, true);
+        ci.drawString(font, new Vector2(x + sizePx + 6f, my + fontSize * 0.36f), "Train",
+                HorizontalAlignment.LEFT, -1f, fontSize, new Color(1f, 1f, 1f, 0.9f));
     }
 
     /**
@@ -455,14 +532,14 @@ final class RoadOverlay {
         double ox = origin.getX(), oz = origin.getZ();
         double cx = center.getX(), cy = center.getY();
         // how far from the view centre anything on screen can be, in world metres
-        double reach = clipRadiusPx > 0 ? clipRadiusPx / scale
+        double reach = clipRadiusPx > 0 ? clipRadiusPx * Math.sqrt(2.0) / scale
                 : Math.hypot(Math.max(cx, viewW - cx), Math.max(cy, viewH - cy)) / scale;
         int i0 = Math.max(1, (int) Math.floor((ox - reach + half) / cell) + 1);
         int i1 = Math.min(n, (int) Math.floor((ox + reach + half) / cell) + 1);
         int j0 = Math.max(1, (int) Math.floor((oz - reach + half) / cell) + 1);
         int j1 = Math.min(n, (int) Math.floor((oz + reach + half) / cell) + 1);
         if (i0 > i1 || j0 > j1) return;
-        List<Vector2> disc = clipRadiusPx > 0 ? discPolygon(cx, cy, clipRadiusPx) : null;
+        List<Vector2> disc = clipRadiusPx > 0 ? clipPolygon(cx, cy, clipRadiusPx) : null;
         for (int i = i0; i <= i1; i++) {
             for (int j = j0; j <= j1; j++) {
                 double x0 = -half + (i - 1) * cell, z0 = -half + (j - 1) * cell;
@@ -493,6 +570,86 @@ final class RoadOverlay {
             List<Vector2> line = List.of(project(xa, v, ox, oz, cx, cy, scale, rot), project(xb, v, ox, oz, cx, cy, scale, rot));
             polyline(ci, new ArrayList<>(line), cx, cy, clipRadiusPx, GRID_LINE, 1f);
         }
+    }
+
+    /**
+     * The minimap's shape (PLAN.md NEXT item 10): a ROUNDED SQUARE of half size {@code r} when true -- it shows more in
+     * its corners at the same size -- or the old disc of radius {@code r}. Every clip on the minimap asks this one
+     * shape (the pictures, the postal grid, the lines, the blips), so nothing can be drawn outside the frame.
+     */
+    static boolean squareClip = true;
+    /** The square's corner radius, as a share of its half size. */
+    static final double CORNER = 0.12;
+
+    /** The clip shape as a convex polygon, wound like {@link #discPolygon} (angle increasing). */
+    static List<Vector2> clipPolygon(double cx, double cy, double r) {
+        if (!squareClip) return discPolygon(cx, cy, r);
+        double rc = r * CORNER, k = r - rc;
+        double[][] corners = {{k, k}, {-k, k}, {-k, -k}, {k, -k}};
+        List<Vector2> pts = new ArrayList<>(28);
+        for (int q = 0; q < 4; q++) {
+            for (int i = 0; i <= 6; i++) {
+                double a = Math.PI / 2 * (q + i / 6.0);
+                pts.add(new Vector2((float) (cx + corners[q][0] + Math.cos(a) * rc),
+                        (float) (cy + corners[q][1] + Math.sin(a) * rc)));
+            }
+        }
+        return pts;
+    }
+
+    /** Is the screen point inside the clip shape? */
+    static boolean insideClip(double x, double y, double cx, double cy, double r) {
+        double dx = x - cx, dy = y - cy;
+        if (!squareClip) return dx * dx + dy * dy <= r * r;
+        return Math.abs(dx) <= r && Math.abs(dy) <= r;
+    }
+
+    /** The point pulled onto the clip shape's edge, `inset` px inside it, along the ray from the centre (a point
+     *  already inside stays where it is). */
+    static Vector2 clampToClip(Vector2 p, double cx, double cy, double r, double inset) {
+        double dx = p.getX() - cx, dy = p.getY() - cy;
+        double h = r - inset;
+        double m = squareClip ? Math.max(Math.abs(dx), Math.abs(dy)) : Math.hypot(dx, dy);
+        if (m <= h || m < 1e-6) return p;
+        return new Vector2((float) (cx + dx * h / m), (float) (cy + dy * h / m));
+    }
+
+    /** The parts of a polyline inside the clip shape. */
+    static List<List<Vector2>> clipRun(List<Vector2> pts, double cx, double cy, double r) {
+        return squareClip ? clipToSquare(pts, cx, cy, r) : clipToCircle(pts, cx, cy, r);
+    }
+
+    /** The parts of a polyline inside the axis-aligned square of half size {@code r} (Liang-Barsky per segment). */
+    static List<List<Vector2>> clipToSquare(List<Vector2> pts, double cx, double cy, double r) {
+        List<List<Vector2>> runs = new ArrayList<>();
+        List<Vector2> cur = null;
+        for (int i = 0; i + 1 < pts.size(); i++) {
+            double ax = pts.get(i).getX() - cx, ay = pts.get(i).getY() - cy;
+            double dx = pts.get(i + 1).getX() - cx - ax, dy = pts.get(i + 1).getY() - cy - ay;
+            double t0 = 0, t1 = 1;
+            double[] p = {-dx, dx, -dy, dy}, q = {ax + r, r - ax, ay + r, r - ay};
+            boolean out = false;
+            for (int k = 0; k < 4 && !out; k++) {
+                if (Math.abs(p[k]) < 1e-12) {
+                    if (q[k] < 0) out = true;
+                } else {
+                    double t = q[k] / p[k];
+                    if (p[k] < 0) t0 = Math.max(t0, t); else t1 = Math.min(t1, t);
+                    if (t0 > t1) out = true;
+                }
+            }
+            if (out) { cur = null; continue; }
+            Vector2 p0 = new Vector2((float) (cx + ax + dx * t0), (float) (cy + ay + dy * t0));
+            Vector2 p1 = new Vector2((float) (cx + ax + dx * t1), (float) (cy + ay + dy * t1));
+            if (cur == null || t0 > 0) {
+                cur = new ArrayList<>();
+                runs.add(cur);
+                cur.add(p0);
+            }
+            cur.add(p1);
+            if (t1 < 1) cur = null;
+        }
+        return runs;
     }
 
     private static List<Vector2> discPolygon(double cx, double cy, double r) {

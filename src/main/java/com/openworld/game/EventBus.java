@@ -160,6 +160,10 @@ public class EventBus extends Node {
     public final Signal1<String> missionBeatTriggered =
             new Signal1<>(this, new StringName("mission_beat_triggered"));
 
+    /** A train set was destroyed (world.TrainSystem) -- its track id. Fires on every peer (the host decides, a client
+     *  hears it through WORLD_EVENT_TRAIN_DESTROYED); a mission can wait for it. */
+    public final Signal1<String> trainDestroyed = new Signal1<>(this, new StringName("train_destroyed"));
+
     /**
      * Emitted by Character once after _ready() completes (deferred, mirrors
      * playerSpawned). Fires for every character — player and AI alike — so

@@ -70,4 +70,76 @@ class TrainTimetableTest {
         }
         assertTrue(sawOpen && sawClosed);
     }
+
+    @Test
+    void aDestroyedSetComesBackAtTheNextPlatformAfterTheGap() {
+        TrainTimetable tt = new TrainTimetable(STOPS, CAPS);
+        for (double t = 0; t < 2 * tt.period(); t += 7.3) {
+            double back = tt.nextDwellStart(t, 30.0);
+            assertTrue(back >= t + 30.0 - 1e-9, "comes back no sooner than the gap");
+            TrainTimetable.State s = tt.at(back + 0.01);
+            assertTrue(s.dwell(), "it reappears standing at a platform");
+            assertTrue(tt.stopAt(back) >= 0);
+            // and it is the FIRST such dwell: no dwell starts between the gap and it
+            assertTrue(back - (t + 30.0) <= tt.period(), "within one cycle");
+        }
+    }
+
+    @Test
+    void theNextCallIsTheStopAheadAndBoardsListTrainsOutOfAStation() {
+        TrainTimetable tt = new TrainTimetable(STOPS, CAPS);
+        for (double t = 0; t < tt.period(); t += 3.1) {
+            TrainTimetable.Call c = tt.nextCall(t);
+            TrainTimetable.State s = tt.at(t);
+            if (s.dwell()) {
+                assertEquals(s.stop(), c.stop(), "standing at a stop, the call is that stop");
+                assertTrue(c.arrive() <= t && t < c.depart());
+            } else {
+                assertTrue(c.arrive() > t, "running, the call is ahead");
+                assertEquals(s.dir() > 0 ? 1 : -1, Integer.signum((int) Math.signum(STOPS[c.stop()] - s.s())));
+            }
+        }
+        // the middle stop is called at both ways in a cycle; a terminus sends every train back
+        java.util.List<TrainTimetable.Call> mid = tt.calls(0, 1, 4);
+        assertTrue(mid.stream().anyMatch(c -> c.dir() > 0) && mid.stream().anyMatch(c -> c.dir() < 0));
+        for (TrainTimetable.Call c : tt.calls(0, 2, 3)) assertEquals(-1, c.dir());
+        assertEquals(2, tt.terminalFor(1));
+        assertEquals(0, tt.terminalFor(-1));
+    }
+
+    @Test
+    void aCircuitRunsOutOnOneTrackAndBackOnTheOtherTurningMidStop() {
+        double[][] st = {{50.0, 900.0, 2000.0}, {60.0, 1100.0, 1990.0}};
+        double[][] caps = {{22.0, 16.0}, {16.0, 22.0}};
+        TrainTimetable tt = TrainTimetable.circuit(st, caps);
+        boolean[][] seen = new boolean[2][3];
+        int swaps = 0;
+        TrainTimetable.State prev = tt.at(0.0);
+        for (double t = 0; t <= tt.period() + 0.5; t += 0.25) {      // past the end: the second change is at the wrap
+            TrainTimetable.State s = tt.at(t);
+            assertTrue(s.v() >= 0.0, "a circuit always runs forward along its track");
+            if (s.dwell()) seen[s.track()][s.stop()] = true;
+            if (s.track() != prev.track()) {
+                swaps++;
+                // the change is made standing still, at a terminus: the last stop of one track, the first of the next
+                assertTrue(prev.dwell() && s.dwell(), "the track changes only mid-stop");
+                assertEquals(st[prev.track()].length - 1, prev.stop());
+                assertEquals(0, s.stop());
+            }
+            prev = s;
+        }
+        for (boolean[] tr : seen) for (boolean b : tr) assertTrue(b, "every stop of both tracks is called at");
+        assertEquals(2, swaps, "one change at each terminus");
+        // the terminus is ONE call (arrive on track 0, leave on track 1) and the train goes to track 1's far end
+        for (TrainTimetable.Call c : tt.calls(0.0, 0, 2, 2)) {
+            assertEquals(1, tt.departureTrack(c));
+            assertEquals(TrainTimetable.TERMINAL_DWELL, c.depart() - c.arrive(), 1e-6);
+            assertEquals(2, tt.destinationStop(new TrainTimetable.Call(c.arrive(), c.depart(), 0, 1, 1)));
+        }
+        // a crossing on track 1 is never closed while the set is out on track 0, away from it
+        for (double t = 0; t < tt.period(); t += 1.0) {
+            TrainTimetable.State s = tt.at(t);
+            if (s.track() == 0 && !s.dwell()) assertTrue(!tt.crossingClosed(1, 500.0, t, 80.0, 150.0, 10.0, 8.0));
+        }
+    }
 }

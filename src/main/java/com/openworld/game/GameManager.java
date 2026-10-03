@@ -1137,6 +1137,10 @@ public class GameManager extends Node {
     // 12 was WORLD_EVENT_PROP_BROKEN (street poles, 3.11); retired by 3.11b — a knocked-down pole is local to each
     // peer and sends nothing. Do not reuse the number while an older build could still send it.
 
+    /** A train set was destroyed (world.TrainSystem) -- key = its track id, args = [the time it happened, on the shared
+     *  clock]. Every peer derives where it comes back from that time, so nothing else is sent. */
+    public static final int WORLD_EVENT_TRAIN_DESTROYED = 13;
+
     /** Routes a decoded MSG_WORLD_EVENT to the owning system. Extend the switch as networked world state is added. */
     public void onWorldEvent(int eventType, String key, float value, java.util.List<String> args) {
         switch (eventType) {
@@ -1151,6 +1155,10 @@ public class GameManager extends Node {
             case WORLD_EVENT_RACE_START -> applyRaceStart(key, value, args);
             case WORLD_EVENT_RACE_CHECKPOINT -> applyRaceCheckpoint(key, value, args);
             case WORLD_EVENT_RACE_FINISH -> applyRaceFinish(key, value, args);
+            case WORLD_EVENT_TRAIN_DESTROYED -> {
+                com.openworld.world.TrainSystem ts = com.openworld.world.TrainSystem.get();
+                if (ts != null) ts.applyRemoteDestroyed(key, arg(args, 0));
+            }
             // case WORLD_EVENT_DOOR -> applyDoorState(key, value);
             default -> GD.print("GameManager: unhandled world event type " + eventType + " key=" + key);
         }

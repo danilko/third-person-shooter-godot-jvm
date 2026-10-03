@@ -59,10 +59,24 @@ func _initialize() -> void:
 	print("probe_trains: %d track(s), %d set(s), %d crossing lane(s), %d signal unit(s)" % [
 		tr.call("track_count_now"), n_sets, tr.call("crossing_count_now"), tr.call("unit_count_now")])
 	_check(int(tr.call("track_count_now")) > 0 and n_sets > 0, "the tracks load and the lines carry sets")
-	var seen_tracks := {}
+	# sets that share a circuit (out on one track, back on the other) never come within a set length of each other
+	var close := 0
+	var period0 := (tr.call("set_state_at", 0, 0.0) as PackedFloat64Array)[8]
 	for i in n_sets:
-		seen_tracks[str(tr.call("set_track_now", i))] = true
-	_check(seen_tracks.size() == n_sets, "every set runs on its own track (%d sets, %d tracks)" % [n_sets, seen_tracks.size()])
+		for j in range(i + 1, n_sets):
+			var pi := (tr.call("set_state_at", i, 0.0) as PackedFloat64Array)[8]
+			var pj := (tr.call("set_state_at", j, 0.0) as PackedFloat64Array)[8]
+			if absf(pi - pj) > 1e-6:
+				continue
+			var t := 0.0
+			while t < pi:
+				var a: PackedFloat64Array = tr.call("set_state_at", i, t)
+				var b: PackedFloat64Array = tr.call("set_state_at", j, t)
+				if int(a[9]) == int(b[9]) and Vector3(a[4], a[5], a[6]).distance_to(Vector3(b[4], b[5], b[6])) < 85.0:
+					if str(tr.call("set_id_now", i)).get_slice("#", 0) == str(tr.call("set_id_now", j)).get_slice("#", 0):
+						close += 1
+				t += 1.0
+	_check(close == 0, "sets sharing a line never meet (%d close samples over %d sets)" % [close, n_sets])
 	# 2. stops and speeds over a whole cycle (the timetable is a pure function of time: sample it)
 	var sts := _stations(island)
 	var bad_stop := []
@@ -79,7 +93,8 @@ func _initialize() -> void:
 		while t < period:
 			var st: PackedFloat64Array = tr.call("set_state_at", i, t)
 			fast = maxf(fast, absf(st[1]))
-			if absf(st[0] - prev[0]) > 25.0 * 0.5 + 0.01:
+			# a jump is only allowed where a circuit hands the set to its other track, mid-stop at a terminus
+			if absf(st[0] - prev[0]) > 25.0 * 0.5 + 0.01 and not (int(st[9]) != int(prev[9]) and st[2] > 0.5 and prev[2] > 0.5):
 				jumps += 1
 			if st[2] > 0.5:
 				var p := Vector2(st[4], st[6])
@@ -103,14 +118,24 @@ func _initialize() -> void:
 		var t := 0.0
 		while t < period:
 			var st: PackedFloat64Array = tr.call("set_state_at", si, t)
-			var gap := absf(c[1] - st[0])
+			var gap := absf(c[1] - st[0]) if int(st[9]) == int(c[5]) else 1e9
 			var closed := bool(tr.call("crossing_closed_at", k, t))
 			if gap <= 40.0:
 				overlaps += 1
 				if not closed and closed_bad.size() < 6:
 					closed_bad.append("crossing %d open with set %d on it at t %.0f" % [k, si, t])
 			if gap > 40.0 + 150.0 + 60.0 and closed and st[2] < 0.5:
-				reopen_ok = false
+				# every set sharing this line (a circuit carries several) must be far from it too
+				var all_far := true
+				var line := str(tr.call("set_id_now", si)).get_slice("#", 0)
+				for sj in n_sets:
+					if str(tr.call("set_id_now", sj)).get_slice("#", 0) != line:
+						continue
+					var sj_st: PackedFloat64Array = tr.call("set_state_at", sj, t)
+					if int(sj_st[9]) == int(c[5]) and (absf(c[1] - sj_st[0]) <= 40.0 + 150.0 + 60.0 or sj_st[2] > 0.5):
+						all_far = false
+				if all_far:
+					reopen_ok = false
 			t += 1.0
 	_check(n_cross == 0 or (closed_bad.is_empty() and overlaps > 0),
 			"a set never stands on an open crossing (%d overlap samples)%s" % [overlaps, (": " + ", ".join(closed_bad)) if closed_bad else ""])
