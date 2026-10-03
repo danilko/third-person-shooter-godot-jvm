@@ -459,11 +459,14 @@ SPAWN_UID = "uid://ctq8u5jyp6ijf"
 # against `tools/godot/probe_city_perf.gd --crowd` (a display), never by eye. A crowd's cost is per PHYSICS TICK
 # and the cliff is Godot's catch-up spiral past 16.7 ms, so the number that matters is how many are in range at
 # once, which `peds` prints.
-PED_DENSITY = {"akiba": 2.4, "nightlife": 2.6, "downtown": 2.0, "city": 1.2, "residential": 0.8, "residential_north": 0.8,
-               "residential_west": 0.5, "suburb": 0.6, "industry": 0.5, "harbour": 0.4, "farm": 0.3,
-               "light_industry": 0.6, "light_industry_w": 0.8, "west_centre": 1.6, "west_ekimae": 2.2, "bay_processing": 0.7, "airport": 0.4,
-               "ekimae": 1.8, None: 0.5}
-PED_MAX = 40           # a single cell's crowd, however much footway it holds
+# Pedestrians per 100 m of footway. Raised x3-5 (user, 2026-10-03: "only 1-2 on a street, small for a Japanese city")
+# now that a far ped is one VAT MultiMesh instance (bench: 600 peds 0.57 ms, 2000 peds 1.48 ms), not a skinned body.
+# Japanese reference: a busy shopping / station-front footway carries ~8-15 people per 100 m, a residential street 1-2.
+PED_DENSITY = {"akiba": 10.0, "nightlife": 12.0, "downtown": 9.0, "city": 4.0, "residential": 2.0, "residential_north": 2.0,
+               "residential_west": 1.2, "suburb": 1.5, "industry": 1.0, "harbour": 0.8, "farm": 0.4,
+               "light_industry": 1.5, "light_industry_w": 2.0, "west_centre": 6.0, "west_ekimae": 10.0, "bay_processing": 1.5, "airport": 1.5,
+               "ekimae": 8.0, None: 1.0}
+PED_MAX = 200          # a single cell's crowd, however much footway it holds
 PED_LOAD = 300.0       # > the cell's own half-diagonal (178 m) and just over the 252 m cell pitch, so the four
                        # orthogonal neighbours stream too and a crowd exists before it is in view
 PED_UNLOAD = 420.0     # hysteresis, the Zone rule: unload > load > halfExtent

@@ -82,6 +82,29 @@ public class WorldBounds extends Node3D {
 
     public void setFloorY(float v) { floorY = v; }
 
+    /**
+     * UNDER THE GROUND (user, 2026-10-03: a rider was left under the island's terrain with no way back): a body whose
+     * feet are more than this far (m) under the Terrain3D surface at its spot, for {@link #undergroundSeconds}, is
+     * under the map -- nothing in this world is below its terrain (no tunnels, no basements; CLAUDE.md "No ground
+     * below sea level"). 0 turns the check off.
+     */
+    @Export public float undergroundDepth = 1.0f;
+
+    public float getUndergroundDepth() { return undergroundDepth; }
+
+    public void setUndergroundDepth(float v) { undergroundDepth = v; }
+
+    @Export public float undergroundSeconds = 0.5f;
+
+    public float getUndergroundSeconds() { return undergroundSeconds; }
+
+    public void setUndergroundSeconds(float v) { undergroundSeconds = v; }
+
+    /** A body under the map is put back on the surface at the same spot (GTA's answer when you fall through the
+     *  map): the topmost thing within this many metres over the terrain there (a road, a footway, a station floor),
+     *  else the terrain. A bridge deck or a roof higher than that is not "the ground here". */
+    static final double SURFACE_REACH = 8.0;
+
     /** Seconds between sweeps of everything that is not a player. */
     @Export public float sweepInterval = 0.5f;
 
@@ -121,6 +144,10 @@ public class WorldBounds extends Node3D {
     private final Map<Long, Double> lastLogMs = new HashMap<>();
     private Node3D debugVolume;
     private int hardCorrections = 0;
+    private int undergroundRescues = 0;
+    private final Map<Long, Double> underSince = new HashMap<>();
+    private Node terrain;
+    private long terrainScene = -1;
     private int warningsEmitted = 0;
     private int returnsEmitted = 0;
 
@@ -137,6 +164,7 @@ public class WorldBounds extends Node3D {
         if (instance == this) instance = null;
         warned.clear();
         lastLogMs.clear();
+        underSince.clear();
     }
 
     @Register
@@ -208,6 +236,7 @@ public class WorldBounds extends Node3D {
             rescue(body);
             return true;
         }
+        if (underground(body, pos)) return true;
         Vector3 c = getGlobalPosition();
         double px = pos.getX(), pz = pos.getZ();
         double dx = overshoot(px - c.getX()), dz = overshoot(pz - c.getZ());
@@ -228,6 +257,68 @@ public class WorldBounds extends Node3D {
         }
         return true;
     }
+
+    /** The Terrain3D surface height (m) at a world XZ, or NaN where there is none (no terrain, a hole, outside it). */
+    @Register
+    public double terrainHeight(double x, double z) {
+        Node scene = getTree() != null ? getTree().getCurrentScene() : null;
+        long sid = scene != null ? scene.getInstanceId() : 0;
+        if (sid != terrainScene || (terrain != null && !GD.isInstanceValid(terrain))) {
+            terrainScene = sid;
+            terrain = scene != null ? scene.findChild("Terrain3D", true, false) : null;
+        }
+        if (terrain == null) return Double.NaN;
+        Object data = terrain.get(new StringName("data"));
+        if (!(data instanceof godot.api.Object d)) return Double.NaN;
+        Object h = d.call(new StringName("get_height"), new Vector3(x, 0.0, z));
+        return h instanceof Number n ? n.doubleValue() : Double.NaN;
+    }
+
+    /** Is this body under the map, and if it has been for long enough, deal with it. True when it was moved. */
+    private boolean underground(Node3D body, Vector3 pos) {
+        if (undergroundDepth <= 0f) return false;
+        if (body instanceof com.openworld.character.Character ch && ch.currentVehicleNode != null) return false;
+        long id = body.getInstanceId();
+        double h = terrainHeight(pos.getX(), pos.getZ());
+        if (Double.isNaN(h) || pos.getY() > h - undergroundDepth) {
+            underSince.remove(id);
+            return false;
+        }
+        double now = godot.api.Time.INSTANCE.getTicksMsec() / 1000.0;
+        Double since = underSince.putIfAbsent(id, now);
+        if (since == null || now - since < undergroundSeconds) return false;
+        underSince.remove(id);
+        undergroundRescues++;
+        Vector3 to = surfaceAt(body, pos.getX(), h, pos.getZ());
+        body.setGlobalPosition(to);
+        cancelAll(body);
+        GD.print("WorldBounds: " + body.getName() + " was under the map at (" + Math.round(pos.getX()) + ", "
+                + Math.round(pos.getY()) + ", " + Math.round(pos.getZ()) + "): put back on the surface at y "
+                + String.format("%.1f", to.getY()));
+        return true;
+    }
+
+    /** The place to stand at (x, z): the topmost collider within SURFACE_REACH over the terrain there, else the
+     *  terrain itself. A bridge deck or a roof higher than that is not "the ground here". */
+    private Vector3 surfaceAt(Node3D body, double x, double h, double z) {
+        double lift = body instanceof RigidBody3D ? 1.0 : 0.15;
+        godot.api.PhysicsDirectSpaceState3D sp = getWorld3d() != null ? getWorld3d().getDirectSpaceState() : null;
+        if (sp != null) {
+            godot.core.VariantArray<godot.core.RID> ex = new godot.core.VariantArray<>(godot.core.RID.class);
+            if (body instanceof godot.api.CollisionObject3D co) ex.append(co.getRid());
+            godot.api.PhysicsRayQueryParameters3D q = godot.api.PhysicsRayQueryParameters3D.create(
+                    new Vector3(x, h + SURFACE_REACH, z), new Vector3(x, h - 0.5, z), com.openworld.util.CollisionLayers.WORLD, ex);
+            godot.core.Dictionary<Object, Object> hit = sp.intersectRay(q);
+            if (hit != null && !hit.isEmpty() && hit.get("position") instanceof Vector3 p) {
+                return new Vector3(x, p.getY() + lift, z);
+            }
+        }
+        return new Vector3(x, h + lift, z);
+    }
+
+    /** Bodies put back from under the map since start -- the gate reads it. */
+    @Register
+    public int undergroundRescueCount() { return undergroundRescues; }
 
     /** Inward correction for one axis (wall frame): the whole overshoot, else 0. */
     private double overshoot(double v) {
