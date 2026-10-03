@@ -7,6 +7,9 @@ extends SceneTree
 ## Saves one frame per hour listed, from a street-level camera beside a lit lamp with a car in shot, and prints
 ## each frame's MEAN LUMINANCE -- which is the number the complaint "night is barely able to see" is about, and
 ## the one to compare before and after a change to the moon, the lamps or the ambient.
+##   --mode=all (default) | real | pools | none   which of StreetLights' layers are on: real = the real
+##   OmniLights only (the world before the fake pools), pools = the fake pools + glow only, none = neither.
+##   --lights=N   how many real lights the pool may use (StreetLights.max_lights)
 
 const WORLDS := {
 	"debugworld": "res://src/main/resources/com/openworld/world/DebugWorld.tscn",
@@ -65,6 +68,13 @@ func _initialize() -> void:
 	car.look_at(car.global_position + Vector3(-1, 0, -1), Vector3.UP)
 	car.freeze = true
 
+	var mode := _arg("mode", "all")
+	var sl := root.get_node_or_null("StreetLights")
+	if sl != null:
+		sl.set("enabled", mode == "all" or mode == "real")
+		sl.set("pools_enabled", mode == "all" or mode == "pools")
+		sl.set("glow_enabled", mode == "all" or mode == "pools")
+		sl.set("max_lights", int(_arg("lights", str(sl.get("max_lights")))))
 	for h in hours:
 		for n in world.find_children("TimeOfDay", "Node", true, false):
 			n.set("current_time", h)
@@ -72,10 +82,11 @@ func _initialize() -> void:
 			await process_frame
 		RenderingServer.force_draw()
 		var img := root.get_viewport().get_texture().get_image()
-		var path := "%s/%s_%02d00.png" % [out, world_key, int(h)]
+		var path := "%s/%s_%s_%02d00.png" % [out, world_key, mode, int(h)]
 		img.save_png(path)
 		var lamps := root.get_node_or_null("StreetLights")
-		print("%02d:00  mean luma %.4f  lamps lit %d  headlights %s  -> %s"
+		print("%02d:00  mean luma %.4f  lamps lit %d  pools %d+%d  headlights %s  -> %s"
 				% [int(h), _mean_luma(img), int(lamps.call("lit_lamps_now")) if lamps else -1,
+				   int(lamps.call("lamp_pools_now")) if lamps else -1, int(lamps.call("shop_pools_now")) if lamps else -1,
 				   car.call("headlights_on_now"), path])
 	quit(0)

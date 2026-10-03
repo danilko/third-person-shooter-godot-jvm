@@ -12,6 +12,8 @@ extends SceneTree
 ## `--scenarios=a,b` picks some; `--strip-sequence` turns per-character nodes off one at a time (cumulative); `--no-rays` / `--no-springarm` / `--no-nameplates` / `--no-hitboxes` / `--no-modifiers` / `--no-anim` strip those from every character (cost split). `--no-lod` sets the viewport's mesh_lod_threshold to 0 (every mesh at full detail): the control for the LOD
 ## chain. `--shadow-distance=M` overrides the sun's directional_shadow_max_distance. `--legs=a,b` runs only those legs. `--no-buildings` removes the BuildingZones markers before the world enters the tree: the same flight over roads
 ## alone, the control that says what the buildings cost. `--shots=<dir>` saves a picture at the start of each leg.
+## `--hour=H` sets the clock (default noon); `--night-mode=all|real|pools|none` picks StreetLights' layers at night
+## (real = the real OmniLights only, pools = fake pools + window glow only); `--lights=N` sets the real-light count.
 ## Exits 1 when the street-level p95 is over `--budget` ms (default 16.7, i.e. 60 fps).
 
 const WORLD := "res://src/main/resources/com/openworld/world/World.tscn"
@@ -54,10 +56,87 @@ func _buildings_in_tree() -> int:
 				n += c.get_child_count()
 	return n
 
+## The ground under (x, z): Terrain3D's own height (the land redo raised the city plain to ~5.6 m, so a fixed
+## street-level y put the camera UNDER the ground on most of every street leg -- measured 91-95 % of both).
+var terrain_data = null
+func _ground(x: float, z: float) -> float:
+	if terrain_data == null:
+		var t := current_scene.find_child("Terrain3D", true, false) if current_scene else null
+		if t != null:
+			terrain_data = t.get("data")
+	if terrain_data != null:
+		var h: float = terrain_data.call("get_height", Vector3(x, 0, z))
+		if not is_nan(h) and h < 1e30:
+			return maxf(h, 0.0)
+	return 0.0
+
+## A street leg is the street itself: the longest chain of one road's lane-0 through lanes (across its zone
+## splits and through the junction connectors that continue it), read from the BUILT lanekits so the route
+## follows the island when it is rebuilt -- fixed coordinates had drifted into the sea and across open blocks.
+## Waypoints every ~10 m at `eye` above the ground under them (see _place / _ground).
+func _road_path(road: String, eye: float) -> Array:
+	var lanes := {}
+	var dir := "res://assets/world_source/pieces/"
+	for f in DirAccess.get_files_at(dir):
+		if f.begins_with("Roads_IslandRoads_") and f.ends_with(".lanekit.json"):
+			var doc = JSON.parse_string(FileAccess.get_file_as_string(dir + f))
+			for l in doc["lanes"]:
+				lanes[l["id"]] = l
+	var base := func(l) -> String: return str(l.get("road_name", "")).split("__")[0]
+	var best := []
+	var best_len := 0.0
+	for id in lanes:
+		var l = lanes[id]
+		if base.call(l) != road or l["kind"] != "through" or int(l["lane_index"]) != 0 or not str(id).ends_with("_F0"):
+			continue
+		var chain := [id]
+		var seen := {id: true}
+		var cur = id
+		while true:
+			var step = null
+			for n in lanes[cur].get("next", []):
+				if lanes.has(n) and not seen.has(n) and lanes[n]["kind"] == "through" and base.call(lanes[n]) == road:
+					step = [n]
+					break
+			if step == null:
+				for c in lanes[cur].get("next", []):
+					if not lanes.has(c) or seen.has(c):
+						continue
+					for n in lanes[c].get("next", []):
+						if lanes.has(n) and not seen.has(n) and lanes[n]["kind"] == "through" and base.call(lanes[n]) == road:
+							step = [c, n]
+							break
+					if step != null:
+						break
+			if step == null:
+				break
+			for n in step:
+				chain.append(n)
+				seen[n] = true
+			cur = step[-1]
+		var pts := []
+		for n in chain:
+			for q in lanes[n]["points"]:
+				pts.append(Vector3(q[0], eye, q[2]))
+		var length := 0.0
+		for i in range(1, pts.size()):
+			length += pts[i - 1].distance_to(pts[i])
+		if length > best_len:
+			best_len = length
+			best = pts
+	var out := []
+	for q in best:
+		if out.is_empty() or out[-1].distance_to(q) >= 10.0:
+			out.append(q)
+	print("  route %s: %.0f m, %d waypoints" % [road, best_len, out.size()])
+	return out
+
+var street_level := false   # true on a street leg: `pos.y` is eye height ABOVE the ground there
 func _place(pos: Vector3, look: Vector3) -> void:
-	cam.global_position = pos
-	cam.look_at(look, Vector3.UP)
-	player.global_position = Vector3(pos.x, 2.0, pos.z)
+	var g := _ground(pos.x, pos.z) if street_level else 0.0
+	cam.global_position = pos + Vector3(0, g, 0)
+	cam.look_at(look + Vector3(0, g, 0), Vector3.UP)
+	player.global_position = Vector3(pos.x, (g if street_level else 0.0) + 2.0, pos.z)
 
 func _settle(seconds: float) -> void:
 	# streaming starts on the ZoneManager's 0.5 s tick and parses on worker threads: wait at least 4 s, then until
@@ -90,7 +169,9 @@ func _info(kind: int) -> int:
 func _leg(label: String, path: Array, speed: float, look_ahead: bool, look_at_pt := Vector3.ZERO) -> Dictionary:
 	if _arg("legs") != null and not (label in str(_arg("legs")).split(",")):
 		return {}
-	# path: [Vector3] waypoints at camera height; the camera moves `speed` m/s by REAL frame time
+	# path: [Vector3] waypoints at camera height (above the GROUND on a look-ahead street leg); the camera moves
+	# `speed` m/s by REAL frame time
+	street_level = look_ahead
 	_place(path[0], path[1] if look_ahead else look_at_pt)
 	await _settle(40.0)
 	var shots = _arg("shots")
@@ -447,7 +528,7 @@ func _initialize() -> void:
 	var tod := w.get_node_or_null("Sky3D/TimeOfDay")
 	if tod != null:
 		tod.set("game_time_enabled", false)
-		tod.set("current_time", 12.0)
+		tod.set("current_time", float(_arg("hour", "12.0")))
 	if _arg("shadow-distance") != null:
 		var sun := w.get_node_or_null("Sky3D/SunLight") as DirectionalLight3D
 		if sun != null:
@@ -458,6 +539,16 @@ func _initialize() -> void:
 		print("CONTROL: mesh LOD off (full detail everywhere)")
 	root.add_child(w)
 	current_scene = w
+	var nm = _arg("night-mode")
+	var sl := root.get_node_or_null("StreetLights")
+	if sl != null and nm != null:
+		sl.set("enabled", nm == "all" or nm == "real")
+		sl.set("pools_enabled", nm == "all" or nm == "pools")
+		sl.set("glow_enabled", nm == "all" or nm == "pools")
+		print("VARIANT: hour %s, night lighting %s" % [_arg("hour", "12"), nm])
+	if sl != null and _arg("lights") != null:
+		sl.set("max_lights", int(_arg("lights")))
+		print("VARIANT: %d real street lights" % int(_arg("lights")))
 	player = w.get_node("Characters/Player")
 	player.get_node("Health").set("max_health", 1000000.0)
 	player.set_physics_process(false)
@@ -473,13 +564,12 @@ func _initialize() -> void:
 	cam.make_current()
 	# Legs (Godot frame; downtown is inside C1, record x 150..1300, y 40..720 -> z -720..-40; the street grid's
 	# east-west streets run at record y 110 / 350 / 540, the north-south ones at x 224 / 562 / 912 / 1250).
-	var street_y := 2.4
+	var street_y := 1.7    # eye height above the ground under it (see _ground)
 	var results := []
-	results.append(await _leg("street_ew_downtown", [Vector3(180, street_y, -350), Vector3(1320, street_y, -350)], 15.0, true))
-	results.append(await _leg("street_ns_downtown", [Vector3(912, street_y, 60), Vector3(912, street_y, -760)], 15.0, true))
-	results.append(await _leg("street_residential", [Vector3(-1300, street_y, 530), Vector3(-150, street_y, 530)], 15.0, true))
-	results.append(await _leg("drive_fast_arterial", [Vector3(-1600, street_y, 330), Vector3(-200, street_y, 330),
-			Vector3(600, street_y, 100), Vector3(1500, street_y, 60)], 40.0, true))
+	results.append(await _leg("street_ew_downtown", _road_path("ekimae_dori", street_y), 15.0, true))
+	results.append(await _leg("street_ns_downtown", _road_path("naka_hondori", street_y), 15.0, true))
+	results.append(await _leg("street_residential", _road_path("nishi_dori", street_y), 15.0, true))
+	results.append(await _leg("drive_fast_arterial", _road_path("chuo_dori", street_y), 40.0, true))
 	results.append(await _leg("overview_60m", [Vector3(-100, 60, 150), Vector3(1500, 60, 150)], 25.0, false, Vector3(725, 0, -380)))
 	results.append(await _leg("overview_200m_orbit", [Vector3(725, 200, 600), Vector3(1700, 200, -380), Vector3(725, 200, -1300),
 			Vector3(-250, 200, -380), Vector3(725, 200, 600)], 60.0, false, Vector3(725, 0, -380)))

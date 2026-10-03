@@ -9770,6 +9770,28 @@ alone. Also `TimeOfDay.minutes_per_day` was the Sky3D default **15**, so a whole
   twilight) — so dusk fades the lamps up instead of switching them. The sun is found by the group
   **`sun_light`** (both world scenes put Sky3D's `SunLight` in it), else the brightest directional light. With no
   directional light at all — a bare probe stand — `nightFactor` is 0 and every consumer behaves as before.
+- **The sun is never the moon** (2026-10-02, user-reported: "only the back light lights up"). A World rebuild
+  (660073ba) dropped `SunLight`'s `sun_light` group (and at runtime Sky3D's node is not in the group even in
+  DebugWorld). The fallback was "the brightest DirectionalLight3D", and after dusk Sky3D takes the sun's energy to
+  0, so the MOON won. It shines down, so it read as noon all night: no headlight or street lamp ever came on, only
+  the day-and-night brake / reverse lamps. `DayNight` now takes the group, then the node NAMED `SunLight`, then the
+  brightest non-moon. `probe_night_lights.gd` asserts it with the group removed (`forget_sun_now` drops the cache).
+  The old rule fails 8 checks there.
+- **Three layers, cheapest first** (`StreetLights`, 2026-10-02): (1) GLOW: the shared window / fascia materials
+  (`StreetLights.GLOW`: `MI_FakeInterior*`, `MI_FasciaKonbini/Gas`, `MI_ShopBand`) get emission x the night, one change
+  per material for the whole city; (2) FAKE POOLS: a box per lamp head (one MultiMesh per streamed lamp batch, a child
+  of it) and per shop door in the places record, drawn with `assets/vfx/night/light_pool.gdshader`, which reads the
+  depth buffer and ADDS a warm disc onto whatever surface is behind it, no light math; (3) REAL lights, the
+  `maxLights` (24) nearest heads. Emission alone lights nothing here (no SDFGI / VoxelGI / lightmaps), which is why (2)
+  exists; baked lightmaps do not fit (Terrain3D has none, streamed + regenerated world, day/night). Measured on the
+  island streets at night (`probe_city_perf.gd --hour=0 --night-mode=none|real|pools|all --lights=N`): every
+  configuration within noise, GPU p50 under 3 ms; the frame is CPU-bound. `shot_night.gd --mode=` pictures each layer.
+- **`probe_city_perf.gd`'s street legs follow REAL roads now** (`_road_path`: one street's lane-0 chain from the built
+  lanekits, eye 1.7 m over Terrain3D's height). The fixed y 2.4 m had the camera UNDER the raised city plain on
+  91-95 % of both street legs, and the fixed coordinates crossed open blocks and the sea; the corrected noon street
+  leg is p95 ~17.4 ms, over the 16.7 budget, where the old one read 15.9.
+- **A far car keeps its lamp FACES lit**: past `LIGHT_VIEW_DISTANCE` only the light nodes go (a material swap
+  costs nothing per frame), so night traffic down the road still reads as lit cars.
 - **`world.StreetLights` (AutoLoad) is a POOL that follows the camera.** The island stands **1 962 poles**; they
   are MultiMesh instances precisely so a district costs one draw call, and a light per instance would undo that
   and light half the island. So the nearest standing lamp HEADS within `radius` (75 m) get one of `maxLights`

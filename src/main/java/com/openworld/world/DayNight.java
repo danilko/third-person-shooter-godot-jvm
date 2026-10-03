@@ -28,8 +28,12 @@ import godot.global.GD;
  * civil twilight ({@link #dayElevation} down to {@link #nightElevation}), so dusk fades the lamps up
  * instead of switching them.
  *
- * <p>The sun is found by the group {@code "sun_light"} (both world scenes put Sky3D's `SunLight` in it),
- * else the brightest `DirectionalLight3D` in the tree, re-resolved if it is freed by a scene change. With
+ * <p>The sun is found by the group {@code "sun_light"}, else a `DirectionalLight3D` NAMED {@code "SunLight"}
+ * (Sky3D's), else the brightest one whose name is not a moon, re-resolved if it is freed by a scene change.
+ * <b>"Brightest" alone is wrong at night</b>: Sky3D takes the sun's energy to 0 after dusk, so the moon wins,
+ * and a moon shines DOWN — which read as noon all night. That is what happened when a World rebuild dropped
+ * the group from `SunLight` (660073ba): headlights and street lamps never came on, only the brake lamps
+ * (which signal day and night). With
  * no directional light at all — a bare probe stand — {@link #nightFactor} is 0 and every consumer behaves
  * exactly as it did before this existed.
  */
@@ -90,14 +94,28 @@ public class DayNight extends Node {
         for (Node n : getTree().getNodesInGroup(new StringName("sun_light"))) {
             if (n instanceof DirectionalLight3D d) { sun = d; break; }
         }
+        if (sun == null) sun = namedSun(getTree().getRoot());
         if (sun == null) sun = brightestDirectional(getTree().getRoot());
         return sun;
+    }
+
+    private DirectionalLight3D namedSun(Node from) {
+        for (Node c : from.getChildren()) {
+            if (c instanceof DirectionalLight3D d && "SunLight".equals(c.getName().toString())) return d;
+            DirectionalLight3D deep = namedSun(c);
+            if (deep != null) return deep;
+        }
+        return null;
+    }
+
+    private static boolean isMoon(Node n) {
+        return n.getName().toString().toLowerCase().contains("moon");
     }
 
     private DirectionalLight3D brightestDirectional(Node from) {
         DirectionalLight3D best = null;
         for (Node c : from.getChildren()) {
-            if (c instanceof DirectionalLight3D d && (best == null || d.getParam(Light3D.Param.ENERGY) > best.getParam(Light3D.Param.ENERGY))) {
+            if (c instanceof DirectionalLight3D d && !isMoon(d) && (best == null || d.getParam(Light3D.Param.ENERGY) > best.getParam(Light3D.Param.ENERGY))) {
                 best = d;
             }
             DirectionalLight3D deep = brightestDirectional(c);
@@ -120,6 +138,9 @@ public class DayNight extends Node {
     @Register public float nightFactorNow() { return night; }
     @Register public float sunElevationNow() { return sunElevation; }
     @Register public boolean lightsWantedNow() { return lightsWanted(); }
+
+    /** Drop the cached sun so the next frame resolves it again (a probe changing the group or the scene). */
+    @Register public void forgetSunNow() { sun = null; }
 
     /** Where the key light is, for a probe that wants to put the sun somewhere without a clock. */
     @Register public Node3D sunLightNow() { return sunLight(); }

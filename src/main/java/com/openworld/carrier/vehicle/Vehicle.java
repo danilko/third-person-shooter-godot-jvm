@@ -886,12 +886,24 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         boolean hasLamps = !(cfg.headlightOffset.getX() == 0.0 && cfg.headlightOffset.getZ() == 0.0);
         boolean alive = healthNode == null || !healthNode.isDead();
         boolean near = nearCamera();
-        if (!hasLamps || !near) {
+        if (!hasLamps) return;
+        // built on first need: a far car by day never pays for its lights
+        if (headRight == null && !near && !com.openworld.world.DayNight.lightsWanted()) return;
+        if (headRight == null) buildLights(cfg);
+        if (!near) {
+            // far from the camera the LIGHTS go (a beam nobody can see is a cost), but the lamp FACES keep their
+            // night glow: a material swap costs nothing per frame, and traffic 300 m down the road must still read
+            // as lit cars at night. Brake / reverse are not judged out here (no lights to show them on).
             lastLightPos = null;
-            if (headRight != null && (lightsOn || brakeLit || reverseLit)) applyLights(false, false, false);
+            applyLights(alive && com.openworld.world.DayNight.lightsWanted(), false, false);
+            setLightNodesVisible(false);
+            lightsFar = true;
             return;
         }
-        if (headRight == null) buildLights(cfg);
+        if (lightsFar) {
+            lightsFar = false;
+            forceLightRefresh();
+        }
         // forward speed from MOTION, so a frozen puppet reads the same as the simulating car
         Vector3 pos = getGlobalPosition();
         Vector3 fwd = getGlobalBasis().getZ().times(-1.0);
@@ -910,6 +922,20 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         }
         boolean reversing = forward < -REVERSE_SPEED;
         applyLights(alive && com.openworld.world.DayNight.lightsWanted(), alive && braking, alive && reversing);
+    }
+
+    private boolean lightsFar;
+
+    private void setLightNodesVisible(boolean on) {
+        for (Light3D l : new Light3D[] {headLeft, headRight, tailLeft, tailRight, reverseLight})
+            if (l != null && !on) l.setVisible(false);
+    }
+
+    /** Coming back into range: re-apply the current state so the hidden light nodes show again. */
+    private void forceLightRefresh() {
+        boolean n = lightsOn, b = brakeLit, r = reverseLit;
+        lightsOn = !n;
+        applyLights(n, b, r);
     }
 
     private void applyLights(boolean night, boolean brake, boolean reverse) {

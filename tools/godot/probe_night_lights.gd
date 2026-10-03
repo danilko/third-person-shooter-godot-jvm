@@ -119,6 +119,23 @@ func _initialize() -> void:
 			% [noon_elev, noon_night, night_elev, night_night])
 	_check(noon_elev > 10.0 and noon_night < 0.05, "noon reads as day")
 	_check(night_elev < -8.0 and night_night > 0.95, "midnight reads as night")
+	# World.tscn's SunLight lost its "sun_light" group in a rebuild (660073ba), and with the sun's energy at 0
+	# after dusk the "brightest directional" fallback took the MOON, which shines down: it read as noon all
+	# night and no headlight or street lamp ever came on. Without the group the sun must still be found.
+	var sun_node: Node = dn.call("sun_light_now")
+	var was_grouped: bool = sun_node != null and sun_node.is_in_group("sun_light")
+	if was_grouped:
+		sun_node.remove_from_group("sun_light")
+	dn.call("forget_sun_now")
+	await _set_time(23.6)
+	var ungrouped: float = dn.call("night_factor_now")
+	var read: Node = dn.call("sun_light_now")
+	print("probe: with no sun_light group, midnight night %.2f (sun read: %s)" % [ungrouped, read.name if read else "none"])
+	_check(ungrouped > 0.95 and read != null and read.name == "SunLight",
+			"midnight reads as night with no sun_light group (the moon is never the sun)")
+	if was_grouped:
+		sun_node.add_to_group("sun_light")
+	dn.call("forget_sun_now")
 
 	# --- 2. the lamp pool (waited in TIME: it re-assigns every 0.25 s, longer than 20 headless frames)
 	await _wait_seconds(0.8)
@@ -131,6 +148,13 @@ func _initialize() -> void:
 			% [lit, nearest, head.y, lamp.y])
 	_check(lit > 0, "lamps near the camera are lit at night")
 	_check(nearest >= 0.0 and nearest < 20.0, "the nearest lit lamp is the one we are standing at")
+	# the fake pools and the window glow (2026-10-02): every streamed lamp head has a pool, shown at night
+	var pools: int = sl.call("lamp_pools_now")
+	print("probe: night -> %d lamp pools, %d shop pools, shown %s, window glow %.2f"
+			% [pools, int(sl.call("shop_pools_now")), sl.call("pools_shown_now"), float(sl.call("glow_energy_now", 1))])
+	if not control:
+		_check(pools >= lamps and bool(sl.call("pools_shown_now")), "every streamed lamp head has a light pool at night")
+		_check(float(sl.call("glow_energy_now", 1)) > 0.5, "the shared window material glows at night")
 	_check(lit > 0 and absf((head.y - lamp.y) - LAMP_HEAD_Y) < 0.5,
 			"the light sits at the luminaire, %.2f m up" % LAMP_HEAD_Y)
 
@@ -187,6 +211,9 @@ func _initialize() -> void:
 		await process_frame
 	_check(not bool(car2.call("headlights_on_now")), "and off by day")
 	_check(int(sl.call("lit_lamps_now")) == 0, "the lamps are out by day")
+	if not control:
+		_check(not bool(sl.call("pools_shown_now")) and float(sl.call("glow_energy_now", 1)) == 0.0,
+				"the pools and the window glow are off by day")
 
 	# --- 5. the moon
 	await _set_time(23.5)
