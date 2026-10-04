@@ -99,6 +99,16 @@ PLATFORM_EXITS = (EXIT_NONE, EXIT_LEFT, EXIT_RIGHT, EXIT_BOTH)
 #: `platform_open` (same values): the rail's fence and car wall on that side stand down -- a kit station's platform
 #: (or its end building) stands there (`island_rail_record.open_air_fence`).
 
+#: A VEHICLE ENTRY's style (`PointData.entry_style`, 2026-10-04; APPEND-ONLY, an enum is stored by name but the order is
+#: the dock's): DROP the kerb and footway lowered to a 5 cm lip in their own concrete (切り下げ, the default); DROP_ASPHALT
+#: the same, the lowered footway paved in the road's asphalt so it reads as one surface with the lot behind; CUT the kerb
+#: and footway simply removed over the entry, exposing whatever ground is there (kept for comparison: the stamped ground
+#: under a road sits 10 cm below the asphalt, so a CUT leaves a lip -- see the EntryTest street).
+ENTRY_DROP = 'DROP'
+ENTRY_DROP_ASPHALT = 'DROP_ASPHALT'
+ENTRY_CUT = 'CUT'
+ENTRY_STYLES = (ENTRY_DROP, ENTRY_DROP_ASPHALT, ENTRY_CUT)
+
 #: The four fields a station may change while still INHERITing the road's base profile -- "what
 #: actually varies along a road" (1.2a). Everything else is whole-profile INHERIT or OVERRIDE,
 #: deliberately one bit rather than a 30-field mask nobody can hold in their head.
@@ -176,6 +186,14 @@ POINT_FIELDS = (
     # An accidental nudge would otherwise lock a mouth forever and every future Auto Setback would
     # silently skip it: exactly the invisible state this rewrite exists to kill (2.2).
     ("setback_locked", 'b',  False),
+
+    # a VEHICLE ENTRY (車両乗入れ部 / 歩道の切り下げ, user 2026-10-04): a dropped kerb on that side, this wide (m),
+    # centred on this station -- the kerb and the footway behind it come down to `point_edges.ENTRY_KERB_H` over the
+    # width and ramp back up to the road's kerb over `ENTRY_RAMP` each side, so a car can drive off the carriageway
+    # into a lot or a car park. 0 = none. A per-STATION fact like `pillar_skip`: insert a station where the entry is.
+    ("entry_left",     'f',  0.0),
+    ("entry_right",    'f',  0.0),
+    ("entry_style",    ENTRY_STYLES, ENTRY_DROP),
 )
 
 ROAD_FIELDS = (
@@ -413,7 +431,7 @@ def resolve_point(point, road):
               "ground_z", "has_ground_z", "pillar_skip", "pillar_offset", "shed", "platform_exit", "platform_open",
               "yard_left", "yard_right", "yard_shift_left", "yard_shift_right", "footbridge",
               "fillet_radius", "allow_cross", "allow_uturn", "traffic_light",
-              "setback_solved", "setback_locked"):
+              "setback_solved", "setback_locked", "entry_left", "entry_right", "entry_style"):
         setattr(out, n, getattr(point, n))
     return out
 

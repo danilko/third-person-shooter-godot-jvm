@@ -196,7 +196,7 @@ def koban(b):
 def fire_branch(b):
     x0, y0, x1, y1 = -8.0, -10.0, 8.0, 8.0
     H = 5.2
-    apron(b, -10.0, -12.5, 10.0, 12.5)
+    apron(b, -15.0, -20.0, 15.0, 14.0)                      # a 10 m apparatus apron, 7 m lanes round the sides and back
     b.slab(x0, y0, x1, y1, 0.0, "MI_ConcreteSmooth")
     bays = [(-5.9, -1, 3.6, "", "open", 4.2), (-2.0, -1, 3.6, "", "open", 4.2)]
     ext(b, x0, y0, x1, y1, 0.0, H + 0.2, "MI_TileWhite", {
@@ -260,28 +260,37 @@ def police_station(b):
     CF, CB = -1.0, 0.8                      # the corridor's two walls (a 1.8 m double-loaded corridor)
     xi0, xi1 = X0 + EXT_T, X1 - EXT_T
     yf, yb = Y0 + EXT_T, Y1 - EXT_T
-    apron(b, -17.5, -20.0, 17.5, 20.0)
-    paint_bays(b, -12.5, 10, 2.5, 10.0, 15.0)                 # the rear car park (patrol cars, staff)
+    # THE SITE (user, 2026-10-04: "leave room on the sides for a large truck to pass, double the entrances, more
+    # front and back"): a 10 m drive lane down EACH side of the building (a truck lane is 6 m; the rest is its turn),
+    # 12 m of forecourt and 16.6 m of yard behind. Vehicles never use the plot's SIDE: a neighbour may stand against
+    # it, so both vehicle gates are in the FRONT fence, one at the head of each side lane (in left, out right, 10 m
+    # each -- they were one 5 m gate on the side), with the 6 m public gate between them before the entrance.
+    FX, FY0, FY1 = 25.0, -22.0, 24.0                  # the fence
+    apron(b, -FX - 0.5, FY0 - 0.5, FX + 0.5, FY1 + 0.5)
+    paint_bays(b, -22.5, 18, 2.5, 18.5, 23.5)                 # the rear car park (patrol cars, staff), an 11 m aisle
     # THE COMPOUND (user, 2026-09-29: a large station stands inside a fence, its entrances watched): a steel fence
     # on a concrete upstand round the plot; the PUBLIC gate in front of the entrance with the 立番 booth (the
-    # standing guard's post) beside it; the VEHICLE gate on the west side to the rear car park, under a barrier,
-    # with its own guard booth. Suspects are brought in through the west side door (護送口), under its canopy,
-    # straight to the holding cells (留置場) behind the duty desk.
+    # standing guard's post) beside it; the two VEHICLE gates under barriers, the exit watched from its own booth.
+    # Suspects are brought in through the west side door (護送口), under its canopy over the west lane, straight to
+    # the holding cells (留置場) behind the duty desk.
     import interior_plans_jp as JP
-    JP.fence(b, -17.3, -19.8, 17.3, 19.8, [("f", -9.0, 5.0), ("l", 12.5, 5.0)])
-    JP.guard_post(b, -14.4, -19.5, -11.9, -16.5, door_side="b")
-    b.mark("spawn", -12.8, -18.2, 0.0, 180.0, team="police", note="立番: the standing guard at the public gate")
-    JP.guard_post(b, -17.0, 15.6, -14.0, 18.2, door_side="r")
-    b.mark("spawn", -16.0, 13.0, 0.0, 270.0, team="police", note="the vehicle gate's guard")
-    b.box("Site", (-17.1, 9.6, 0.0), (-16.8, 9.9, 1.1), "MI_PaintYellow")               # the barrier's post
-    b.box("Site", (-17.05, 9.65, 1.1), (-16.85, 9.85, 5.2), "MI_PaintWhite")            # its arm, raised
-    b.box("Site", (-17.3, 15.2, 0.0), (-17.15, 19.6, 2.0), "MI_Steel")                   # the sliding gate, open
-    b.box("Site", (-17.5, -2.0, 3.0), (-15.0, 1.8, 3.2), "MI_PaintedMetal")             # the 護送口 canopy
-    b.mark("vehicle", -13.75, 17.5, 0.0, 90.0, vehicle="CRT1", faction="police", note="the prisoner-transport bay")
-    for (x, y) in ((-17.0, -19.5), (17.0, -19.5), (-17.0, 19.5), (17.0, 19.5), (-6.2, -19.5)):
+    JP.fence(b, -FX, FY0, FX, FY1, [("f", -20.0, 10.0), ("f", -9.0, 6.0), ("f", 20.0, 10.0)])
+    JP.guard_post(b, -14.6, FY0 + 0.4, -12.4, FY0 + 3.2, door_side="b")
+    b.mark("spawn", -11.6, FY0 + 1.8, 0.0, 180.0, team="police", note="立番: the standing guard at the public gate")
+    JP.guard_post(b, 11.6, FY0 + 0.4, 14.4, FY0 + 3.2, door_side="b")
+    b.mark("spawn", 14.6, FY0 + 4.2, 0.0, 180.0, team="police", note="the vehicle gates' guard")
+    for x, sgn in ((-15.2, 1), (15.2, -1)):                                           # the barriers, raised
+        b.box("Site", (x - 0.15, FY0 + 0.3, 0.0), (x + 0.15, FY0 + 0.6, 1.1), "MI_PaintYellow")
+        b.box("Site", (x - 0.1, FY0 + 0.35, 1.1), (x + 0.1, FY0 + 0.55, 5.2), "MI_PaintWhite")
+    b.box("Site", (-23.5, -3.0, 4.2), (-15.0, 2.0, 4.4), "MI_PaintedMetal")             # the 護送口 canopy
+    for y in (-2.8, 1.8):
+        b.box("Site", (-23.4, y - 0.1, 0.0), (-23.2, y + 0.1, 4.2), "MI_PaintedMetal")
+    b.mark("vehicle", -21.5, -0.5, 0.0, 0.0, vehicle="CRT1", faction="police",
+           note="the prisoner transport, under the 護送口 canopy (the lane passes it on the building side)")
+    for (x, y) in ((-24.7, FY0 + 0.3), (24.7, FY0 + 0.3), (-24.7, FY1 - 0.3), (24.7, FY1 - 0.3), (-5.6, FY0 + 0.3)):
         JP.camera(b, x, y, 2.0)
-    for x, vid in ((-11.25, "POC1"), (-8.75, "POC1"), (-6.25, "MPC1")):
-        b.mark("vehicle", x, 12.5, 0.0, 180.0, vehicle=vid, faction="police")
+    for x, vid in ((-11.25, "POC1"), (-8.75, "POC1"), (-6.25, "MPC1"), (6.25, "POC1")):
+        b.mark("vehicle", x, 21.0, 0.0, 180.0, vehicle=vid, faction="police")
     # stairs (B at the west end, A in the middle, which goes on to the roof) and the lift
     wellB = (xi0, CB + 0.06, -12.06, yb)
     wellA = (3.66, CB + 0.06, 6.34, yb)
@@ -442,8 +451,9 @@ def police_station(b):
     b.put("Office_Locker", 9.0, yb - 0.3, 0.0, repeat=(3, 0.95, 0.0), z=F2)
     b.put("WC_Toilet", 14.4, 5.8, 270.0, z=F2)
     b.put("WC_Basin", 12.4, 3.2, 90.0, z=F2)
-    return {"note": "警察署: the large police station, two storeys, inside a FENCED COMPOUND: the public gate with "
-                    "the 立番 booth, the vehicle gate to the rear car park under a barrier with its own booth, "
+    return {"note": "警察署: the large police station, two storeys, inside a FENCED COMPOUND 50 x 46 m: 10 m drive "
+                    "lanes down both sides to the rear car park, two 10 m vehicle gates in the front fence (in left, "
+                    "out right) under barriers with a booth, the public gate with the 立番 booth between them, "
                     "cameras; the ARMOURY on the ground floor (front right, MARK_weapon for every rack slot) -- the "
                     "complete one; the 留置場 (three holding cells behind the duty desk) reached from the west "
                     "護送口 door under its canopy, two interrogation rooms with observation rooms; the chief's "
@@ -457,12 +467,15 @@ def fire_station(b):
     F1, F2, TOP = 0.0, 5.4, 9.4
     CF, CB = -1.2, 0.6
     xi0, xi1, yf, yb = X0 + EXT_T, X1 - EXT_T, Y0 + EXT_T, Y1 - EXT_T
-    apron(b, -20.0, -25.0, 20.0, 14.0)                      # the apparatus apron in front; the plot's back is left open
-    # the 訓練塔 (training / hose tower) right behind, not enterable
-    b.box("Site", (9.0, 8.6, 0.0), (14.0, 13.6, 16.0), "MI_ConcreteSmooth")
+    # THE SITE (user, 2026-10-04: room for a large truck round the building): a 14 m apparatus apron in front (the
+    # ladder truck pulls clear of the bays before it turns), a 9 m drive lane down each side and an 8 m one behind, so
+    # an engine can circle the station; the 訓練塔 stands behind that rear lane
+    apron(b, -25.0, -27.0, 25.0, 22.0)
+    # the 訓練塔 (training / hose tower), not enterable
+    b.box("Site", (9.0, 16.5, 0.0), (14.0, 21.5, 16.0), "MI_ConcreteSmooth")
     for z in range(3, 16, 3):
-        b.box("Site", (8.97, 9.4, z), (9.0, 12.8, z + 1.2), "MI_Window")
-    b.box("Site", (8.6, 8.4, 16.0), (14.4, 13.8, 16.6), "MI_CraneRed")
+        b.box("Site", (8.97, 17.3, z), (9.0, 20.7, z + 1.2), "MI_Window")
+    b.box("Site", (8.6, 16.3, 16.0), (14.4, 21.7, 16.6), "MI_CraneRed")
     wellB = (xi0, CB + 0.06, -13.06, yb)
     wellA = (10.06, CB + 0.06, 12.74, yb)
     holeB = b.ustair(*wellB, F1, F2 - F1, near="s")
@@ -566,13 +579,18 @@ def hospital(b):
     CF, CB = -3.4, -0.7                     # a 2.7 m corridor (a double-loaded hospital corridor)
     xi0, xi1, yf, yb = X0 + EXT_T, X1 - EXT_T, Y0 + EXT_T, Y1 - EXT_T
     SL = "slide"
-    apron(b, -27.5, -30.0, 27.5, 30.0)
-    paint_bays(b, -25.0, 20, 2.5, 14.0, 19.0)
-    paint_bays(b, -25.0, 20, 2.5, 24.0, 29.0)
+    # THE SITE (user, 2026-10-04: room for a large truck down the sides): a 9.5 m drive lane down EACH side of the
+    # building to the car park behind, which is two rows of bays across the back with a 6 m aisle against the
+    # building and another between the rows. The EMERGENCY side is the east lane: the ambulance lane (6 m) runs in it
+    # under the 救急 canopy and on round the back.
+    SX = X1 + 9.5                                                               # the site's side edge
+    apron(b, -SX, -30.0, SX, 31.5)
+    paint_bays(b, -27.5, 22, 2.5, 14.0, 19.0)
+    paint_bays(b, -27.5, 22, 2.5, 25.0, 30.0)
     b.box("Site", (-20.0, -19.0, 3.8), (-8.0, Y0, 4.1), "MI_PaintedMetal")        # the entrance canopy
     for x in (-19.7, -8.3):
         b.box("Site", (x - 0.15, -18.85, 0.0), (x + 0.15, -18.55, 3.8), "MI_PaintedMetal")
-    b.box("Site", (X1, -11.0, 4.0), (27.0, -4.0, 4.3), "MI_PaintedMetal")       # the 救急 ambulance canopy
+    b.box("Site", (X1, -11.0, 4.6), (X1 + 8.6, -4.0, 4.9), "MI_PaintedMetal")   # the 救急 ambulance canopy
     wellB = (xi0, CB + 0.06, -19.06, yb)
     wellA = (2.56, CB + 0.06, 5.24, yb)
     holes, holesA = [], []
@@ -622,13 +640,13 @@ def hospital(b):
     b.box("Site", (-19.8, -19.0, 0.02), (-8.2, -16.6, 0.03), "MI_AsphaltLot")
     b.box("Facade", (-17.5, -19.05, 3.3), (-10.5, -18.85, 3.8), "MI_SignGreen")       # 正面玄関 over the canopy
     for y0_, y1_ in ((-30.0, -27.0), (-25.0, -22.0), (-20.0, -17.0), (-15.0, -12.0)):
-        b.box("Site", (X1 + 1.5, y0_, 0.01), (X1 + 4.5, y1_, 0.02), "MI_SignRed")      # the ambulance lane
-    b.box("Site", (X1 + 1.3, -30.0, 0.01), (X1 + 1.45, -4.0, 0.02), "MI_PaintYellow")
-    b.box("Site", (X1 + 4.55, -30.0, 0.01), (X1 + 4.7, -4.0, 0.02), "MI_PaintYellow")
+        b.box("Site", (X1 + 2.0, y0_, 0.01), (X1 + 8.0, y1_, 0.02), "MI_SignRed")      # the ambulance lane (6 m)
+    b.box("Site", (X1 + 1.8, -30.0, 0.01), (X1 + 1.95, -4.0, 0.02), "MI_PaintYellow")
+    b.box("Site", (X1 + 8.05, -30.0, 0.01), (X1 + 8.2, -4.0, 0.02), "MI_PaintYellow")
     for y in (-10.8, -4.2):
-        b.box("Site", (26.6, y - 0.2, 0.0), (27.0, y + 0.2, 4.0), "MI_PaintedMetal")   # the ER canopy's columns
-    b.box("Site", (27.1, -29.8, 0.0), (27.25, -29.65, 2.4), "MI_Steel")               # 救急車専用 sign post
-    b.box("Site", (26.8, -29.8, 1.8), (27.4, -29.65, 2.4), "MI_SignRed")
+        b.box("Site", (X1 + 8.4, y - 0.2, 0.0), (X1 + 8.8, y + 0.2, 4.6), "MI_PaintedMetal")   # the ER canopy's columns
+    b.box("Site", (X1 + 9.0, -29.8, 0.0), (X1 + 9.15, -29.65, 2.4), "MI_Steel")     # 救急車専用 sign post
+    b.box("Site", (X1 + 8.7, -29.8, 1.8), (X1 + 9.3, -29.65, 2.4), "MI_SignRed")
     b.box("Facade", (X1, -8.9, 2.7), (X1 + 0.2, -6.3, 3.3), "MI_SignRed")              # 救急搬入口
     b.box("Facade", (X1, -2.8, 2.6), (X1 + 0.2, -1.3, 3.1), "MI_SignRed")              # 救急外来
     b.box("Facade", (X1, -3.0, 3.3), (X1 + 1.6, -1.1, 3.45), "MI_PaintedMetal")        # its small canopy
@@ -668,7 +686,7 @@ def hospital(b):
         b.put("Hosp_Monitor", 14.6, y + 1.1, 90.0)
     b.put("Hosp_Curtain", 16.8, -9.1, 0.0)
     b.put("Hosp_Stretcher", 20.6, -10.8, 90.0)
-    b.mark("vehicle", 24.8, -7.5, 0.0, 180.0, vehicle="AMB1")   # under the 救急 canopy
+    b.mark("vehicle", X1 + 5.0, -7.5, 0.0, 180.0, vehicle="AMB1")   # under the 救急 canopy
     b.put("Hosp_NurseStation", 17.9, -5.0, 180.0)
     b.mark("spawn", 18.0, -8.0, F1, 90.0, team="doctor", note="the ER team, met at the 搬入口")
     # back row: stair B | pharmacy store | X-ray | two WCs | the bed lift | stair A | the doctors' office | treatment
@@ -1015,15 +1033,19 @@ def warehouse_yard(b):
     H = 9.0
     OF = 4.0                                            # the office's upper floor
     xi0, xi1, yf, yb = X0 + EXT_T, X1 - EXT_T, Y0 + EXT_T, Y1 - EXT_T
-    apron(b, -22.0, -26.0, 22.0, 24.0)
-    # the yard's fence, gate and guard booth
-    for x0_, x1_ in ((-22.0, -4.0), (4.0, 22.0)):
+    # THE SITE (user, 2026-10-04: room for a large truck round the building, double the entrance): the yard in front,
+    # a 9 m drive lane down each side and an 8 m one behind (a container truck can circle the warehouse), the whole
+    # site fenced, the gate 16 m (was 8)
+    FX, FB = 29.0, 32.0
+    apron(b, -FX, -26.0, FX, FB)
+    for x0_, x1_ in ((-FX, -8.0), (8.0, FX)):
         b.box("Site", (x0_, -26.0, 0.0), (x1_, -25.9, 2.0), "MI_Steel")
-    for x in (-22.0, 21.9):
-        b.box("Site", (x, -26.0, 0.0), (x + 0.1, Y0, 2.0), "MI_Steel")
-    b.box("Site", (5.0, -24.8, 0.0), (7.0, -22.8, 2.6), "MI_PaintWhite")             # the guard booth
-    b.box("Site", (4.97, -24.4, 1.0), (5.0, -23.2, 2.0), "MI_Window")
-    b.mark("spawn", 4.2, -23.8, 0.0, 180.0, team="guard")
+    for x in (-FX, FX - 0.1):
+        b.box("Site", (x, -26.0, 0.0), (x + 0.1, FB, 2.0), "MI_Steel")
+    b.box("Site", (-FX, FB - 0.1, 0.0), (FX, FB, 2.0), "MI_Steel")
+    b.box("Site", (9.0, -24.8, 0.0), (11.0, -22.8, 2.6), "MI_PaintWhite")            # the guard booth
+    b.box("Site", (8.97, -24.4, 1.0), (9.0, -23.2, 2.0), "MI_Window")
+    b.mark("spawn", 8.2, -23.8, 0.0, 180.0, team="guard")
     # two container trucks backed onto docks (COT1: the terminal's 20 ft ISO box on a tractor + chassis), drivable
     for u in (-12.0, -4.0):
         b.mark("vehicle", u, -6.3, 0.0, 180.0, vehicle="COT1", note="a container truck at the dock")

@@ -1934,7 +1934,7 @@ def post_office_small(b):
     x0, x1, y0, y1 = -6.0, 6.0, -5.0, 5.0
     H = 4.0
     xi0, xi1, yf, yb = x0 + EXT_T, x1 - EXT_T, y0 + EXT_T, y1 - EXT_T
-    apron(b, -7.4, -9.8, 7.4, 9.8, "MI_ConcreteSmooth")
+    apron(b, -12.0, -11.0, 12.0, 13.0, "MI_ConcreteSmooth")      # a 6 m lane down each side to the 8 m van yard (2026-10-04)
     bay_lines(b, 1.5, 7.0, -9.6, -5.4, 0.0, along="y", pitch=2.5)                      # two parking bays
     b.slab(x0, y0, x1, y1, 0.0, "MI_Terrazzo")
     ext(b, x0, y0, x1, y1, 0.0, H, "MI_TileBeige", {
@@ -1946,8 +1946,8 @@ def post_office_small(b):
     b.box("Facade", (x0, y0 - 0.2, 3.1), (x1, y0, 3.7), "MI_PostRed")                 # the red band
     b.box("Facade", (4.6, y0 - 0.3, 2.4), (5.6, y0 - 0.2, 3.4), "MI_PostRed")         # the 〒 board
     post_box(b, -5.2, -6.0)
-    bay_lines(b, -6.8, 6.8, 5.4, 9.6, 0.0, along="x", pitch=3.4)                       # the delivery yard (back)
-    b.mark("vehicle", 1.7, 7.6, 0.0, 0.0, vehicle="POV1", note="the branch's delivery van, in its back yard")
+    bay_lines(b, -11.5, 11.5, 8.4, 12.6, 0.0, along="x", pitch=3.4)                     # the delivery yard (back)
+    b.mark("vehicle", 1.7, 10.5, 0.0, 0.0, vehicle="POV1", note="the branch's delivery van, in its back yard")
     Hi = H - 0.2
     # the ゆうちょ ATM corner by the door, the writing desk, the waiting bench
     for y in (-2.7, -1.6):
@@ -1983,11 +1983,13 @@ def post_office_large(b):
     X0, X1, Y0, Y1 = -18.0, 18.0, -13.0, 13.0
     LV, TOP = [0.0, 5.0, 9.0], 13.0
     xi0, xi1, yf, yb = X0 + EXT_T, X1 - EXT_T, Y0 + EXT_T, Y1 - EXT_T
-    apron(b, -19.8, -19.8, 19.8, 19.8, "MI_ConcreteSmooth")
-    bay_lines(b, -19.0, -9.0, 14.2, 19.6, 0.0, along="y", pitch=3.0)                   # the red vans' bays (back yard)
-    b.mark("vehicle", -17.5, 17.0, 0.0, 0.0, vehicle="POT1", note="a 郵便 2 t box truck")
-    for x in (-14.5, -11.5):
-        b.mark("vehicle", x, 17.0, 0.0, 0.0, vehicle="POV1", note="a 郵便 delivery van")
+    # THE SITE (user, 2026-10-04: room for a truck round the building): an 8 m lane down each side to the van yard
+    # behind, 12 m clear in front of the dock shutters before the bays along the back
+    apron(b, -26.0, -21.0, 26.0, 31.0, "MI_ConcreteSmooth")
+    bay_lines(b, -25.0, 25.0, 25.0, 30.6, 0.0, along="y", pitch=3.0)                   # the red vans' bays (back yard)
+    b.mark("vehicle", -23.5, 27.8, 0.0, 0.0, vehicle="POT1", note="a 郵便 2 t box truck")
+    for x in (-20.5, -17.5):
+        b.mark("vehicle", x, 27.8, 0.0, 0.0, vehicle="POV1", note="a 郵便 delivery van")
     wellA = (xi0, -2.6, xi0 + 2.4, 4.0)
     wellB = (xi1 - 2.4, 6.2, xi1, yb)
     shaft = b.lift(xi1 - 4.6, -0.6, 1.8, 1.6, LV, faces=1, turned=True)

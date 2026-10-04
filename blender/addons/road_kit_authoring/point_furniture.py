@@ -514,13 +514,24 @@ def _lane_props(fur, table, lanes, mine, ground):
                 fur.put(table, "manhole", p, d, l.get("road_name", ""))
 
 
+#: m past a vehicle entry's ramps kept free of street furniture (a car turning in sweeps wider than the gap)
+ENTRY_CLEAR = 1.5
+
+
 def _edge_samples(pts, walk, kerb, wall, spacing, clear, phase=None):
     """Stations along one edge run: (point, plan direction, walk half width, kerb height), skipping any whose
     segment carries a barrier or no kerb."""
     pts = [tuple(p) for p in pts]
     cum = _lengths(pts)
     out = []
+    # a VEHICLE ENTRY (`point_edges.drop_entries`) is kept clear: no drain, planter, tree, lamp or bollard on the dropped
+    # kerb, its ramps, or ENTRY_CLEAR past them. Read off the kerb itself -- the dropped vertices carry the dropped-kerb
+    # value marks (`point_edges.EntryKerb`) -- so every placer obeys it with nothing else passed in
+    drops = [cum[v] for v, k in enumerate(kerb) if isinstance(k, ped.EntryKerb)]
+    keep_out = ped.ENTRY_RAMP + ENTRY_CLEAR
     for s in _stations(cum[-1], spacing, clear, phase):
+        if any(abs(s - c) <= keep_out for c in drops):
+            continue
         p, d, i = _at(pts, cum, s)
         j = min(i + 1, len(pts) - 1)
         if max(float(wall[i]), float(wall[j])) > 0.0:

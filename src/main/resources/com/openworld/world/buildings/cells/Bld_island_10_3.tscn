@@ -1,6 +1,19 @@
 [gd_scene format=3]
 
+[ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/world/CropField.java" id="crop"]
+
+[sub_resource type="BoxMesh" id="ApronBox"]
+material = ExtResource("lotmat")
+
+[sub_resource type="MultiMesh" id="Aprons"]
+transform_format = 1
+instance_count = 2
+mesh = SubResource("ApronBox")
+buffer = PackedFloat32Array(0.0000, 0.0000, 2.0000, 517.4820, 0.0000, 0.4000, 0.0000, 5.9400, -2.1000, 0.0000, 0.0000, -1235.0000, 0.0000, 0.0000, 2.0000, 517.4820, 0.0000, 0.4000, 0.0000, 5.9400, -2.1000, 0.0000, 0.0000, -1236.9430)
+
+[sub_resource type="BoxShape3D" id="ApronShape"]
+size = Vector3(2.100, 0.400, 2.000)
 
 [node name="Bld_island_10_3" type="Node3D"]
 
@@ -8,3 +21,18 @@
 script = ExtResource("crop")
 chunks = PackedFloat32Array(500.000, -1250.000, 6.000, 0, 500.000, -1200.000, 6.000, 0, 500.000, -1150.000, 6.000, 0, 500.000, -1100.000, 5.659, 0, 500.000, -1050.000, 5.600, 0, 550.000, -1250.000, 6.000, 0, 550.000, -1200.000, 6.000, 0, 550.000, -1150.000, 5.600, 0, 550.000, -1100.000, 5.600, 0, 550.000, -1050.000, 5.600, 0, 600.000, -1250.000, 5.658, 0, 600.000, -1200.000, 5.600, 0, 600.000, -1150.000, 5.600, 0, 650.000, -1250.000, 5.600, 0, 650.000, -1200.000, 5.600, 0, 700.000, -1250.000, 5.600, 0, 700.000, -1200.000, 5.600, 0)
 masks = PackedStringArray("003fff801fffc00fffe007fff003fff801fffc00fffe003fff001fff800fffc000ffe0007ff00000000000000000000000000000000000000000ffe000fff001fff800fffc007ffe007fff003fff8", "003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff8", "003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff8", "003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff8", "003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff8", "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000003fffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffefffffe7ffffe3ffffe1ffffe0ffffe07ffff03ffff81ffffc0ffffe07ffff03ffff81ffffc0ffffe07ffff03ffff81ffffc0ffffe07ffff03ffff81ffffc0ffffe00", "ffffe07ffff03ffff01ffff80ffffc07fffe03ffff01ffff80ffffc07fffe03ffff01ffff80ffffc07fffe03ffff01ffff80ffffc07fffe03ffff01ffff80ffffc07fffe03ffff01ffff80ffffc00", "ffffc07fffe03ffff01ffff80ffffc07fffe03ffff01ffff80ffffc07fffe03ffff01ffff80ffffc07fffe03ffff01ffff80ffffc07fffe03ffff01ffff00ffff807fffc03fffe01ffff00ffff800", "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000003fffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff01ff8000e000000", "c000004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000003fffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff9fffc00ff000000000000000000000000000000", "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000003fffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0fff0007c0000000000000000000000000000000000000000000000000")
+
+[node name="Aprons" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("Aprons")
+cast_shadow = 0
+
+[node name="ApronCollision" type="StaticBody3D" parent="."]
+collision_mask = 0
+
+[node name="Apron0" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, 517.482, 5.940, -1235.000)
+shape = SubResource("ApronShape")
+
+[node name="Apron1" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, 517.482, 5.940, -1236.943)
+shape = SubResource("ApronShape")

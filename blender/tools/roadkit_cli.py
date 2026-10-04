@@ -596,6 +596,22 @@ def _preset(net, a):
 
 
 cmd_preset = _record_op(_preset)
+
+
+def _entry(net, a):
+    """A VEHICLE ENTRY at record-frame (x, y) (`point_record_ops.add_entry`): a station on the nearest road opposite
+    the point, its entry on that side `width` wide, in `style` (DROP / DROP_ASPHALT / CUT)."""
+    res = ro.add_entry(net, a.x, a.y, a.width, a.max_dist)
+    if res is None:
+        raise ro.GestureError("no road within %.0f m, or the point is too close to a junction mouth or a road end"
+                              % a.max_dist)
+    road, uid, side = res
+    net.points[uid].entry_style = a.style
+    return ("%s entry %.1f m on %s's %s side (station %s)" % (a.style, a.width, road, side, uid),
+            {"road": road, "uid": uid, "side": side})
+
+
+cmd_entry = _record_op(_entry)
 cmd_branch_ramp = _record_op(lambda net, a: ro.branch_ramp(
     net, a.uid, a.name, a.lanes, a.carriageway, a.entrance, a.length, a.spread, a.drop))
 
@@ -689,6 +705,9 @@ def main(argv=None):
     s.add_argument("uids"); s.add_argument("groups"); s.set_defaults(fn=cmd_cross_section)
     s = sub.add_parser("preset"); s.add_argument("record"); s.add_argument("road")
     s.add_argument("preset", choices=sorted(pr.PRESETS)); s.set_defaults(fn=cmd_preset)
+    s = sub.add_parser("entry"); s.add_argument("record"); s.add_argument("x", type=float); s.add_argument("y", type=float)
+    s.add_argument("--width", type=float, default=5.0); s.add_argument("--max-dist", dest="max_dist", type=float, default=30.0)
+    s.add_argument("--style", default=pm.ENTRY_DROP, choices=pm.ENTRY_STYLES); s.set_defaults(fn=cmd_entry)
     s = sub.add_parser("branch_ramp"); s.add_argument("record"); s.add_argument("uid")
     s.add_argument("--name", default=""); s.add_argument("--lanes", type=int, default=1)
     s.add_argument("--carriageway", default="FWD", choices=("FWD", "BWD"))

@@ -1,6 +1,19 @@
 [gd_scene format=3]
 
+[ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/world/CropField.java" id="crop"]
+
+[sub_resource type="BoxMesh" id="ApronBox"]
+material = ExtResource("lotmat")
+
+[sub_resource type="MultiMesh" id="Aprons"]
+transform_format = 1
+instance_count = 40
+mesh = SubResource("ApronBox")
+buffer = PackedFloat32Array(-1.1846, 0.0000, 1.6514, 581.7410, 0.0000, 0.4000, 0.0000, 11.9400, -1.7340, 0.0000, -1.1282, -1618.5920, -1.4485, 0.0000, 1.4481, 535.5380, 0.0000, 0.4000, 0.0000, 12.0800, -1.5205, 0.0000, -1.3795, -1683.9710, 2.0408, 0.0000, -0.4716, 537.3880, 0.0000, 0.4000, 0.0000, 5.9400, 0.4952, 0.0000, 1.9436, -1588.0250, 2.0408, 0.0000, -0.4716, 539.3320, 0.0000, 0.4000, 0.0000, 5.9400, 0.4952, 0.0000, 1.9436, -1587.5530, 2.0204, 0.0000, -0.5456, 545.5800, 0.0000, 0.4000, 0.0000, 5.9400, 0.5728, 0.0000, 1.9242, -1570.1720, 2.0204, 0.0000, -0.5456, 547.5040, 0.0000, 0.4000, 0.0000, 5.9400, 0.5728, 0.0000, 1.9242, -1569.6260, 2.0494, 0.0000, -0.4363, 553.6920, 0.0000, 0.4000, 0.0000, 5.9400, 0.4581, 0.0000, 1.9518, -1568.1200, 2.0494, 0.0000, -0.4363, 555.6440, 0.0000, 0.4000, 0.0000, 5.9400, 0.4581, 0.0000, 1.9518, -1567.6840, 2.0117, 0.0000, -0.5737, 560.8390, 0.0000, 0.4000, 0.0000, 5.9420, 0.6024, 0.0000, 1.9159, -1566.3110, 2.0117, 0.0000, -0.5737, 562.7540, 0.0000, 0.4000, 0.0000, 5.9430, 0.6024, 0.0000, 1.9159, -1565.7370, 1.9959, 0.0000, -0.6220, 566.3400, 0.0000, 0.4000, 0.0000, 5.9440, 0.6531, 0.0000, 1.9008, -1564.5870, 1.9837, 0.0000, -0.6564, 568.0670, 0.0000, 0.4000, 0.0000, 5.9450, 0.6892, 0.0000, 1.8892, -1564.0040, 1.9981, 0.0000, -0.6154, 600.9460, 0.0000, 0.4000, 0.0000, 5.9290, 0.6461, 0.0000, 1.9030, -1568.4740, 1.9981, 0.0000, -0.6154, 602.8090, 0.0000, 0.4000, 0.0000, 5.9260, 0.6461, 0.0000, 1.9030, -1567.8710, 1.9981, 0.0000, -0.6154, 608.4790, 0.0000, 0.4000, 0.0000, 5.9140, 0.6461, 0.0000, 1.9030, -1566.0380, 1.9981, 0.0000, -0.6154, 614.1080, 0.0000, 0.4000, 0.0000, 5.8990, 0.6461, 0.0000, 1.9030, -1564.2170, 1.9981, 0.0000, -0.6154, 627.3110, 0.0000, 0.4000, 0.0000, 5.8570, 0.6461, 0.0000, 1.9030, -1559.9480, 1.9981, 0.0000, -0.6154, 632.0920, 0.0000, 0.4000, 0.0000, 5.8180, 0.6461, 0.0000, 1.9030, -1542.6380, 1.9981, 0.0000, -0.6154, 633.9950, 0.0000, 0.4000, 0.0000, 5.8090, 0.6461, 0.0000, 1.9030, -1542.0220, 1.9981, 0.0000, -0.6154, 639.6240, 0.0000, 0.4000, 0.0000, 5.7780, 0.6461, 0.0000, 1.9030, -1540.2020, 1.9981, 0.0000, -0.6154, 678.1370, 0.0000, 0.4000, 0.0000, 5.6100, 0.6461, 0.0000, 1.9030, -1543.5130, 1.9981, 0.0000, -0.6154, 681.9040, 0.0000, 0.4000, 0.0000, 5.5970, 0.6461, 0.0000, 1.9030, -1542.2950, 1.9981, 0.0000, -0.6154, 683.8070, 0.0000, 0.4000, 0.0000, 5.5920, 0.6461, 0.0000, 1.9030, -1541.6800, 1.9981, 0.0000, -0.6154, 687.5730, 0.0000, 0.4000, 0.0000, 5.5810, 0.6461, 0.0000, 1.9030, -1540.4620, 1.9981, 0.0000, -0.6154, 689.4360, 0.0000, 0.4000, 0.0000, 5.5760, 0.6461, 0.0000, 1.9030, -1539.8590, 1.9981, 0.0000, -0.6154, 695.1060, 0.0000, 0.4000, 0.0000, 5.5620, 0.6461, 0.0000, 1.9030, -1538.0260, 1.9981, 0.0000, -0.6154, 701.7900, 0.0000, 0.4000, 0.0000, 5.5410, 0.6461, 0.0000, 1.9030, -1520.1000, 1.9981, 0.0000, -0.6154, 703.6530, 0.0000, 0.4000, 0.0000, 5.5390, 0.6461, 0.0000, 1.9030, -1519.4970, 1.9981, 0.0000, -0.6154, 707.4200, 0.0000, 0.4000, 0.0000, 5.5350, 0.6461, 0.0000, 1.9030, -1518.2790, 1.9981, 0.0000, -0.6154, 709.3230, 0.0000, 0.4000, 0.0000, 5.5340, 0.6461, 0.0000, 1.9030, -1517.6640, 1.9981, 0.0000, -0.6154, 713.0890, 0.0000, 0.4000, 0.0000, 5.5330, 0.6461, 0.0000, 1.9030, -1516.4460, 1.9981, 0.0000, -0.6154, 716.8550, 0.0000, 0.4000, 0.0000, 5.5330, 0.6461, 0.0000, 1.9030, -1515.2280, 1.9981, 0.0000, -0.6154, 720.6220, 0.0000, 0.4000, 0.0000, 5.5330, 0.6461, 0.0000, 1.9030, -1514.0100, 1.9981, 0.0000, -0.6154, 749.6990, 0.0000, 0.4000, 0.0000, 5.5400, 0.6461, 0.0000, 1.9030, -1520.3720, 1.9981, 0.0000, -0.6154, 751.6020, 0.0000, 0.4000, 0.0000, 5.5400, 0.6461, 0.0000, 1.9030, -1519.7570, 2.0651, 0.0000, -0.3631, 661.0180, 0.0000, 0.4000, 0.0000, 11.9240, 0.3813, 0.0000, 1.9668, -1605.9940, 2.0651, 0.0000, -0.3631, 662.9850, 0.0000, 0.4000, 0.0000, 11.9250, 0.3813, 0.0000, 1.9668, -1605.6310, 2.0289, 0.0000, -0.5160, 726.4870, 0.0000, 0.4000, 0.0000, 12.1370, 0.5417, 0.0000, 1.9323, -1560.0100, 2.0289, 0.0000, -0.5160, 739.2160, 0.0000, 0.4000, 0.0000, 12.1610, 0.5417, 0.0000, 1.9323, -1586.1100, 2.0289, 0.0000, -0.5160, 741.1480, 0.0000, 0.4000, 0.0000, 12.1700, 0.5417, 0.0000, 1.9323, -1585.5950)
+
+[sub_resource type="BoxShape3D" id="ApronShape"]
+size = Vector3(2.100, 0.400, 2.000)
 
 [node name="Bld_island_10_1" type="Node3D"]
 
@@ -8,3 +21,170 @@
 script = ExtResource("crop")
 chunks = PackedFloat32Array(500.000, -1700.000, 6.000, 0, 500.000, -1650.000, 6.000, 0, 500.000, -1600.000, 6.000, 0, 500.000, -1550.000, 6.000, 0, 550.000, -1650.000, 6.000, 0, 550.000, -1600.000, 6.000, 0, 550.000, -1550.000, 6.000, 0, 600.000, -1600.000, 6.000, 0, 600.000, -1550.000, 6.000, 0, 650.000, -1600.000, 5.600, 0, 650.000, -1550.000, 5.600, 0, 700.000, -1600.000, 5.600, 0, 700.000, -1550.000, 5.600, 0)
 masks = PackedStringArray("8000006000003c00001f00000fc00007f00003fe0001ff8000ffe0007ff8003ffe001fff800fffe007fff803fffe01ffff00ffffc07ffff03ffffc1fffff0fffffc7ffffe3fffff9fffffeffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "fffffffffffffffffffffffffffe0ffff8003ff00003f00000f0000070000030000018000008000004000002007f01007ff0003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff8", "003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff801fffc01fffe00ffff003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff801fffc00fffe007fff003fff8", "0000004000003000001800000e000007800003c00001f00000fc00007e00003f80001fe0000ff00007fc0003fe0001ff8000ffe0007ff0003ffc001fff000fff8007ffe003fff801fffe00ffff800", "ffffc07ffff03ffffc1fffff0fffffc7fffff3fffffc3fffff01ffff801fffc001ffe0001ff00003f800003c0000020000000000007800003f80001ff8000fff8007fff803ffff81fffff8ffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "00000000000000000000000000000000000000000001000000c000007800003e00001fe0000fff0007fff003ffff803ffff803ffff803fffc003ffe0003ff00003f800003c0000020000000000000", "e000007e00003fe0001ffe000fffe007fffe03ffffe1fffffeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000007c00003fc0001ffe000ffff007ffff03fffff87fffff07ffff8", "00ffff8007ffc0007fe00007f0000078000004000000000000e000007e00003fe0001ffe000fffe007fffe03ffffe1fffffeffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001800000f800000", "ff80007ffc003fffc01ffffe0ffffff7fffffcfffffe0fffff00ffff800fffc000ffe0000ff0000078000004000000000000c000007c00003fc0001fe0000fe00007f00003f80001f80000fc00000")
+
+[node name="Aprons" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("Aprons")
+cast_shadow = 0
+
+[node name="ApronCollision" type="StaticBody3D" parent="."]
+collision_mask = 0
+
+[node name="Apron0" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(-0.564103, 0, 0.825705, 0, 1, 0, -0.825705, 0, -0.564103, 581.741, 11.940, -1618.592)
+shape = SubResource("ApronShape")
+
+[node name="Apron1" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(-0.689746, 0, 0.724051, 0, 1, 0, -0.724051, 0, -0.689746, 535.538, 12.080, -1683.971)
+shape = SubResource("ApronShape")
+
+[node name="Apron2" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.971797, 0, -0.235821, 0, 1, 0, 0.235821, 0, 0.971797, 537.388, 5.940, -1588.025)
+shape = SubResource("ApronShape")
+
+[node name="Apron3" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.971797, 0, -0.235821, 0, 1, 0, 0.235821, 0, 0.971797, 539.332, 5.940, -1587.553)
+shape = SubResource("ApronShape")
+
+[node name="Apron4" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.962075, 0, -0.272784, 0, 1, 0, 0.272784, 0, 0.962075, 545.580, 5.940, -1570.172)
+shape = SubResource("ApronShape")
+
+[node name="Apron5" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.962075, 0, -0.272784, 0, 1, 0, 0.272784, 0, 0.962075, 547.504, 5.940, -1569.626)
+shape = SubResource("ApronShape")
+
+[node name="Apron6" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.975917, 0, -0.218143, 0, 1, 0, 0.218143, 0, 0.975917, 553.692, 5.940, -1568.120)
+shape = SubResource("ApronShape")
+
+[node name="Apron7" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.975917, 0, -0.218143, 0, 1, 0, 0.218143, 0, 0.975917, 555.644, 5.940, -1567.684)
+shape = SubResource("ApronShape")
+
+[node name="Apron8" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.957973, 0, -0.286859, 0, 1, 0, 0.286859, 0, 0.957973, 560.839, 5.942, -1566.311)
+shape = SubResource("ApronShape")
+
+[node name="Apron9" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.957973, 0, -0.286859, 0, 1, 0, 0.286859, 0, 0.957973, 562.754, 5.943, -1565.737)
+shape = SubResource("ApronShape")
+
+[node name="Apron10" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.950407, 0, -0.311008, 0, 1, 0, 0.311008, 0, 0.950407, 566.340, 5.944, -1564.587)
+shape = SubResource("ApronShape")
+
+[node name="Apron11" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.944606, 0, -0.328207, 0, 1, 0, 0.328207, 0, 0.944606, 568.067, 5.945, -1564.004)
+shape = SubResource("ApronShape")
+
+[node name="Apron12" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 600.946, 5.929, -1568.474)
+shape = SubResource("ApronShape")
+
+[node name="Apron13" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 602.809, 5.926, -1567.871)
+shape = SubResource("ApronShape")
+
+[node name="Apron14" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 608.479, 5.914, -1566.038)
+shape = SubResource("ApronShape")
+
+[node name="Apron15" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 614.108, 5.899, -1564.217)
+shape = SubResource("ApronShape")
+
+[node name="Apron16" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 627.311, 5.857, -1559.948)
+shape = SubResource("ApronShape")
+
+[node name="Apron17" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 632.092, 5.818, -1542.638)
+shape = SubResource("ApronShape")
+
+[node name="Apron18" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 633.995, 5.809, -1542.022)
+shape = SubResource("ApronShape")
+
+[node name="Apron19" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 639.624, 5.778, -1540.202)
+shape = SubResource("ApronShape")
+
+[node name="Apron20" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 678.137, 5.610, -1543.513)
+shape = SubResource("ApronShape")
+
+[node name="Apron21" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 681.904, 5.597, -1542.295)
+shape = SubResource("ApronShape")
+
+[node name="Apron22" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 683.807, 5.592, -1541.680)
+shape = SubResource("ApronShape")
+
+[node name="Apron23" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 687.573, 5.581, -1540.462)
+shape = SubResource("ApronShape")
+
+[node name="Apron24" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 689.436, 5.576, -1539.859)
+shape = SubResource("ApronShape")
+
+[node name="Apron25" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 695.106, 5.562, -1538.026)
+shape = SubResource("ApronShape")
+
+[node name="Apron26" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 701.790, 5.541, -1520.100)
+shape = SubResource("ApronShape")
+
+[node name="Apron27" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 703.653, 5.539, -1519.497)
+shape = SubResource("ApronShape")
+
+[node name="Apron28" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 707.420, 5.535, -1518.279)
+shape = SubResource("ApronShape")
+
+[node name="Apron29" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 709.323, 5.534, -1517.664)
+shape = SubResource("ApronShape")
+
+[node name="Apron30" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 713.089, 5.533, -1516.446)
+shape = SubResource("ApronShape")
+
+[node name="Apron31" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 716.855, 5.533, -1515.228)
+shape = SubResource("ApronShape")
+
+[node name="Apron32" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 720.622, 5.533, -1514.010)
+shape = SubResource("ApronShape")
+
+[node name="Apron33" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 749.699, 5.540, -1520.372)
+shape = SubResource("ApronShape")
+
+[node name="Apron34" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 751.602, 5.540, -1519.757)
+shape = SubResource("ApronShape")
+
+[node name="Apron35" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.983382, 0, -0.181549, 0, 1, 0, 0.181549, 0, 0.983382, 661.018, 11.924, -1605.994)
+shape = SubResource("ApronShape")
+
+[node name="Apron36" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.983382, 0, -0.181549, 0, 1, 0, 0.181549, 0, 0.983382, 662.985, 11.925, -1605.631)
+shape = SubResource("ApronShape")
+
+[node name="Apron37" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.966151, 0, -0.257976, 0, 1, 0, 0.257976, 0, 0.966151, 726.487, 12.137, -1560.010)
+shape = SubResource("ApronShape")
+
+[node name="Apron38" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.966151, 0, -0.257976, 0, 1, 0, 0.257976, 0, 0.966151, 739.216, 12.161, -1586.110)
+shape = SubResource("ApronShape")
+
+[node name="Apron39" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.966151, 0, -0.257976, 0, 1, 0, 0.257976, 0, 0.966151, 741.148, 12.170, -1585.595)
+shape = SubResource("ApronShape")

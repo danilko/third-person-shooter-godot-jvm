@@ -61,6 +61,9 @@ const POINT_FIELDS := [
 	["traffic_light", "b", false, []],
 	["setback_solved", "f", 0.0, []],
 	["setback_locked", "b", false, []],
+	["entry_left", "f", 0.0, []],
+	["entry_right", "f", 0.0, []],
+	["entry_style", "e", "DROP", ["DROP", "DROP_ASPHALT", "CUT"]],
 ]
 
 const ROAD_FIELDS := [

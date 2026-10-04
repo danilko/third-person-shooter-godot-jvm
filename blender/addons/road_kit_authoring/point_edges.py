@@ -505,6 +505,146 @@ def step_walls(points, walk, kerb, wall):
     return pts, wk, kb, wl
 
 
+#: A VEHICLE ENTRY (車両乗入れ部, `PointData.entry_left/right`): over the entry's width the kerb, and the footway behind
+#: it, stand this high above the carriageway (the Japanese 切り下げ standard for a crossover: a 5 cm lip, low enough
+#: for a car's tyre and for `MovementController.stepHeight`) ...
+ENTRY_KERB_H = 0.05
+#: ... and each end ramps back up to the road's own kerb over this length along the footway (すりつけ: 10 cm over 2 m
+#: is a 5 % slope, the gradient a footway may have where a wheelchair crosses it).
+ENTRY_RAMP = 2.0
+#: A station further than this from the edge polyline is not on this run (the run was clipped at a junction).
+ENTRY_REACH = 40.0
+
+
+class EntryKerb(float):
+    """A dropped kerb height that remembers the footway height it was lowered from (`outer`): the lowered footway
+    slopes ACROSS, from the kerb's 5 cm lip at the kerb line up to `outer` at its back edge, so the lot behind meets it
+    exactly as it meets every other stretch of footway (セミフラット: a car crosses a slope, never a step at the property
+    line). A float, so every consumer of an edge run's kerb heights reads it as before."""
+    __slots__ = ("outer",)
+
+    def __new__(cls, value, outer):
+        o = float.__new__(cls, value)
+        o.outer = float(outer)
+        return o
+
+
+def _arc(pts):
+    out = [0.0]
+    for a, b in zip(pts, pts[1:]):
+        out.append(out[-1] + math.dist(a[:2], b[:2]))
+    return out
+
+
+def _project_arc(pts, arc, x, y):
+    """(arc length, distance) of the point of the plan polyline `pts` nearest (x, y)."""
+    best = None
+    for i in range(len(pts) - 1):
+        ax, ay, bx, by = pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]
+        dx, dy = bx - ax, by - ay
+        L2 = dx * dx + dy * dy
+        t = 0.0 if L2 < 1e-12 else max(0.0, min(1.0, ((x - ax) * dx + (y - ay) * dy) / L2))
+        d = math.hypot(ax + dx * t - x, ay + dy * t - y)
+        if best is None or d < best[1]:
+            best = (arc[i] + (arc[i + 1] - arc[i]) * t, d)
+    return best
+
+
+def entry_spans(points, side, pts):
+    """`[(centre, width, style)]` along the plan polyline `pts` (arc length) of every vehicle entry the run's stations
+    declare on `side` -- each station projected onto the kerb line it drops. `style` is `PointData.entry_style`."""
+    key = "entry_left" if side == "left" else "entry_right"
+    arc = _arc(pts)
+    out = []
+    for p in points:
+        w = float(getattr(p, key, 0.0) or 0.0)
+        if w <= 0.0 or len(pts) < 2:
+            continue
+        s, d = _project_arc(pts, arc, p.pos[0], p.pos[1])
+        if d <= ENTRY_REACH and 0.0 < s < arc[-1]:
+            out.append((s, w, getattr(p, "entry_style", "DROP") or "DROP"))
+    return out
+
+
+def _insert_at(points, walk, kerb, wall, cuts):
+    """The run with a vertex inserted at every arc length in `cuts` (values interpolated); returns the four lists and
+    each vertex's arc length."""
+    arc = _arc(points)
+    cuts = sorted(c for c in set(cuts) if 0.0 < c < arc[-1])
+    pts, wk, kb, wl, ar = [points[0]], [walk[0]], [kerb[0]], [wall[0]], [0.0]
+    k = 0
+    for i in range(1, len(points)):
+        while k < len(cuts) and cuts[k] <= arc[i - 1] + 1e-6:
+            k += 1
+        while k < len(cuts) and cuts[k] < arc[i] - 1e-6:
+            t = (cuts[k] - arc[i - 1]) / max(1e-9, arc[i] - arc[i - 1])
+            a, b = points[i - 1], points[i]
+            pts.append(tuple(pa + (pb - pa) * t for pa, pb in zip(a, b)))
+            wk.append(walk[i - 1] + (walk[i] - walk[i - 1]) * t)
+            kb.append(kerb[i - 1] + (kerb[i] - kerb[i - 1]) * t)
+            wl.append(wall[i - 1] + (wall[i] - wall[i - 1]) * t)
+            ar.append(cuts[k])
+            k += 1
+        pts.append(points[i])
+        wk.append(walk[i])
+        kb.append(kerb[i])
+        wl.append(wall[i])
+        ar.append(arc[i])
+    return pts, wk, kb, wl, ar
+
+
+def drop_entries(points, walk, kerb, wall, spans):
+    """`(points, walk, kerb, wall)` with each DROP / DROP_ASPHALT entry's kerb dropped to `ENTRY_KERB_H` (never
+    raised: a road with a lower kerb keeps it) and ramped back over `ENTRY_RAMP` each side. Vertices are inserted at
+    the breaks (and at a CUT's two ends, for `split_entries`) so each entry is exactly as wide as authored, whatever
+    the sample spacing. A CUT's kerb is left at full height: it simply stops at the gap."""
+    if not spans or len(points) < 2:
+        return points, walk, kerb, wall
+    cuts = []
+    for s, w, style in spans:
+        cuts += [s - w / 2.0, s + w / 2.0]
+        if style != "CUT":
+            cuts += [s - w / 2.0 - ENTRY_RAMP, s + w / 2.0 + ENTRY_RAMP]
+    pts, wk, kb, wl, ar = _insert_at(points, walk, kerb, wall, cuts)
+    for j, a in enumerate(ar):
+        for s, w, style in spans:
+            if style == "CUT":
+                continue
+            off = abs(a - s) - w / 2.0                 # <= 0 inside the drop, then metres up the ramp
+            if off >= ENTRY_RAMP - 1e-9 or kb[j] <= ENTRY_KERB_H:
+                continue
+            f = max(0.0, off) / ENTRY_RAMP
+            outer = getattr(kb[j], "outer", float(kb[j]))
+            low = ENTRY_KERB_H + (float(kb[j]) - ENTRY_KERB_H) * f
+            if low < float(kb[j]):
+                kb[j] = EntryKerb(low, outer)
+    return pts, wk, kb, wl
+
+
+def split_entries(points, walk, kerb, wall, spans):
+    """`[(tag, points, walk, kerb, wall)]`: the run cut at each DROP_ASPHALT and CUT entry's two ends (run
+    `drop_entries` first: it put the vertices there). A DROP_ASPHALT core comes back tagged "asphalt" -- its footway is
+    paved in the road's surface material (`point_mesh._edge_run`), its kerb lip stays concrete; a CUT core is left out
+    altogether, a gap in the kerb and the footway. Everything else is one untagged piece, as before."""
+    special = [(s - w / 2.0, s + w / 2.0, "asphalt" if style == "DROP_ASPHALT" else "cut")
+               for s, w, style in spans if style in ("DROP_ASPHALT", "CUT")]
+    if not special:
+        return [("", points, walk, kerb, wall)]
+    arc = _arc(points)
+    tags = []
+    for i in range(len(points) - 1):
+        mid = 0.5 * (arc[i] + arc[i + 1])
+        tags.append(next((t for a0, a1, t in special if a0 - 1e-6 <= mid <= a1 + 1e-6), ""))
+    out, start = [], 0
+    for i in range(1, len(tags) + 1):
+        if i == len(tags) or tags[i] != tags[start]:
+            if tags[start] != "cut":
+                sl = slice(start, i + 1)
+                out.append((tags[start], points[sl], walk[sl], kerb[sl], wall[sl]))
+            start = i
+    return [o for o in out if len(o[1]) >= 2]
+
+
 def exit_bit(side):
     """`rka_exit`'s bits for `side`: 4 / 8 the fence stands down (`platform_open`), 1 / 2 a retired platform exit."""
     b = 1 if side == "left" else 2
@@ -543,7 +683,12 @@ def road_edge_runs(solve, bands):
             vals = run_values(solve.values, run)
             pts, walk, kerb, wall = step_walls(pts, [v[walk_key] for v in vals], [v[kerb_key] for v in vals],
                                                run_values(walls[side], run))
-            out.append(("%s_%d" % (side, n), pts, walk, kerb, wall, 1.0 if side == "left" else -1.0))
+            spans = entry_spans(solve.points, side, pts)
+            pts, walk, kerb, wall = drop_entries(pts, walk, kerb, wall, spans)
+            for k_, (tag, p_, w_, kb_, wl_) in enumerate(split_entries(pts, walk, kerb, wall, spans)):
+                # the first piece keeps the run's old name, so a road with no special entry builds byte-identical
+                sfx = "%s_%d" % (side, n) + ("_e%d" % k_ if k_ else "") + ("_asphalt" if tag == "asphalt" else "")
+                out.append((sfx, p_, w_, kb_, wl_, 1.0 if side == "left" else -1.0))
     return out
 
 
@@ -819,6 +964,44 @@ def self_test():
     # Two non-zero heights still blend, and a wall-free run is untouched.
     assert step_walls(line, [0.0] * 5, [0.15] * 5, [1.0, 1.2, 1.2, 1.0, 1.0])[0] == line
     assert step_walls(line, [0.0] * 5, [0.15] * 5, [0.0] * 5)[0] == line
+    ok += 1
+
+    # ---- a VEHICLE ENTRY drops the kerb exactly where and as wide as authored (2026-10-04) ------------
+    ent = pm.NetworkData()
+    er = _straight(ent, pm, "street", 0.0, n=1, left_walk_width=3.0, right_walk_width=3.0)
+    mid = ent.points[ent.roads["street"].points[1]]                 # the station at x = 200
+    mid.entry_left = 5.0
+    es = ps.solve_road(ent, er)
+    runs = {sfx.split("_")[0]: (p_, k_) for sfx, p_, _w, k_, _wl, _sg in road_edge_runs(es, collect_bands([es]))}
+    lp_, lk = runs["left"]
+    low = [p_[0] for p_, k_ in zip(lp_, lk) if k_ <= ENTRY_KERB_H + 1e-9]
+    assert low and abs(min(low) - 197.5) < 1e-6 and abs(max(low) - 202.5) < 1e-6, low      # exactly 5 m wide
+    assert all(abs(getattr(k_, "outer", -1.0) - 0.15) < 1e-9 for k_ in lk if k_ < 0.15 - 1e-9), "slopes up to 0.15"
+    ramp = [k_ for p_, k_ in zip(lp_, lk) if 195.5 + 1e-6 < p_[0] < 197.5 - 1e-6]
+    assert all(ENTRY_KERB_H < k_ < 0.15 for k_ in ramp), ramp                              # the すりつけ in between
+    assert all(abs(k_ - 0.15) < 1e-9 for p_, k_ in zip(lp_, lk) if abs(p_[0] - 200.0) >= 4.5 + 1e-6)   # the rest
+    assert all(abs(k_ - 0.15) < 1e-9 for k_ in runs["right"][1]), "the other side keeps its kerb"
+    # DROP_ASPHALT: the same drop, the 5 m core its own "_asphalt" piece (its footway paved in asphalt)
+    mid.entry_style = pm.ENTRY_DROP_ASPHALT
+    es = ps.solve_road(ent, er)
+    pieces = [(sfx, p_, k_) for sfx, p_, _w, k_, _wl, _sg in road_edge_runs(es, collect_bands([es]))
+              if sfx.startswith("left")]
+    asph = [x for x in pieces if x[0].endswith("_asphalt")]
+    assert len(pieces) == 3 and len(asph) == 1, [x[0] for x in pieces]
+    xs = [q[0] for q in asph[0][1]]
+    assert abs(min(xs) - 197.5) < 1e-6 and abs(max(xs) - 202.5) < 1e-6 and max(asph[0][2]) <= ENTRY_KERB_H + 1e-9
+    # CUT: a 5 m GAP in the kerb and footway, the kerb at full height up to it (no ramp)
+    mid.entry_style = pm.ENTRY_CUT
+    es = ps.solve_road(ent, er)
+    pieces = [(p_, k_) for sfx, p_, _w, k_, _wl, _sg in road_edge_runs(es, collect_bands([es])) if sfx.startswith("left")]
+    assert len(pieces) == 2, len(pieces)
+    assert abs(pieces[0][0][-1][0] - 197.5) < 1e-6 and abs(pieces[1][0][0][0] - 202.5) < 1e-6
+    assert all(abs(k_ - 0.15) < 1e-9 for p_, k0 in pieces for k_ in k0), "a cut lowers nothing"
+    mid.entry_style = pm.ENTRY_DROP
+    mid.entry_left = 0.0                                                           # control: no entry, no drop
+    es0 = ps.solve_road(ent, er)
+    assert all(abs(k_ - 0.15) < 1e-9 for sfx, _p, _w, k0, _wl, _sg in road_edge_runs(es0, collect_bands([es0]))
+               for k_ in k0)
     ok += 1
 
     print("point_edges.py: %d checks PASS" % ok)

@@ -1,4 +1,40 @@
 [gd_scene format=3]
 
+[ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
+
+[sub_resource type="BoxMesh" id="ApronBox"]
+material = ExtResource("lotmat")
+
+[sub_resource type="MultiMesh" id="Aprons"]
+transform_format = 1
+instance_count = 4
+mesh = SubResource("ApronBox")
+buffer = PackedFloat32Array(0.2857, 0.0000, -1.9814, 534.0320, 0.0000, 0.4000, 0.0000, 7.6190, 2.0805, 0.0000, 0.2721, 568.6460, -2.1000, 0.0000, 0.0000, 638.7750, 0.0000, 0.4000, 0.0000, 11.9400, -0.0000, 0.0000, -2.0000, 686.2500, -2.1000, 0.0000, 0.0000, 636.9240, 0.0000, 0.4000, 0.0000, 11.9400, -0.0000, 0.0000, -2.0000, 686.2500, -2.1000, 0.0000, -0.0028, 525.7550, 0.0000, 0.4000, 0.0000, 5.5400, 0.0029, 0.0000, -2.0000, 521.5280)
+
+[sub_resource type="BoxShape3D" id="ApronShape"]
+size = Vector3(2.100, 0.400, 2.000)
 
 [node name="Bld_island_10_10" type="Node3D"]
+
+[node name="Aprons" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("Aprons")
+cast_shadow = 0
+
+[node name="ApronCollision" type="StaticBody3D" parent="."]
+collision_mask = 0
+
+[node name="Apron0" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.136061, 0, -0.990700, 0, 1, 0, 0.990700, 0, 0.136061, 534.032, 7.619, 568.646)
+shape = SubResource("ApronShape")
+
+[node name="Apron1" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, 638.775, 11.940, 686.250)
+shape = SubResource("ApronShape")
+
+[node name="Apron2" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, 636.924, 11.940, 686.250)
+shape = SubResource("ApronShape")
+
+[node name="Apron3" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(-0.999999, 0, -0.001396, 0, 1, 0, 0.001396, 0, -0.999999, 525.755, 5.540, 521.528)
+shape = SubResource("ApronShape")

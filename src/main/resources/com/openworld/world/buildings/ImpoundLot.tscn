@@ -3,7 +3,7 @@
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/ImpoundLot_mesh.res" id="1_bi11b"]
 [ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/ImpoundLot_collision.res" id="2_1xmpw"]
 
-[node name="ImpoundLot" type="Node3D" unique_id=453643749]
+[node name="ImpoundLot" type="Node3D" unique_id=2006352949]
 metadata/building = {
 "aabb": [Vector3(-25, 0, -20), Vector3(50, 2.72, 40.3)],
 "base_m": 0.0,
@@ -21,21 +21,21 @@ metadata/building = {
 "kit": "library",
 "landmark": false,
 "piece_count": 1,
-"probe_xz": [-8.5, 16.5],
+"probe_xz": [-3.5, 16.5],
 "solid_probes": [],
 "trimesh_pieces": 1.0,
-"use": "police impound lot, 50 x 40; PLACEHOLDER (library_jp_city.py)",
+"use": "police impound lot, 50 x 40, a 14 m gate; PLACEHOLDER (library_jp_city.py)",
 "wall_top_m": 2.7
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=784149122]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1290939611]
 visibility_range_end = 382.10953
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_bi11b")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=1201124756]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1604783487]
 collision_mask = 0
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1301398814]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1788251899]
 shape = ExtResource("2_1xmpw")

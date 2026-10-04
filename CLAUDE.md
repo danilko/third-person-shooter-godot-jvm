@@ -3143,7 +3143,7 @@ along the `Yaw` node's X; under the old rig that axis pointed *opposite* the cam
 a POSITIVE `cameraShoulderOffset` produced a LEFT-shoulder camera. Removing the flip makes the axis
 honest and mirrors the framing — measured `yawRight · camRight` **−1.000 before, +1.000 after** — so
 the authored values in `combatstates/*.tres` were negated to keep the side the game ships with.
-The sign now MEANS something (positive = right shoulder) instead of being absorbed by a flip.
+The sign now MEANS something (positive = right shoulder) instead of being absorbed by a flip. **Since 2026-10-04 the game ships the RIGHT shoulder** (the gun side; all three states positive). The off side is measured by `tools/godot/probe_shoulder_view.gd` (display): on Shino with ASR1 the right shoulder shows 55% of the gun and the left 12%. `CombatState.cameraLeftShoulderExtra` / `cameraLeftHeightExtra` (sideways / height, left shoulder only) do not help a long-haired body: 0.2-0.5 m wider stays at 10-12%, and higher only drops her out of a level view. Both ship 0.
 
 **The VEHICLE rig is deliberately untouched.** `VehicleCameraController` has its own
 `yaw`/`pitch`/`pitchMin`/`pitchMax`, its own scene under `Vehicle.tscn`, and still carries the
@@ -11582,6 +11582,46 @@ airliner + a LIP1); `CargoShip` (a static walkable feeder, origin on the waterli
   `military_airfield` x -1260..-720). The airport island needs no widening.
 - `probe_buildings.gd` now tests a door at its own floor height (`center[1]`), so an upper-floor exit (a gate, a ship's
   deck door) is probed where it is.
+
+## Civic compounds leave room for a truck to drive round them (2026-10-04, user-asked)
+
+User: the fence stood too close to the building for a large truck to pass, and side entrances were blocked by the
+neighbouring building. The rule now (the site ring only; every interior is unchanged):
+- **A drive lane down each side of the building**, measured from the wall to the fence or site edge: police
+  station 10 m, hospital 9.5 m, fire station 9 m (+ 8 m behind, the 訓練塔 behind that lane), fire branch 7 m, warehouse
+  yard 9 m (+ 8 m behind, fenced all round), main post office 8 m, branch post office 6 m. A truck lane is 6 m; the rest
+  is its turn.
+- **Vehicles enter from the FRONT, never through the plot's side**: a neighbour may stand against a plot's side edge.
+  The police station's single 5 m side gate became two 10 m gates in the front fence, one at the head of each side
+  lane (in left, out right), with the 6 m public gate between them. The warehouse gate is 16 m (was 8), the impound
+  lot's and scrapyard's 14 m (were 8).
+- **Deeper front and back**: the police car park is one row against the back fence across an 11 m aisle; the fire
+  branch has a 10 m apparatus apron (was 2.5); the post offices' van yards are 8 m (branch) and 18 m (main) deep.
+- **Plots grew to match** (`island_civic_sites.PLOTS`): police 52 x 50, fire HQ 52 x 56, fire branch 32 x 42, hospital
+  (west) 65 x 65, main post office 54 x 64, branch 25 x 28, warehouse yard 60 x 66; re-sited with `--resite=<ids>
+  --avoid-streets`. **`--check` now also compares a plot with an INTERIORS building** (`piece_extents` read only the
+  library before, which is how a 34.6 m police fence sat on a 35 m plot unnoticed). It found four plots already smaller
+  than their buildings (both multi-storey car parks, the civic centre, the onsen ryokan), now sized.
+
+## A vehicle entry is a dropped kerb (切り下げ), authored per station (2026-10-04, user-asked)
+
+`PointData.entry_left` / `entry_right` (m, 0 = none): a car entry centred on that station, on that side; `entry_style`
+(APPEND-ONLY enum): **DROP** (default), **DROP_ASPHALT**, **CUT**. `point_edges.drop_entries` lowers the kerb to
+`ENTRY_KERB_H` 5 cm over the width with an `ENTRY_RAMP` 2 m slope (5 %) each end, inserting vertices at the breaks so
+the entry is exactly as wide as authored. The footway SLOPES ACROSS (`EntryKerb`, a float carrying the height it was
+lowered from): the 5 cm lip at the kerb line, the footway's own height at the property line, so the lot behind meets
+it with its ordinary 6 cm step instead of a 16 cm one (セミフラット). DROP_ASPHALT paves that footway in the road's
+surface (the kerb lip stays concrete, the drain's edge); CUT removes the kerb and footway (kept for COMPARISON: the
+stamped ground under a road is 10 cm below the asphalt, so a cut leaves a pit). Street furniture keeps
+`point_furniture.ENTRY_CLEAR` past the ramps; it reads the kerb itself, so every placer obeys it.
+- **Placing one**: `roadkit_cli.py entry <record> <x> <y> [--width 5] [--style DROP]` (record frame), i.e.
+  `point_record_ops.add_entry`: the nearest road's chain gets a station opposite the point (or reuses one within
+  1 m), refused within `MIN_MOUTH_CLEAR` + half the width of a junction mouth or a road end. In the dock the three
+  fields are on every point (the generated field table).
+- **The comparison street**: `tools/roadkit_entry_test.py` writes `EntryTest.roads.json` (one lane each way, 3 m
+  footways, the three styles plus an ordinary kerb); `build_roads_piece.sh ... Roads_EntryTest`;
+  `tools/godot/probe_entry_test.gd` (profiles + SPC-1 and CRT-1 driven in; `-- --shot=<dir>` pictures).
+- Not wired yet: the island's car-park driveways (`island_buildings` `drive`) still get the old gutter wedge.
 
 ## The airport behind the bridge: one divided spur, the rail under it, the station against the terminal, the runway south; every hub station has its street (2026-09-29, user-asked)
 

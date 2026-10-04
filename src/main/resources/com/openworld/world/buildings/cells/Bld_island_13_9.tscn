@@ -12,13 +12,13 @@ material = ExtResource("lotmat")
 transform_format = 1
 instance_count = 2
 mesh = SubResource("LotBox")
-buffer = PackedFloat32Array(-5.9752, 0.0000, -60.2042, 1314.5000, 0.0000, 0.3750, 0.0000, 5.4855, 60.2042, 0.0000, -5.9752, 354.5000, -9.0874, 0.0000, -65.4674, 1330.1619, 0.0000, 0.3750, 0.0000, 5.4855, 90.0426, 0.0000, -6.6072, 258.2640)
+buffer = PackedFloat32Array(-5.9752, 0.0000, -60.2042, 1314.5000, 0.0000, 0.3100, 0.0000, 5.4530, 60.2042, 0.0000, -5.9752, 354.5000, -9.0874, 0.0000, -65.4674, 1330.1619, 0.0000, 0.3100, 0.0000, 5.4530, 90.0426, 0.0000, -6.6072, 258.2640)
 
 [sub_resource type="BoxShape3D" id="LotShape0"]
-size = Vector3(60.500, 0.375, 60.500)
+size = Vector3(60.500, 0.310, 60.500)
 
 [sub_resource type="BoxShape3D" id="LotShape1"]
-size = Vector3(90.500, 0.375, 65.800)
+size = Vector3(90.500, 0.310, 65.800)
 
 [node name="Bld_island_13_9" type="Node3D"]
 
@@ -30,13 +30,13 @@ visibility_range_begin_margin = 40.0
 visibility_range_fade_mode = 1
 
 [node name="Park_000" parent="." instance=ExtResource("1")]
-transform = Transform3D(-0.098764, 0, -0.995111, 0, 1, 0, 0.995111, 0, -0.098764, 1314.500, 5.688, 354.500)
+transform = Transform3D(-0.098764, 0, -0.995111, 0, 1, 0, 0.995111, 0, -0.098764, 1314.500, 5.623, 354.500)
 
 [node name="Mesh" parent="./Park_000" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
 [node name="SuperSento_001" parent="." instance=ExtResource("2")]
-transform = Transform3D(-0.100414, 0, -0.994946, 0, 1, 0, 0.994946, 0, -0.100414, 1332.500, 5.688, 258.500)
+transform = Transform3D(-0.100414, 0, -0.994946, 0, 1, 0, 0.994946, 0, -0.100414, 1332.500, 5.623, 258.500)
 
 [node name="Mesh" parent="./SuperSento_001" index="0"]
 visibility_parent = NodePath("../../HLOD")
@@ -48,9 +48,9 @@ multimesh = SubResource("Lots")
 collision_mask = 0
 
 [node name="Plinth0" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(-0.098764, 0, -0.995111, 0, 1, 0, 0.995111, 0, -0.098764, 1314.500, 5.486, 354.500)
+transform = Transform3D(-0.098764, 0, -0.995111, 0, 1, 0, 0.995111, 0, -0.098764, 1314.500, 5.453, 354.500)
 shape = SubResource("LotShape0")
 
 [node name="Plinth1" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(-0.100414, 0, -0.994946, 0, 1, 0, 0.994946, 0, -0.100414, 1330.162, 5.486, 258.264)
+transform = Transform3D(-0.100414, 0, -0.994946, 0, 1, 0, 0.994946, 0, -0.100414, 1330.162, 5.453, 258.264)
 shape = SubResource("LotShape1")

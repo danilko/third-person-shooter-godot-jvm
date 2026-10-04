@@ -102,7 +102,7 @@ def scrapyard(material, Builder):
     ground(b, -hx, hx, -hy, hy, "MI_Dirt")
     ground(b, -hx, hx, -hy, -hy + 8.0, "MI_AsphaltLot", z=0.03)
     for (a0, b0, a1, b1) in ((-hx, -hy + 8.0, -hx + 0.2, hy), (hx - 0.2, -hy + 8.0, hx, hy), (-hx, hy - 0.2, hx, hy),
-                             (-hx, -hy + 8.0, -4.0, -hy + 8.2), (4.0, -hy + 8.0, hx, -hy + 8.2)):
+                             (-hx, -hy + 8.0, -7.0, -hy + 8.2), (7.0, -hy + 8.0, hx, -hy + 8.2)):   # a 14 m opening (2026-10-04)
         b.box((a0, b0, 0.0), (a1, b1, 2.4), "MI_Corrugated")
     _cars(b, [(-20.0 + 5.0 * i, -hy + 4.0, False) for i in range(9)], "MI_PlasticWhite")
     for i in range(9):
@@ -119,7 +119,7 @@ def scrapyard(material, Builder):
 
 
 _note("Gang_Scrapyard", "Placeholder 解体屋 / used-car lot (青木場組's front), 50 x 40, the street at -Y: the used-car "
-      "row on asphalt at the front, the yard behind a corrugated fence with an 8 m opening. The game assumes: the "
+      "row on asphalt at the front, the yard behind a corrugated fence with a 14 m opening. The game assumes: the "
       "gang's clerk/contact stands by the cabin (front-left); the cars are mesh, not vehicles.")
 
 
@@ -1050,9 +1050,9 @@ def impound_lot(material, Builder):
     gate with a barrier, a cabin, a tow truck's place."""
     b = Builder("ImpoundLot", material)
     _parking(b, -25.0, 25.0, -20.0, 20.0, rows=3)
-    fence(b, -24.8, 24.8, -19.8, 19.8, h=2.4, gaps=[("f", -15.0, 8.0)])
-    b.box((-11.0, -19.0, 0.0), (-6.0, -14.0, 2.7), "MI_PlasticWhite")
-    b.box((-19.0, -20.3, 1.0), (-11.0, -20.1, 1.15), "MI_SignRed")                 # the barrier arm
+    fence(b, -24.8, 24.8, -19.8, 19.8, h=2.4, gaps=[("f", -15.0, 14.0)])            # a 14 m gate (2026-10-04)
+    b.box((-6.0, -19.0, 0.0), (-1.0, -14.0, 2.7), "MI_PlasticWhite")
+    b.box((-22.0, -20.3, 1.0), (-8.0, -20.1, 1.15), "MI_SignRed")                  # the barrier arm
     _cars(b, [(-18.0 + 4.0 * i, -6.0, False) for i in range(8)], "MI_PaintedMetalDark")
     return "ImpoundLot", "civic", b.mesh()
 

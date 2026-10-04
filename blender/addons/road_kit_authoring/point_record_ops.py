@@ -471,6 +471,72 @@ def branch_ramp(net, main_uid, name="", aux_lanes=1, carriageway="FWD", entrance
 
 # ------------------------------------------------------------------------------- facings
 
+ENTRY_REUSE = 1.0       # m: an existing station this close to the entry carries it, no new station
+
+
+def add_entry(net, x, y, width=5.0, max_dist=30.0, skip=("rail",)):
+    """A VEHICLE ENTRY (車両乗入れ部, `PointData.entry_left/right`) at plan point (x, y) -- the spot on the kerb where a
+    car turns off the road into a lot or a car park. The nearest road's chain is found (never a rail line or a road
+    whose class is in `skip`), a station is inserted on it opposite the point (or one within ENTRY_REUSE is reused),
+    and that station's entry on the side the point is on is set to `width`. The new station takes its neighbours'
+    deltas and interpolated height, so nothing else about the road changes. Refused (None) with no road within
+    `max_dist`, or within `point_validate.MIN_MOUTH_CLEAR` + half the width of a junction mouth or a road end, where
+    the kerb is not this road's. Returns (road name, station uid, side)."""
+    best = None
+    for road in net.roads.values():
+        if road.road_class in skip:
+            continue
+        chain = [u for u in road.points if u in net.points]
+        for i in range(len(chain) - 1):
+            a, b = net.points[chain[i]], net.points[chain[i + 1]]
+            if not a.has_link(b.uid, pm.LINK_SEGMENT):
+                continue
+            ax, ay, bx, by = a.pos[0], a.pos[1], b.pos[0], b.pos[1]
+            dx, dy = bx - ax, by - ay
+            L2 = dx * dx + dy * dy
+            if L2 < 1e-6:
+                continue
+            t = max(0.0, min(1.0, ((x - ax) * dx + (y - ay) * dy) / L2))
+            d = math.hypot(ax + dx * t - x, ay + dy * t - y)
+            if d <= max_dist and (best is None or d < best[0]):
+                best = (d, road, chain, i, t)
+    if best is None:
+        return None
+    _d, road, chain, i, t = best
+    a, b = net.points[chain[i]], net.points[chain[i + 1]]
+    L = math.dist(a.pos[:2], b.pos[:2])
+    at = (a.pos[0] + (b.pos[0] - a.pos[0]) * t, a.pos[1] + (b.pos[1] - a.pos[1]) * t)
+    # the side: the kit's LEFT is +90 deg from the chain's direction (FWD = increasing index)
+    side = "left" if ((b.pos[0] - a.pos[0]) * (y - at[1]) - (b.pos[1] - a.pos[1]) * (x - at[0])) > 0.0 else "right"
+    clear = pv.MIN_MOUTH_CLEAR + width / 2.0
+    ends = (chain[0], chain[-1])
+    for u in chain:
+        p = net.points[u]
+        mouth = p.role == pm.INTERSECTION or any(l.type == pm.LINK_JUNCTION for l in p.links) or u in ends
+        if mouth and math.dist(p.pos[:2], at) < clear:
+            return None
+    if t * L <= ENTRY_REUSE:
+        st = a
+    elif (1.0 - t) * L <= ENTRY_REUSE:
+        st = b
+    else:
+        kw = {n: getattr(a, n) for n in pm.DELTA_FIELDS}
+        kw.update(lane_width=a.lane_width, profile_mode=a.profile_mode,
+                  ground_z=a.ground_z + (b.ground_z - a.ground_z) * t, has_ground_z=a.has_ground_z and b.has_ground_z)
+        if a.profile_mode == pm.OVERRIDE:
+            kw = {n: getattr(a, n) for n, _k, _d in pm.POINT_FIELDS if n not in ("uid", "role", "entry_left",
+                                                                            "entry_right")}
+            kw["ground_z"] = a.ground_z + (b.ground_z - a.ground_z) * t
+        st = net.add_station(road, (at[0], at[1], a.pos[2] + (b.pos[2] - a.pos[2]) * t), **kw)
+        road.points.remove(st.uid)
+        road.points.insert(road.points.index(b.uid), st.uid)
+        net.unlink(a.uid, b.uid)
+        net.link(a.uid, st.uid, pm.LINK_SEGMENT)
+        net.link(st.uid, b.uid, pm.LINK_SEGMENT)
+    setattr(st, "entry_" + side, float(width))
+    return road.name, st.uid, side
+
+
 def facings(net):
     """`{uid: (x, y, z)}` -- `point_profile.chain_facings`, the direction the tool gives a point it owns
     (AUTO). The Godot plugin faces AUTO points with it and stamps the baseline a hand rotation is

@@ -58,24 +58,24 @@ NO_FRONT = ("shuto_", "shrine_touge", "kaigan_dori", "rail")
 # 300-bed 総合病院 ~1 ha, a 診療所 ~250 m2, a 小学校 with its 校庭 ~1.1 ha, a 中学校 ~1.4 ha, a 区役所 ~3 600 m2.
 PLOTS = (
     # civic core, on the trunk roads round downtown and the city
-    ("police_hq", "police_station", "警察署", 40.0, 45.0, 2, (650.0, 250.0)),
-    ("fire_hq", "fire_station", "消防署", 40.0, 50.0, 2, (250.0, 150.0)),
+    ("police_hq", "police_station", "警察署", 52.0, 50.0, 2, (650.0, 250.0)),
+    ("fire_hq", "fire_station", "消防署", 52.0, 56.0, 2, (250.0, 150.0)),
     ("ward_office", "ward_office", "区役所", 60.0, 60.0, 2, (450.0, 350.0)),
     ("hospital_general", "hospital", "総合病院", 100.0, 100.0, 2, (150.0, 550.0)),
-    ("post_office_main", "post_office", "郵便局", 40.0, 40.0, 2, (900.0, 150.0)),
+    ("post_office_main", "post_office", "郵便局", 54.0, 64.0, 2, (900.0, 150.0)),
     # the west (residential SW, west centre, residential west)
-    ("police_west", "police_station", "警察署", 35.0, 40.0, 2, (-800.0, -500.0)),
-    ("fire_branch_west", "fire_branch", "消防出張所", 20.0, 25.0, 1, (-1200.0, -700.0)),
-    ("fire_branch_rwest", "fire_branch", "消防出張所", 20.0, 25.0, 1, (-500.0, 100.0)),
-    ("hospital_west", "hospital", "病院", 55.0, 60.0, 1, (-1000.0, -850.0)),
-    ("post_office_west", "post_office", "郵便局", 15.0, 20.0, 1, (-700.0, -600.0)),
+    ("police_west", "police_station", "警察署", 52.0, 50.0, 2, (-800.0, -500.0)),
+    ("fire_branch_west", "fire_branch", "消防出張所", 32.0, 42.0, 1, (-1200.0, -700.0)),
+    ("fire_branch_rwest", "fire_branch", "消防出張所", 32.0, 42.0, 1, (-500.0, 100.0)),
+    ("hospital_west", "hospital", "病院", 65.0, 65.0, 1, (-1000.0, -850.0)),
+    ("post_office_west", "post_office", "郵便局", 25.0, 28.0, 1, (-700.0, -600.0)),
     # the water resort FIRST in the east (the search is in table order): it needs the suburb loop's whole interior beside
     # the beach hotels, and the fire station and clinic take what it leaves
     ("water_resort", "water_resort", "温浴・プールリゾート", 150.0, 70.0, 1, (1065.0, -800.0)),   # inside the dike, inside the suburb loop (2026-10-03)
     # the north (residential north) and the east (suburb)
-    ("fire_branch_north", "fire_branch", "消防出張所", 20.0, 25.0, 1, (700.0, 800.0)),
-    ("fire_branch_east", "fire_branch", "消防出張所", 20.0, 25.0, 1, (1110.0, -720.0)),
-    ("post_office_east", "post_office", "郵便局", 15.0, 20.0, 1, (1100.0, -500.0)),
+    ("fire_branch_north", "fire_branch", "消防出張所", 32.0, 42.0, 1, (700.0, 800.0)),
+    ("fire_branch_east", "fire_branch", "消防出張所", 32.0, 42.0, 1, (1110.0, -720.0)),
+    ("post_office_east", "post_office", "郵便局", 25.0, 28.0, 1, (1100.0, -500.0)),
     # 診療所: one in every residential district
     ("clinic_west", "clinic", "診療所", 14.0, 18.0, 1, (-1400.0, -600.0)),
     ("clinic_sw", "clinic", "診療所", 14.0, 18.0, 1, (-700.0, -900.0)),
@@ -92,16 +92,16 @@ PLOTS = (
     # district of a bank and a clinic -- measured, these were the gaps (industry + the port 660-960 m from police and
     # fire, the farm 1 km from police, residential north / west 560-780 m from a bank)
     ("koban_port", "koban", "交番", 8.0, 10.0, 1, (-250.0, -1000.0)),
-    ("fire_branch_port", "fire_branch", "消防出張所", 20.0, 25.0, 1, (-150.0, -900.0)),
+    ("fire_branch_port", "fire_branch", "消防出張所", 32.0, 42.0, 1, (-150.0, -900.0)),
     ("koban_farm", "koban", "交番", 8.0, 10.0, 1, "station:Farm"),
     ("bank_north", "bank_small", "銀行 (支店)", 20.0, 20.0, 1, (700.0, 790.0)),
     ("bank_rwest", "bank_small", "銀行 (支店)", 20.0, 20.0, 1, (-250.0, -20.0)),
     # 郵便局 (user, 2026-10-03): a branch in every residential district, the 集配 main office (post_office_main) in the
     # city; residential north is 2 km long, so it gets two
-    ("post_office_rwest", "post_office", "郵便局", 15.0, 20.0, 1, (-500.0, 100.0)),
-    ("post_office_sw", "post_office", "郵便局", 15.0, 20.0, 1, (-1350.0, -850.0)),
-    ("post_office_north", "post_office", "郵便局", 15.0, 20.0, 1, (250.0, 820.0)),
-    ("post_office_north_e", "post_office", "郵便局", 15.0, 20.0, 1, (1300.0, 820.0)),
+    ("post_office_rwest", "post_office", "郵便局", 25.0, 28.0, 1, (-500.0, 100.0)),
+    ("post_office_sw", "post_office", "郵便局", 25.0, 28.0, 1, (-1350.0, -850.0)),
+    ("post_office_north", "post_office", "郵便局", 25.0, 28.0, 1, (250.0, 820.0)),
+    ("post_office_north_e", "post_office", "郵便局", 25.0, 28.0, 1, (1300.0, 820.0)),
     # THE REVIEW'S JAPANESE CITY TYPES (user, 2026-10-03: "do all, so less vacancy"; blender/tools/library_jp_city.py).
     # Targets are the large vacant blocks measured on the built island (a 4 m vacancy grid against roads, lots, sites).
     # ONE school (user: "all in one school ... one big building ... park land for baseball"): the K-12 学園 on the big
@@ -164,13 +164,13 @@ PLOTS = (
     ("clothing_store", "clothing_store", "衣料品店", 30.0, 28.0, 1, (450.0, 150.0)),
     ("shooting_range", "shooting_range", "射撃場", 30.0, 60.0, 1, (-200.0, -780.0)),
     ("impound_lot", "impound_lot", "レッカー保管場所", 50.0, 42.0, 1, (650.0, 300.0)),
-    ("parking_garage_nightlife", "parking_garage", "立体駐車場", 36.0, 50.0, 1, (900.0, 350.0)),
-    ("parking_garage_west", "parking_garage", "立体駐車場", 36.0, 50.0, 1, (-700.0, -450.0)),
+    ("parking_garage_nightlife", "parking_garage", "立体駐車場", 36.0, 54.0, 1, (900.0, 350.0)),
+    ("parking_garage_west", "parking_garage", "立体駐車場", 36.0, 54.0, 1, (-700.0, -450.0)),
     ("mission_farm_barn", "farm_barn", "農家 (納屋)", 60.0, 50.0, 1, (700.0, 1350.0), {"gang": "gang_a"}),
     ("super_sento_suburb", "super_sento", "スーパー銭湯", 90.0, 70.0, 1, (1050.0, -500.0)),
     ("super_sento_residential", "super_sento", "スーパー銭湯", 90.0, 70.0, 1, (-1100.0, -350.0)),
     ("super_sento_city", "super_sento", "スーパー銭湯", 90.0, 70.0, 1, (200.0, -150.0)),
-    ("mission_port_warehouse", "warehouse_yard", "倉庫 (密輸)", 48.0, 54.0, 1, (-100.0, -1150.0), {"gang": "gang_b"}),
+    ("mission_port_warehouse", "warehouse_yard", "倉庫 (密輸)", 60.0, 66.0, 1, (-100.0, -1150.0), {"gang": "gang_b"}),
     ("public_market", "public_market", "公設市場", 50.0, 40.0, 1, (-560.0, -200.0)),
     # leisure, the neighbourhood and the shore
     ("shrine_city", "shrine", "神社", 50.0, 60.0, 1, (-250.0, 50.0)),
@@ -185,7 +185,7 @@ PLOTS = (
     ("mission_bank_large", "bank_large", "銀行 (本店)", 44.0, 34.0, 2, (450.0, 50.0)),
     ("mission_office_hq", "office_hq", "本社ビル", 32.0, 30.0, 1, (300.0, 150.0)),
     ("mission_department_store", "department_store", "百貨店", 84.0, 64.0, 2, (800.0, 60.0)),
-    ("mission_civic_center", "civic_center", "区民センター", 60.0, 50.0, 2, (1050.0, -50.0)),
+    ("mission_civic_center", "civic_center", "区民センター", 60.0, 54.0, 2, (1050.0, 40.0)),   # (2026-10-04) north: at 54 m deep it slid south onto the suburb's only near konbini
     ("mission_fashion", "fashion_building", "ファッションビル", 38.0, 36.0, 1, (680.0, 20.0)),
     ("mission_safehouse_city_large", "safehouse_city_large", "雑居ビル (隠れ家)", 10.0, 21.0, 1, (220.0, 350.0)),
     # the nightlife quarter and 秋葉原
@@ -199,8 +199,8 @@ PLOTS = (
     ("mission_safehouse_small", "safehouse_small", "一戸建て (隠れ家)", 12.0, 17.0, 1, (-900.0, -700.0)),
     ("mission_safehouse_large", "safehouse_large", "邸宅 (隠れ家)", 21.0, 22.0, 1, (600.0, 820.0)),
     ("mission_secure_mansion", "secure_mansion", "要塞邸宅", 68.0, 55.0, 1, (-450.0, 300.0), {"gang": "gang_a"}),   # 黒鉄会's HQ
-    ("mission_warehouse_yard", "warehouse_yard", "倉庫", 48.0, 54.0, 1, (-300.0, -800.0)),
-    ("mission_onsen_ryokan", "onsen_ryokan", "温泉旅館", 46.0, 43.0, 1, (-675.0, 1125.0), {"front": ("shrine_touge",)}),
+    ("mission_warehouse_yard", "warehouse_yard", "倉庫", 60.0, 66.0, 1, (-300.0, -800.0)),
+    ("mission_onsen_ryokan", "onsen_ryokan", "温泉旅館", 46.0, 47.0, 1, (-675.0, 1125.0), {"front": ("shrine_touge",)}),
 )
 
 
@@ -465,20 +465,29 @@ def coverage(doc):
 
 
 def piece_extents():
-    """{plot kind: (along, deep)} a plot must have to cover its building: the library piece's extent, doubled about the
+    """{building type: (along, deep)} a plot must have to cover its building: the library piece's extent, doubled about the
     piece's origin (a civic building stands with its origin on the plot's centre, `plot_origin`)."""
     import island_buildings as IB_
-    pj = json.load(open(os.path.join(ROOT, "assets", "world_source", "kits", "library", "pieces.json")))
-    pieces = pj.get("pieces", pj)
+    kits = {}
+    for kit in ("library", "interiors"):     # (2026-10-04) the interiors buildings too: the police station's fence
+        pj = json.load(open(os.path.join(ROOT, "assets", "world_source", "kits", kit, "pieces.json")))   # was unchecked
+        kits[kit] = pj.get("pieces", pj)
     bt = json.load(open(os.path.join(ROOT, "assets", "world_source", "buildings", "building_types.json")))
     custom = {r["id"]: r for r in bt.get("custom", [])}
     out = {}
-    for kind, t in getattr(IB_, "CIVIC_TYPES", {}).items():
+    types = set(getattr(IB_, "CIVIC_TYPES", {}).values()) | {"Hospital", "HospitalSmall", "PostOffice",
+                                                               "PostOfficeSmall"}
+    for t in types:
         t = t[0] if isinstance(t, (tuple, list)) else t
-        pc = custom.get(t, {}).get("piece")
+        row = custom.get(t, {})
+        pieces = kits.get(row.get("kit", "library"), {})
+        pc = row.get("piece")
         if pc in pieces:
             mn, mx = pieces[pc]["min"], pieces[pc]["max"]
-            out[kind] = (2 * max(abs(mn[0]), mx[0]), 2 * max(abs(mn[2]), mx[2]))
+            if row.get("plot_origin", row.get("kit", "library") == "library"):
+                out[t] = (2 * max(abs(mn[0]), mx[0]), 2 * max(abs(mn[2]), mx[2]))
+            else:                                # re-centred on its bounds when placed
+                out[t] = (mx[0] - mn[0], mx[2] - mn[2])
     return out
 
 
@@ -529,7 +538,8 @@ def main(argv):
         need = piece_extents()
         spec = {s_[0]: s_ for s_ in PLOTS}
         for p in doc["plots"]:
-            n_ = need.get(p["kind"])
+            import island_buildings as IB_
+            n_ = need.get(IB_.civic_type(p)) if p["kind"] in IB_.CIVIC_TYPES or p["kind"] in ("hospital", "post_office") else None
             sp = spec.get(p["id"])
             if (n_ and (n_[0] > p["size"][0] + 0.5 or n_[1] > p["size"][1] + 0.5)) or (
                     sp and [float(sp[3]), float(sp[4])] != [float(v) for v in p["size"]]):

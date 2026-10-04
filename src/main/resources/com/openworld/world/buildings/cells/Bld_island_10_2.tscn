@@ -12,10 +12,22 @@ material = ExtResource("lotmat")
 transform_format = 1
 instance_count = 1
 mesh = SubResource("LotBox")
-buffer = PackedFloat32Array(-57.5653, 0.0000, 15.5374, 738.8000, 0.0000, 0.5750, 0.0000, 5.5375, -18.6142, 0.0000, -48.0504, -1481.3300)
+buffer = PackedFloat32Array(-57.5653, 0.0000, 15.5374, 738.8000, 0.0000, 0.5100, 0.0000, 5.5050, -18.6142, 0.0000, -48.0504, -1481.3300)
 
 [sub_resource type="BoxShape3D" id="LotShape0"]
-size = Vector3(60.500, 0.575, 50.500)
+size = Vector3(60.500, 0.510, 50.500)
+
+[sub_resource type="BoxMesh" id="ApronBox"]
+material = ExtResource("lotmat")
+
+[sub_resource type="MultiMesh" id="Aprons"]
+transform_format = 1
+instance_count = 7
+mesh = SubResource("ApronBox")
+buffer = PackedFloat32Array(0.0000, 0.0000, 2.0000, 517.4850, 0.0000, 0.4000, 0.0000, 5.9400, -2.1000, 0.0000, 0.0000, -1303.5910, 1.9981, 0.0000, -0.6154, 728.1550, 0.0000, 0.4000, 0.0000, 5.5360, 0.6461, 0.0000, 1.9030, -1511.5740, 1.9981, 0.0000, -0.6154, 733.7840, 0.0000, 0.4000, 0.0000, 5.5390, 0.6461, 0.0000, 1.9030, -1509.7540, 1.9981, 0.0000, -0.6154, 739.4540, 0.0000, 0.4000, 0.0000, 5.5400, 0.6461, 0.0000, 1.9030, -1507.9200, 1.9981, 0.0000, -0.6154, 745.0840, 0.0000, 0.4000, 0.0000, 5.5400, 0.6461, 0.0000, 1.9030, -1506.1000, 1.9981, 0.0000, -0.6154, 750.7530, 0.0000, 0.4000, 0.0000, 5.5400, 0.6461, 0.0000, 1.9030, -1504.2670, 1.9981, 0.0000, -0.6154, 752.6160, 0.0000, 0.4000, 0.0000, 5.5400, 0.6461, 0.0000, 1.9030, -1503.6640)
+
+[sub_resource type="BoxShape3D" id="ApronShape"]
+size = Vector3(2.100, 0.400, 2.000)
 
 [node name="Bld_island_10_2" type="Node3D"]
 
@@ -32,7 +44,7 @@ visibility_range_begin_margin = 40.0
 visibility_range_fade_mode = 1
 
 [node name="FarmBarn_000" parent="." instance=ExtResource("1")]
-transform = Transform3D(-0.951492, 0, 0.307672, 0, 1, 0, -0.307672, 0, -0.951492, 738.800, 5.840, -1481.330)
+transform = Transform3D(-0.951492, 0, 0.307672, 0, 1, 0, -0.307672, 0, -0.951492, 738.800, 5.775, -1481.330)
 
 [node name="Mesh" parent="./FarmBarn_000" index="0"]
 visibility_parent = NodePath("../../HLOD")
@@ -44,5 +56,40 @@ multimesh = SubResource("Lots")
 collision_mask = 0
 
 [node name="Plinth0" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(-0.951492, 0, 0.307672, 0, 1, 0, -0.307672, 0, -0.951492, 738.800, 5.538, -1481.330)
+transform = Transform3D(-0.951492, 0, 0.307672, 0, 1, 0, -0.307672, 0, -0.951492, 738.800, 5.505, -1481.330)
 shape = SubResource("LotShape0")
+
+[node name="Aprons" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("Aprons")
+cast_shadow = 0
+
+[node name="ApronCollision" type="StaticBody3D" parent="."]
+collision_mask = 0
+
+[node name="Apron0" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, 517.485, 5.940, -1303.591)
+shape = SubResource("ApronShape")
+
+[node name="Apron1" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 728.155, 5.536, -1511.574)
+shape = SubResource("ApronShape")
+
+[node name="Apron2" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 733.784, 5.539, -1509.754)
+shape = SubResource("ApronShape")
+
+[node name="Apron3" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 739.454, 5.540, -1507.920)
+shape = SubResource("ApronShape")
+
+[node name="Apron4" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 745.084, 5.540, -1506.100)
+shape = SubResource("ApronShape")
+
+[node name="Apron5" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 750.753, 5.540, -1504.267)
+shape = SubResource("ApronShape")
+
+[node name="Apron6" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 752.616, 5.540, -1503.664)
+shape = SubResource("ApronShape")

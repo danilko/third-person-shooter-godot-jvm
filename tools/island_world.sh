@@ -131,7 +131,10 @@ if want ground; then
     stage ground
     godot 900 tools/godot/dump_height_grid.gd -- "$TMP/before_ground.f32" -2304 -2304 2305 2305 2 | tail -1
     [ -n "${KEEP_DUMPS:-}" ] && cp "$TMP/before_ground.f32" "$KEEP_DUMPS/" || true
-    python3 tools/island_ground.py derive "$TMP/before_ground.f32" --out "$TMP/block" | tail -3
+    python3 tools/island_ground.py derive "$TMP/before_ground.f32" --out "$TMP/block" | grep -E "under footways|aprons|wrote|paint"
+    # the block-ground APRONS over the footway-edge dips the 2 m terrain cannot fill (island_ground.edge_aprons) live
+    # in the building cells: write them again now the ground has decided where they go
+    python3 tools/island_buildings.py write | tail -1
     godot 900 tools/godot/apply_height_grid.gd -- "$D" "$TMP/block.height.f32" -2304 -2304 2305 2305 2 | tail -1
     godot 900 tools/godot/apply_paint_grid.gd -- "$D" "$TMP/block.paint.u8" -2304 -2304 2305 2305 2 4 "$TMP/block.height.f32" | tail -2   # 4 = Urban
     # 5 = Soil, the paddy fields (a second pass, no heights: it only paints, it leaves the block layer alone)

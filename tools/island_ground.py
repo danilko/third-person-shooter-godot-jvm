@@ -73,6 +73,17 @@ MAX_STEP = 1.5         # ...and so is ground further below it than this (it woul
 # `kaigan_dori` (none): ground 0.020 m proud of `ring_kita_F1`. Within CAP_REACH of such a road's paved edge the
 # block ground is capped at the road surface less the stamp's own clearance (road_kit_stamp.gd CLEARANCE).
 CAP_REACH = 3.0
+# THE BLOCK GROUND REACHES UNDER THE FOOTWAY (2026-10-04, user: "maybe half way through the sidewalk's reach from the
+# inside, so there is no major gap between the sidewalk and the internal ground"). The stamp holds every terrain vertex
+# under a footway 10 cm under the CARRIAGEWAY, and the block ground only started at the first vertex past the footway,
+# so the 2 m terrain triangle between them was a ditch behind the footway's back edge. Now the block's level is spread
+# under the footway's outer part too (UNDER_WALK under the footway top, so the paving always covers it), never nearer
+# the kerb line than KERB_KEEP -- with vertices 2 m apart, a raised vertex closer than ~1.15 m would pull the slope up
+# through the edge of the asphalt -- and the slope from the road's ground up to the block's happens under the paving.
+KERB_KEEP = 1.25
+UNDER_WALK = 0.02
+ENTRY_SPAN = 30.0                  # m from a vehicle entry's station out across its side's footway (see road_mask)
+STRIP_CELLS = 3                    # vertices the block ground walks in under a footway (6 m: wider than any footway)
 CLEARANCE = 0.10
 
 
@@ -238,6 +249,8 @@ def road_mask(ib, grid_fn, text):
     road = np.zeros((N, N), bool)
     under = np.zeros((N, N), bool)      # land under an ELEVATED road (a deck's footprint): painted, never raised
     cap = np.full((N, N), np.nan)
+    kerb = np.zeros((N, N), bool)       # the road mask less each footway's outer part (beyond KERB_KEEP of the kerb)
+    walk_cap = np.full((N, N), np.nan)  # under a footway: its top less UNDER_WALK
     for line, _h, owner in cors:
         owner = str(owner)
         pts = [(x, -y, z, half) for (x, y, z, half) in line]
@@ -249,8 +262,13 @@ def road_mask(ib, grid_fn, text):
         if high or owner.startswith(("GORE:", "shuto_")):
             # an elevated deck is not ground: keep the whole footprint out of the fill
             hard = max(hard, ib.ELEVATED_GAP)
+        strip = hard > KERB_KEEP and not high and not owner.startswith(("JCT:", "GORE:", "shuto_"))
         for a, b in zip(pts, pts[1:]):
             capsule_into(road, a[:2], b[:2], max(a[3], b[3]) + hard)
+            capsule_into(kerb, a[:2], b[:2], max(a[3], b[3]) + (KERB_KEEP if strip else hard))
+            if strip:
+                capsule_cap(walk_cap, a[:2], b[:2], max(a[3], b[3]) + hard,
+                            a[2] + ny + ib.KERB_H - UNDER_WALK, b[2] + ny + ib.KERB_H - UNDER_WALK)
             if high or owner.startswith("shuto_"):
                 capsule_into(under, a[:2], b[:2], max(a[3], b[3]) + hard)
             if hard <= 0.0 and not high and not owner.startswith("JCT:"):
@@ -258,6 +276,7 @@ def road_mask(ib, grid_fn, text):
                             a[2] + ny - CLEARANCE, b[2] + ny - CLEARANCE)
         if len(pts) == 1:
             capsule_into(road, pts[0][:2], pts[0][:2], pts[0][3] + hard)
+            capsule_into(kerb, pts[0][:2], pts[0][:2], pts[0][3] + hard)
     # THE RAIL CORRIDOR (PLAN.md 3.25 R2) is not a block either: an at-grade track's ballast bed stands ~0.15 m over
     # the ground, UNDER the kerb-level fill a block raises round its lots, so a fill walking into the corridor would
     # bury the track. Its reserve (the same record the placement keeps buildings off) goes into the road mask; an
@@ -271,6 +290,7 @@ def road_mask(ib, grid_fn, text):
             P = [(q[0], -q[1], q[2] - q[3] > 1.0) for q in c["pts"]]
             for a, b in zip(P, P[1:]):
                 capsule_into(road, a[:2], b[:2], half)
+                capsule_into(kerb, a[:2], b[:2], half)
                 if a[2] and b[2]:
                     capsule_into(under, a[:2], b[:2], half)
     # A SITE IS NOT A ROAD AND IT IS NOT A BLOCK EITHER. Its own scene carries whatever ground it has (a
@@ -282,7 +302,32 @@ def road_mask(ib, grid_fn, text):
         # site_exclusions' yaw is RADIANS (island_buildings.block_box's convention) and rect_into takes DEGREES: passed
         # straight through, every site mask was laid near axis-aligned (a yaw-90 terminal across its quay, not along it)
         rect_into(site, cx, cz, math.degrees(yaw), -hx, -hz, hx, hz)
-    return road, site, cap, under
+    # ...and UNDER A VEHICLE ENTRY the footway is lowered (point_edges.drop_entries: a 5 cm lip at the kerb, sloping up to
+    # the footway's height at the property line), so the block ground there stays under the LIP, or it would stand
+    # through the dropped paving (measured on the EntryTest stand: 0.13 m of ground over a 0.10 m footway)
+    import point_edges as ped
+    for road_ in net.roads.values():
+        chain = [net.points[u] for u in road_.points if u in net.points]
+        for i, p in enumerate(chain):
+            for side, w in (("left", float(getattr(p, "entry_left", 0.0) or 0.0)),
+                            ("right", float(getattr(p, "entry_right", 0.0) or 0.0))):
+                if w <= 0.0:
+                    continue
+                q = chain[i + 1] if i + 1 < len(chain) else chain[i - 1]
+                dx, dy = q.pos[0] - p.pos[0], q.pos[1] - p.pos[1]
+                if i + 1 >= len(chain):
+                    dx, dy = -dx, -dy
+                L = math.hypot(dx, dy) or 1.0
+                nx, ny_ = -dy / L, dx / L                    # the kit's LEFT (record frame)
+                if side == "right":
+                    nx, ny_ = -nx, -ny_
+                # out from the centreline across that side's whole footway, whatever the road's width (the cap only
+                # bites in the under-footway strip)
+                a_ = (p.pos[0], -p.pos[1])
+                b_ = (p.pos[0] + nx * ENTRY_SPAN, -(p.pos[1] + ny_ * ENTRY_SPAN))
+                z = p.pos[2] + ny + ped.ENTRY_KERB_H - UNDER_WALK
+                capsule_cap(walk_cap, a_, b_, w / 2.0 + ped.ENTRY_RAMP + 1.0, z, z)
+    return road, site, cap, under, kerb & road, walk_cap
 
 
 DIRS8 = ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1))
@@ -330,7 +375,7 @@ def build(heights_path, area=None):
         # do not drop passages from it
         rect_into(lot, p["pos"][0], p["pos"][2], p["yaw"], -w / 2.0, -dd / 2.0, w / 2.0, dd / 2.0,
                   heights=lot_top, h=p["pos"][1] + ib.LOT_RAISE)
-    road, site, cap, under = road_mask(ib, None, text)
+    road, site, cap, under, kerb, walk_cap = road_mask(ib, None, text)
     # a LEVELLED site (an access car park, island_sites.access_parking) is ground this stage owns: the terrain under it
     # is filled up to its level exactly like a lot, and it is no longer a site the fill must keep out of
     levelled = np.zeros((N, N), bool)
@@ -397,6 +442,27 @@ def build(heights_path, area=None):
 
     paved = fill | (lot & ~np.isnan(lot_top))
     height = np.where(paved, target, np.nan)
+    # under the footway's outer part (see KERB_KEEP): the block's own level walks in from the paved ground, never above
+    # THIS footway's top less UNDER_WALK (a corner lot's level comes from its other street, which may stand higher)
+    strip = road & ~kerb & ~site & ~under & ~np.isnan(walk_cap) & land
+    grow = paved.copy()
+    under_walk = np.zeros((N, N), bool)
+    for _k in range(STRIP_CELLS):
+        gv = np.full((N, N), np.nan)
+        for dj, di in DIRS8:
+            src = shift_bool(grow, dj, di)
+            sv = shift_f(height, dj, di)
+            take = src & strip & ~under_walk & ~paved & np.isnan(gv)
+            gv[take] = sv[take]
+        new = ~np.isnan(gv)
+        if not new.any():
+            break
+        gv = np.fmin(gv, walk_cap)
+        new &= gv > nat            # never lower the stamped ground under a footway
+        height[new] = gv[new]
+        under_walk |= new
+        grow = new
+    print("island_ground: %d vertices of block ground under footways" % int(under_walk.sum()))
     # the batter: ramp back to the natural ground outside the paved edge, so an open frontage does not end
     # on a 21 cm ledge
     edge = paved.copy()
@@ -504,6 +570,119 @@ def measure(nat, height, lot, lot_top, road=None, where=None):
     return lip * STEP
 
 
+# THE BLOCK-GROUND APRON (2026-10-04, user: "better a slight pop than a hole or a gap in the ground that a character or a
+# car gets stuck on"). With terrain vertices 2 m apart, a NARROW footway often has no vertex between the kerb zone
+# (KERB_KEEP, stamped 10 cm under the carriageway) and its own back edge, and the one terrain triangle across it is a
+# straight slope from the road's ground up to the block's: a ditch behind the footway, measured as 18 % of edges more
+# than 5 cm deep. No terrain height can remove it (any vertex high enough to fill it pushes ground up through the
+# asphalt edge), so where -- and only where -- the final ground dips behind an at-grade footway with block ground
+# beyond it, a strip of the lot concrete covers the ditch: APRON_W wide from the footway's back edge, its top
+# APRON_UNDER under the footway (1 cm over the block ground, so no two surfaces share a height), with collision.
+# Written to APRONS; `island_buildings.py write` puts them in the streamed building cells.
+APRONS = os.path.join(ROOT, "assets", "world_source", "buildings", "IslandEdgeAprons.json")
+APRON_W = 2.0
+APRON_STEP = 2.0
+APRON_UNDER = 0.01
+APRON_KERB = 0.3          # m past another road's paved edge an apron must keep off (its kerb)
+APRON_DIP = 0.03          # a dip this far under the block ground's level, anywhere across the strip, gets an apron
+
+
+def edge_aprons(ib, nat, height, road, site, text, under=None):
+    """[[x, top, z, yaw_deg, length, width]] (Godot frame) -- see APRONS. A corner under an ELEVATED road's footprint
+    (`under`) is not refused: the deck is metres overhead, and the ground under C1 is a block's like any other."""
+    final = np.where(np.isnan(height), nat, height)
+    if under is not None:
+        road = road & ~under
+
+    def h(x, z):
+        fi, fj = (x + HALF) / STEP, (z + HALF) / STEP
+        i, j = int(math.floor(fi)), int(math.floor(fj))
+        if not (0 <= i < N - 1 and 0 <= j < N - 1):
+            return float("nan")
+        u, v = fi - i, fj - j
+        return float(final[j, i] * (1 - u) * (1 - v) + final[j, i + 1] * u * (1 - v)
+                     + final[j + 1, i] * (1 - u) * v + final[j + 1, i + 1] * u * v)
+
+    def masked(m, x, z):
+        i, j = idx(x), idx(z)
+        return 0 <= i < N and 0 <= j < N and bool(m[j, i])
+
+    net, grid, cors = ib.solve_bands()
+    ny = network_y(text)
+    # every at-grade road's paving (carriageway + footway, or a pad's), as segments in a 20 m bucket index: an apron is
+    # refused where it would lie on ANOTHER road -- asked exactly, never of the 2 m mask, whose nearest vertex to a point
+    # just behind a footway can be inside that street's own capsule
+    segs, buckets = [], {}
+    for line, _h, owner in cors:
+        owner = str(owner)
+        walk, _l = ib.road_walk(net, owner)
+        reach = (walk if walk else ib.PAD_WALK) if owner.startswith("JCT:") else walk
+        for a, b in zip(line, line[1:]):
+            if ib.elevated(a[2], grid(a[0], a[1])) and ib.elevated(b[2], grid(b[0], b[1])):
+                continue
+            k = len(segs)
+            # the CARRIAGEWAY (+ its kerb) only: over another road's footway the apron is harmless, its top 1 cm under
+            # that paving, which hides it; on a carriageway it would be a 14 cm bump
+            segs.append((owner, (a[0], -a[1]), (b[0], -b[1]), max(a[3], b[3]) + APRON_KERB))
+            for gx in range(int(math.floor(min(a[0], b[0]) / 20.0)) - 1, int(math.floor(max(a[0], b[0]) / 20.0)) + 2):
+                for gz in range(int(math.floor(min(-a[1], -b[1]) / 20.0)) - 1, int(math.floor(max(-a[1], -b[1]) / 20.0)) + 2):
+                    buckets.setdefault((gx, gz), []).append(k)
+
+    def on_other(x, z, mine):
+        for k in buckets.get((int(math.floor(x / 20.0)), int(math.floor(z / 20.0))), ()):
+            owner, pa, pb, r = segs[k]
+            if owner == mine:
+                continue
+            dx, dz = pb[0] - pa[0], pb[1] - pa[1]
+            L2 = dx * dx + dz * dz
+            t = 0.0 if L2 < 1e-9 else max(0.0, min(1.0, ((x - pa[0]) * dx + (z - pa[1]) * dz) / L2))
+            if (x - pa[0] - t * dx) ** 2 + (z - pa[1] - t * dz) ** 2 <= r * r:
+                return True
+        return False
+
+    out = []
+    for line, _h, owner in cors:
+        owner = str(owner)
+        if owner.startswith(("JCT:", "GORE:", "shuto_")):
+            continue
+        walk, _l = ib.road_walk(net, owner)
+        if walk <= 0.0:
+            continue
+        for a, b in zip(line, line[1:]):
+            if ib.elevated(a[2], grid(a[0], a[1])) or ib.elevated(b[2], grid(b[0], b[1])):
+                continue
+            dx, dy = b[0] - a[0], b[1] - a[1]
+            L = math.hypot(dx, dy)
+            if L < 1e-6:
+                continue
+            nx, ny_ = -dy / L, dx / L
+            k = APRON_STEP / 2.0
+            while k < L:
+                t = k / L
+                x, y, z = a[0] + dx * t, a[1] + dy * t, a[2] + (b[2] - a[2]) * t
+                half = a[3] + (b[3] - a[3]) * t
+                top = z + ny + ib.KERB_H
+                lot = top + ib.LOT_RAISE
+                for sgn in (1.0, -1.0):
+                    def at(d, u=0.0):
+                        return (x + sgn * nx * d + dx / L * u, -(y + sgn * ny_ * d + dy / L * u))
+                    edge = half + walk
+                    if abs(h(*at(edge + 3.0)) - lot) > 0.03:          # no block ground behind this edge
+                        continue
+                    dip = min(h(*at(edge + d)) for d in (0.2, 0.7, 1.2, 1.7))
+                    if not dip < lot - APRON_DIP:
+                        continue
+                    corners = [at(edge + d, u) for d in (0.6, APRON_W - 0.1) for u in (-0.9, 0.9)]
+                    if any(on_other(c[0], c[1], owner) or masked(site, *c) for c in corners):
+                        continue                                   # another road, a pad, a site: not this block's
+                    cx, cz = at(edge + APRON_W / 2.0)
+                    yaw = math.degrees(math.atan2(dy, dx))      # local X along the road: (cos, -sin) = (dx, -dy) / L
+                    out.append([round(cx, 3), round(top - APRON_UNDER, 3), round(cz, 3), round(yaw, 2),
+                                APRON_STEP + 0.1, APRON_W])
+                k += APRON_STEP
+    return out
+
+
 def main(argv):
     if not argv or argv[0] not in ("derive", "report"):
         print(__doc__)
@@ -539,6 +718,13 @@ def main(argv):
     if argv[0] == "report":
         return 0
     height.astype("<f4").tofile(prefix + ".height.f32")
+    ib_ = load_record()[0]
+    aprons = edge_aprons(ib_, nat, height, road, site, open(ib_.SCENE).read(), under)
+    with open(APRONS, "w") as f:
+        json.dump({"source": "tools/island_ground.py (edge_aprons)", "note": "[x, top, z, yaw deg, length, width] Godot",
+                   "aprons": aprons}, f, separators=(",", ":"))
+        f.write("\n")
+    print("island_ground: %d block-ground aprons over footway-edge dips -> %s" % (len(aprons), APRONS))
     # THE PAINT BLEEDS PAST THE FILL, the height does not. A junction pad's road MASK is an over-estimate of
     # its paving (`PAD_WALK` where a mouth declares no footway), so a ring of ground shows between the pad's
     # own edge and where a lot may stand; and paint under a road mesh costs nothing and is never seen. Raising

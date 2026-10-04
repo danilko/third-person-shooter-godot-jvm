@@ -39,7 +39,7 @@ if [ -f "$P/IslandRail.roads.json" ]; then
     # change rebuilds only the rail pieces it reaches (its crossings, its dropped piers)
     # furniture ON: a rail road carries none of the street's (point_furniture.place skips it), only the 踏切
     # signals its level crossings get (R4, point_furniture.crossing_signals)
-    GLTF_EXTRA="--avoid $P/IslandRoads.roads.json $AVOID_GROUND" NAV_FIT=1 DIRTY_ONLY=1 \
+    [ -n "${SKIP_PIECES:-}" ] || GLTF_EXTRA="--avoid $P/IslandRoads.roads.json $AVOID_GROUND" NAV_FIT=1 DIRTY_ONLY=1 \
         blender/tools/build_roads_piece.sh "$P/IslandRail.roads.json" Roads_IslandRail \
         "$P/IslandRail.zones.json" "$P/IslandRail.ground.json" | grep -E "gate:|level crossing|^── 3/3|FAIL|ERROR" || true
     timeout -k 5 1800 stdbuf -oL "$G" --headless --path . --script tools/godot/stamp_roadkit_terrain.gd -- "$W" IslandRail \
@@ -57,6 +57,9 @@ step "4/7 build"
 # a C1 column stood on the Main line where it passes under the ring, probe_rail_track's gauge 2026-09-26)
 RAIL_AVOID=""; [ -f "$P/IslandRail.roads.json" ] && RAIL_AVOID="--avoid $P/IslandRail.roads.json"
 [ -f "$P/IslandRail.ground.json" ] && RAIL_AVOID="$RAIL_AVOID --avoid-ground $P/IslandRail.ground.json"
+# SKIP_PIECES=1 (2026-10-04): the ground and stamps only -- for a change that moves no road (the block ground, a
+# builder edit whose output is unchanged). The pieces' digests then stay stale and the next ordinary run rebuilds them.
+[ -n "${SKIP_PIECES:-}" ] && echo "   SKIP_PIECES: road pieces not rebuilt" || \
 GLTF_EXTRA="--keep-clear-lanekits $P/Roads_IslandRail_ $RAIL_AVOID" NAV_FIT=1 DIRTY_ONLY=1 \
     blender/tools/build_roads_piece.sh "$P/IslandRoads.roads.json" Roads_IslandRoads \
     "$P/IslandRoads.zones.json" "$P/IslandRoads.ground.json" | grep -E "gate:|^── 3/3|FAIL|ERROR" || true

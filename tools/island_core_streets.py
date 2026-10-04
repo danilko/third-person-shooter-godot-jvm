@@ -196,6 +196,64 @@ def _family(name):
     return m.group(1) if m else name
 
 
+#: a street crossing another ground road this close to either of its own ends is the end's business (its T), not a
+#: crossing to cut; and a crossing whose two roads stand further apart in height than AT_GRADE passes over or under
+CROSS_END_CLEAR = 2.0 * MOUTH
+AT_GRADE = 4.0
+#: OFF until the next layout pass (PLAN.md "Resume here", 2026-10-04): switched on, kojo_waku is cut at its two crossings
+#: with the dike's side road, and the Industry station's access T (island_rail_layout HUB_ACCESS, at (110, -650)) then
+#: lands 14 m from the new crossroads and `cut_road` refuses it -- move that T onto the crossroads first.
+CUT_CROSSINGS = False
+
+
+def _arc(poly):
+    cum = [0.0]
+    for a, b in zip(poly, poly[1:]):
+        cum.append(cum[-1] + math.hypot(b[0] - a[0], b[1] - a[1]))
+    return cum
+
+
+def _slice(poly, cum, s0, s1):
+    """The polyline between arc lengths s0 and s1."""
+    def at(s):
+        k = max(j for j in range(len(cum) - 1) if cum[j] <= s) if s < cum[-1] else len(cum) - 2
+        f = (s - cum[k]) / max(1e-9, cum[k + 1] - cum[k])
+        return (poly[k][0] + (poly[k + 1][0] - poly[k][0]) * f, poly[k][1] + (poly[k + 1][1] - poly[k][1]) * f)
+    return [at(s0)] + [poly[j] for j in range(len(poly)) if s0 < cum[j] < s1] + [at(s1)]
+
+
+def crossings(net, poly, ground, skip=()):
+    """[(arc length along `poly`, (x, y), road name)] -- every at-grade ground road the planned street crosses between
+    its ends (2026-10-04: `kojo_waku` was laid across the dike's side road, built earlier in the layout, and crossed it
+    with no junction -- the corner kerbs of a nearby pad then stood on the side road's carriageway)."""
+    cum = _arc(poly)
+    out = []
+    for name, r in net.roads.items():
+        if name in skip or r.road_class == "rail" or name.startswith("shuto_"):
+            continue
+        ch = [net.points[u] for u in r.points if u in net.points]
+        for a, b in zip(ch, ch[1:]):
+            if not a.has_link(b.uid, pm.LINK_SEGMENT):
+                continue
+            for k in range(len(poly) - 1):
+                p, q = poly[k], poly[k + 1]
+                d = (q[0] - p[0]) * (b.pos[1] - a.pos[1]) - (q[1] - p[1]) * (b.pos[0] - a.pos[0])
+                if abs(d) < 1e-9:
+                    continue
+                t = ((a.pos[0] - p[0]) * (b.pos[1] - a.pos[1]) - (a.pos[1] - p[1]) * (b.pos[0] - a.pos[0])) / d
+                u = ((a.pos[0] - p[0]) * (q[1] - p[1]) - (a.pos[1] - p[1]) * (q[0] - p[0])) / d
+                if not (0.0 <= t <= 1.0 and 0.0 <= u <= 1.0):
+                    continue
+                x, y = p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t
+                zr = a.pos[2] + (b.pos[2] - a.pos[2]) * u
+                if abs(zr - max(0.0, ground.z(x, y) or 0.0)) > AT_GRADE:
+                    continue
+                sarc = cum[k] + (cum[k + 1] - cum[k]) * t
+                if CROSS_END_CLEAR < sarc < cum[-1] - CROSS_END_CLEAR:
+                    out.append((sarc, (x, y), name))
+    return sorted(out)
+
+
 def add(net, s, ground):
     c = s["corners"]
     t1 = _tee(net, _family(s["first"]), c[0])
@@ -203,20 +261,50 @@ def add(net, s, ground):
     head = _mouth_head(net, t1, c[1])
     tail = _mouth_head(net, t2, c[-2])
     plan = rg.rounded_polygon([head] + list(c[1:-1]) + [tail], CORNER_R, closed=False)
-    # the fillet samples its arc every ARC_STEP (30 m): resample the straights too, so a 90 deg corner is not a chord
+    # A CROSSING IS A JUNCTION: the street is cut at every at-grade road it crosses between its ends (each piece ends
+    # MOUTH short of the crossing), and the crossed road is cut there too, the two pieces and its two halves one pad
+    dense = rg.densify(plan, 4.0) if len(plan) >= 4 else plan
+    cum = _arc(dense)
+    cross = crossings(net, dense, ground) if CUT_CROSSINGS else []
+    kept, last = [], 0.0
+    for sarc, xy, name in cross:
+        if sarc - last < 2.0 * MOUTH + 10.0 or cum[-1] - sarc < MOUTH + 10.0:
+            print("island_core_streets: %s crosses %s at (%.0f, %.0f) too near another junction to cut it -- left"
+                  % (s["name"], name, xy[0], -xy[1]))
+            continue
+        kept.append((sarc, xy, name))
+        last = sarc
+    bounds = [0.0] + [v for sarc, _xy, _n in kept for v in (sarc - MOUTH, sarc + MOUTH)] + [cum[-1]]
     step = s.get("spacing", SPACING)
-    pts = _resample(plan, step) if len(plan) < 4 else _resample(rg.densify(plan, 4.0), step)
-    pts3 = [(x, y, max(0.0, ground.z(x, y) or 0.0)) for x, y in pts]
-    road = chain_road(net, s["name"], pts3, preset="block", one_way=s.get("one_way", False))
+    pieces = []
+    for i in range(0, len(bounds), 2):
+        part = _slice(dense, cum, bounds[i], bounds[i + 1])
+        pts = _resample(part, step)
+        pts3 = [(x, y, max(0.0, ground.z(x, y) or 0.0)) for x, y in pts]
+        pieces.append(chain_road(net, s["name"] + ("__c%d" % (i // 2) if i else ""), pts3, preset="block",
+                                 one_way=s.get("one_way", False)))
+    for k, (sarc, xy, name) in enumerate(kept):
+        members = list(cut_road(net, xy, name.split("__")[0], MOUTH))
+        make_junction(net, members + [pieces[k].points[-1], pieces[k + 1].points[0]])
+        print("island_core_streets: %s crosses %s at (%.0f, %.0f) -- a crossroads" % (s["name"], name, xy[0], -xy[1]))
+    for road in pieces[1:]:
+        for u in road.points:
+            q = net.points[u]
+            q.ground_z, q.has_ground_z = ground.z(q.pos[0], q.pos[1]) or 0.0, True
+    road = pieces[0]
+    last_road = pieces[-1]
     if s.get("one_way"):
         # a ONE-WAY street (the station rotary): all its lanes run with the chain, on every station (a station's lane
         # counts are its own, not the base's), and its outer (left) footway is the kerb a bus stops at
         road.base.lanes_fwd, road.base.lanes_bwd = s.get("lanes", 2), 0
         road.base.left_walk_width, road.base.right_walk_width = s.get("walks", (4.0, 2.0))
-        for u in road.points:
-            net.points[u].lanes_fwd, net.points[u].lanes_bwd = s.get("lanes", 2), 0
+        for r_ in pieces:
+            r_.base.lanes_fwd, r_.base.lanes_bwd = s.get("lanes", 2), 0
+            r_.base.left_walk_width, r_.base.right_walk_width = s.get("walks", (4.0, 2.0))
+            for u in r_.points:
+                net.points[u].lanes_fwd, net.points[u].lanes_bwd = s.get("lanes", 2), 0
     make_junction(net, t1 + [road.points[0]])
-    make_junction(net, t2 + [road.points[-1]])
+    make_junction(net, t2 + [last_road.points[-1]])
     for u in road.points:
         q = net.points[u]
         q.ground_z, q.has_ground_z = ground.z(q.pos[0], q.pos[1]) or 0.0, True

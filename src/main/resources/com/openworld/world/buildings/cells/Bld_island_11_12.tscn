@@ -1,4 +1,28 @@
 [gd_scene format=3]
 
+[ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
+
+[sub_resource type="BoxMesh" id="ApronBox"]
+material = ExtResource("lotmat")
+
+[sub_resource type="MultiMesh" id="Aprons"]
+transform_format = 1
+instance_count = 1
+mesh = SubResource("ApronBox")
+buffer = PackedFloat32Array(-0.0187, 0.0000, 1.9999, 930.7240, 0.0000, 0.4000, 0.0000, 12.3500, -2.0999, 0.0000, -0.0178, 1022.1280)
+
+[sub_resource type="BoxShape3D" id="ApronShape"]
+size = Vector3(2.100, 0.400, 2.000)
 
 [node name="Bld_island_11_12" type="Node3D"]
+
+[node name="Aprons" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("Aprons")
+cast_shadow = 0
+
+[node name="ApronCollision" type="StaticBody3D" parent="."]
+collision_mask = 0
+
+[node name="Apron0" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(-0.008901, 0, 0.999960, 0, 1, 0, -0.999960, 0, -0.008901, 930.724, 12.350, 1022.128)
+shape = SubResource("ApronShape")

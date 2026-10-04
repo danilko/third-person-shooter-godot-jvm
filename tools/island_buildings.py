@@ -2078,8 +2078,12 @@ LOT_MATERIAL = "res://assets/world_source/buildings/materials/M_LotConcrete.tres
 # of the 10-15 cm a Japanese shop really stands up, and far under `MovementController.stepHeight` (0.35 m), so
 # nothing has to climb it. Both are applied in `write`, so changing them re-writes the cell scenes and needs no
 # terrain dump and no re-derive.
-LOT_RAISE = 0.06
-FLOOR_LIFT = 0.03
+# (2026-10-04, user: "let all terrain within the street block reach almost the same height as the sidewalk ... so there
+# is no major gap between the sidewalk and the internal ground"): the private ground now sits 2 cm UNDER the footway,
+# not 6 cm proud of it -- flush to the eye, and low enough that the terrain `island_ground` lays under the footway's
+# outer part (UNDER_WALK) can never poke through the paving. The plinth and the floor move up to stay clear of it.
+LOT_RAISE = -0.02
+FLOOR_LIFT = 0.045
 # THE BLOCK IS THE PRIVATE GROUND; THERE IS NO LOT SLAB (user, 2026-09-25). A lot was a rectangle grown out from
 # its own building in its own frame, and rectangles in different frames cannot tile a block, so neighbouring slabs
 # always left strips of the fill showing between them -- a gap no bevel could close, because it came from WHERE the
@@ -2091,7 +2095,7 @@ FLOOR_LIFT = 0.03
 # so the walls never meet the ground on a seam and neither face is coplanar with the other.
 LOT_FILL_GAP = 0.0
 PLINTH_MARGIN = 0.25
-PLINTH_LIFT = 0.015
+PLINTH_LIFT = 0.03            # the plinth top 1 cm over the footway, 3 cm over the block ground, 1.5 cm under the floor
 
 
 _AABBS = {}
@@ -2306,7 +2310,11 @@ def facade_surfaces(scene):
 CROP_SCRIPT = "res://src/main/java/com/openworld/world/CropField.java"
 
 
-def cell_scene(name, blds, passages=(), fields=()):
+APRONS = os.path.join(ROOT, "assets", "world_source", "buildings", "IslandEdgeAprons.json")
+APRON_DEPTH = 0.4      # the apron box reaches this far down from its top: into the footway-edge dip it covers
+
+
+def cell_scene(name, blds, passages=(), fields=(), aprons=()):
     """One streamed cell: every building instanced, and its lot slabs as ONE MultiMesh (+ box collision).
 
     A 路地 is NOT drawn here (PLAN.md 3.18(c3a)): it is a RESERVATION (`field.passage`, 接道義務) and its ground is
@@ -2337,7 +2345,7 @@ def cell_scene(name, blds, passages=(), fields=()):
                 used.setdefault((fam, t), "tone%d_%d" % (len(used), t))
     for (fam, t), rid in sorted(used.items()):
         ext.append('[ext_resource type="Material" path="%s" id="%s"]\n' % (FACADE_MAT_RES % tones[fam][t], rid))
-    if lots:
+    if lots or aprons:
         ext.append('[ext_resource type="Material" path="%s" id="lotmat"]\n' % LOT_MATERIAL)
     if blds:
         ext.append('[ext_resource type="ArrayMesh" path="%s/%s.res" id="hlod"]\n' % (HLOD_RES, name))
@@ -2434,6 +2442,29 @@ def cell_scene(name, blds, passages=(), fields=()):
             nodes.append('\n[node name="Plinth%d" type="CollisionShape3D" parent="PlinthCollision"]\n'
                          'transform = Transform3D(%.6f, 0, %.6f, 0, 1, 0, %.6f, 0, %.6f, %.3f, %.3f, %.3f)\n'
                          'shape = SubResource("LotShape%d")\n' % (k, c, s, -s, c, ox, oy, oz, k))
+    if aprons:
+        # THE BLOCK-GROUND APRONS (island_ground.edge_aprons): a strip of the lot concrete over each footway-edge dip
+        # the 2 m terrain could not fill, one draw call and one box collider each
+        sub.append('[sub_resource type="BoxMesh" id="ApronBox"]\nmaterial = ExtResource("lotmat")\n\n')
+        buf = []
+        for (x, top, z, yaw, ln, wd) in aprons:
+            a = math.radians(yaw)
+            c, s = math.cos(a), math.sin(a)
+            buf += [c * ln, 0.0, s * wd, x, 0.0, APRON_DEPTH, 0.0, top - APRON_DEPTH / 2.0, -s * ln, 0.0, c * wd, z]
+        sub.append('[sub_resource type="MultiMesh" id="Aprons"]\ntransform_format = 1\ninstance_count = %d\n'
+                   'mesh = SubResource("ApronBox")\nbuffer = PackedFloat32Array(%s)\n\n'
+                   % (len(aprons), ", ".join("%.4f" % v for v in buf)))
+        sub.append('[sub_resource type="BoxShape3D" id="ApronShape"]\nsize = Vector3(%.3f, %.3f, %.3f)\n\n'
+                   % (aprons[0][4], APRON_DEPTH, aprons[0][5]))
+        nodes.append('\n[node name="Aprons" type="MultiMeshInstance3D" parent="."]\nmultimesh = SubResource("Aprons")\n'
+                     'cast_shadow = 0\n')
+        nodes.append('\n[node name="ApronCollision" type="StaticBody3D" parent="."]\ncollision_mask = 0\n')
+        for k, (x, top, z, yaw, _ln, _wd) in enumerate(aprons):
+            a = math.radians(yaw)
+            c, s = math.cos(a), math.sin(a)
+            nodes.append('\n[node name="Apron%d" type="CollisionShape3D" parent="ApronCollision"]\n'
+                         'transform = Transform3D(%.6f, 0, %.6f, 0, 1, 0, %.6f, 0, %.6f, %.3f, %.3f, %.3f)\n'
+                         'shape = SubResource("ApronShape")\n' % (k, c, s, -s, c, x, top - APRON_DEPTH / 2.0, z))
     return "".join(ext + sub + nodes)
 
 
@@ -2835,6 +2866,12 @@ def write(check):
         field_cells.setdefault(cell_of(f["x0"] + half, f["z0"] + half), []).append(f)
     for k in field_cells:
         cells.setdefault(k, [])
+    apron_cells = {}
+    if os.path.exists(APRONS):
+        for ap in json.load(open(APRONS))["aprons"]:
+            apron_cells.setdefault(cell_of(ap[0], ap[2]), []).append(ap)
+    for k in apron_cells:
+        cells.setdefault(k, [])
     changed = []
     want = set()
     os.makedirs(CELL_DIR, exist_ok=True)
@@ -2868,7 +2905,8 @@ def write(check):
         name = "Bld_island_%d_%d" % (gx, gz)
         path = os.path.join(CELL_DIR, name + ".tscn")
         want.add(name + ".tscn")
-        body = cell_scene(name, blds, pass_cells.get((gx, gz), ()), field_cells.get((gx, gz), ()))
+        body = cell_scene(name, blds, pass_cells.get((gx, gz), ()), field_cells.get((gx, gz), ()),
+                          apron_cells.get((gx, gz), ()))
         if not os.path.exists(path) or open(path).read() != body:
             changed.append(path)
             if not check:

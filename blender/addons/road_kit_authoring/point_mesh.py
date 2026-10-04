@@ -1104,11 +1104,27 @@ def _edge_run(objs, name, pts, walk, kerb, wall, sgn, style=None):
         th = min(h * ps.KERB_THICKNESS, KERB_HALF_MAX)
         slide = min(1.0, max(0.0, (h - PLATFORM_KERB_FROM) / PLATFORM_KERB_RAMP))
         values.append({"rka_curb_ol": sgn * th * slide, "rka_curb_hl": h, "rka_curb_tl": th,
+                       "_fw_in": 0.0, "_fw_out": sgn * 2.0 * w, "_fw_zo": getattr(kerb[k], "outer", h),
                        "rka_walk_cl": sgn * w, "rka_walk_hl": w, "rka_walk_zl": h, "rka_wall_h": wl,
                        "rka_wall_hw": half_t if wl > 0.0 else 0.0, "rka_wall_c": sgn * (2.0 * w + half_t),
                        "rka_wall_z": h + wl, "rka_wall_foot": h})
     pts = [tuple(p) for p in pts]
+    asphalt = name.endswith("_asphalt")      # a DROP_ASPHALT vehicle entry (`point_edges.split_entries`)
+    sloped = any(abs(v["_fw_zo"] - v["rka_walk_zl"]) > 1e-9 for v in values)    # a dropped kerb (vehicle entry)
     for layer, kind, slot, oa, z, za, wa, ta in EDGE:
+        if slot == "footway" and (asphalt or sloped):
+            # a VEHICLE ENTRY's footway: from the dropped kerb's lip at the kerb line UP to the footway's own height at
+            # its back edge (セミフラット), so the lot behind meets it as it meets every other stretch. DROP_ASPHALT paves
+            # it in the road's surface so it reads as one surface with the lot; the kerb lip stays concrete (the drain's
+            # edge). (A footway PROFILE ASSET is not swept on such a run: the slope is a plain band.)
+            mat = (style.material("surface" if asphalt else "footway") if style is not None
+                   else MAT[pk.SLOT_DEFAULT["surface" if asphalt else "footway"]])
+            lats = [_lateral(t) for t in poly_tangents(pts)]
+            inner = _offset_curve(pts, lats, values, "_fw_in", 0.0, "rka_walk_zl")
+            outer = _offset_curve(pts, lats, values, "_fw_out", 0.0, "_fw_zo")
+            if any(float(v["rka_walk_hl"]) > 1e-6 for v in values):
+                _add(objs, name, mat, _face_up(_strip(inner, outer)))
+            continue
         _layer(objs, name, style, slot, kind, oa, z, za, wa, ta, pts, values, flip=(sgn < 0.0))
     # The CAR WALL: where a barrier stands, a collision-only wall on its line, `CAR_WALL_HEIGHT` tall from its foot, that
     # only vehicle bodies collide with (`CollisionLayers.CAR_WALL`, set by the bake from the `-carwall` name). A car
