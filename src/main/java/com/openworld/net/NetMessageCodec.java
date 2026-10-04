@@ -399,6 +399,39 @@ public final class NetMessageCodec {
         return buf.getUtf8String();
     }
 
+    // ── MSG_SHOP_REQUEST (client → host, reliable channel 1) ─────────────────
+    //
+    // [tag u8][buyerCharacterId utf8][itemId utf8]
+    //
+    // The owner picked an item at a shop counter (PLAN.md W3): the host checks ownership and that the buyer stands at
+    // a counter that sells it, then grants it the ordinary way (inventory converges through MSG_INVENTORY).
+
+    public static PackedByteArray encodeShopRequest(int msgType, String buyerCharacterId, String itemId) {
+        StreamPeerBuffer buf = new StreamPeerBuffer();
+        buf.put8(msgType);
+        buf.putUtf8String(buyerCharacterId);
+        buf.putUtf8String(itemId);
+        return buf.getDataArray();
+    }
+
+    public record DecodedShopRequest(String buyerCharacterId, String itemId) { }
+
+    public static DecodedShopRequest decodeShopRequest(StreamPeerBuffer buf) {
+        String who = buf.getUtf8String();
+        return new DecodedShopRequest(who, buf.getUtf8String());
+    }
+
+    // ── MSG_SUPPLY_USE (client → host, reliable channel 1): [tag u8][characterId utf8] ──
+    // The owner pressed use_supply; the host uses that character's best-fitting carried supply.
+
+    public static PackedByteArray encodeSupplyUse(int msgType, String characterId) {
+        return encodeDetonateRequest(msgType, characterId);
+    }
+
+    public static String decodeSupplyUse(StreamPeerBuffer buf) {
+        return buf.getUtf8String();
+    }
+
     // ── MSG_DAMAGE_BROADCAST ──────────────────────────────────────────────────
     //
     // [tag u8][victimCharacterId utf8][damage float][hasSource u8][source 3×float]

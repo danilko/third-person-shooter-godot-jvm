@@ -167,6 +167,12 @@ public class HUDManager extends CanvasLayer {
 	  clock.setName(new godot.core.StringName("GameClock"));
 	  addChild(clock);
 	}
+	// the wanted level, left of the clock (PLAN.md W5)
+	if (getNodeOrNull("WantedStars") == null) {
+	  WantedStars ws = new WantedStars();
+	  ws.setName(new godot.core.StringName("WantedStars"));
+	  addChild(ws);
+	}
 	if (feed != null && feed.getNodeOrNull("VBoxContainer") instanceof Control kv) {
 	  kv.setOffset(godot.core.Side.TOP, GameClock.MARGIN + GameClock.H + 8f);
 	  kv.setOffset(godot.core.Side.BOTTOM, GameClock.MARGIN + GameClock.H + 30f);
@@ -256,7 +262,8 @@ public class HUDManager extends CanvasLayer {
 		  || name.equals("WeaponRadialMenu") || name.equals("WeaponProgress")
 		  || name.equals("ScopeOverlay") || name.equals("AreaWarning") || name.equals("HitMarker")
 		  || name.equals("Minimap") || name.equals("WorldMap") || name.equals("GpsArrow")
-		  || name.equals("RaceHUD") || name.equals("GameClock")) continue;
+		  || name.equals("RaceHUD") || name.equals("GameClock")
+		  || name.equals("WantedStars")) continue;
 	  widgets.put(name, c);
 	  if (c instanceof WeaponSlotsUI ws) weaponSlotsUI = ws;
 	  if (c instanceof WeaponHUD wh) weaponHud = wh;

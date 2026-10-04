@@ -1,0 +1,93 @@
+{
+  "note": "The crime table (PLAN.md W5). A row is a crime id -> heat added, the minimum stars it sets at once, whether a witness is needed, and `lethal`: once a lethal crime is on a player's record, police shoot on sight and no arrest is offered, until the heat is gone or the player is hospitalized. Adding a crime = one row here + one WantedSystem.report(id, ...) call. Stars come from heat by `stars_at` (thresholds for 1..6 stars). `police_weapons` is what responding police carry (the dispatch, PLAN.md W5): heavy weapons once the player is lethal-wanted (user, 2026-10-03).",
+  "stars_at": [
+    40,
+    140,
+    320,
+    560,
+    860,
+    1250
+  ],
+  "calm_seconds": 12.0,
+  "calm_per_star": 6.0,
+  "decay_per_second": 18.0,
+  "witness_radius": 45.0,
+  "crimes": {
+    "gunfire": {
+      "heat": 10,
+      "min_stars": 0,
+      "witness": true,
+      "lethal": false
+    },
+    "assault": {
+      "heat": 30,
+      "min_stars": 1,
+      "witness": true,
+      "lethal": false
+    },
+    "murder": {
+      "heat": 120,
+      "min_stars": 2,
+      "witness": true,
+      "lethal": false
+    },
+    "assault_police": {
+      "heat": 120,
+      "min_stars": 2,
+      "witness": false,
+      "lethal": false
+    },
+    "kill_police": {
+      "heat": 300,
+      "min_stars": 3,
+      "witness": false,
+      "lethal": true
+    },
+    "car_theft": {
+      "heat": 25,
+      "min_stars": 1,
+      "witness": true,
+      "lethal": false
+    },
+    "train_attack": {
+      "heat": 500,
+      "min_stars": 4,
+      "witness": false,
+      "lethal": true
+    },
+    "bank_attack": {
+      "heat": 500,
+      "min_stars": 4,
+      "witness": false,
+      "lethal": true
+    },
+    "attack_vip": {
+      "heat": 400,
+      "min_stars": 4,
+      "witness": false,
+      "lethal": false
+    },
+    "threaten_clerk": {
+      "heat": 60,
+      "min_stars": 1,
+      "witness": false,
+      "lethal": false
+    },
+    "rob_store": {
+      "heat": 220,
+      "min_stars": 2,
+      "witness": false,
+      "lethal": true
+    }
+  },
+  "police_weapons": {
+    "normal": [
+      "PIS1"
+    ],
+    "lethal": [
+      "SHG1",
+      "ASR2",
+      "SMG1"
+    ]
+  }
+}

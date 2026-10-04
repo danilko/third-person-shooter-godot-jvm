@@ -237,6 +237,7 @@ public class PlayerController extends Controller {
         cmd.fire    = inp.isActionPressed("fire", false);
         cmd.reload  = inp.isActionJustPressed("reload", false);
         cmd.detonate = inp.isActionJustPressed("detonate", false);
+        cmd.useSupply = com.openworld.item.Supplies.useKeyJustPressed();
         cmd.drop    = inp.isActionJustPressed("drop", false);
         cmd.jump    = inp.isActionJustPressed("jump", false);
 

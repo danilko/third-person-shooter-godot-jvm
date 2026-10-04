@@ -67,6 +67,8 @@ public class UserCommand {
     public boolean reload;
     /** One-tick edge: the remote-charge detonator (REC1), set off whatever is held (GTA's sticky bomb). */
     public boolean detonate;
+    /** One-tick edge: use a carried healing supply (food / medical; PLAN.md W3). */
+    public boolean useSupply;
     public boolean drop;
 
     // ── Body actions ──────────────────────────────────────────────────────────

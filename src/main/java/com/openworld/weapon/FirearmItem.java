@@ -146,6 +146,10 @@ public class FirearmItem extends WeaponItem {
 		? c.characterInfo.faction : "";
 	sm.post(StimulusManager.Type.GUNSHOT, weaponMuzzle().getGlobalPosition(),
 		gunshotHearingRadius, owningCharacter, faction);
+	// the wanted level (PLAN.md W5): a player firing where someone can see it
+	com.openworld.game.WantedSystem wanted = com.openworld.game.WantedSystem.get();
+	if (wanted != null && owningCharacter instanceof com.openworld.character.Player p && p.characterInfo != null)
+	  wanted.report("gunfire", weaponMuzzle().getGlobalPosition(), p.characterInfo.characterId);
   }
 
   /**

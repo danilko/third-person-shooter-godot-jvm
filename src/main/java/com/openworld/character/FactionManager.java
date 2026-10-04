@@ -123,6 +123,14 @@ public class FactionManager extends Node {
         return missionTable != null ? "mission" : regionTable != null ? "region" : "default";
     }
 
+    /** The live table's relationship string for a pair ("" = none: the inherent default applies). */
+    public String relationship(String a, String b) {
+        FactionTable t = table;
+        if (t == null) return "";
+        String r = t.relationship(a, b);
+        return r == null ? "" : r;
+    }
+
     /** {@link #areHostile} for GDScript probes. */
     @Register
     public boolean hostileNow(String a, String b) {

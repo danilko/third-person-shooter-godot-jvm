@@ -187,22 +187,6 @@ public class WeaponPad extends Area3D {
     }
 
     private void grant(Character c) {
-        var wc = c.weaponController;
-        for (int i = 0; i < wc.slotCount(); i++) {
-            WeaponItem w = wc.getWeaponItem(i);
-            if (w == null || !weaponId.equals(w.weaponId)) continue;
-            w.magazine = w.magazineSize;
-            w.reserve = w.reserveMax;
-            WeaponItem cur = wc.getCurrentWeaponItem();
-            if (cur != null) wc.ammoChanged.emit(cur.magazine, cur.reserve);
-            grants++;
-            return;
-        }
-        WeaponItem item = WeaponCatalog.instantiate(weaponId);
-        if (item == null) return;
-        getTree().getCurrentScene().addChild(item);
-        item.setGlobalPosition(c.getGlobalPosition());
-        wc.requestEquip(item);
-        grants++;
+        if (WeaponGrant.grant(c, weaponId, this) != WeaponGrant.Result.FAILED) grants++;
     }
 }

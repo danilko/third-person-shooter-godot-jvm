@@ -116,6 +116,8 @@ public class NetworkManager extends Node {
     private static final int MSG_LAUNCH                 = 28; // N4  — client→host: a rocket/grenade's inputs; the host flies it
     private static final int MSG_DETONATION             = 29; // N4  — host→all: where a host projectile exploded
     private static final int MSG_DETONATE_REQUEST       = 30; // client→host: the owner pressed its remote-charge detonator
+    private static final int MSG_SHOP_REQUEST           = 31; // W3  — client→host: the owner bought an item at a shop counter
+    private static final int MSG_SUPPLY_USE             = 32; // W3  — client→host: the owner used a healing supply
 
     /** WeaponController's slotTypes table has 7 entries (FIST/PRIMARY×2/SECONDARY/MELEE/THROWABLE/CONSUMABLE) — bounds isValidSnapshot's activeSlotIndex check. */
     private static final int WEAPON_SLOT_COUNT = 7;
@@ -176,7 +178,7 @@ public class NetworkManager extends Node {
             // pickups and spawns on channel 0, and vice versa. Ordered within the channel, which is
             // what lets the host treat a non-advancing shotSeq as a replay.
             // Swings share the shots' lane (N2): the same reliable, ordered stream of attack inputs.
-            case MSG_SHOT, MSG_MELEE, MSG_LAUNCH, MSG_DETONATE_REQUEST -> new ChannelSpec(1, ENetPacketPeer.FLAG_RELIABLE);
+            case MSG_SHOT, MSG_MELEE, MSG_LAUNCH, MSG_DETONATE_REQUEST, MSG_SHOP_REQUEST, MSG_SUPPLY_USE -> new ChannelSpec(1, ENetPacketPeer.FLAG_RELIABLE);
             // Shot results are cosmetic and superseded by the next pull: unreliable, own lane (N1b).
             case MSG_SHOT_RESULT_BATCH -> new ChannelSpec(3, 0L);
             default -> throw new IllegalArgumentException("No channel mapping for MSG_* tag " + msgType);
@@ -839,6 +841,8 @@ public class NetworkManager extends Node {
                 case MSG_LAUNCH -> handleLaunchMessage(senderPeerId, buf);
                 case MSG_DETONATION -> handleDetonationMessage(senderPeerId, buf);
                 case MSG_DETONATE_REQUEST -> handleDetonateRequestMessage(senderPeerId, buf);
+                case MSG_SHOP_REQUEST -> handleShopRequestMessage(senderPeerId, buf);
+                case MSG_SUPPLY_USE -> handleSupplyUseMessage(senderPeerId, buf);
                 case MSG_WORLD_EVENT -> handleWorldEventMessage(senderPeerId, buf);
                 case MSG_OWNERSHIP -> handleOwnershipMessage(senderPeerId, buf);
                 case MSG_PICKUP_REQUEST -> handlePickupRequestMessage(senderPeerId, buf);
@@ -1760,6 +1764,60 @@ public class NetworkManager extends Node {
         }
         com.openworld.net.NetStats.increment("detonate_request_accepted");
         com.openworld.weapon.RemoteCharges.detonateAll(id);
+    }
+
+    /** Client → host: the owner used a healing supply (PLAN.md W3). */
+    public void sendSupplyUse(String characterId) {
+        if (!isNetworked() || isServer() || characterId == null || characterId.isEmpty()) return;
+        com.openworld.net.NetStats.increment("supply_use_sent");
+        sendMessage(SERVER_PEER_ID, NetMessageCodec.encodeSupplyUse(MSG_SUPPLY_USE, characterId));
+    }
+
+    private void handleSupplyUseMessage(int senderPeerId, StreamPeerBuffer buf) {
+        String id = NetMessageCodec.decodeSupplyUse(buf);
+        if (!isValidIdentifier(id)) { dropInvalid("supply", "MSG_SUPPLY_USE", senderPeerId); return; }
+        if (!isServer()) return;
+        Character c = findCharacterById(id);
+        if (c == null || c.characterInfo == null || c.characterInfo.ownerPeerId != senderPeerId) {
+            com.openworld.net.NetStats.increment("supply_use_rejected_not_owner");
+            return;
+        }
+        com.openworld.net.NetStats.increment(com.openworld.item.Supplies.useHere(c).isEmpty()
+                ? "supply_use_nothing" : "supply_use_accepted");
+    }
+
+    /** Client → host: the owner bought an item at a shop counter (PLAN.md W3). */
+    public void sendShopRequest(String buyerCharacterId, String itemId) {
+        if (!isNetworked() || isServer() || buyerCharacterId == null || buyerCharacterId.isEmpty()) return;
+        com.openworld.net.NetStats.increment("shop_request_sent");
+        sendMessage(SERVER_PEER_ID, NetMessageCodec.encodeShopRequest(MSG_SHOP_REQUEST, buyerCharacterId, itemId));
+    }
+
+    /**
+     * Host: a client bought something. Only the character's owner may buy for it, and only standing at a counter
+     * that sells it (counted {@code shop_request_rejected_<why>}).
+     */
+    private void handleShopRequestMessage(int senderPeerId, StreamPeerBuffer buf) {
+        NetMessageCodec.DecodedShopRequest r = NetMessageCodec.decodeShopRequest(buf);
+        if (!isValidIdentifier(r.buyerCharacterId()) || !isValidIdentifier(r.itemId())) {
+            dropInvalid("shop", "MSG_SHOP_REQUEST", senderPeerId);
+            return;
+        }
+        if (!isServer()) return;
+        Character c = findCharacterById(r.buyerCharacterId());
+        if (c == null || c.characterInfo == null || c.characterInfo.ownerPeerId != senderPeerId) {
+            com.openworld.net.NetStats.increment("shop_request_rejected_not_owner");
+            return;
+        }
+        for (Node n : getTree().getNodesInGroup(new StringName(com.openworld.item.ShopCounter.GROUP))) {
+            if (n instanceof com.openworld.item.ShopCounter sc && sc.sells(r.itemId())
+                    && sc.holds(c.getGlobalPosition(), 1.5)) {
+                com.openworld.net.NetStats.increment("shop_request_accepted");
+                sc.grantTo(c, r.itemId());
+                return;
+            }
+        }
+        com.openworld.net.NetStats.increment("shop_request_rejected_not_at_counter");
     }
 
     /**

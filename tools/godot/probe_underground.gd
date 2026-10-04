@@ -6,7 +6,8 @@ extends SceneTree
 ##   ... -- --control      (underground_depth 0: the check is off, and the player stays under the map)
 ##
 ##   1. a player put 6 m under the terrain is back on the surface within a second, at the same XZ;
-##   2. a player standing normally on the ground is never moved (no false rescue over 3 s).
+##   2. a player standing normally on the ground is never moved (no false rescue over 3 s);
+##   3. a player swimming in the sea over the seabed is never moved (the terrain under water IS the seabed).
 
 const DEBUG := "res://src/main/resources/com/openworld/world/DebugWorld.tscn"
 const ISLAND := "res://src/main/resources/com/openworld/world/World.tscn"
@@ -45,6 +46,32 @@ func _initialize() -> void:
 		await physics_frame
 	_check(int(wb.call("underground_rescue_count")) == r0 and player.global_position.distance_to(spawn) < 2.0,
 			"a player standing on the ground is left alone (moved %.2f m)" % player.global_position.distance_to(spawn))
+	# 3. swimming: the sea's surface is y 0 and the seabed is the terrain under it, so a swimmer is ABOVE the terrain
+	var sea := Vector3.INF
+	for r in range(40, 1600, 20):
+		for k in 16:
+			var a := TAU * k / 16.0
+			var q := spawn + Vector3(cos(a) * r, 0.0, sin(a) * r)
+			var hq: float = wb.call("terrain_height", q.x, q.z)
+			if not is_nan(hq) and hq < -4.0:
+				sea = Vector3(q.x, -0.6, q.z)
+				break
+		if sea != Vector3.INF:
+			break
+	if sea == Vector3.INF:
+		print("  [SKIP] no sea deeper than 4 m within 1.6 km of the spawn")
+	else:
+		var r1 := int(wb.call("underground_rescue_count"))
+		player.global_position = sea
+		player.velocity = Vector3.ZERO
+		for i in 180:
+			await physics_frame
+		_check(int(wb.call("underground_rescue_count")) == r1,
+				"a player swimming over the seabed at (%.0f, %.0f) is left alone (y now %.2f)" % [sea.x, sea.z, player.global_position.y])
+		player.global_position = spawn
+		player.velocity = Vector3.ZERO
+		for i in 30:
+			await physics_frame
 	# 1. under the map
 	var h: float = wb.call("terrain_height", spawn.x + 20.0, spawn.z)
 	var under := Vector3(spawn.x + 20.0, h - 6.0, spawn.z)

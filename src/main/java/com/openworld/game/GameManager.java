@@ -99,6 +99,23 @@ public class GameManager extends Node {
         // their in-flight reload/fire AudioStreamPlaybackWAV leaks ("Resource still in use:
         // Rifle_reload.wav" / leaked ObjectDB instances). The root Window's close_requested fires
         // first, while everything is valid, so it is the one reliable place to silence them.
+        // the wanted level and the jail respawn (PLAN.md W5): children of this AutoLoad, built in code
+        if (getNodeOrNull("WantedSystem") == null) {
+            WantedSystem ws = new WantedSystem();
+            ws.setName(new godot.core.StringName("WantedSystem"));
+            addChild(ws);
+        }
+        if (getNodeOrNull("GangSystem") == null) {
+            GangSystem gs = new GangSystem();
+            gs.setName(new godot.core.StringName("GangSystem"));
+            addChild(gs);
+        }
+        if (getNodeOrNull("RespawnSystem") == null) {
+            RespawnSystem rs = new RespawnSystem();
+            rs.setName(new godot.core.StringName("RespawnSystem"));
+            addChild(rs);
+        }
+
         Window root = (getTree() != null) ? getTree().getRoot() : null;
         if (root != null) {
             root.getCloseRequested().connectUnsafe(
@@ -187,8 +204,11 @@ public class GameManager extends Node {
     @Register
     public void onCharacterDied(CharacterInfo info) {
         if (info == null) return;
+        boolean respawning = RespawnSystem.get() != null && RespawnSystem.get().willRespawn(info);
         if (alivePlayerCharacterIds.remove(info.characterId) && alivePlayerCharacterIds.isEmpty()) {
             if (currentState != GameState.PLAYING) return;
+            // death is not game over in single player: the player wakes up in a police cell (PLAN.md W5)
+            if (respawning) return;
             transitionTo(GameState.GAME_OVER);
             // Surface the session-ending game-over screen ONLY now that every player is down.
             // MenuManager listens to allPlayersDied (not the per-body playerDied) so a single
@@ -240,6 +260,12 @@ public class GameManager extends Node {
     }
 
     public boolean isPlaying() {
+        return currentState == GameState.PLAYING;
+    }
+
+    /** Probe readout: still PLAYING (not GAME_OVER / PAUSED). */
+    @Register
+    public boolean playingNow() {
         return currentState == GameState.PLAYING;
     }
 
@@ -403,7 +429,7 @@ public class GameManager extends Node {
         return node instanceof com.openworld.character.FactionManager fm ? fm : null;
     }
 
-    private Node resolveCharactersContainer() {
+    Node resolveCharactersContainer() {
         if (getTree() == null) return null;
         Node scene = getTree().getCurrentScene();
         return scene != null ? scene.getNodeOrNull("Characters") : null;

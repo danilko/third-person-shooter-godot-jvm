@@ -277,6 +277,12 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     // ── UI input lock (set by radial menu / pause / any overlay that must own the mouse) ──
     public boolean inputBlocked = false;
 
+    /** Yen carried (a robbed till, PLAN.md W3). Kept on the authoritative peer; nothing spends it yet. */
+    public int cash = 0;
+
+    /** Healing supplies carried: id -> count (PLAN.md W3). Kept on the authoritative peer. */
+    public final java.util.Map<String, Integer> supplies = new java.util.LinkedHashMap<>();
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
     @Register
     @Override
@@ -800,6 +806,9 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
 
         // ── Remote-charge detonator (REC1) ────────────────────────────────
         if (input.detonate) pressDetonator();
+
+        // ── Healing supply (PLAN.md W3) ───────────────────────────────────
+        if (input.useSupply) com.openworld.item.Supplies.use(this);
 
         // ── Jump (single ground jump only) ─────────────────────────────────
         // First stand up if crouched/crawling, otherwise launch a ground jump.
@@ -1612,6 +1621,20 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         } else {
             com.openworld.weapon.RemoteCharges.detonateAll(id);
         }
+    }
+
+    /** Yen carried (probe readout). */
+    @Register
+    public int cashNow() { return cash; }
+
+    /** Hand yen to this character (probes and the debug console). */
+    @Register
+    public void giveCashNow(int yen) { cash = Math.max(0, cash + yen); }
+
+    /** How many of a healing supply this character carries (probe readout, PLAN.md W3). */
+    @Register
+    public int supplyCountNow(String id) {
+        return supplies.getOrDefault(id, 0);
     }
 
     /** How many remote charges this character has armed on this peer (probe readout). */

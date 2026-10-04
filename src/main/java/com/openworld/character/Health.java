@@ -185,6 +185,13 @@ public class Health extends Node {
         // Server is the single site that broadcasts the per-hit cue + attacker source to clients
         // (covers host-originated AND client-relayed damage; the relay path flows through here too).
         maybeBroadcastDamageCue(damage, attackerPos, attackerId, headshot, killed);
+        // the wanted level (PLAN.md W5): a player hurting a police officer or a civilian is a crime
+        com.openworld.game.WantedSystem wanted = com.openworld.game.WantedSystem.get();
+        if (wanted != null && attackerId != null && !attackerId.isEmpty() && getOwner() instanceof Character victim)
+            wanted.reportHit(victim, attackerId, killed);
+        com.openworld.game.GangSystem gangs = com.openworld.game.GangSystem.get();
+        if (gangs != null && attackerId != null && !attackerId.isEmpty() && getOwner() instanceof Character gv)
+            gangs.reportHit(gv, attackerId, killed);
         if (currentHealth <= 0) {
             Node busNode = getNodeOrNull("/root/EventBus");
             if (busNode instanceof EventBus bus) {

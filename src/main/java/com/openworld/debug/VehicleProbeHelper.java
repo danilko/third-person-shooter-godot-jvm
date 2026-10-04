@@ -33,6 +33,17 @@ public class VehicleProbeHelper extends Node {
         if (c != null && c.getNodeOrNull("Health") instanceof Health h) h.takeDamage(null, 1.0e6f, "probe");
     }
 
+    /** A hit of {@code damage} on {@code victim} credited to {@code attacker} (its characterId): the wanted level's
+     *  seam is Health.applyDamage's attacker id (probe_wanted_respawn.gd). */
+    @Register
+    public void hitBy(Node victim, Node attacker, float damage) {
+        if (victim != null && victim.getNodeOrNull("Health") instanceof Health h
+                && attacker instanceof com.openworld.character.Character a && a.characterInfo != null) {
+            h.takeDamage(null, damage, "probe", null, a.characterInfo.displayName, a.characterInfo.faction,
+                    a.getGlobalPosition(), a.characterInfo.characterId);
+        }
+    }
+
     /**
      * One weapon hit of {@code damage} on {@code body}, through {@code ImpactManager.processHit} — the path
      * every bullet, pellet and melee swing takes, so the target's {@code hitDamageMultiplier} applies.
