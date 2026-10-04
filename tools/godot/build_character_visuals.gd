@@ -388,6 +388,18 @@ func _ik_modifiers(skel: Skeleton3D, ref: Node, f: Dictionary) -> void:
 	stock.set("mount_markers", PackedStringArray(f["mount_markers"]))
 	var offs: Array[Vector3] = []
 	for v in f["mount_offsets"]: offs.append(str_to_var(String(v)) as Vector3)
+	# ARTIST OVERRIDES of the shoulder anchors: `anchors` in `<body>.sockets.json`, from the ANCHOR_* empties
+	# (export_character.py) -- an aim pose pulled back off the measured pocket keeps its place in game.
+	var over_path := "res://assets/characters/%s/%s.sockets.json" % [_body, _body]
+	if FileAccess.file_exists(over_path):
+		var over = JSON.parse_string(FileAccess.get_file_as_string(over_path))
+		if over is Dictionary and over.has("anchors"):
+			var names: Array = f["mount_markers"]
+			for k in over["anchors"]:
+				var i := names.find(k)
+				if i >= 0:
+					offs[i] = str_to_var(String(over["anchors"][k])) as Vector3
+			print("[build-visuals] anchor overrides from %s: %s" % [over_path, ", ".join(PackedStringArray(over["anchors"].keys()))])
 	stock.set("mount_offsets", offs)
 	_modifier(skel, "WeaponRecoilModifier", S_RECOIL)
 	_modifier(skel, "SupportHandIKModifier", S_SUPPORT)

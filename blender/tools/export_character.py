@@ -359,7 +359,7 @@ def _socket_overrides():
     facts = os.path.join(os.path.dirname(bpy.data.filepath), stem + ".body.json")
     empties = [o for o in bpy.data.objects if o.type == 'EMPTY' and "game_socket" in o.keys()
                and o.parent is arm and o.parent_bone]
-    if arm is None or not empties or not os.path.exists(facts):
+    if arm is None or not os.path.exists(facts):
         return
     measured = json.load(open(facts)).get("sockets", {})
     if "SocketShotgun" not in measured and "SocketRifle" in measured:
@@ -388,12 +388,36 @@ def _socket_overrides():
             if dp < 0.0005 and min(dr, 360 - dr) < 0.05:
                 continue
         out[name] = fmt(s)
+    # The shoulder anchors (StockMountIKModifier): `ANCHOR_<marker>` empties on clavicle_r, each an offset from
+    # upperarm_r in clavicle_r's orthonormalised frame -- the same rule game_weapon_preview.py places them by.
+    # An aim clip whose butt is pulled off the measured anchor is dragged back onto it in game, so moving the
+    # empty with the pose is the edit (2026-10-04: the long-gun aims pulled back to ease the support arm).
+    anchors = {}
+    facts_all = json.load(open(facts))
+    m_names = facts_all.get("mount_markers", [])
+    m_offs = [tuple(float(x) for x in re.search(r"\(([^)]*)\)", v).group(1).split(","))
+              for v in facts_all.get("mount_offsets", [])]
+    ev_arm = arm.evaluated_get(dg)
+    cl, ua = ev_arm.pose.bones.get("clavicle_r"), ev_arm.pose.bones.get("upperarm_r")
+    for e in [o for o in bpy.data.objects if o.type == 'EMPTY' and o.name.startswith("ANCHOR_")]:
+        marker = e.name[len("ANCHOR_"):]
+        if cl is None or ua is None or marker not in m_names:
+            continue
+        p_arm = arm.matrix_world.inverted() @ e.evaluated_get(dg).matrix_world.translation
+        off = cl.matrix.to_3x3().normalized().inverted() @ (p_arm - ua.matrix.translation)
+        ref = m_offs[m_names.index(marker)]
+        if math.dist(tuple(off), ref) < 0.0005:
+            continue
+        anchors[marker] = "Vector3(%.6f, %.6f, %.6f)" % tuple(off)
     path = os.path.join(os.path.dirname(bpy.data.filepath), stem + ".sockets.json")
-    if out:
-        json.dump({"note": "hand-socket overrides from the SOCKET_* empties in %s.blend (export_character.py); "
-                           "applied over %s.body.json by build_character_visuals.gd" % (stem, stem),
-                   "sockets": out}, open(path, "w"), indent=2)
-        print(f"[export_character] socket overrides written: {', '.join(sorted(out))} -> {os.path.basename(path)}")
+    if out or anchors:
+        doc = {"note": "hand-socket and shoulder-anchor overrides from the SOCKET_* / ANCHOR_* empties in %s.blend "
+                       "(export_character.py); applied over %s.body.json by build_character_visuals.gd" % (stem, stem),
+               "sockets": out}
+        if anchors:
+            doc["anchors"] = anchors
+        json.dump(doc, open(path, "w"), indent=2)
+        print(f"[export_character] overrides written: {', '.join(sorted(out) + sorted(anchors))} -> {os.path.basename(path)}")
     elif os.path.exists(path):
         os.remove(path)
         print(f"[export_character] every socket is back on its measured value; removed {os.path.basename(path)}")

@@ -71,6 +71,11 @@ public class TPSCameraController extends Node3D {
   // positionOffsetTarget.Y via applyCameraHeight). Init to the default Y above.
   private double stanceCameraHeight = 0.8;
   private double combatHeightOffset = 0.0;
+  // the combat state's shoulder offset and its left-shoulder extras (CombatState); the target X and the
+  // height are derived from these and shoulderDirection, never negated in place (the two sides differ)
+  private double shoulderOffset = 0.0;
+  private double leftShoulderExtra = 0.0;
+  private double leftHeightExtra = 0.0;
 
   private float springArmLengthTarget = 3;
 
@@ -156,8 +161,26 @@ public class TPSCameraController extends Node3D {
 
   public void changeShoulderDirection() {
     shoulderDirection = shoulderDirection * -1;
-    positionOffsetTarget.setX(-positionOffsetTarget.getX());
+    applyShoulderOffset();
+    applyCameraHeight();
     setCameraFov();
+  }
+
+  /** True while the camera sits over the LEFT shoulder (the off side: the gun is on the right). */
+  protected boolean onLeftShoulder() {
+    return shoulderOffset * shoulderDirection < 0.0;
+  }
+
+  private void applyShoulderOffset() {
+    double x = shoulderOffset * shoulderDirection;
+    if (x < 0.0) x -= leftShoulderExtra;
+    positionOffsetTarget.setX(x);
+  }
+
+  /** 1 = right shoulder, -1 = left -- for probes. */
+  @Register
+  public int shoulderSideNow() {
+    return onLeftShoulder() ? -1 : 1;
   }
 
   @Register
@@ -277,7 +300,10 @@ public class TPSCameraController extends Node3D {
   public void onSetCombatState(CombatState combatState) {
     combat    = combatState.isCombat();
     cameraFov = combatState.cameraFov;
-    positionOffsetTarget.setX(combatState.cameraShoulderOffset * shoulderDirection);
+    shoulderOffset = combatState.cameraShoulderOffset;
+    leftShoulderExtra = combatState.cameraLeftShoulderExtra;
+    leftHeightExtra = combatState.cameraLeftHeightExtra;
+    applyShoulderOffset();
     springArmLengthTarget = (float) combatState.cameraDistance;
     combatHeightOffset = combatState.cameraHeightOffset;
     applyCameraHeight();
@@ -346,6 +372,6 @@ public class TPSCameraController extends Node3D {
 
   /** Combine the stance base height with the combat-state offset into the camera's Y target. */
   private void applyCameraHeight() {
-    positionOffsetTarget.setY(stanceCameraHeight + combatHeightOffset);
+    positionOffsetTarget.setY(stanceCameraHeight + combatHeightOffset + (onLeftShoulder() ? leftHeightExtra : 0.0));
   }
 }

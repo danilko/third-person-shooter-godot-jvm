@@ -29,8 +29,9 @@ WHAT IS ASSERTED, AND WHY EACH ONE EXISTS
   * the collection — `WeaponLibrary.blend` links the weapon by that name, so a weapon outside it is
     silently missing from the library everyone cross-checks sizes in;
   * `length_m` — the size is a fact from the reference, not a free parameter;
-  * `support_grip: "under"` — the SupportPoint is 2.5-6 cm BELOW the gun's underside, where a hand closing
-    under a handguard puts its grip point; inside the gun buries the hand, and no probe sees it;
+  * `support_grip: "under"` — the SupportPoint is OUTSIDE the gun and 2-6 cm from its surface, where a hand
+    closing round a handguard puts its grip point (beside and under it: the authored support hand grips from
+    the left, 2026-10-04); inside the gun buries the hand, and no probe sees it;
   * `grip_to_rear_m` — the origin really is the grip. The first standard only ASSERTED origin=grip
     and nothing measured it: every raw model's origin had in fact been left wherever a centring
     offset put it (SHG1's sat on the receiver, 0.48 m from the butt), and the character carried one
@@ -52,7 +53,7 @@ cfg = json.load(open(TABLE))
 LENGTH_TOL = 0.005      # 0.5% of the declared length
 GRIP_TOL = 0.01         # 1 cm: the origin may not drift further than this off the grip
 APPLIED_TOL = 1e-5
-SUPPORT_UNDER_MIN, SUPPORT_UNDER_MAX = 0.025, 0.06      # location/rotation ~0 and scale ~1, i.e. "everything is applied"
+SUPPORT_UNDER_MIN, SUPPORT_UNDER_MAX = 0.02, 0.06       # location/rotation ~0 and scale ~1, i.e. "everything is applied"
 
 
 def fail(wid, msg):
@@ -177,18 +178,23 @@ def verify_and_export(w):
             verts += [o.matrix_world @ v.co for v in o.data.vertices]
             polys += [[b + i for i in p.vertices] for p in o.data.polygons]
         bvh = BVHTree.FromPolygons(verts, polys)
-        bottom = None
-        for dy in (0.0, 0.01, -0.01, 0.02, -0.02, 0.03, -0.03):   # nearest station along the bore with a surface
-            hit = bvh.ray_cast(Vector((px, py + dy, -1.0)), Vector((0, 0, 1)), 3.0)[0]
-            if hit is not None:
-                bottom = hit.z
+        p = Vector((px, py, pz))
+        # outside = an odd number of crossings on a ray out of the point (one skewed ray: a ray along an axis
+        # can run down a seam); clearance = the nearest surface, whichever side of the gun the hand is on
+        ray = Vector((0.0123, 0.0071, 1.0)).normalized()
+        hits, o = 0, p.copy()
+        while True:
+            h = bvh.ray_cast(o, ray, 5.0)[0]
+            if h is None:
                 break
-        clearance = None if bottom is None else bottom - pz
+            hits, o = hits + 1, h + ray * 1e-4
+        near = bvh.find_nearest(p)
+        clearance = None if near[0] is None or hits % 2 else near[3]
         if clearance is None or not (SUPPORT_UNDER_MIN <= clearance <= SUPPORT_UNDER_MAX):
-            fail(wid, f"SupportPoint is {'over no surface' if clearance is None else f'{clearance:+.3f} m under the gun'}; "
-                      f"a hand closing under a handguard needs it {SUPPORT_UNDER_MIN:.3f}-{SUPPORT_UNDER_MAX:.3f} m below the "
-                      f"underside (negative = inside the gun, the hand is buried). Move the marker in {scene_rel}.")
-        support = f", SupportPoint {clearance:.3f} m under the gun"
+            fail(wid, f"SupportPoint is {'INSIDE the gun' if clearance is None else f'{clearance:+.3f} m from the gun'}; "
+                      f"a hand closing round a handguard needs it outside and {SUPPORT_UNDER_MIN:.3f}-{SUPPORT_UNDER_MAX:.3f} m "
+                      f"from the surface (inside = the hand is buried). Move the marker in {scene_rel}.")
+        support = f", SupportPoint {clearance:.3f} m off the gun"
 
     print(f"[build_weapon] {wid}: {got:.3f} m (declared {want:.3f}), grip->rear {rear:.3f} m, "
           f"clips {exported or '-'}{support}, wrote {os.path.basename(out)} ({os.path.getsize(out)} bytes)")

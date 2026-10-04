@@ -368,8 +368,20 @@ func _initialize() -> void:
 			var live: Vector3 = cb.inverse() * (mesh_root.global_transform.basis * (skin_pt - joint))
 			print("  pocket from the skin: body %s  -> clavicle frame %s  (constant %s)"
 				% [_parts(skin_pt - joint), _v(live), _v(pocket_offset)])
-			_check("pocket offset matches the mesh", live.distance_to(pocket_offset) < POCKET_DRIFT_TOLERANCE,
-				"drift %.3f m" % live.distance_to(pocket_offset))
+			# An ARTIST-PLACED anchor (`anchors` in `<body>.sockets.json`, from the ANCHOR_* empty -- an aim
+			# pose pulled back off the skin pocket, 2026-10-04) is a decision, not a drift: reported only.
+			var vis := visuals_path if visuals_path != "" else "res://src/main/resources/com/openworld/character/CharacterVisuals_Shino.tscn"
+			var stem := vis.get_file().get_basename().trim_prefix("CharacterVisuals_").to_lower()
+			var over_path := "res://assets/characters/%s/%s.sockets.json" % [stem, stem]
+			var placed := false
+			if FileAccess.file_exists(over_path):
+				var over = JSON.parse_string(FileAccess.get_file_as_string(over_path))
+				placed = over is Dictionary and over.has("anchors") and (over["anchors"] as Dictionary).has("StockPoint")
+			if placed:
+				print("  INFO  pocket anchor is artist-placed (%s), %.3f m from the skin pocket" % [over_path, live.distance_to(pocket_offset)])
+			else:
+				_check("pocket offset matches the mesh", live.distance_to(pocket_offset) < POCKET_DRIFT_TOLERANCE,
+					"drift %.3f m" % live.distance_to(pocket_offset))
 			# `--emit-pocket=<file>` makes this probe the OWNER of the number instead of merely its
 			# eye. `measure_body.gd` derives a first estimate off the rest rig, which is enough to
 			# build a body's scene; this is the same rule measured on the body the game actually
