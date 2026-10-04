@@ -126,7 +126,7 @@ PLOTS = (
     ("karaoke", "karaoke", "カラオケボックス", 14.0, 22.0, 1, (620.0, 330.0)),
     ("game_centre", "game_centre", "ゲームセンター", 18.0, 24.0, 1, (1100.0, 300.0)),
     ("construction_site", "construction_site", "工事現場", 60.0, 42.0, 1, (483.0, 398.0)),
-    ("arena", "arena", "アリーナ", 150.0, 120.0, 1, (0.0, -620.0)),   # 2026-10-03: the dike side road runs through the old (377, -568); now on kojo_waku by Industry station (Ariake Arena by the bay industry)
+    ("arena", "arena", "アリーナ", 150.0, 120.0, 1, (-40.0, -620.0)),   # (2026-10-04: 40 m west, clear of the new kojo_waku x side-road crossroads) 2026-10-03: the dike side road runs through the old (377, -568); now on kojo_waku by Industry station (Ariake Arena by the bay industry)
     ("suburban_mall", "suburban_mall", "郊外型モール (シネコン)", 160.0, 130.0, 1, (31.0, -545.0)),   # on ex-
     # industrial land by Industry station (the LaLaport Toyosu pattern): the suburb has no 150 x 115 m of frontage, and
     # at the farm edge it took the paddy grid's lines and the farm rows collapsed. (2026-10-03) 160 x 130: the piece is

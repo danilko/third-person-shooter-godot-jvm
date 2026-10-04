@@ -1991,6 +1991,7 @@ def derive(heights_path):
             b["scene"] = b["type"] + "_Shop"
             shops += 1
     print("island_buildings: %d shops are always open (%s)" % (shops, ", ".join(sorted(SHOP_TYPES))))
+    ensure_konbini(placed)
     anchored, roles = apply_anchors(placed)
     report_cover(field)
     # the CIVIC buildings stand on their plots (their plots were blocked for everything else above)
@@ -2589,6 +2590,59 @@ def home_park_neighbour(placed, b):
     return best[1] if best else None
 
 
+def ensure_konbini(placed):
+    """EVERY DISTRICT REACHES A KONBINI (2026-10-04): the konbini comes from the region's type draw, and a change
+    anywhere in the chain can take a district's only near one away (the suburb's went from 535 m to 662 m when a
+    city slot drew a pencil building instead). For each district of COVERAGE_MIN+ buildings whose centroid has no
+    konbini within the coverage distance (`island_civic_sites.COVERAGE`, the gate that measures it), the nearest
+    street-front, unanchored building with room for a KonbiniS becomes one, its FRONT kept on its line. Returns the
+    number converted."""
+    import island_civic_sites as CV
+    reach = CV.COVERAGE["konbini"]
+    want = "KonbiniS"
+    kx0, kz0, kx1, kz1, _kh = type_aabb(want)
+    regions = {}
+    for b in placed:
+        if not b.get("civic"):
+            regions.setdefault(b["region"], []).append(b)
+    made = 0
+    for reg, bs in sorted(regions.items()):
+        if len(bs) < CV.COVERAGE_MIN:
+            continue
+        cx = sum(b["pos"][0] for b in bs) / len(bs)
+        cz = sum(b["pos"][2] for b in bs) / len(bs)
+        kon = [b for b in placed if b["type"].startswith("Konbini")]
+        if any(math.hypot(b["pos"][0] - cx, b["pos"][2] - cz) <= reach for b in kon):
+            continue
+        cand = []
+        for b in placed:
+            if b.get("civic") or b.get("role") or b.get("scene") or b.get("deep") or b["type"].startswith("Parking"):
+                continue
+            k = b.get("key", "|||").split("|")
+            if len(k) < 3 or k[2] != "0" or b.get("key", "").endswith("|P"):
+                continue
+            d = math.hypot(b["pos"][0] - cx, b["pos"][2] - cz)
+            if d > reach - 20.0:
+                continue
+            x0, z0, x1, z1, _h = type_aabb(b["type"])
+            if x1 - x0 >= kx1 - kx0 and z1 - z0 >= kz1 - kz0:
+                cand.append((d, b, z1))
+        if not cand:
+            print("island_buildings: %s has no konbini within %.0f m and no street-front slot to give it one"
+                  % (reg, reach))
+            continue
+        _d, b, front = min(cand, key=lambda c: c[0])
+        a = math.radians(b["yaw"])
+        dz = front - kz1                     # keep the front on its line (the park swap's formula)
+        b["pos"] = [round(b["pos"][0] + math.sin(a) * dz, 3), b["pos"][1], round(b["pos"][2] + math.cos(a) * dz, 3)]
+        print("island_buildings: %s had no konbini within %.0f m -- the %s at (%.0f, %.0f) becomes one"
+              % (reg, reach, b["type"], b["pos"][0], b["pos"][2]))
+        b["type"] = want
+        b["scene"] = want + "_Shop"
+        made += 1
+    return made
+
+
 def apply_anchors(placed):
     """Give each anchored building its variant (and role), from PUBLIC_BUILDINGS and OPEN_BUILDINGS. Returns
     ({mission node: pos}, {role: {pos, yaw, type}}). Shared by `derive` and `anchors`, so moving an anchor needs
@@ -2666,6 +2720,7 @@ def anchors_only(check):
         sc = b.get("scene", b["type"])
         if not b.get("civic") and (sc.endswith("_Open") or (sc.endswith("_Shop") and b["type"] not in SHOP_TYPES)):
             b.pop("scene", None)
+    ensure_konbini(doc["buildings"])
     doc["anchored_missions"], doc["roles"] = apply_anchors(doc["buildings"])
     changed = json.dumps(doc, sort_keys=True) != before
     if check:
