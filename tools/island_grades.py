@@ -224,7 +224,21 @@ def _nearest(poly, x, y):
         px, py = a[0] + dx * t, a[1] + dy * t
         d = math.hypot(px - x, py - y)
         if d < best[0]:
-            best = (d, a[2] + (b[2] - a[2]) * t)
+            best = (d, a[2] + (b[2] - a[2]) * t, px, py)
+    return best[:2]
+
+
+def _nearest_pt(poly, x, y):
+    """(plan distance, surface z, x, y) of the nearest point of polyline `poly` to (x, y)."""
+    best = (1e18, 0.0, x, y)
+    for a, b in zip(poly, poly[1:]):
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        L2 = dx * dx + dy * dy
+        t = 0.0 if L2 < 1e-12 else max(0.0, min(1.0, ((x - a[0]) * dx + (y - a[1]) * dy) / L2))
+        px, py = a[0] + dx * t, a[1] + dy * t
+        d = math.hypot(px - x, py - y)
+        if d < best[0]:
+            best = (d, a[2] + (b[2] - a[2]) * t, px, py)
     return best
 
 
@@ -266,7 +280,16 @@ def level_gores(net):
                     mains.append(r)
                     break
         polys = [[net.points[q].pos for q in r.points] for r in mains]
+        mpts = [[net.points[q] for q in r.points] for r in mains]
         need = _road_half(main) + _road_half(ramp) + GORE_MARGIN
+        # SIDE-AWARE (2026-10-04, two-lane gores): a one-way ramp lays its lanes to the LEFT of its driving direction,
+        # so where the mainline lies on its RIGHT the ramp's band ends at its own station line and only its edge
+        # allowance counts -- the full width is the worst case, and on a shallow diverge each extra lane of it held a
+        # ramp ~100 m longer at the mainline's height (port_off: 125 m, then over the dike road at 7 m)
+        rb = ramp.base
+        need_away = _road_half(main) + rb.median_width / 2.0 + max(rb.left_walk_width, rb.right_walk_width) + GORE_MARGIN
+        drive_fwd = any(net.points[q].lanes_fwd for q in ramp.points)
+        two_way = any(net.points[q].lanes_fwd and net.points[q].lanes_bwd for q in ramp.points)
         chain = list(ramp.points)
         if chain[-1] == u:
             chain.reverse()
@@ -275,6 +298,32 @@ def level_gores(net):
 
         def main_at(x, y):
             return min((_nearest(pl, x, y) for pl in polys), key=lambda t: t[0])
+
+        def need_at(x, y, pa, pb, a, b):
+            if two_way:
+                return need
+            _d, _z, qx, qy = min((_nearest_pt(pl, x, y) for pl in polys), key=lambda t: t[0])
+            # ...the mainline's AUX slot there is the ramp's own lanes running on its pavement: until it tapers
+            # out, the bands have not parted
+            aux = 0.0
+            best_ = 1e18
+            for pl in mpts:
+                for p0, p1 in zip(pl, pl[1:]):
+                    dx, dy = p1.pos[0] - p0.pos[0], p1.pos[1] - p0.pos[1]
+                    L2 = dx * dx + dy * dy
+                    f = 0.0 if L2 < 1e-12 else max(0.0, min(1.0, ((x - p0.pos[0]) * dx + (y - p0.pos[1]) * dy) / L2))
+                    dd = math.hypot(p0.pos[0] + dx * f - x, p0.pos[1] + dy * f - y)
+                    if dd < best_:
+                        best_ = dd
+                        a0, a1 = max(p0.aux_fwd, p0.aux_bwd), max(p1.aux_fwd, p1.aux_bwd)
+                        aux = (a0 + (a1 - a0) * f) * main.base.lane_width
+            tx, ty = pb[0] - pa[0], pb[1] - pa[1]
+            if ramp.points.index(a) > ramp.points.index(b):
+                tx, ty = -tx, -ty                        # the chain's own direction
+            if not drive_fwd:
+                tx, ty = -tx, -ty                        # driven against its chain
+            left = tx * (qy - y) - ty * (qx - x) > 0.0
+            return need if left else need_away + aux
         # walk out from the mouth until the bands have parted
         clear, s = None, 0.0
         for a, b in zip(chain, chain[1:]):
@@ -285,11 +334,14 @@ def level_gores(net):
                 t = k / n
                 x, y = pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t
                 md, mz = main_at(x, y)
+                need_here = need_at(x, y, pa, pb, a, b)
+                if ramp.name in os.environ.get("LG_DEBUG", "").split(","):
+                    print("LG_DEBUG %s s %.0f md %.1f need %.1f (full %.1f away %.1f)" % (ramp.name, s + L * t, md, need_here, need, need_away))
                 # parted SIDEWAYS, or VERTICALLY: a ramp that runs beside its mainline and then crosses over (or under)
                 # it is on another level there, and holding it at the mainline's height flattened the Wangan's T1
                 # into the airport spur it flies over (27.9 m -> 21.2 m, a flat crossing, probe_road_clear)
-                if md >= need or abs(pa[2] + (pb[2] - pa[2]) * t - mz) > GORE_VERTICAL:
-                    clear = (a, b, t if md >= need else 0.0, x, y)   # parted vertically: hold only up to `a`
+                if md >= need_here or abs(pa[2] + (pb[2] - pa[2]) * t - mz) > GORE_VERTICAL:
+                    clear = (a, b, t if md >= need_here else 0.0, x, y)   # parted vertically: hold only up to `a`
                     break
             if clear:
                 break
@@ -590,6 +642,10 @@ def ramp_curves(net, k_target=None):
             for t_ in tg:
                 kin.add(road_of.get(t_))
                 kin.update(road_of.get(l.target) for l in net.points[t_].links if l.target in road_of)
+            # ...and the arms of the GROUND junction it ends in: it arrives at their height, it does not fly over them
+            # (a two-lane band overlapped the port loop's arms at its own T and was lifted 5.7 m over them, 2026-10-04)
+            kin.update(road_of.get(l.target) for l in net.points[e].links
+                       if str(l.type) == "JUNCTION" and l.target in road_of)
         for k in range(len(s)):
             x, y = smp[k].pos[0], smp[k].pos[1]
             best = {}
@@ -612,6 +668,8 @@ def ramp_curves(net, k_target=None):
                     floor[k + n0] = max(floor.get(k + n0, -1e9), zo + need)
                 else:
                     ceil[k + n0] = min(ceil.get(k + n0, 1e9), zo - need)
+                if name in os.environ.get("RC_DEBUG", "").split(","):
+                    print("RC_DEBUG %s s %.0f z %.1f %s %s zo %.1f d %.1f" % (name, s[k], z[k], "floor" if dz > 0 else "ceil", on, zo, d))
 
         joined = {road_of.get(l.target) for e in (uids[0], uids[-1]) for l in net.points[e].links
                   if str(l.type) == "SEGMENT"} - {name}

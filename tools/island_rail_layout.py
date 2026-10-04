@@ -769,7 +769,7 @@ HUB_ACCESS = {
     # (6.4 m) down to the west door (3.4 m); the car park south of the street, clear of the viaduct's piers
     "Harbour": dict(from_road="ring_kita", at=(38.0, -1025.0), via=[(100.0, -1052.0)], mode="head", park="right"),
     # the annex on the WEST side (the east is squeezed against the dike's embankment): straight off kojo_waku
-    "Industry": dict(from_road="kojo_waku", at=(110.0, -650.0), via=[(128.0, -688.5)], mode="head", side="right",
+    "Industry": dict(from_road="kojo_waku", at=(103.0, -664.0), via=[(128.0, -688.5)], mode="head", side="right",
                      park="left"),
     # off eki_minami_dori along the north face, past the door; the car park north of it (it faced open ground)
     "Fish Market": dict(from_road="eki_minami_dori", at=(532.0, -330.0), via=[(510.0, -367.5)], mode="face",

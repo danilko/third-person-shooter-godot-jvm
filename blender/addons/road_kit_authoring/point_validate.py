@@ -340,6 +340,12 @@ def check_tapers(net, out):
             # station that owns the AUX link.
             if a.targets(pm.LINK_AUX):
                 continue
+            # ...AND A LANE THAT JOINS AT A GORE IS THE SAME THING SEEN FROM THE OTHER END (2026-10-04, two-lane
+            # entrances): an ENTRANCE's acceleration lane begins at the gore nose at full width, so the width change
+            # in the one span AHEAD of the station that takes the ramp in is the ramp's own band arriving alongside,
+            # not a driver moving sideways. Exempt only there, only for an entrance.
+            if any(pm.ramp_is_entrance(net, t) for t in b.targets(pm.LINK_AUX)):
+                continue
             # The factor that WOULD pass, spelled out. "lower taper_factor" on its own leaves the
             # artist guessing at a number the gate already knows, and guessing low is how a road
             # ends up with a taper an order of magnitude short of what it could have had.

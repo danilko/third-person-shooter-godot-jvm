@@ -594,7 +594,7 @@ SB_ON_T = (850.0, -672.0)
 SB_ON_X = 640.0
 #: P3-8: the port's WB exit -- off the WB's left under Y2's flyover, landing at a new T on the port loop's west leg
 #: (kichi_dori__2) from inside the loop; a mainline joint at WG_CUT4_X keeps it off Y3's run
-PORT_OFF_X = -200.0
+PORT_OFF_X = -170.0          # -200 -> -170 (2026-10-04): a two-lane exit holds ~30 m longer at the deck height
 PORT_T = (-494.0, -1190.0)
 WG_CUT4_X = -10.0
 #: the port's EASTBOUND entrance (review 2026-10-02 night, port access (a)): from a new T on the dike road (ring_kita__11,
@@ -602,13 +602,13 @@ WG_CUT4_X = -10.0
 #: east, climbing the 5.6 m from the dike crest to the deck, merging onto EB's left at PORT_ON_X -- after Y1's exit
 #: (exit -> entrance, no weave) and in wangan__2's run, whose only other ramp is the WB port exit
 PORT_ON_T = (-440.0, -1082.0)
-PORT_ON_X = -250.0   # -270 -> -250 (2026-10-04): the two-lane ramp levels into its T over a 30 m landing
+PORT_ON_X = -230.0   # -270 -> -250 -> -230 (2026-10-04): two-lane ramps; -230 clears port_off now it leaves at -170
 SB_JUNCTION = (775.0, -437.0)
 #: ...the junction is the nearest pad of one of these roads (2026-10-03 night: wangan_dori's own, opposite
 #: eki_ginza_suburb; the side road's pad by kogai_michi sat inside wangan_dori's junction -- island_suburb_kogai.py)
 SB_JUNCTION_ROADS = ("wangan_dori",)
 WG_CUT3_X = 400.0
-Y3_ON_Y = -700.0
+Y3_ON_Y = -650.0
 #: THE CONNECTOR (R3): the Wangan's last stretch runs north OVER chuo_dori's median (piers in the median) from
 #: CONN_S_Y to its end at CONN_N_Y, the W JCT's joint on C1's west side. It follows chuo_dori's own stations.
 CONN_S_Y = -900.0          # south of here the chuo line is extended straight to the turn

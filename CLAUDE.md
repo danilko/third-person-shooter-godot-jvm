@@ -10892,6 +10892,42 @@ checks its "Wired in code" table against the enum. Licence rule as for art: CC0 
   earlier one's SOLVED height on every sample of a run >= 60 m beside it. Limited to that pair on purpose: pinning a JCT
   split's halves (Y1/Y2, which part vertically) put Y2 at 7 %, and pinning T4 to T2 met T4's held gore at another slope.
 
+### Every crossing is a junction; two lanes at every gore (2026-10-04 evening, user-asked)
+
+- **A new layout gate: `island_layout.ungapped_crossings`** (asserted; also in `--check`). Two at-grade road
+  centrelines crossing with no junction (expressway and rail skipped, |dz| < 4 m), and a road passing THROUGH a pad it
+  is not an arm of (within 0.85 of the nearest mouth's distance from the centre, or through the mouths' convex hull).
+  The committed layout had 6; validate and flow read every one clean, because a crossing is two consistent roads.
+- **Three causes, each fixed at its source:**
+  * `island_core_streets.CUT_CROSSINGS` is on: an authored street crossing a road between its ends makes a crossroads
+    there. `kojo_minami` is removed (the dike's side road fronts that block), and the Industry station's access
+    (`island_rail_layout.HUB_ACCESS`, at (103, -664)) joins the side road x kojo_waku crossroads: a 5-arm pad.
+  * `island_streets._line_ok` / `_line_split`: a crossing that crowds a junction is dropped as a node, and now it is
+    also a WALL the line may not pass. The line keeps the run of its nodes with the most junctions, and its limit
+    stops a new-line crossing from extending it past the wall.
+  * `plan_region`: a crossing of two NEW lines given up (e.g. for MIN_SPAN) is no longer still crossed. At settle,
+    one of the two lines is trimmed short of it: the line whose shorter side holds fewer junctions loses that side.
+- **Every expressway ramp is two lanes at its gore** (`ENTRY_LANES` / `EXIT_GROUND_LANES` 2, and the three ground
+  ramps that defaulted to 1). The four T ramps stay one lane at BOTH ends: at J0 the 2+2 Wangan splits lane by lane,
+  and their spur gores would need a 108 m taper span where the bridge-approach stations are 71-76 m apart (the slot
+  ran to the road's end; `T_GORE_LANES`, `widen_ramps` already skips the hold at a two-lane gore). Five rules came
+  with it:
+  * `point_validate.check_tapers` exempts an ENTRANCE's gore station: the acceleration lane begins at the nose at
+    full width. It mirrors the exit exemption that was already there.
+  * `island_grades.level_gores` is side-aware. A one-way ramp lays its lanes LEFT of its driving direction, so with
+    the mainline on its right the bands have parted at `half(main) + edge + the mainline's AUX width there + 1 m`.
+    The old full-width rule held a two-lane exit ~30 m too long. The aux term is load-bearing: at a gore the ramp's
+    lanes lie on the mainline's aux pavement.
+  * `island_grades.ramp_curves` and `island_dike.crossing_needs`: a ramp's own GROUND junction (its arms, `TEE_SKIP`
+    40 m) is not a road it flies over. The wider band read port_off as crossing the port loop's dike ramp, and it
+    was lifted 17 m.
+  * `island_expressway.station_by_x` faces an inserted station on its alignment's design tangent. Chord-faced where
+    the Wangan bends, port_off's mouth read 5.7 deg off and the gate said `ramp_wrong_side`.
+  * `_carry` rounds its end to the NEARER station and never onto the road's end. Y3's carry rounded up onto the
+    connector joint, which left an `open_end`.
+- Re-placed for room: `Y3_ON_Y` -700 -> -650 (Y3 descends in one straight grade after its last crossing,
+  `Y3_GORE_HOLD`), `PORT_OFF_X` -200 -> -170, `PORT_ON_X` -250 -> -230; Y2 flies on a 4.5 % cone.
+
 ## Expressway guide signs, and every displayed name is fictional (2026-09-30)
 
 - **Names shown to a player are FICTIONAL, for legal reasons (user decision).** The expressway brand is 海都高速

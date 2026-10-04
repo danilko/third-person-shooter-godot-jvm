@@ -72,9 +72,9 @@ RAMP_PIER = "RKA_PIER_round"
 C1_SPEED = 60.0         # km/h: the inner ring is signed below the outer network's 80, as 首都高's C1 is (50-60 in the
                         # core, 80 outside). Set AFTER the build, so the aux-slot tapers stay sized for 80 (longer)
 RAMP_LANES = 2          # an exit, and a JCT ramp that IS a carriageway (a joint), is two lanes wide (user, 3.13: racing)
-ENTRY_LANES = 1         # an ENTRANCE from the city (a diamond, Y3, Y4) merges as ONE lane (2026-10-01 review: a 2-lane
-                        # entrance onto a 2-lane road forced a merge within 108-164 m)
-EXIT_GROUND_LANES = 1   # an exit straight into a signalised ground junction (the Suburb exit)
+ENTRY_LANES = 2         # an ENTRANCE (a diamond, Y3, Y4, the ground ramps) is TWO lanes at its gore too (user, 2026-10-04
+                        # evening: "a wall blocks the opening"; one lane there was the 2026-10-01 review's choice)
+EXIT_GROUND_LANES = 2   # an exit straight into a signalised ground junction (the Suburb exit, the port, the connector)
 BRIDGE_Z = 24.0        # the Rainbow Bridge's upper deck (library_landmarks.RB_ROAD_UPPER; 32 until 2026-09-29)
 PEEL_HOLD = 30.0            # past the bridge's south end the deck height is held this far, clear of the rail below
 PEEL_Y = -1590.0            # the road peels WEST off the rail along this y (the station's north end is at -1625)
@@ -787,8 +787,14 @@ def build(net, ground):
     # NEXT PASS step 5: a 60 km/h STAGE before the hairpin, so the posted speed steps 80 -> 60 -> 40 (a driver is not
     # asked to lose 40 km/h at one sign); SPEED_STAGE posts it
     yb = PEEL_Y + PEEL_R + SPEED_SPLIT_PAST + SPEED_STAGE_M
-    near = min(spur2.points, key=lambda u: abs(net.points[u].pos[1] - yb))
-    hs = near if abs(net.points[near].pos[1] - yb) < 25.0 else station_on(net, spur2, yb)
+    # a station carrying an aux slot or a ramp link cannot be a joint (T1's two-lane acceleration lane reaches here)
+    free = [u for u in spur2.points[1:-1] if not net.points[u].aux_fwd and not net.points[u].aux_bwd
+            and all(l.type == pm.LINK_SEGMENT for l in net.points[u].links)]
+    near = min(free, key=lambda u: abs(net.points[u].pos[1] - yb)) if free else None
+    hs = near if near is not None and abs(net.points[near].pos[1] - yb) < 25.0 else station_on(net, spur2, yb)
+    if net.points[hs].aux_fwd or net.points[hs].aux_bwd:
+        aux_y = [net.points[u].pos[1] for u in spur2.points if net.points[u].aux_fwd or net.points[u].aux_bwd]
+        hs = station_on(net, spur2, min(aux_y) - 15.0)
     ro.split_at_joint(net, hs, name=PREFIX + "spur__2b")
 
 
@@ -852,6 +858,10 @@ def _carry(net, road, k, step, field, lanes, length, taper=0.0):
                 pos = tuple(a[q] + (b[q] - a[q]) * f for q in range(3))
                 end = insert_after(net, road, ch[i] if step > 0 else ch[j], pos)
                 setattr(net.points[end], field, 0)
+            elif f <= 0.05 or j in (0, len(ch) - 1):
+                # the nearer station, and never the road's END: a carry rounded up onto a joint station handed its
+                # lanes to a road with no aux slot there (Y3's two lanes on the connector, 2026-10-04: open_end)
+                end = ch[i]
             else:
                 end = ch[j]
             _raise_aux(net, end, field, lanes)
@@ -939,11 +949,11 @@ def lane_balance(net, spur, conn, conn_n):
               % (ent, ext, lanes, L, "" if big <= lanes else ", the exit's %d more open over %.0f m" % (big - lanes, run)))
     # T3: the spur NB is its BWD carriageway, running toward the chain's start (the E joint)
     k = spur.points.index(_main_of(net, "t3", spur))
-    on_spur = _carry(net, spur, k, -1, "aux_bwd", T_LANES, 1e9)
+    on_spur = _carry(net, spur, k, -1, "aux_bwd", T_GORE_LANES, 1e9)
     e2 = net.roads[PREFIX + "e_fwd_on"]
     res = net.resolved(e2.points[-1])
-    want = pv.taper_min_length(T_LANES * res.lane_width, res.design_speed, TAPER) + 2.0
-    on_e2 = _carry(net, e2, len(e2.points) - 1, -1, "aux_bwd", T_LANES,
+    want = pv.taper_min_length(T_GORE_LANES * res.lane_width, res.design_speed, TAPER) + 2.0
+    on_e2 = _carry(net, e2, len(e2.points) - 1, -1, "aux_bwd", T_GORE_LANES,
                    min(MERGE_MIN - on_spur, _carry_room(net, e2, want)), taper=want)
     print("island_expressway: T3's added lane %.0f m on the spur + %.0f m into E2" % (on_spur, on_e2))
     # Y3: the connector NB is its FWD carriageway
@@ -1121,13 +1131,21 @@ def _t_arm(net, a, b, toward, mouth=MOUTH, skew=0.0, lean=None):
 
 
 def station_by_x(net, road, x):
-    """A station of `road` at record x (inserted into the span that holds it), as `station_on` does for y."""
+    """A station of `road` at record x (inserted into the span that holds it), as `station_on` does for y. When both
+    neighbours lie on one design alignment (`plan_face`), the new station is faced on its tangent too: chord-faced
+    where the Wangan begins to bend, the port exit's mouth read 5.7 deg off and the gate saw the ramp "bend back
+    across" lanes it was leaving (ramp_wrong_side, 2026-10-04)."""
     ch = road.points
     for a, b in zip(ch, ch[1:]):
         pa, pb = net.points[a].pos, net.points[b].pos
         if min(pa[0], pb[0]) < x < max(pa[0], pb[0]):
             t = (x - pa[0]) / (pb[0] - pa[0])
-            return insert_after(net, road, a, tuple(pa[k] + (pb[k] - pa[k]) * t for k in range(3)))
+            u = insert_after(net, road, a, tuple(pa[k] + (pb[k] - pa[k]) * t for k in range(3)))
+            fa, fb = PLAN_FACED.get(a), PLAN_FACED.get(b)
+            if fa and fb and fa[0] == fb[0] and fa[0] in PLANS:
+                plan, cum, closed = PLANS[fa[0]]
+                plan_face(net, u, plan, cum, closed)
+            return u
     return min(ch, key=lambda u: abs(net.points[u].pos[0] - x))
 
 
@@ -1141,7 +1159,7 @@ def suburb_entrance(net):
     _thin_near(net, road, [st])
     a, b = cut_road(net, PL.SB_ON_T, "ring_kita", MOUTH)
     end, te = _t_arm(net, a, b, (PL.SB_ON_T[0], PL.SB_ON_T[1] - 100.0))
-    L, g, R = ground_ramp(net, st, "sb_on", "BWD", True, end, te, [a, b])
+    L, g, R = ground_ramp(net, st, "sb_on", "BWD", True, end, te, [a, b], lanes=ENTRY_LANES)
     print("island_expressway: Suburb WB entrance %.0f m %.1f %% R %.0f" % (L, g * 100.0, R))
 
 
@@ -1227,12 +1245,12 @@ def connector_half_ic(net, conn):
     # the SB exit: the connector's chain runs south -> north, so SB is its BWD carriageway
     a, b = cut_road(net, PL.CONN_EXIT_T, "wangan_dori", MOUTH)
     end, te = _t_arm(net, a, b, (PL.CONN_EXIT_T[0], PL.CONN_EXIT_T[1] + 100.0))
-    L1, g1, R1 = ground_ramp(net, ex, "c_sb_off", "BWD", False, end, te, [a, b])
+    L1, g1, R1 = ground_ramp(net, ex, "c_sb_off", "BWD", False, end, te, [a, b], lanes=EXIT_GROUND_LANES)
     # the NB entrance: an entrance's chain runs from its gore (mouth) out to the ground, so it ARRIVES at the T heading
     # south; its traffic runs the other way
     a, b = cut_road(net, PL.CONN_ENT_T, "rinkai_dori", MOUTH)
     end, te = _t_arm(net, a, b, (PL.CONN_ENT_T[0], PL.CONN_ENT_T[1] + 100.0))
-    L2, g2, R2 = ground_ramp(net, en, "c_nb_on", "FWD", True, end, te, [a, b])
+    L2, g2, R2 = ground_ramp(net, en, "c_nb_on", "FWD", True, end, te, [a, b], lanes=ENTRY_LANES)
     print("island_expressway: connector half IC: SB exit %.0f m %.1f %% R %.0f, NB entrance %.0f m %.1f %% R %.0f"
           % (L1, g1 * 100.0, R1, L2, g2 * 100.0, R2))
     return north
@@ -1443,7 +1461,9 @@ def y_ramps(net, wat, conn):
     wl = [net.points[u].pos[:2] for n_ in (PREFIX + "wangan", PREFIX + "wangan__1", PREFIX + "wangan__2")
           for u in net.roads[n_].points]
     spans = [(v - 20.0, v + 20.0) for v in (s_cross(p, wl), s_cross(p, p_y1)) if v is not None]
-    run_on(net, PREFIX + "y2", on_curve(net, PREFIX + "y2", fly_heights(p, m[2], cp[2], PL.Y2_Z, spans)))
+    # a 4.5 % cone, not the default 5.5 %: rounded by island_grades.ramp_curves the 5.5 % came out 6.5 % (JCT limit 6),
+    # once two-lane port ramps under it held Y2's crest longer (2026-10-04)
+    run_on(net, PREFIX + "y2", on_curve(net, PREFIX + "y2", fly_heights(p, m[2], cp[2], PL.Y2_Z, spans, grade=0.045)))
     joint_ramp(net, PREFIX + "y2", head, face, -1, against=False)
     # Y4: off the connector SB (its BWD carriageway) to the east, south, one arc east onto the mainline's north side
     off = station_on(net, conn, PL.Y4_OFF_Y)
@@ -1481,6 +1501,7 @@ def y_ramps(net, wat, conn):
 
 
 Y3_MERGE_DEG = 8.0   # Y3's last straight converges onto the connector at this angle
+Y3_GORE_HOLD = 85.0  # m: about how long island_grades.level_gores holds it level with the connector at its merge
 
 
 def y3_ramp(net, off, conn):
@@ -1567,11 +1588,19 @@ def y3_ramp(net, off, conn):
     cum = arclen(p, False)
     base = [(q[0], q[1], m[2] if c <= 40.0 else m[2] + (op[2] - m[2]) * (c - 40.0) / max(1.0, L - 40.0))
             for q, c in zip(p, cum)]
+    # ...and past the LAST window it comes down in one straight grade to where its merge's gore hold begins (a 5 %
+    # cone there fell to the base line within 50 m and ran flat after it: 6.8 % once rounded, with the two-lane merge's
+    # longer hold, 2026-10-04)
+    lw = win[-1] if win else None
+    zl_end = L - Y3_GORE_HOLD
     prof = []
     for (x, y, z), c in zip(base, cum):
         for a0, a1, zw in win:
             d = 0.0 if a0 <= c <= a1 else min(abs(c - a0), abs(c - a1))
             z = max(z, zw - 0.05 * d)
+        if lw is not None and lw[1] < c and zl_end > lw[1] + 1.0:
+            f = min(1.0, (c - lw[1]) / (zl_end - lw[1]))
+            z = max(z, lw[2] + (op[2] - lw[2]) * f)
         prof.append((x, y, round(z, 2)))
     knots = [(round(a0), round(zw, 1)) for a0, _a1, zw in win]
     run_on(net, PREFIX + "y3", on_curve(net, PREFIX + "y3", prof))
@@ -1599,6 +1628,8 @@ def _tangent_cw(p, c, r):
 
 
 T_LANES = 1           # each T ramp is ONE lane: the 2+2 Wangan splits lane by lane at J0
+T_GORE_LANES = 1      # ...and so is its SPUR gore, for now: two lanes there want a 108 m taper span and the spur's stations
+#                       by the bridge are 71-76 m apart, so the slot ran to the road's end (2026-10-04; PLAN.md)
 T_HALF = 4.0          # a one-lane ramp's paved half width (lane 4.5 + shoulders), for overlap spans
 T_FLY = 5.8           # surface-over-surface target where one T ramp passes over another road (gate: 5.5)
 T_GRADE = 0.05        # the steepest a T ramp climbs or falls
@@ -1835,10 +1866,10 @@ def t_split(net, wg, spur, spur2):
         net.link(last, head)
         freeze(net, last, u if at_j0_first else (-u[0], -u[1]))
     freeze(net, head, u)
-    ro.make_ramp(net, on3, net.roads[PREFIX + "t3"].points[-1], lanes=T_LANES)
-    ro.make_ramp(net, on1, net.roads[PREFIX + "t1"].points[-1], lanes=T_LANES)
-    ro.make_ramp(net, of4, net.roads[PREFIX + "t4"].points[0], lanes=T_LANES)
-    ro.make_ramp(net, of2, net.roads[PREFIX + "t2"].points[0], lanes=T_LANES)
+    ro.make_ramp(net, on3, net.roads[PREFIX + "t3"].points[-1], lanes=T_GORE_LANES)
+    ro.make_ramp(net, on1, net.roads[PREFIX + "t1"].points[-1], lanes=T_GORE_LANES)
+    ro.make_ramp(net, of4, net.roads[PREFIX + "t4"].points[0], lanes=T_GORE_LANES)
+    ro.make_ramp(net, of2, net.roads[PREFIX + "t2"].points[0], lanes=T_GORE_LANES)
     # no pier on the first span off J0 (four columns would stand together)
     for name in ("t3", "t1"):
         net.points[net.roads[PREFIX + name].points[0]].pillar_skip = True
@@ -2038,6 +2069,12 @@ def widen_ramps(net):
         for side in (0, -1):
             end = ch[side]
             if str(end.role) == "INTERSECTION":
+                continue
+            # a gore whose mainline slot is already WIDEN_LANES wide hands over every lane: no single stretch there
+            # (the T ramps' spur ends; their J0 ends are a lane-by-lane split and keep one)
+            src = [q for q in net.points.values()
+                   if any(l.target == end.uid and str(l.type) == "AUX" for l in q.links)]
+            if src and max(src[0].aux_fwd, src[0].aux_bwd) >= WIDEN_LANES:
                 continue
             ps = partners(end)
             idx = range(len(ch)) if side == 0 else range(len(ch) - 1, -1, -1)

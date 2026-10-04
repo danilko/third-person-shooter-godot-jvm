@@ -86,11 +86,8 @@ STREETS = [
     # on nishi_dori__3 (clear of the clinic and fire branch plots there) to a T on nishi_dori__4 north of the touge's
     dict(name="yamasoi", first="nishi_dori", corners=[(-300.0, -124.3), (-331.0, -61.0), (-250.0, 110.0),
                                                      (-235.0, 190.0), (-149.0, 180.0)], last="nishi_dori"),
-    # kojo_minami: the industry south of kojo_waku's east-west leg (between chuo_dori and the Harbour line, down to the
-    # dike) -- every grid line there met kojo_waku alone. A U off that leg, 135 m wide, its bottom 45 m inside the
-    # dike's land-side toe, so the factories front it on both sides.
-    dict(name="kojo_minami", first="kojo_waku", corners=[(-65.0, -800.0), (-65.0, -965.0), (70.0, -965.0),
-                                                        (70.0, -800.0)], last="kojo_waku"),
+    # (kojo_minami, a U off kojo_waku into the industry south of it, went 2026-10-04: the dike's side road runs through
+    # that block and gives it frontage, and the U crossed it twice with no junction)
     # (kojo_ura, the `after` street east of the old campus plot, went 2026-10-03: the campus is its real 260 x 220 now
     # and fills that block. The `after` mechanism stays for the next street that must hang off the grid.)
     # (THE SUBURB LOOP that stood here -- a U outside the dike whose legs were ramps onto the crest -- went 2026-10-03:
@@ -200,10 +197,9 @@ def _family(name):
 #: crossing to cut; and a crossing whose two roads stand further apart in height than AT_GRADE passes over or under
 CROSS_END_CLEAR = 2.0 * MOUTH
 AT_GRADE = 4.0
-#: OFF until the next layout pass (PLAN.md "Resume here", 2026-10-04): switched on, kojo_waku is cut at its two crossings
-#: with the dike's side road, and the Industry station's access T (island_rail_layout HUB_ACCESS, at (110, -650)) then
-#: lands 14 m from the new crossroads and `cut_road` refuses it -- move that T onto the crossroads first.
-CUT_CROSSINGS = False
+#: kojo_waku is cut at its crossings with the dike's side road (2026-10-04); the Industry station's access
+#: (island_rail_layout HUB_ACCESS) joins that crossroads rather than cutting its own T 14 m from it.
+CUT_CROSSINGS = True
 
 
 def _arc(poly):

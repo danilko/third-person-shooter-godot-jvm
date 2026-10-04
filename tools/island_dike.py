@@ -505,6 +505,7 @@ def rail_lifts(net, dike):
     return [(x, y, z + RAIL_OVER) for x, y, z, _h, _ux, _uy, _near in xs]
 
 
+TEE_SKIP = 40.0           # m of a ramp's approach to its own GROUND junction (its landing and the T's arms)
 MEET_SKIP = 250.0         # m of an expressway's own approach to a T on the ring: a ramp, not a crossing
 OVER_CLEAR = 7.5          # an expressway deck's surface over the dike road's (roadkit_interchange.CLEARANCE 5.5 + margin)
 #: an expressway road that planned its crossing of the dike road ITSELF, against the raised crest and across the whole
@@ -553,7 +554,10 @@ def crossing_needs(net, every=False):
             s.append(s[-1] + math.dist(a.pos[:2], b.pos[:2]))
         # where this expressway MEETS the ring (a T onto the crest, the Wangan's west end) it is meant to come down to
         # it: that approach is the ramp's business, not a crossing
+        # ...and so is its own GROUND junction (a ramp's T onto a road that is itself ramped up to the crest: port_off on
+        # the port loop -- its two-lane band reached that road's ramp beside the T and read as crossing it, 2026-10-04)
         meets = [s[i] for i, p in enumerate(ch) if any(l.target in dike for l in p.links)]
+        tees = [s[i] for i, p in enumerate(ch) if any(str(l.type) == "JUNCTION" for l in p.links)]
         need = []
         clear = PLANNED_OVER.get(name, RAMP_OVER if str(r.road_class) == "ramp" else OVER_CLEAR)
         for k, (a, b) in enumerate(zip(ch, ch[1:])):
@@ -571,7 +575,7 @@ def crossing_needs(net, every=False):
                         continue
                     zd = p[2] + (q[2] - p[2]) * u
                     sk = s[k] + L * t
-                    if any(abs(sk - sm) < MEET_SKIP for sm in meets):
+                    if any(abs(sk - sm) < MEET_SKIP for sm in meets) or any(abs(sk - st) < TEE_SKIP for st in tees):
                         continue
                     # above the crest by too little, OR under / through it (the Wangan crossed the south-west
                     # corner at record 4.0 against a 6.4 crest: through the embankment, with no column allowed)

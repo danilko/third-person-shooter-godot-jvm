@@ -176,36 +176,48 @@ def _line_ok(net, ground, obst, kind, v, box, segs=None):
     a, b = ((v, y0), (v, y1)) if kind == "x" else ((x0, v), (x1, v))
     cr = _crossings(net, a, b)
     if not cr:
-        return None, "meets no road"
+        return None, None, "meets no road"
     # A crowding crossing is dropped, not the LINE. Dropping the line was right while the lines were hand-listed
     # and few; with a generated grid one bad crossing would discard a whole street, and one missing street is a
     # gap that merges two blocks into one (PLAN.md 3.18c). A line that keeps nothing is still dropped.
-    nodes, crowded = [], 0
+    nodes, crowded = [], []
+    ax = 1 if kind == "x" else 0
     for c in cr:
         p = c[2]
         if min((math.hypot(p[0] - o[0], p[1] - o[1]) for o in obst), default=1e9) < JUNCTION_CLEAR:
-            crowded += 1
+            crowded.append(p[ax])
             continue
         nodes.append((p, c[1]))
     if not nodes:
-        return None, "every one of its %d crossings crowds an existing junction" % len(cr)
-    ax = 1 if kind == "x" else 0
+        return None, None, "every one of its %d crossings crowds an existing junction" % len(cr)
+    # A CROWDED CROSSING IS NOT A JUNCTION, SO THE LINE MAY NOT RUN THROUGH IT (2026-10-04: nishi_cho_355 crossed
+    # nishi_machi_390 46 m from that road's junction and cho_34 crossed naka_hondori 23 m from one, both with no pad;
+    # the layout gate `ungapped_crossings` found them). The line keeps the run of its nodes between two crowded
+    # crossings that holds the most, and its LIMIT stops a crossing with another new line extending it past either.
+    lo_b, hi_b = (y0, y1) if kind == "x" else (x0, x1)
+    walls = sorted(crowded)
+    runs = {}
+    for n in nodes:
+        k = sum(1 for w in walls if w < n[0][ax])
+        runs.setdefault(k, []).append(n)
+    k, nodes = max(runs.items(), key=lambda kv: (len(kv[1]), max(n[0][ax] for n in kv[1]) - min(n[0][ax] for n in kv[1])))
+    lim = (walls[k - 1] + MIN_SPAN if k else lo_b, walls[k] - MIN_SPAN if k < len(walls) else hi_b)
     along = [p[ax] for p, _r in nodes]
     lo_, hi_ = min(along), max(along)
     sid = _site_hit((v, lo_) if kind == "x" else (lo_, v), (v, hi_) if kind == "x" else (hi_, v))
     if sid:
-        return None, "runs through the site %s" % sid
+        return None, None, "runs through the site %s" % sid
     rr = _raised_ramp(net, (v, lo_) if kind == "x" else (lo_, v), (v, hi_) if kind == "x" else (hi_, v))
     if rr:
-        return None, "crosses %s off the ground" % rr
+        return None, None, "crosses %s off the ground" % rr
     ra = _rail_along(kind, v, lo_, hi_)
     if ra > RAIL_ALONG:
-        return None, "runs along the rail for %.0f m" % ra
+        return None, None, "runs along the rail for %.0f m" % ra
     if segs is not None:
         run = _parallel_run(segs, kind, v, min(along), max(along))
         if run > PARALLEL_RUN:
-            return None, "runs alongside an existing road for %.0f m" % run
-    return nodes, None
+            return None, None, "runs alongside an existing road for %.0f m" % run
+    return nodes, lim, None
 
 
 SITE_CLEAR = 10.0      # a street keeps this far outside a frozen site's footprint (PLAN.md 3.33)
@@ -409,10 +421,21 @@ def _line_split(net, obst, kind, v, box, segs=None):
     ax = 1 if kind == "x" else 0
     nodes = [(c[2], c[1]) for c in cr
              if min((math.hypot(c[2][0] - o[0], c[2][1] - o[1]) for o in obst), default=1e9) >= JUNCTION_CLEAR]
+    # a crowded crossing is a wall too (`_line_ok`): no piece runs through one
+    walls = sorted(c[2][ax] for c in cr
+                   if min((math.hypot(c[2][0] - o[0], c[2][1] - o[1]) for o in obst), default=1e9) < JUNCTION_CLEAR)
     lo, hi = (y0, y1) if kind == "x" else (x0, x1)
-    out = []
+    gaps = []
     for g0, g1 in _site_gaps(kind, v, lo, hi):
-        mine = [n for n in nodes if g0 <= n[0][ax] <= g1]
+        cuts = [w for w in walls if g0 < w < g1]
+        edges = [(g0, False)] + [(w, True) for w in cuts] + [(g1, False)]
+        for (e0, w0), (e1, w1) in zip(edges, edges[1:]):
+            gaps.append((e0 + (MIN_SPAN if w0 else 0.0), e1 - (MIN_SPAN if w1 else 0.0), e0, e1))
+    out = []
+    for g0, g1, h0, h1 in gaps:
+        if g1 < g0:
+            g1 = g0 = 0.5 * (h0 + h1)
+        mine = [n for n in nodes if h0 < n[0][ax] < h1]
         if not mine:
             continue
         along = [p[ax] for p, _r in mine]
@@ -481,12 +504,12 @@ def plan_region(net, ground, region):
                 continue
             tried, site_hit, pieces = [], None, None
             for dv in NUDGES:
-                nodes, last = _line_ok(net, ground, obst, kind, v0 + dv, box, segs)
+                nodes, lim, last = _line_ok(net, ground, obst, kind, v0 + dv, box, segs)
                 if nodes:
                     if pieces and sum(len(n) for n, _l in pieces) > len(nodes):
                         tried.append("%+.0f: kept only %d crossing(s)" % (dv, len(nodes)))
                         continue
-                    kept.append([kind, v0 + dv, nodes, None])
+                    kept.append([kind, v0 + dv, nodes, lim])
                     break
                 tried.append("%+.0f: %s" % (dv, last))
                 if site_hit is None:
@@ -574,6 +597,37 @@ def plan_region(net, ground, region):
                     changed = True
                 else:
                     verdict[i] = "two of its junctions on ROADS are closer than %.0f m" % MIN_SPAN
+        if not verdict and not changed:
+            # A GIVEN-UP CROSSING MUST NOT STILL BE CROSSED (2026-10-04: nishi_cho_355 and nishi_machi_390 kept running
+            # through their crossing after it was dropped for MIN_SPAN, with no junction there -- the layout gate
+            # `ungapped_crossings`). One of the two stops short of it: the one whose shorter side holds fewer junctions
+            # loses that side.
+            for k, (x, y) in cross.items():
+                i, j = k
+                if k in active or i not in alive or j not in alive:
+                    continue
+                if not (ext[i][0] + 1e-6 < y < ext[i][1] - 1e-6 and ext[j][0] + 1e-6 < x < ext[j][1] - 1e-6):
+                    continue
+                best = None
+                for li, c in ((i, y), (j, x)):
+                    kind_, _v, nodes_ = kept[li][:3]
+                    ax_ = 1 if kind_ == "x" else 0
+                    mine_ = [kk for kk in active if li == (kk[0] if kind_ == "x" else kk[1])]
+                    pts_ = [pp[ax_] for pp, _r in nodes_] + [cross[kk][ax_] for kk in mine_]
+                    lo_n, hi_n = sum(1 for q in pts_ if q < c), sum(1 for q in pts_ if q > c)
+                    side = "lo" if lo_n < hi_n or (lo_n == hi_n and c - ext[li][0] < ext[li][1] - c) else "hi"
+                    loss = min(lo_n, hi_n)
+                    if best is None or loss < best[0]:
+                        best = (loss, li, c, side, ax_, mine_)
+                _loss, li, c, side, ax_, mine_ = best
+                cut_off = (lambda q: q < c) if side == "lo" else (lambda q: q > c)
+                kept[li][2] = [n for n in kept[li][2] if not cut_off(n[0][ax_])]
+                for kk in mine_:
+                    if cut_off(cross[kk][ax_]):
+                        active.discard(kk)
+                why.append("%s %s=%.0f trimmed short of a crossing it could not make" % (name, kept[li][0], kept[li][1]))
+                changed = True
+                break
         if not verdict and not changed:
             # water is judged only once everything else has settled: a partner dropped may shorten the line
             for i in list(alive):

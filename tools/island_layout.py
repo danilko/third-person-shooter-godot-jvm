@@ -455,6 +455,98 @@ def chain_folds(path):
                 out.append((name, r.points[i], turn))
     return out
 
+CROSS_AT_GRADE = 4.0   # m: two ground roads whose centrelines cross closer than this in height meet, or must
+
+
+def _through_hull(a, b, poly):
+    """Does the segment a-b pass through the convex polygon `poly` (counter-clockwise, (x, y))?"""
+    if not poly:
+        return False
+
+    def inside(p):
+        return all((q[0] - o[0]) * (p[1] - o[1]) - (q[1] - o[1]) * (p[0] - o[0]) > 0.0
+                   for o, q in zip(poly, poly[1:] + poly[:1]))
+
+    def cross(p, q, r, t):
+        d = (q[0] - p[0]) * (t[1] - r[1]) - (q[1] - p[1]) * (t[0] - r[0])
+        if abs(d) < 1e-12:
+            return False
+        u = ((r[0] - p[0]) * (t[1] - r[1]) - (r[1] - p[1]) * (t[0] - r[0])) / d
+        v = ((r[0] - p[0]) * (q[1] - p[1]) - (r[1] - p[1]) * (q[0] - p[0])) / d
+        return 0.0 < u < 1.0 and 0.0 < v < 1.0
+    return inside(a) or inside(b) or any(cross(a, b, o, q) for o, q in zip(poly, poly[1:] + poly[:1]))
+
+
+def ungapped_crossings(path):
+    """Every place two at-grade roads' centrelines CROSS with no junction between them (2026-10-04: the dike's side
+    road crossed kojo_waku and kojo_minami four times with no pad, and the gate, validate and flow all read it clean:
+    a crossing is two consistent roads). Expressways and rail are skipped (they pass over or under). Returns
+    [(road a, road b, (x, y), dz)]."""
+    net = pm.load_network(path)
+    segs = []
+    for name, r in net.roads.items():
+        if r.road_class == "rail" or name.startswith("shuto_"):
+            continue
+        ch = [net.points[u] for u in r.points if u in net.points]
+        for a, b in zip(ch, ch[1:]):
+            if a.has_link(b.uid, pm.LINK_SEGMENT):
+                segs.append((name, a.pos, b.pos))
+    cell = 60.0
+    grid = {}
+    for i, (_n, a, b) in enumerate(segs):
+        for gx in range(int(math.floor(min(a[0], b[0]) / cell)), int(math.floor(max(a[0], b[0]) / cell)) + 1):
+            for gy in range(int(math.floor(min(a[1], b[1]) / cell)), int(math.floor(max(a[1], b[1]) / cell)) + 1):
+                grid.setdefault((gx, gy), []).append(i)
+    seen, out = set(), []
+    eps = 1e-3
+    for ids in grid.values():
+        for ii in range(len(ids)):
+            for jj in range(ii + 1, len(ids)):
+                i, j = ids[ii], ids[jj]
+                if (i, j) in seen:
+                    continue
+                seen.add((i, j))
+                na, p, q = segs[i]
+                nb, a, b = segs[j]
+                d = (q[0] - p[0]) * (b[1] - a[1]) - (q[1] - p[1]) * (b[0] - a[0])
+                if abs(d) < 1e-9:
+                    continue
+                t = ((a[0] - p[0]) * (b[1] - a[1]) - (a[1] - p[1]) * (b[0] - a[0])) / d
+                u = ((a[0] - p[0]) * (q[1] - p[1]) - (a[1] - p[1]) * (q[0] - p[0])) / d
+                if not (eps < t < 1 - eps and eps < u < 1 - eps):
+                    continue
+                dz = (p[2] + (q[2] - p[2]) * t) - (a[2] + (b[2] - a[2]) * u)
+                if abs(dz) < CROSS_AT_GRADE:
+                    out.append((na, nb, (round(p[0] + (q[0] - p[0]) * t, 1), round(p[1] + (q[1] - p[1]) * t, 1)),
+                                round(dz, 2)))
+    # ...and a road running THROUGH a junction pad it is not an arm of (the side road passed through kojo_minami's T on
+    # kojo_waku between that pad's mouths, which no segment-against-segment test sees): its centreline within half the
+    # 0.85 of the nearest mouth's distance from the pad's centre
+    for comp in net.junction_cliques():
+        mem = [net.points[u] for u in comp if u in net.points]
+        if len(mem) < 2:
+            continue
+        cx = sum(m.pos[0] for m in mem) / len(mem)
+        cy = sum(m.pos[1] for m in mem) / len(mem)
+        cz = sum(m.pos[2] for m in mem) / len(mem)
+        reach = 0.85 * min(math.hypot(m.pos[0] - cx, m.pos[1] - cy) for m in mem)
+        owners = {nm for nm, r in net.roads.items() if any(u in comp for u in r.points)}
+        # the mouths' convex hull is the pad (the side road ran 8.9 m from a T's centroid, between its mouths)
+        hull = sorted(mem, key=lambda m: math.atan2(m.pos[1] - cy, m.pos[0] - cx))
+        hull = [(m.pos[0], m.pos[1]) for m in hull] if len(hull) >= 3 else []
+        g = (int(math.floor(cx / cell)), int(math.floor(cy / cell)))
+        for i in set(grid.get(g, [])):
+            n, a, b = segs[i]
+            if n in owners:
+                continue
+            ex, ey = b[0] - a[0], b[1] - a[1]
+            L2 = ex * ex + ey * ey
+            f = max(0.0, min(1.0, ((cx - a[0]) * ex + (cy - a[1]) * ey) / L2)) if L2 > 1e-9 else 0.0
+            if ((math.hypot(a[0] + ex * f - cx, a[1] + ey * f - cy) < reach or _through_hull(a, b, hull))
+                    and abs(a[2] + (b[2] - a[2]) * f - cz) < CROSS_AT_GRADE):
+                out.append((n, "pad of " + "/".join(sorted(owners)), (round(cx, 1), round(cy, 1)), 0.0))
+    return out
+
 
 PHASE2_ALONG = 60.0   # m: a road may cross the held phase-2 corridor (it will pass UNDER the elevated Wangan), not run in it
 
@@ -651,6 +743,11 @@ def main(argv):
     print("island_layout: %d road(s) folding back on themselves%s" % (len(folds), "" if not folds else ": " + ", ".join(
         "%s at %s (%.0f deg)" % f for f in folds)))
     t0 = time.monotonic()
+    ungapped = ungapped_crossings(OUTPUT)
+    TIMES["check: at-grade crossings"] = time.monotonic() - t0
+    print("island_layout: %d at-grade crossing(s) with no junction%s" % (len(ungapped), "" if not ungapped else ": " +
+          ", ".join("%s x %s at (%.0f, %.0f) dz %.1f" % (a, b, xy[0], xy[1], dz) for a, b, xy, dz in ungapped[:10])))
+    t0 = time.monotonic()
     gaps = joint_gaps(OUTPUT)
     TIMES["check: joint gaps"] = time.monotonic() - t0
     wide = [g for g in gaps if g[0] > JOINT_GAP]
@@ -667,7 +764,7 @@ def main(argv):
         len(p2), ", ".join("%s %s %s" % x for x in p2[:10]))))
     print("island_layout: time " + ", ".join("%s %.0f s" % kv for kv in sorted(TIMES.items(), key=lambda kv: -kv[1])))
     print("island_layout: %d step(s) replayed from the cache%s" % (len(HITS), "" if not HITS else " (%s)" % ", ".join(HITS)))
-    if rep["errors"] or any(bad.values()) or low or steep or folds or p2 or rbad:
+    if rep["errors"] or any(bad.values()) or low or steep or folds or p2 or rbad or ungapped:
         sys.exit(1)
 
 
