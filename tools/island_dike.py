@@ -666,6 +666,11 @@ SIDE_EXTRA = [(820.0, -672.0, 260.0, 60.0)]
 #: a U 240 m across whose town-side offset (the ramp length, ~180 m) folds on itself -- the whole line was dropped as
 #: not simple, taking the side road along ring_kita__7 with it. Nothing inside the U joins the dike, so it needs none.
 SIDE_SKIP = ("ring_kita__6",)   # R5 (2026-10-02): 25 -> 60, the exit at <= 6 %
+#: record boxes (x0, y0, x1, y1): a side-road piece with a crossing inside one is not built. By Suburb station the side
+#: road's last piece ran 20-40 m from wangan_dori and its junction with kogai_michi sat inside wangan_dori's own
+#: junction (probe_road_clear, 2026-10-03: connectors through both pads) -- a 側道 that close to an arterial serves
+#: nothing the arterial does not, and the Suburb exit now lands on wangan_dori itself (island_suburb_kogai.py).
+SIDE_DROP = [(600.0, -620.0, 1000.0, -400.0)]
 
 
 def side_extra(x, y):
@@ -807,6 +812,11 @@ def sokudo(net, ground):
         for (s0, n0, p0, r0), (s1, n1, p1, r1) in zip(hits, hits[1:]):
             if r0 or r1 or s1 - s0 < SIDE_MIN:
                 continue
+            if any(x0 <= p_[0] <= x1 and y0 <= p_[1] <= y1 for x0, y0, x1, y1 in SIDE_DROP for p_ in (p0, p1)):
+                # not built, but it keeps its NUMBER: other records name side roads (IslandBlockSplits.json's streets
+                # end on teibo_sokudo_<n>), and a dropped piece must not renumber every one after it
+                pieces.append((s0, n0, p0, s1, n1, None))
+                continue
             i0, i1 = int(s0 // 5.0), min(int(s1 // 5.0), len(good) - 1)
             if all(good[i0:i1 + 1]):
                 pieces.append((s0, n0, p0, s1, n1, p1))
@@ -820,6 +830,8 @@ def sokudo(net, ground):
         # each crossing is cut ONCE; two pieces meeting there share its pad (a 4-way)
         cuts = {}
         for s0, n0, p0, s1, n1, p1 in pieces:
+            if p1 is None:
+                continue
             for n_, p_ in ((n0, p0), (n1, p1)):
                 key = (round(p_[0], 1), round(p_[1], 1))
                 if key in cuts:
@@ -829,6 +841,9 @@ def sokudo(net, ground):
                 except ValueError:
                     cuts[key] = None
         for s0, n0, p0, s1, n1, p1 in pieces:
+            if p1 is None:
+                k += 1
+                continue
             k0, k1 = (round(p0[0], 1), round(p0[1], 1)), (round(p1[0], 1), round(p1[1], 1))
             if cuts.get(k0) is None or cuts.get(k1) is None:
                 continue

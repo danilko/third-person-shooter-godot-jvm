@@ -23,6 +23,7 @@ It runs in `island_layout` BEFORE `island_streets`, so the planner's lines can e
 Idempotent: a street already in the record is left alone. `--check` exits 1 if one is missing.
 """
 import math
+import re
 import os
 import sys
 
@@ -125,7 +126,7 @@ STREETS = [
     # a short block street the shops line both sides of (island_buildings.STREET_MIXES keys the shop-house mix on the
     # "eki_ginza" name). Castle Town's is its 参道, jokamachi_sando (island_site_access), keyed the same way.
     # Suburb: west of the station (x 834..926), from rinkai_dori south to wangan_dori at the station's front
-    dict(name="eki_ginza_suburb", first="rinkai_dori", corners=[(790.0, -270.0), (790.0, -428.0)],
+    dict(name="eki_ginza_suburb", first="rinkai_dori", corners=[(775.0, -270.0), (775.0, -440.0)],   # the crossroads' centre, the Suburb exit's (island_suburb_kogai.py)
          last="wangan_dori"),        # (ekimae_suburb, the station's own street, is built later -- island_site_access)
     # Residential North: west off the farm frame's leg (nodo_waku x 1045) level with the station, then south to nishi_dori
     dict(name="eki_ginza_res_north", first="nodo_waku", corners=[(1045.0, 850.0), (960.0, 850.0), (960.0, 779.0)],
@@ -187,10 +188,18 @@ def _tee(net, prefix, at):
     return list(cut_road(net, at, prefix, MOUTH))
 
 
+def _family(name):
+    """A GENERATED road's number is not stable: island_dike numbers its side roads in build order, so a piece that is
+    not built shifts every one after it, and a frozen record naming `teibo_sokudo_2` (IslandBlockSplits.json) would
+    find another road or none. Such a name is matched as its family prefix -- the nearest side road at the corner."""
+    m = re.match(r"^(teibo_sokudo_)\d+$", name)
+    return m.group(1) if m else name
+
+
 def add(net, s, ground):
     c = s["corners"]
-    t1 = _tee(net, s["first"], c[0])
-    t2 = _tee(net, s["last"], c[-1])
+    t1 = _tee(net, _family(s["first"]), c[0])
+    t2 = _tee(net, _family(s["last"]), c[-1])
     head = _mouth_head(net, t1, c[1])
     tail = _mouth_head(net, t2, c[-2])
     plan = rg.rounded_polygon([head] + list(c[1:-1]) + [tail], CORNER_R, closed=False)

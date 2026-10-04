@@ -1167,9 +1167,11 @@ def expressway_sign_sites(table, lanes):
             q, d, at = w
             half = 0.5 * float(lane.get("lane_width", 4.5))
             lft = _left(d)
-            # a roadside sign, not an overhang: its whole panel clears the kerb
+            # a roadside sign, not an overhang: its whole panel clears the kerb -- of the LEFTMOST lane there (a ramp is two
+            # lanes now, and the sign stood in the second one, probe_road_clear 2026-10-04)
             e2 = float(r.get("expwy_entrance_edge", 2.9))
-            pos = (q[0] + lft[0] * (half + e2), q[1] + lft[1] * (half + e2), q[2])
+            off = _leftmost_edge(lanes, q, d, half) + e2
+            pos = (q[0] + lft[0] * off, q[1] + lft[1] * off, q[2])
             out.append({"asset": "expwy_entrance_sign", "pos": pos, "fwd": d, "road": road, "lane": lid,
                         "sign": "entrance", "dest": route, "route": route})
             done.add(road)

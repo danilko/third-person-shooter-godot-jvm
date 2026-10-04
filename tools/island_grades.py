@@ -59,6 +59,7 @@ a silent pass.
 import glob
 import json
 import math
+import re
 import os
 import sys
 
@@ -300,14 +301,21 @@ def level_gores(net):
         # a parting station within GORE_MIN_SPAN of the next one is not inserted: that one is held instead, or the
         # climb out of the gore begins over a 4.5 m span no vertical curve fits in (E2 / W2: K 1.5, the shipped
         # lanekits, 2026-10-02)
-        if 0.05 < t < 0.95 and math.dist((x, y), net.points[b].pos[:2]) > GORE_MIN_SPAN:
+        # ...nor within it of the station BEFORE it (island_expressway.widen_ramps puts its single-lane end exactly
+        # where the bands part, and the two coincident stations were a zero span the profile solve divided by)
+        near_a = math.dist((x, y), net.points[a].pos[:2]) <= GORE_MIN_SPAN
+        # ...and never into a lane TAPER: its span is the length the rule asked for (island_expressway.widen_ramps)
+        pa_, pb_ = net.points[a], net.points[b]
+        if (pa_.lanes_fwd, pa_.lanes_bwd) != (pb_.lanes_fwd, pb_.lanes_bwd):
+            near_a = True
+        if 0.05 < t < 0.95 and not near_a and math.dist((x, y), net.points[b].pos[:2]) > GORE_MIN_SPAN:
             # insert where the bands part, in the ramp's CHAIN order (insert_after follows road.points)
             first, second = (a, b) if ramp.points.index(a) < ramp.points.index(b) else (b, a)
             nu = rg.insert_after(net, ramp, first, (x, y, main_at(x, y)[1]))
             road_of[nu] = ramp.name
             stop = nu
         else:
-            stop = b if t >= 0.95 else a
+            stop = a if near_a else (b if t >= 0.95 else a)
         chain = list(ramp.points)
         if chain[-1] == u:
             chain.reverse()
@@ -372,6 +380,12 @@ RAMP_K_SOLVE = 9.0    # what `ramp_curves` aims for, so the exported Hermite bet
 RAMP_K_OVERRIDE = {"shuto_port_on": 9.0}
 RAMP_GROUND_GRADE = 0.07   # a ramp to or from the ground at 40 km/h (道路構造令: 7 %)
 RAMP_JCT_GRADE = 0.06      # an expressway-to-expressway ramp
+#: the lane split's EB halves (island_expressway.t_split), which climb together 6 m apart; the WB pair (T2 + T4) is held by
+#: `pair_held` at their generator's heights -- pinning T4 to T2's SOLVED profile met T4's held gore span at another
+#: slope (K 5.7, a kink no weight can move)
+PAIR_RAMPS = {frozenset(("shuto_t1", "shuto_t3"))}
+PAIR_RUN = 60.0       # m: ...over at least this long a run
+PAIR_LEVEL = 1.0      # m: a ramp beside another within this of its height is ONE profile with it (ramp_curves)
 CROSS_DZ = 3.0        # m: a road this far above or below the ramp, across its band, is one it crosses (else a gore)
 CROSS_OVERLAP = 0.5   # m: the two paved bands overlap by at least this much in plan
 CROSS_MIN = 5.7       # m: the least surface-over-surface the solve keeps at a crossing (roadkit_interchange 5.5)
@@ -432,6 +446,16 @@ def ramp_curves(net, k_target=None):
             for gx in range(int(min(a_[0], b_[0]) // 40) - 1, int(max(a_[0], b_[0]) // 40) + 2):
                 for gy in range(int(min(a_[1], b_[1]) // 40) - 1, int(max(a_[1], b_[1]) // 40) + 2):
                     seg_grid.setdefault((gx, gy), []).append((on, a_, b_, h_))
+    # TWO RAMPS SIDE BY SIDE ARE ONE PROFILE (2026-10-03 night): each ramp is solved alone, so the two halves of a lane
+    # split that climb together (T1 + T3, 6 m apart) came out 0.5-0.8 m apart -- a step probe_road_clear reads as a wall
+    # in the lower one's lane. A ramp solved later takes an earlier one's SOLVED height on every sample where the two
+    # run beside each other within PAIR_LEVEL (never a road joined at its own ends, never its gore partner).
+    solved = {}                                     # ramp name -> (half width, [(x, y, z)] of its solved samples)
+    gore_pairs = set()
+    for u_, p_ in net.points.items():
+        for l in p_.links:
+            if str(l.type) == "AUX" and u_ in road_of and l.target in road_of:
+                gore_pairs.add(frozenset((road_of[u_], road_of[l.target])))
     for name in sorted(net.roads):
         road = net.roads[name]
         if not _is_ramp(name, road) or len(road.points) < 3:
@@ -589,6 +613,43 @@ def ramp_curves(net, k_target=None):
                 else:
                     ceil[k + n0] = min(ceil.get(k + n0, 1e9), zo - need)
 
+        joined = {road_of.get(l.target) for e in (uids[0], uids[-1]) for l in net.points[e].links
+                  if str(l.type) == "SEGMENT"} - {name}
+        paired = 0
+        mx0, mx1 = min(q.pos[0] for q in smp) - 30.0, max(q.pos[0] for q in smp) + 30.0
+        my0, my1 = min(q.pos[1] for q in smp) - 30.0, max(q.pos[1] for q in smp) + 30.0
+        for on, (oh, osm) in solved.items():
+            if on in joined or frozenset((name, on)) in gore_pairs:
+                continue
+            # only the halves of a LANE SPLIT climb together by design (PAIR_RAMPS); the two one-way roads of a JCT
+            # split part vertically on purpose, and pinning Y2 to Y1 put it at 7 % (the JCT limit is 6)
+            if frozenset((name, on)) not in PAIR_RAMPS:
+                continue
+            osm = [q for q in osm if mx0 <= q[0] <= mx1 and my0 <= q[1] <= my1]
+            if not osm:
+                continue
+            beside = []
+            for k in range(len(s)):
+                x, y = smp[k].pos[0], smp[k].pos[1]
+                d2, zo = min(((ox - x) ** 2 + (oy - y) ** 2, oz) for ox, oy, oz in osm)
+                ok_ = math.sqrt(d2) < oh + rh + GORE_MARGIN and abs(z[k] - zo) <= PAIR_LEVEL and k + n0 not in F
+                beside.append(zo if ok_ else None)
+            # only a LONG run beside it is a pair (a lane split's halves climbing together): the first metres of two
+            # one-way roads parting at a joint are level for a moment, and pinning them kinked the climb that follows
+            k = 0
+            while k < len(s):
+                if beside[k] is None:
+                    k += 1
+                    continue
+                j = k
+                while j + 1 < len(s) and beside[j + 1] is not None:
+                    j += 1
+                if s[j] - s[k] >= PAIR_RUN:
+                    for q in range(k, j + 1):
+                        F[q + n0] = beside[q]
+                        paired += 1
+                k = j + 1
+
         def solve(w, Fx, act=()):
             fr = [k for k in range(N) if k not in Fx]
             ix = {k: j for j, k in enumerate(fr)}
@@ -638,6 +699,8 @@ def ramp_curves(net, k_target=None):
             if k not in F:
                 near_free.update(range(max(3, k - 4), min(N - 3, k + 5)))
         judged = sorted(near_free)
+        if all(k in F for k in range(N)):
+            continue
         w, f = 1.0, None
         for _ in range(16):
             f = solve_floored(w)
@@ -673,6 +736,20 @@ def ramp_curves(net, k_target=None):
                 if i in held and (i - 1 in held or i + 1 in held):
                     continue                       # faced on its held span's chord, above
                 face(P, st_i[i], smp[st_i[i]].tangent[:2])
+        # a GROUND end arrives LEVEL on its pad: its mouth's tangent carries slope 0 along its approach chord (left AUTO
+        # it is the chord's slope, and the port entrance met its T at -4.9 %, K 4.4 on its lanekit, 2026-10-04)
+        for i in (0, n_st - 1):
+            P = net.points[uids[i]]
+            if str(P.role) != "INTERSECTION":
+                continue
+            Q = net.points[uids[1 if i == 0 else n_st - 2]]
+            px, py = (Q.pos[0] - P.pos[0], Q.pos[1] - P.pos[1]) if i == 0 else (P.pos[0] - Q.pos[0], P.pos[1] - Q.pos[1])
+            if P.tangent_mode == pm.MANUAL and P.tangent is not None and math.hypot(*P.tangent[:2]) > 1e-9:
+                px, py = P.tangent[:2]
+            m_ = math.hypot(px, py)
+            if m_ > 1e-9:
+                P.tangent_mode = pm.MANUAL
+                P.tangent = (px / m_, py / m_, 0.0)
         # insert where the curve bends inside a long span (never in a held span, never near a mouth)
         mouths = [net.points[u].pos for u in uids if str(net.points[u].role) in ("RAMP", "INTERSECTION")]
         added = 0
@@ -684,8 +761,14 @@ def ramp_curves(net, k_target=None):
             if span <= RAMP_STATION:
                 continue
             pa, pb = net.points[uids[i]], net.points[uids[i + 1]]
-            if (pa.lanes_fwd, pa.lanes_bwd) != (pb.lanes_fwd, pb.lanes_bwd) or rg._tapers(pa, pb):
-                continue                           # a lane taper: its length is the span the author put there
+            # a lane taper: its length is the span the author put there. A span ending on a GROUND junction's mouth is
+            # not one (rg._tapers counts any non-SEGMENT end): it is where the ramp levels out onto its pad, and left
+            # whole the port entrance arrived at 5 % (K 4.4 on its lanekit, 2026-10-04)
+            mouth_end = (str(pa.role) in ("SEGMENT", "INTERSECTION") and str(pb.role) in ("SEGMENT", "INTERSECTION")
+                         and pa.aux_fwd == pb.aux_fwd and pa.aux_bwd == pb.aux_bwd
+                         and not pa.targets(pm.LINK_AUX) and not pb.targets(pm.LINK_AUX))
+            if (pa.lanes_fwd, pa.lanes_bwd) != (pb.lanes_fwd, pb.lanes_bwd) or (rg._tapers(pa, pb) and not mouth_end):
+                continue
             bend = min(_local_k(s, fs, k) for k in range(k0, k1 + 1))
             if bend > 60.0:
                 continue
@@ -702,6 +785,9 @@ def ramp_curves(net, k_target=None):
                 added += 1
         for u in road.points:
             _GORE_HELD.add(u)
+        solved[name] = (rh, [(q.pos[0], q.pos[1], fs[k]) for k, q in enumerate(smp)])
+        if paired:
+            out.append("%s: %d sample(s) held level with a ramp beside it" % (name, paired))
         kk = min(range(len(s)), key=lambda q: _local_k(s, fs, q))
         near = min(range(n_st), key=lambda i: abs(s[st_i[i]] - s[kk]))
         out.append("%s: K %.1f at s %.0f (station %d/%d %s%s), w %.0f, %d station(s) added"

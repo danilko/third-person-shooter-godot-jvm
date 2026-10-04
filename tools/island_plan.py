@@ -584,8 +584,8 @@ Y3_OFF_X = 220.0
 Y3_CLIMB = 150.0             # Y3 keeps beside (not over) the mainline this far from its gore...
 Y3_KEEP = 11.0               # ...its station at least this far off the mainline's centreline
 #: the SUBURB EXIT (user, 2026-09-30: "can that ramp be on the Suburb side"): Wangan EB -> the ground, off the waterfront
-#: diagonal's north side at SB_OFF_X, one S of two arcs beside the mainline, down into the teibo_sokudo_2 / kogai_michi
-#: junction by Suburb station as its fourth (south-west) arm, at SB_JUNCTION. A mainline joint at WG_CUT3_X keeps it
+#: diagonal's north side at SB_OFF_X, one S of two arcs beside the mainline, down into wangan_dori's junction by Suburb
+#: station as its south arm, at SB_JUNCTION. A mainline joint at WG_CUT3_X keeps it
 #: off Y4's run (both on EB).
 SB_OFF_X = 540.0
 #: P2-6: the Suburb's WB entrance -- from a new T on the dike road (ring_kita) east of the Wangan's crossing, where the
@@ -602,8 +602,11 @@ WG_CUT4_X = -10.0
 #: east, climbing the 5.6 m from the dike crest to the deck, merging onto EB's left at PORT_ON_X -- after Y1's exit
 #: (exit -> entrance, no weave) and in wangan__2's run, whose only other ramp is the WB port exit
 PORT_ON_T = (-440.0, -1082.0)
-PORT_ON_X = -270.0
-SB_JUNCTION = (848.0, -490.0)
+PORT_ON_X = -250.0   # -270 -> -250 (2026-10-04): the two-lane ramp levels into its T over a 30 m landing
+SB_JUNCTION = (775.0, -437.0)
+#: ...the junction is the nearest pad of one of these roads (2026-10-03 night: wangan_dori's own, opposite
+#: eki_ginza_suburb; the side road's pad by kogai_michi sat inside wangan_dori's junction -- island_suburb_kogai.py)
+SB_JUNCTION_ROADS = ("wangan_dori",)
 WG_CUT3_X = 400.0
 Y3_ON_Y = -700.0
 #: THE CONNECTOR (R3): the Wangan's last stretch runs north OVER chuo_dori's median (piers in the median) from

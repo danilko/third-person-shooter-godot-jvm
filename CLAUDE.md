@@ -10851,6 +10851,47 @@ line. Weapons keep `fire_audio` / `reload_audio` in their scenes. `assets/audio/
 ships, what is wired but missing a file (`glass_shatter`, `hit_marker`) and what is not wired yet; `SoundTest`
 checks its "Wired in code" table against the enum. Licence rule as for art: CC0 / MIT / public domain, credited.
 
+### Two-lane ramps, the Suburb crossroads, and the lane-split pair kept level (2026-10-04, user-asked)
+
+- **Every expressway ramp's BODY is two lanes** (`island_expressway.widen_ramps`, user: a one-lane ramp was a race
+  bottleneck; user's choice "narrow to 1 at the gore"). Each EXPRESSWAY end (a gore = AUX link, or a joint = a lane split
+  or JCT carriageway) keeps the one lane its mainline slot hands over until the ramp has parted from every road it meets
+  there, then opens or closes over `WIDEN_TAPER` (13 m: the rule wants 11.6 m at 40 km/h x 0.25, and
+  `island_grades.ramp_curves` never subdivides a taper span). The ground end runs both lanes into the intersection. The
+  mainline aux slots are unchanged. Rules each a measured defect first:
+  * **The hold is side-aware**: a one-way road lays its lanes to the LEFT of its stations, so the added lane reaches only
+    toward a partner on the left (port exit 140 -> 109 m single, Y4 94 -> 59).
+  * **The road's BASE stays one lane** (stations carry the two): `island_dike` sizes a crossing's floor from the base,
+    and at two the Suburb exit stayed up over the crest 30 m longer and came down at 8.4 %.
+  * **A station reused for a taper end must lie OUTSIDE the taper** and lane counts are assigned by those stations, or
+    a 13 m taper became 10 m. `island_grades.level_gores` never inserts its parting station into a taper span, nor within
+    `GORE_MIN_SPAN` of the station BEFORE it (two coincident stations were a zero span the profile solve divided by).
+  * Single stretches left: where a ramp still runs beside its mainline (a gore) or its lane-split sibling (T1+T3 and
+    T2+T4 run 6 m apart: a split hands each ramp one lane of a 2-lane carriageway).
+- **The Suburb junctions** (probe_road_clear: connectors through two overlapping pads). `kogai_michi` met `wangan_dori` at
+  34 deg (mouths ~200 m apart), the dike side road ran 20-40 m from `wangan_dori` and crossed it 45 m on, and the exit
+  landed on THAT junction. Now (`tools/island_suburb_kogai.py`, one-shot on the arterials input): `wangan_dori`'s
+  junction at record x 775 is a crossroads of `eki_ginza_suburb` (north) and the **Suburb exit** (south,
+  `island_plan.SB_JUNCTION` / `SB_JUNCTION_ROADS`); `kogai_michi` leaves `wangan_dori` at the Suburb station's own T
+  (x 929, opposite `ekimae_suburb`), and the side road's piece there is not built (`island_dike.SIDE_DROP`; a dropped
+  piece keeps its number, and a frozen record naming `teibo_sokudo_<n>` matches the family, `island_core_streets._family`).
+  Moving the side road away instead (`SIDE_EXTRA` 60 -> 25) cost the exit 60 m of run: 12 %.
+- **No street crosses a ramp mid-air** (`island_streets._raised_ramp`): a line crossing an expressway road between
+  `RAMP_AT_GRADE` 0.6 m and `RAMP_UNDER` 5.5 m (too high to meet, too low to pass under) is refused, so it is nudged
+  or dropped. `cho_sw_345` had cut the connector's SB exit 3 m up in its descent; that junction's pad sloped 20 % and
+  the two-lane deck overhung its own connectors (probe_road_clear).
+- **The port's EB entrance with two lanes**: its second lane (on its left) lay over the dike road's footway, so the dike
+  road moved a further 5 m north (`tools/island_dike_port_gap_2lane.py`, one-shot); its T arm leans 30 deg east toward
+  the merge (`_t_arm(skew=, lean=)`, `PORT_ON_SKEW`: square, the gap left ~10 m to turn 90 deg, an R 9 corner whose
+  setback slid all three mouths onto one point); it levels over a 30 m landing into the T (`PORT_ON_LANDING`: on the
+  turn the inner lane's path is shorter, so a grade there read K 4.4), and it merges 20 m further east
+  (`PORT_ON_X` -250) for the length. `ramp_curves` also subdivides a ramp's last span into a GROUND junction's mouth
+  (`rg._tapers` counted any non-SEGMENT end as a taper) and faces that mouth level.
+- **T1 + T3 are ONE profile** (`island_grades.PAIR_RAMPS`): each ramp is solved alone, and the two halves of the EB
+  lane split, 6 m apart, came out 0.5-0.8 m apart -- a step probe_road_clear reads as a wall. The later one takes the
+  earlier one's SOLVED height on every sample of a run >= 60 m beside it. Limited to that pair on purpose: pinning a JCT
+  split's halves (Y1/Y2, which part vertically) put Y2 at 7 %, and pinning T4 to T2 met T4's held gore at another slope.
+
 ## Expressway guide signs, and every displayed name is fictional (2026-09-30)
 
 - **Names shown to a player are FICTIONAL, for legal reasons (user decision).** The expressway brand is 海都高速

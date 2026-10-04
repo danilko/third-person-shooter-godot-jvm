@@ -144,6 +144,33 @@ def _parallel_run(segs, kind, v, lo, hi):
     return best
 
 
+RAMP_AT_GRADE = 0.6    # m: an expressway ramp this low is at grade -- a street may meet it in a junction
+RAMP_UNDER = 5.5       # m: ...and this high a street passes under it; in between, neither (roadkit_interchange 5.5)
+
+
+def _raised_ramp(net, a, b):
+    """The expressway road a->b crosses where it is neither at grade nor high enough to pass under: a street that met it
+    there cut a ramp still 3 m up in its descent into a junction (shuto_c_sb_off x cho_sw_345, whose pad then sloped 20 %
+    and whose two-lane deck overhung its own connectors -- probe_road_clear, 2026-10-04). None if it crosses none."""
+    for name, r in net.roads.items():
+        if not name.startswith("shuto_"):
+            continue
+        pts = [net.points[u].pos for u in r.points]
+        for p, q in zip(pts, pts[1:]):
+            if max(p[2], q[2]) <= RAMP_AT_GRADE or min(p[2], q[2]) > RAMP_UNDER:
+                continue
+            rx, ry = b[0] - a[0], b[1] - a[1]
+            sx, sy = q[0] - p[0], q[1] - p[1]
+            den = rx * sy - ry * sx
+            if abs(den) < 1e-9:
+                continue
+            t = ((p[0] - a[0]) * sy - (p[1] - a[1]) * sx) / den
+            u = ((p[0] - a[0]) * ry - (p[1] - a[1]) * rx) / den
+            if 0.0 <= t <= 1.0 and 0.0 <= u <= 1.0:
+                return name
+    return None
+
+
 def _line_ok(net, ground, obst, kind, v, box, segs=None):
     x0, y0, x1, y1 = box
     a, b = ((v, y0), (v, y1)) if kind == "x" else ((x0, v), (x1, v))
@@ -168,6 +195,9 @@ def _line_ok(net, ground, obst, kind, v, box, segs=None):
     sid = _site_hit((v, lo_) if kind == "x" else (lo_, v), (v, hi_) if kind == "x" else (hi_, v))
     if sid:
         return None, "runs through the site %s" % sid
+    rr = _raised_ramp(net, (v, lo_) if kind == "x" else (lo_, v), (v, hi_) if kind == "x" else (hi_, v))
+    if rr:
+        return None, "crosses %s off the ground" % rr
     ra = _rail_along(kind, v, lo_, hi_)
     if ra > RAIL_ALONG:
         return None, "runs along the rail for %.0f m" % ra

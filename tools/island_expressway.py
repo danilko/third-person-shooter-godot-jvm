@@ -1099,9 +1099,11 @@ def _thin_near(net, road, keep_uids, clear=MARK_CLEAR):
             net.link(a_, b_)
 
 
-def _t_arm(net, a, b, toward, mouth=MOUTH):
+def _t_arm(net, a, b, toward, mouth=MOUTH, skew=0.0, lean=None):
     """Where a T's new arm's mouth stands, and the direction a ramp arrives in to reach it: MOUTH from the centre of
-    the cut (`a`, `b`, the road's two mouths), square to the road, on the side of `toward` (a point)."""
+    the cut (`a`, `b`, the road's two mouths), square to the road, on the side of `toward` (a point) -- or `skew` degrees
+    off square, leaning along the road toward `lean` (a point): a ramp that runs on close beside the road it Ts into has
+    no room to turn a full 90 deg."""
     pa, pb = net.points[a].pos, net.points[b].pos
     cx, cy = (pa[0] + pb[0]) / 2.0, (pa[1] + pb[1]) / 2.0
     dx, dy = pb[0] - pa[0], pb[1] - pa[1]
@@ -1109,6 +1111,12 @@ def _t_arm(net, a, b, toward, mouth=MOUTH):
     nx, ny = -dy / L, dx / L
     if nx * (toward[0] - cx) + ny * (toward[1] - cy) < 0:
         nx, ny = -nx, -ny
+    if skew:
+        ux, uy = dx / L, dy / L
+        if lean is not None and ux * (lean[0] - cx) + uy * (lean[1] - cy) < 0:
+            ux, uy = -ux, -uy
+        c_, s_ = math.cos(math.radians(skew)), math.sin(math.radians(skew))
+        nx, ny = nx * c_ + ux * s_, ny * c_ + uy * s_
     return (cx + nx * mouth, cy + ny * mouth), (-nx, -ny)
 
 
@@ -1155,7 +1163,12 @@ def port_exit(net):
 
 
 PORT_ON_MOUTH = 16.0   # the T's arm on the dike road: short, so the arc into it has room in the gap
-PORT_ON_OFF = 18.0     # how far off the mainline's centreline the entrance runs while it climbs
+PORT_ON_OFF = 18.0     # how far off the mainline's centreline the entrance runs while it climbs (two lanes:
+#                        the dike road moved 5 m north to clear its second lane, island_dike_port_gap_2lane.py)
+PORT_ON_SKEW = 30.0    # deg: its T arm leans east toward the merge (2026-10-04: two lanes; square, the dike road and
+#                        the Wangan leave ~10 m to turn 90 deg in -- an R 9 corner, and a setback that slid off the road)
+PORT_ON_LANDING = 30.0  # m level before its T: the whole turn into it (two lanes: the inner one's path is shorter, and
+#                        a grade on the turn read K 4.4 on its lanekit, 2026-10-04)
 PORT_ON_R = 30.0       # its arc into the T (a ground ramp's own turn, 30 km/h)
 PORT_ON_HOLD = 25.0    # its own profile stays level this far past where its band parts (see ground_ramp)
 
@@ -1171,7 +1184,8 @@ def port_entrance(net):
     _thin_near(net, road, [st] + [u for u in road.points if net.points[u].targets(pm.LINK_AUX)
                                    or any(l.type != pm.LINK_SEGMENT for l in net.points[u].links)])
     a, b = cut_road(net, PL.PORT_ON_T, "ring_kita", PORT_ON_MOUTH)
-    end, te = _t_arm(net, a, b, (PL.PORT_ON_T[0], PL.PORT_ON_T[1] - 100.0), mouth=PORT_ON_MOUTH)
+    end, te = _t_arm(net, a, b, (PL.PORT_ON_T[0], PL.PORT_ON_T[1] - 100.0), mouth=PORT_ON_MOUTH, skew=PORT_ON_SKEW,
+                     lean=(PL.PORT_ON_X, PL.PORT_ON_T[1]))
 
     def path(m, t0):
         # a short diverge, a run PORT_ON_OFF m off the mainline (parted from it, so the climb can start), then one arc
@@ -1190,7 +1204,7 @@ def port_entrance(net):
         n = max(2, int(math.ceil(cum[-1] / 8.0)))
         return [at_s(pl, cum, cum[-1] * k / n, False) for k in range(n + 1)]
     L, g, R = ground_ramp(net, st, "port_on", "FWD", True, end, te, [a, b], lanes=ENTRY_LANES, path=path,
-                          hold_extra=PORT_ON_HOLD)
+                          hold_extra=PORT_ON_HOLD, landing=PORT_ON_LANDING)
     print("island_expressway: port EB entrance %.0f m %.1f %% R %.0f" % (L, g * 100.0, R))
 
 
@@ -1841,7 +1855,7 @@ SB_CLEAR = 5.6    # over the dike road, held across the whole overlap (island_di
 def suburb_exit(net, off, ground=None):
     """The Suburb exit, Wangan EB -> the ground (user, 2026-09-30): off the north side of the waterfront diagonal, ONE S
     of two equal arcs beside the mainline, level until its band has parted from the mainline's, then down into the
-    junction of teibo_sokudo_2 / kogai_michi by Suburb station as that junction's fourth (south-west) arm."""
+    junction on wangan_dori by Suburb station (SB_JUNCTION) as its south arm, opposite eki_ginza_suburb."""
     far = open_ramp(net, off, PREFIX + "sb_off", "FWD", False, length=45.0, lanes=EXIT_GROUND_LANES)
     m = mouth_of(net, PREFIX + "sb_off")
     road = next(r for r in net.roads.values() if off in r.points)
@@ -1851,8 +1865,10 @@ def suburb_exit(net, off, ground=None):
     tl = math.hypot(*t0)
     t0 = (t0[0] / tl, t0[1] / tl)
     cx, cy = PL.SB_JUNCTION
-    # the junction is the side road's (island_dike.sokudo) pad nearest SB_JUNCTION: its mouth and the clique linked to it
-    side = min((u for n_, r in net.roads.items() if n_.startswith("teibo_sokudo") for u in r.points
+    # the junction is the pad nearest SB_JUNCTION of a road in SB_JUNCTION_ROADS: its mouth and the clique linked to it
+    # (2026-10-03 night: wangan_dori's own junction opposite eki_ginza_suburb, island_suburb_kogai.py -- it was the side
+    # road's pad, which sat inside wangan_dori's junction with kogai_michi)
+    side = min((u for n_, r in net.roads.items() if n_.startswith(PL.SB_JUNCTION_ROADS) for u in r.points
                 if net.points[u].role == pm.INTERSECTION),
                key=lambda u: math.dist(net.points[u].pos[:2], (cx, cy)))
     members = [side] + [l.target for l in net.points[side].links if l.type == pm.LINK_JUNCTION]
@@ -1948,6 +1964,164 @@ def _straight(a, b, step=40.0):
 def _ys(y0, y1, step=40.0):
     n = max(1, int(math.ceil(abs(y1 - y0) / step)))
     return [y0 + (y1 - y0) * k / n for k in range(n + 1)]
+
+WIDEN_LANES = 2        # (user, 2026-10-04: arcade races) every ramp's BODY is two lanes, so a car can pass on the ramp
+WIDEN_TAPER = 13.0     # m: the span its second lane opens or closes over (40 km/h at TAPER: 4.5 m wants 11.6 m);
+#                        short, because island_grades.ramp_curves never subdivides a taper span and its curve suffers
+WIDEN_REUSE = 6.0      # m: a station this close to where a taper should start or end is that point
+WIDEN_CLEAR = 3.0      # m: ...past where its band has parted from every road it meets at that end
+
+
+def widen_ramps(net):
+    """TWO LANES ON EVERY RAMP (user, 2026-10-04): a single-lane ramp was a bottleneck in an arcade race. Its BODY is
+    WIDEN_LANES; at each EXPRESSWAY end -- a gore (an AUX link) or a joint (a lane split, a JCT carriageway) -- it keeps
+    the one lane its mainline slot hands over, until its band has parted from every road it meets there (so the added
+    lane never sits on the mainline's asphalt; a one-way road lays its lanes to one side of its stations), then opens or
+    closes over WIDEN_TAPER. The ground end (a junction mouth) runs all its lanes into the intersection. The mainline's
+    aux slots are unchanged. Returns report lines."""
+    import island_dike as ID
+    road_of = {u: n for n, r in net.roads.items() for u in r.points}
+    out = []
+    for name in sorted(net.roads):
+        r = net.roads[name]
+        if not name.startswith(PREFIX) or r.road_class != "ramp":
+            continue
+        ch = net.chain(r)
+        if len(ch) < 3 or max(p.lanes_fwd + p.lanes_bwd for p in ch) >= WIDEN_LANES:
+            continue
+        fld = "lanes_fwd" if any(p.lanes_fwd for p in ch) else "lanes_bwd"
+        s = [0.0]
+        for a, b in zip(ch, ch[1:]):
+            s.append(s[-1] + math.dist(a.pos[:2], b.pos[:2]))
+        L = s[-1]
+
+        def partners(end):
+            """The roads this end meets: its AUX mainline, a joint's road, and that joint's other roads (siblings)."""
+            ps = set()
+            for l in end.links:
+                if l.target in road_of and road_of[l.target] != name:
+                    ps.add(road_of[l.target])
+                    if str(l.type) == "SEGMENT":
+                        ps.update(road_of[m.target] for m in net.points[l.target].links if m.target in road_of)
+            for u, p in net.points.items():              # an AUX link is directed mainline -> ramp
+                if any(l.target == end.uid and str(l.type) == "AUX" for l in p.links) and u in road_of:
+                    ps.add(road_of[u])
+            ps.discard(name)
+            return ps
+
+        def parted(i, ps):
+            """Is the WIDENED ramp clear of every partner here? A one-way road lays its lanes to the LEFT of its
+            stations, so the added lane only reaches toward a partner on the left; a partner on the right is cleared as
+            soon as the one existing lane is."""
+            x, y = ch[i].pos[:2]
+            a_, b_ = ch[max(0, i - 1)].pos, ch[min(len(ch) - 1, i + 1)].pos
+            tx, ty = b_[0] - a_[0], b_[1] - a_[1]
+            if fld == "lanes_bwd":
+                tx, ty = -tx, -ty                        # it is driven against its chain
+            for pn in ps:
+                o = net.roads[pn]
+                pts = [net.points[u].pos for u in o.points]
+                best = None
+                for p0, p1 in (zip(pts, pts[1:]) if len(pts) > 1 else [(pts[0], pts[0])]):
+                    d, qx, qy = _seg_near((x, y), p0[:2], p1[:2])
+                    if best is None or d < best[0]:
+                        best = (d, qx, qy)
+                d, qx, qy = best
+                left = tx * (qy - y) - ty * (qx - x) > 0.0
+                reach = WIDEN_LANES * 4.5 if left else 4.5
+                if d < ID._half(o) + reach + WIDEN_CLEAR:
+                    return False
+            return True
+
+        holds = []                          # (from-end arclength the single lane reaches, which end)
+        ok = True
+        for side in (0, -1):
+            end = ch[side]
+            if str(end.role) == "INTERSECTION":
+                continue
+            ps = partners(end)
+            idx = range(len(ch)) if side == 0 else range(len(ch) - 1, -1, -1)
+            d_end = None
+            for i in idx:
+                if parted(i, ps):
+                    d_end = s[i] if side == 0 else L - s[i]
+                    break
+            if d_end is None:
+                ok = False
+                break
+            holds.append((side, max(d_end, 10.0)))
+        if not ok or sum(h + WIDEN_TAPER for _side, h in holds) + 10.0 > L:
+            out.append("%s: stays %d lane (no room to open and close a second lane, %.0f m)" % (name, 1, L))
+            continue
+        bounds = []
+        for side, h in holds:
+            # stations at the hold's end and the taper's end (along the chain from that end), plain stations between
+            # them removed, so the width changes over ONE span of WIDEN_TAPER (point_validate.check_tapers is pairwise)
+            ch = net.chain(r)
+            s = [0.0]
+            for a, b in zip(ch, ch[1:]):
+                s.append(s[-1] + math.dist(a.pos[:2], b.pos[:2]))
+            L = s[-1]
+            a_s, b_s = (h, h + WIDEN_TAPER) if side == 0 else (L - h - WIDEN_TAPER, L - h)
+            new = []
+            for n_, want in enumerate((a_s, b_s)):
+                k = max(j for j in range(len(s) - 1) if s[j] <= want)
+                # an existing station within WIDEN_REUSE is used as it stands (a new one beside it would be a span no
+                # profile or taper fits -- T1: two stations 0.3 m apart), but only one OUTSIDE the taper: one inside
+                # shortened it below the rule (T1, T3: 10.0 and 11.5 m)
+                near = min((j for j in (k, k + 1) if j not in (0, len(s) - 1) and ch[j].uid not in new
+                            and (s[j] <= want + 0.25 if n_ == 0 else s[j] >= want - 0.25)),
+                           key=lambda j: abs(s[j] - want), default=None)
+                if near is not None and abs(s[near] - want) < WIDEN_REUSE:
+                    new.append(ch[near].uid)
+                    continue
+                f = (want - s[k]) / max(1e-9, s[k + 1] - s[k])
+                pa, pb = ch[k].pos, ch[k + 1].pos
+                pos = tuple(pa[c] + (pb[c] - pa[c]) * f for c in range(3))
+                new.append(insert_after(net, r, ch[k].uid, pos))
+                ch = net.chain(r)
+                s = [0.0]
+                for x_, y_ in zip(ch, ch[1:]):
+                    s.append(s[-1] + math.dist(x_.pos[:2], y_.pos[:2]))
+            ch = net.chain(r)
+            ia, ib = [p.uid for p in ch].index(new[0]), [p.uid for p in ch].index(new[1])
+            for p in ch[ia + 1:ib]:
+                if str(p.role) == "SEGMENT" and not p.aux_fwd and not p.aux_bwd and all(
+                        str(l.type) == "SEGMENT" and l.target in (ch[ch.index(p) - 1].uid, ch[ch.index(p) + 1].uid)
+                        for l in p.links):
+                    net.remove_point(p.uid)
+            kept = net.chain(r)
+            for x_, y_ in zip(kept, kept[1:]):
+                if not x_.has_link(y_.uid):
+                    net.link(x_.uid, y_.uid)
+            bounds.append((side, new[0], new[1]))
+        # lane counts BY THE TAPER'S OWN STATIONS: one lane from each expressway end to its taper, WIDEN_LANES between
+        ch = net.chain(r)
+        at = {p.uid: i for i, p in enumerate(ch)}
+        for i, p in enumerate(ch):
+            single = any((i <= at[a_] if side == 0 else i >= at[b_]) for side, a_, b_ in bounds)
+            setattr(p, fld, 1 if single else WIDEN_LANES)
+        # (the BASE stays one lane: the lane counts are the stations' own, and island_dike sizes a crossing's floor from
+        # the base -- at two lanes the Suburb exit had to stay up over the crest 30 m longer and came down at 8.4 %)
+        out.append("%s: %d lanes, single for %s m at its expressway end(s)"
+                   % (name, WIDEN_LANES, "/".join("%.0f" % h for _side, h in holds) or "0"))
+    return out
+
+
+def _seg_near(p, a, b):
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    L2 = dx * dx + dy * dy
+    t = 0.0 if L2 < 1e-12 else max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2))
+    qx, qy = a[0] + dx * t, a[1] + dy * t
+    return math.hypot(qx - p[0], qy - p[1]), qx, qy
+
+
+def _seg_dist(p, a, b):
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    L2 = dx * dx + dy * dy
+    t = 0.0 if L2 < 1e-12 else max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2))
+    return math.hypot(a[0] + dx * t - p[0], a[1] + dy * t - p[1])
+
 
 def bridge_skip(net):
     """The spur rides the Rainbow Bridge's UPPER deck: inside the suspension structure the bridge carries it, so its
@@ -2056,6 +2230,8 @@ def main(argv):
         raise SystemExit("island_expressway: %s already carries the expressway; pass --from <base record>" % base)
     ground = Ground()
     build(net, ground)
+    for line in widen_ramps(net):
+        print("island_expressway: widen " + line)
     speeds = post_speeds(net)
     n0 = sum(len(r.points) for n_, r in net.roads.items() if n_.startswith(PREFIX))
     k = 0 if "--no-thin" in argv else thin(net)
