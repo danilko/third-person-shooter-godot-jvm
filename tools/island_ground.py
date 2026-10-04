@@ -97,7 +97,8 @@ def military_paint():
     for name, (x0, z0, x1, z1) in PL.RESERVES:
         if name.startswith("military"):
             m |= (X >= x0) & (X <= x1) & (Z >= z0) & (Z <= z1)
-    for x0, x1, z0, z1 in ir.MILITARY_PIERS:
+    # ...and the Wangan's west terminal platform (reclaimed concrete under its junction and turnaround loop)
+    for x0, x1, z0, z1 in tuple(ir.MILITARY_PIERS) + (ir.WANGAN_TERMINAL_FILL,):
         m |= (X >= x0) & (X <= x1) & (Z >= z0) & (Z <= z1)
     return m
 

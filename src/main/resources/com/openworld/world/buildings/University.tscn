@@ -1,0 +1,41 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/University_mesh.res" id="1_34jls"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/University_collision.res" id="2_m7cjx"]
+
+[node name="University" type="Node3D" unique_id=634916953]
+metadata/building = {
+"aabb": [Vector3(-55, 0, -50), Vector3(110, 39.22, 100.1)],
+"base_m": 0.0,
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [110.0, 100.1],
+"height_m": 39.22,
+"id": "University",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"probe_xz": [-30.0, 10.0],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "urban university campus 110 x 100 plot: teaching tower, the library + 5-storey block, lecture hall, 正門; PLACEHOLDER (library_jp_city.py), shut",
+"wall_top_m": 36.0
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=176612813]
+visibility_range_end = 770.64
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_34jls")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=167637855]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1958788585]
+shape = ExtResource("2_m7cjx")

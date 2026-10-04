@@ -649,6 +649,12 @@ _R0["stations"]["City West"] = ("Blue line", -125.0, -160.0) + tuple(_R0["statio
 # 110 m, so its platform is 100 m (Industry's and Harbour's are 90)
 _bay = _R0["stations"]["Bay"]
 _R0["stations"]["Bay"] = ("Main line", 205.0, -140.0, _bay[3], 100.0) + tuple(_bay[5:])
+# THE PLATFORM ENDS KEEP OFF THE CROSSING STREET'S FOOTWAY (PLAN.md item 8, measured 2026-10-02 night: "the ground hub
+# stands across half the sidewalk"): Bay's end fence stood 2.3 m into rinkai_dori's footway, Fish Market's 4.0 m into
+# eki_minami_dori's. Bay's platform is 90 m (a whole number of the station kit's 5 m modules -- 92 m was refused by
+# station_layout), 5 m further north (its north end stays clear of the ramp's foot); Fish Market slides 6 m west. Both now clear the footway's edge by >= 1.5 m (probe: tools/station_layout.py --report)
+_R0["stations"]["Bay"] = ("Main line", 205.0, -135.0, _bay[3], 90.0) + tuple(_bay[5:])
+_R0["stations"]["Fish Market"] = ("Main line", 464.0, -400.0) + tuple(_R0["stations"]["Fish Market"][3:])
 # EVERY OPEN-AIR STATION MEETS ITS STREET (user, 2026-09-28: "remove the stairs, have the slope in line with the
 # entrance, so the station can move close to the sidewalk -- it stood in the middle of a ground, the car park had no
 # way in"). Each end building's ramp now runs straight out along the track (`station_layout.OA_Ramp`), and the station
@@ -1459,11 +1465,7 @@ def picture(res, out, legend=True):
         ul = math.hypot(ux, uy) or 1.0
         nx, ny = -uy / ul, ux / ul
         w, h = PARKING[st["parking"]]
-        if front_park:
-            box = {"id": "parking:" + n, "ux": round(ux, 5), "uy": round(uy, 5), "kind": st["parking"]}
-            box.update(front_park)
-            boxes.append(box)
-        elif w:
+        if w:
             off = STATION_W[st["kind"]] / 2 + 10 + h / 2
             cx, cy = st["x"] + nx * off, st["y"] + ny * off
             corners = [(cx + ux / ul * a + nx * b, cy + uy / ul * a + ny * b)

@@ -1,0 +1,40 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/ShopHundredYen_mesh.res" id="1_wy5tq"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/ShopHundredYen_collision.res" id="2_t4cpo"]
+
+[node name="ShopHundredYen" type="Node3D" unique_id=1948214305]
+metadata/building = {
+"aabb": [Vector3(-7, 0, -9.45), Vector3(14, 4.9, 18.9)],
+"base_m": 0.0,
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [14.0, 18.9],
+"height_m": 4.9,
+"id": "ShopHundredYen",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "100円ショップ, 14 x 18 m, 1 storey(s), placed by the district mixes; PLACEHOLDER (library_jp_city.py), shut",
+"wall_top_m": 4.9
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=774319483]
+visibility_range_end = 361.7602
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_wy5tq")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1028141445]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=2023879302]
+shape = ExtResource("2_t4cpo")

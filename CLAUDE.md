@@ -10784,6 +10784,64 @@ PLAN.md "NEXT (2026-09-29 night)", one `island_world.sh --from land` rebuild.
   - Cars (AnimatableBody3D) exist only within 650 m of the camera.
   - Gate `tools/godot/probe_trains.gd [--world=island] [--control]`.
 
+- **The Wangan's west end is a terminal loop** (NEXT PASS step 2, 2026-10-02, user's choice of three). The second
+  review wanted a west-end turnaround joining the two one-way systems BOTH ways (a port-side PA joins only one). The
+  mainline now comes down its straight coast line to `island_plan.WG_LOOP_J` (-850, -1128), a signalised 4-arm junction
+  on a reclaimed platform at the plain's height (`island_reshape.WANGAN_TERMINAL_FILL`, painted concrete by
+  `island_ground.military_paint`, held from buildings by the `wangan_terminal` reserve): east the mainline, north the
+  access road `wangan_iriguchi` (潮風口通り) to a T on the dike road, west and south the two ends of
+  `shuto_wangan_loop`, a ONE-WAY 2-lane rounded square laid counter-clockwise (a one-way road lays its lanes on its
+  left, so its stations are the loop's OUTER edge). WB -> loop -> EB turns a car round. Gone: the west-coast T, its
+  R 34 bend, `port_on` and the WG_CUT5 joint (the access road is the port's way on). The strip between the mainline and
+  the dike road is only ~55 m, which is why the junction sits on the coast line and the loop on new land.
+  `terminal_loop` in `island_expressway.py`.
+
+## Wanted level, jail respawn, shop counters and healing supplies (PLAN.md W3 / W5, 2026-10-03; NOT YET PROBED)
+
+Written while an island rebuild ran, so compiled and unit-tested only; the gates are written and must be run.
+- **Death and arrest are not game over in single player** (`game.RespawnSystem`, a child GameManager builds in code).
+  The two outcomes are named in Japanese + English and deliberately NOT after another game's cards (user: Japan flavour,
+  and to avoid an infringement claim): a death is **入院 HOSPITALIZED** (wake at the nearest Hospital / HospitalSmall /
+  Clinic door, `world.Places`); `RespawnSystem.arrest(player)` is **逮捕 ARRESTED** (wake at the nearest
+  PoliceStation, moved onto a `mission_marker` `team = prisoner` -- the 留置場 cells -- once it streams in; the
+  station's locked `Door`s unlock until the player is 60 m away). Either: a 4 s card (the sign font, `make_jp_font.py`
+  `UI_WORDS`), the running mission FAILS, a fresh Player (fist only, wanted cleared). `GameManager.onCharacterDied` skips GAME_OVER when
+  `RespawnSystem.willRespawn`. A networked session keeps GAME_OVER (co-op respawn is open). `enabled` off is the
+  control. Gate: `tools/godot/probe_wanted_respawn.gd [-- --world=island] [-- --control]`.
+- **The wanted level is DATA** (`game/crimes.json`: crime id -> heat, min stars, witness; `stars_at` thresholds, a
+  calm period then a drain), rules in engine-free `game.WantedRules` (`WantedRulesTest`), state in `game.WantedSystem`
+  (authority only). A new crime = one row + one `WantedSystem.report(id, where, playerId)` call. Seams today:
+  `Health.applyDamage` (a player hurting / killing a civilian or a police officer) and `FirearmItem` (gunfire). A
+  witnessed crime needs a living non-player character within `witness_radius`. `ui.WantedStars` draws six stars left
+  of the clock. Not replicated yet; no police dispatch, so nothing calls `arrest` yet.
+- **A shop clerk** (`world.ShopClerkSpot`, from a `MARK_clerk` in the shop's model once the builder supports it; props
+  `surrender`, `weapons`, `responders`, `till`): aimed at or hurt, it rolls once by its id -- surrender (crouches) or
+  fight (a heavy weapon, faction `vigilante`, the AIController brain). Threatening it is `threaten_clerk`; robbing the
+  till afterwards (the nearest `ShopCounter`'s "Empty the till" row) is `rob_store` at EVERY store. LETHAL crimes
+  make police hostile to players (`game.FactionFlips`, both directions, the old relation restored afterwards) and
+  refuse an arrest. A GRAY-AREA shop (`responders`) adds its gang: armed people come out, and the gang's standing
+  rises. Gate `tools/godot/probe_shop_clerk.gd`.
+- **Gang standing is separate from the police** (`game.GangSystem`, `game.GangRules`, DATA `game/gangs.json`): stars per
+  (player, gang) from hitting/killing members and threatening/robbing its shops; hostile at `attack_at`; survives a
+  hospitalisation or an arrest; drains only below `pay_at`, otherwise cleared only by the "Donation" row at that
+  gang's gray-area counter. `DefaultFactions.tres` ships police<->player and police<->gangs NEUTRAL. HUD: a second
+  star row in the gang's colour.
+- **A shop sells through a COUNTER, not floor pads** (user: pads blocked pedestrians and AI). `item.ShopCounter` is a
+  sensor box in front of the register (no collider, group `shop_counter`), its `stock` a comma list of catalog weapon
+  ids and supply ids; `interact` opens `ui.ShopMenu` (GTA SA's Ammu-Nation list). Every grant goes through
+  `item.WeaponGrant` (a carried weapon is refilled), which `WeaponPad` uses too until the pads are removed. A client
+  sends `MSG_SHOP_REQUEST` (31); the host checks the owner and that the buyer stands at a counter that sells it.
+- **Healing supplies** (user: food from a konbini / restaurant / market, medical from a hospital, "strange" medical
+  from an adult shop): `item/supplies.json`, `item.SupplyCatalog` (`SupplyCatalogTest`), carried in
+  `Character.supplies` on the authoritative peer (at most `max` each), used with `use_supply` (H; the action is added
+  to the InputMap at run time so project.godot is untouched): the smallest supply that heals all the missing health,
+  else the biggest. A client sends `MSG_SUPPLY_USE` (32).
+- **Under the map** (`WorldBounds.underground`, PLAN.md W1): a body more than 1 m under the Terrain3D surface for
+  0.5 s is put on the topmost collider within 8 m over the terrain there; swimming over the seabed is never touched.
+  Gate `tools/godot/probe_underground.gd` (3 cases, `--control`).
+- **`./gradlew test` replaces `jvm/main.jar`** (shadowJar + copyDesktopJars). While Godot bakes are running, test with
+  `./gradlew test -x shadowJar -x copyDesktopJars -x packageBootstrapJar`.
+
 ## Audio: every sound is a file (2026-09-29)
 
 No sound is synthesised in code (`SoundTest` refuses `new AudioStreamWAV(` / `AudioStreamGenerator` under
@@ -11798,3 +11856,173 @@ stacked 15 % ramps: up west, down east), `AirportControlTower` (civil, lift to a
   * Quick loop: the real derive is `island_layout.derive(out)` (~70 s; the step cache replays unchanged steps), then
     `point_export.write` (20 s) and `island_grades.py ramps`; the generator alone on the base cannot judge the diamonds
     (their junctions are cut and set back later).
+
+## The rebuild review batch: port entrance, signal controllers, the waterfront re-plan, services coverage (2026-10-03)
+
+A re-review of the remaining plan (PLAN.md "REVIEW OF THE REMAINING REBUILD PLAN") before the one rebuild; each item
+measured on the generator's network first.
+- **Terminal order is already Japanese**: inside an interchange the exit comes before the entrance (the port, every
+  diamond); entrance-before-exit only happens between interchanges as a weave (Y4 -> Suburb exit 540 m, Suburb entrance
+  -> Y3 exit 460 m). The planned port collector-distributor road was dropped: step 2 left 3 terminals there, not 6.
+- **The port's eastbound entrance** (`island_expressway.port_entrance`): a T on the dike road at `PORT_ON_T` (x -440,
+  east of Y1), a one-lane ramp merging EB at `PORT_ON_X` -270 (at -230 its gore stood 16 m from the WB port exit's
+  first station and the kit read that exit as bending back across the mainline, `ramp_wrong_side`), level
+  `PORT_ON_HOLD` past where its band parts, solved to K 9 (`island_grades.RAMP_K_OVERRIDE`: its descent overlaps its
+  plan turn, and the exported Hermite read K 4.6 where the 2 m solve read 6.7). The
+  dike road `ring_kita__11` was moved 10-16 m north in the arterials INPUT to make the room
+  (`tools/island_dike_port_gap.py`, one-shot, applied). C1 -> port has NO direct ramp (the corridor north of the
+  Wangan from x -600 to +300 is full of Y1-Y4 and the connector): it uses the west terminal and its access road.
+- **`ground_ramp(hold_extra=)`**: `island_grades.level_gores` holds a ramp at its mainline's height until the bands
+  part by its own measure and then rejoins the ramp's profile in one HELD chord, so a ramp already descending by then
+  carries a fixed break the solver cannot round (port_on K 3.9). Hold the ramp's own profile level longer.
+- **Two generator traps step 2 exposed** (both read as Y3 lying on Y4 for 230 m, Y4 at 19 %):
+  - Y3's "mainline" polyline concatenates every `shuto_wangan*` road; `shuto_wangan_loop` joining it added a fake
+    segment across the bay. Only the mainline's runs belong in it.
+  - Ramp geometry taken from the CHORD to a neighbouring mainline station moves whenever the mainline's length shifts
+    the 45 m station grid (Y4 moved 12 m). Y4's merge frame now reads `pm.station_axis` (the frozen design tangent).
+    Y3 keeps the chord (the axis put its crossing with Y4 where it could not climb at 6 %). Y4 merges at `Y4_ON_X` 80
+    (was 110), lower on the Harbour hump, so Y3 clears it at 5.6 %. Suburb exit planned 5.6 m over the dike road
+    (`SB_CLEAR`, `island_dike.PLANNED_OVER`), 6.9 %.
+- **Spur speed stage**: `shuto_spur__2b`, 142 m posted 60 (`SPEED_STAGE`) before the 40 km/h hairpin.
+- **Coordinated signals** (`point_furniture.coordinate`, self-tested): signalised junctions within `COORD_REACH` 100 m
+  sharing a road and a cycle run as ONE controller -- `coord` = {root, rel}: the root's hashed offset + a green wave at
+  `COORD_SPEED` 12 m/s, the shared road's group aligned. `TrafficSignals` reads it (offset(root) + rel).
+- **The waterfront** (items 4-5): the fish market reserve was 99 m deep where the flat land between the dike's slope and
+  the shore is 57 m (shore z 762), and the Wangan and both Suburb ramps crossed its east end: it is now (405, 705, 570,
+  775), a 165 x 70 m FishMarket with a quay deck, fenders and a PONTOON parallel to the quay (the Wangan's deck stands
+  15-25 m off it) with two FIB1 and a WOB1 moored (`keep_origin` so it is not lifted, `plot_origin`). The Ferris park
+  moved south of `shuto_sb_on` (760, 798, 870, 958), Park_FerrisWheel 110 x 160, its wheel's circle facing the open sea.
+  The three hotels moved out of the suburb loop to the beach front (z 806..868) as `ResortHotelSite` composites (the
+  interiors hotel sea-side, forecourt + 14 bays on the loop's leg). The water resort stands inside the loop on its bottom leg
+  (WaterResort now 150 x 70: the dike's embankment slope takes the interior's north part), searched BEFORE the
+  fire station and clinic (the civic search runs in table order).
+- **Ground hubs** (item 8): measured against each road's FOOTWAY, the defect was the platform-END fences (Bay 2.3 m,
+  Fish Market 4.0 m into the crossing street's footway): Bay's platform 92 m at y -136, Fish Market at x 464.
+- **Services coverage** (item 6): `island_civic_sites.py --coverage` (after the buildings stage): from each district's
+  building centroid, police <= 600 m, fire <= 700, konbini <= 600, and for the residential districts bank and
+  clinic/hospital <= 800. New plots: koban_port, fire_branch_port, koban_farm, bank_north, bank_rwest. Not done: the
+  yacht.
+- **The Japanese 一戸建て** (item 11b, `library_civic._house`, `Builder.convex` for real roof slabs): 平入り, a 玄関 bay by
+  the parking, 掃き出し窓, a railed ベランダ, low wall + 門柱, a cantilever carport, the 基礎 2 cm proud; B is the
+  hipped mirror.
+- `island_rail_layout.picture()` had a dead copy of the reserve's car-park code (`front_park` NameError): removed.
+
+### Post offices, postal vans, and streets into the vacant blocks (2026-10-03, user-asked)
+
+- **郵便局, two enterable sizes** (`blender/tools/interior_plans_jp.py` `post_office_small` / `post_office_large`,
+  `kits/interiors/PostOffice*.blend`, rows `PostOfficeSmall` / `PostOffice` in `building_types.json`, which replace the
+  library massings; placed `_Shop`, i.e. open):
+  - the branch is 12 x 10 m on a 15 x 20 m plot, one storey: ATM corner, 記載台, 窓口 counter, back office (区分棚,
+    safe), staff WC; a DELIVERY YARD behind with a POV-1 van;
+  - the 集配 main office is 36 x 26 m on a 40 x 40 m plot, three storeys: customer hall, 窓口 + ゆうパック counters, the
+    delivery depot with two dock shutters onto a van yard (a POT-1, two POV-1).
+  - Placement: `post_office_main` in the city; branches `post_office_west/east/rwest/sw/north/north_e` -- one in every
+    residential district (`island_civic_sites.COVERAGE_HOME["post"]` 800 m is in `--coverage`).
+- **Postal vans**: `POV1` (郵便 軽バン, Every / N-VAN class, 3.395 x 1.475 x 1.90) and `POT1` (2 t box truck, Elf /
+  Dyna class, 4.69 x 1.695 x 2.95), placeholder blocks from `make_placeholder_cars.py`; `VehicleModels` indices 20 / 21
+  (append-only); one POV1 in twenty civilian traffic cars.
+- **Why the blocks were vacant**: a planner line is kept only if it meets TWO roads, and in several blocks the only
+  other road did not exist yet when the streets were planned (the dike's side road is made later), lay outside the
+  region's box (koba stopped at y -590, its north road is y -413), or the line hit a junction gap / crowded a junction
+  (within 55 m). Fixes:
+  - authored frames in `island_core_streets.py`: `c1_naka_yoko` / `_e` (y 465 inside C1 across the three trunk roads,
+    one crossroads on naka_hondori -- `_tee` now also reuses a junction by its CENTRE) and `koba_waku_w` (a U off
+    kichi_dori along y -655 / -783 across the Blue line, x -800, into the west industrial block);
+  - planner regions `koba_w` (x -700 from nishi_cho_413 down to the U) and `city_n` (x 360 and 800 between yamate_dori
+    and c1_naka_yoko), lines placed clear of existing junctions.
+  - Left vacant, measured: the residential_west hill-foot band (the castle site covers it to 10 m off nishi_dori);
+    north_mid (the frozen park/clinic plots fill it); the suburb inside its loop (the legs are dike ramps); industry's
+    big plots (by design).
+  - Scan tool used: a 4 m vacancy grid (land, flat, not road, not a lot/site/reserve) clustered by region -- the kind
+    of measurement to repeat after any street change.
+
+### The suburb moves behind the dike; streets into the deep pockets (2026-10-03, user-asked)
+
+User: "should the suburb street / resort be behind the dike, with only certain entertainment on the beach?" -- then
+"homes behind the dike, push the dike further south so there is room, still leave enough beach". The Japanese norm is
+homes behind the 防潮堤 and only beach leisure outside it; the suburb (kogai_loop, the resort hotels, the water resort)
+had stood OUTSIDE the coastal ring on a loop whose legs were ramps onto the crest.
+- **The land reaches south** (`island_reshape.SUBURB_FILL`, Godot x 880..1230, z 760..1170, at the city floor). Its
+  bank and dry beach are LAID OUTRIGHT after `coastal_works` (plain 5.6 m, 1:3 bank to 3.0 m, then 1:25 through the
+  water line, ~80 m of dry sand): the works fade their beach toward the old 25 m-deep seabed round the fill and left a
+  5 m face. `SUBURB_SHELF` lays the sea in front as a shelving shore. The fill's EAST face is a revetment
+  (`DIKE_NOT_BOXES`): the Rainbow Bridge's crossing is measured along x 1250 on the land grid, and it did not move
+  (centre y -1121, measured before and after).
+- **`ring_kita__6` swings south round the suburb** (`tools/island_suburb_dike.py`, a one-shot on the arterials input):
+  from the ring_kita__5 / wangan_dori pad down x 1185 (clear of the Main line's viaduct at x 1250), along z 1085, up
+  x 945, to a JOINT with `ring_kita__7` at x 895 (45 m east of the Suburb entrance's T). The old stretch (x 954 .. the
+  pad) is gone, so **`kogai_michi` no longer meets the dike**: it stays at grade and runs on into `kogai_loop` (legs x
+  1013 / 1117, bottom z 984) inside. Nothing inside touches the dike, so nothing is ramped onto its crest (a 14.7 m crest
+  needs 180 m of 5 % ramp: that rule is why the old suburb was outside).
+- **The dike's 側道 skips that stretch** (`island_dike.SIDE_SKIP`): the town-side offset of a 240 m U by ~180 m folds on
+  itself, and a line that is not simple is dropped WHOLE -- it took the side road along ring_kita__7 with it, and the
+  Suburb exit (which lands on that side road) failed.
+- **Inside**: the water resort in the loop, the two resort hotels in the band between the loop's bottom and the dike's
+  land-side toe (the third was dropped: 190 m of band holds two), houses round the loop. **Outside**: the beach, and the
+  Ferris-wheel park west of the dike's west leg -- reached on foot over the dike now; no road reaches it (open item).
+
+**Deep vacancy** (user: "reduce large vacancy behind buildings; every building faces a street; add streets"). Measured
+as flat land more than 48 m from any street a building could front, with roads, sites, reserves, civic plots, rail,
+seawall works and fields blocked. Fixes, each measured against the scan:
+- `island_core_streets`: `nishi_ura` (the foothill triangle north of rinkai_dori), `yamasoi` (the strip between
+  nishi_dori__3 and the massif's foot), `kojo_minami` (a U into the industry south of kojo_waku), and `kojo_ura`, the
+  first `after` street: it carries the x -280 grid street on south through its junction, so it must be added AFTER the
+  grid planner (`island_core_streets.py <record> --after`, a new `island_layout` step).
+- `island_plan.STREET_REGIONS`: four `fill_*` rows of single lines found by a search that tries every line through a
+  pocket with the planner's own rules (`_line_ok`, MIN_SPAN, water) and keeps the one serving the most empty ground;
+  the industry grid 200 -> 140 m (its east-west lines listed, clear of Industry station's access at y -650); the suburb
+  region starts at x 1000 (the station front and the loop are authored).
+- What stays, and why: the long strips between the dike and its side road (the ramp zone: a street there would cross
+  every ramped arterial in the air -- a coastal pine belt, 海岸防災林, is the Japanese answer and is proposed, not
+  built), the airport island's grounds, the mountain and countryside (no district there), the paddy.
+- **A civic plot must cover its building** (`island_civic_sites.py --check` now says so): the campus was a 240 x 180
+  plot under a 260 x 220 piece and its wall stood on kichi_dori; the mall, the construction site (40 vs 60 m) and seven
+  others were short too. The check doubles each library piece's extent about its origin (a civic building stands with
+  its origin on the plot centre) and also flags a record whose size differs from `PLOTS` (re-site it).
+- The arena (150 x 120) went to kojo_waku beside Industry station: the dike's side road now runs through its old plot,
+  and nothing else on the island fronts it with that much room (the Ariake Arena pattern, bayside ex-industrial land).
+- **The deep pockets: cut first, then fill** (user, 2026-10-03: "vacancy around the stations and the highways";
+  "split big blocks with streets"; "one large car park instead of small ones spread around, the footway opened for
+  its entrance"; "no need to force a park -- leave it empty if that makes more sense"; "residential more parks, light
+  industry more car parks"). One street-facing row leaves the ground behind it empty wherever the next street is far
+  -- beside an elevated expressway, a rail corridor, a station box, the dike. Three passes, in this order:
+  * **Cut the block** (`tools/island_block_split.py derive <layout record>`, frozen into
+    `pieces/IslandBlockSplits.json`, added by `island_core_streets.py --after`): every face of the at-grade street
+    graph (each mouth joined to its pad's centre, or no block closes) with >= 2500 m2 of deep ground gets a straight
+    street across it, square to its long axis, both ends T'd onto at-grade streets >= 34 m from any junction, over
+    buildable ground, each half >= 45 m deep; a half still deep is cut again (the T). Each cut is tried through
+    `island_core_streets.add` on a copy of the network, so a road piece too short for a mouth is skipped, not
+    half-applied. Only a handful pass: most big blocks are crossed by a plot or a site, or would end on the dike.
+  * **One large flat building** (`DEEP_BIG`, by district: supermarket, pachinko, スーパー銭湯, multi-storey car park, a
+    団地, warehouse yard, cargo shed; each type >= 450 m apart), set back behind its forecourt, reached by a straight
+    driveway or a 路地.
+  * **One car park per pocket, as large as it holds** (`DEEP_CARPARKS`: `ParkingLot56` / `ParkingLot28` /
+    `ParkingLot14`, the two large ones new composites), facing its street with a **driveway** straight to the kerb
+    (`DRIVEWAY_W` 5 m, reserved like a 路地, never through a building or a held plot) and the B9 **kerb ramp** where
+    it crosses the footway (`drive` / `drive_y`). Spacing by district (`DEEP_CARPARK_SPACING_BY`: 55 m in light
+    industry, 160 m in housing). At the airport the car park is a `ParkingGarage` (multi-storey).
+  * **Parks only where people live** (`DEEP_PARK_REGIONS`): the 60 m `Park`, else the new 27 m `PocketPark`
+    (児童遊園: paved ground, trees, benches, a clock), closer in housing (`DEEP_PARK_SPACING_BY`).
+  Anything else is left empty. Measured on the test layout: 52 parks (44 pocket), 64 car parks, 5 multi-storey car
+  parks, 26 large buildings. Rows carry `"deep": true`. Preview: `assets/world_source/reference/island_preview_2026-10-03.png`.
+- **The apartment ladder** (user, 2026-10-03: "larger and smaller apartments; modern ones with one line of units,
+  horizontal or vertical over several floors; the outdated, cheaper two-storey one-line アパート"). Six placeholders in
+  `library_jp_city.apartments` (library.blend, custom rows, placed by the housing / city / suburb mixes), at ordinary
+  Japanese sizes: `Apato2F4` / `Apato2F6` (木造2階建てアパート: 1K units 3.64 x 7.28 m in one line, 2 x 2.8 m storeys,
+  the open corridor and the external steel stair on the street side, a slate gable), `ApartRC3F` (RC 3階建て, 12 x 10 m,
+  two units a floor), `MansionLine4` / `MansionLine6` (片廊下型: 6.5 x 11 m 3LDK units in one line, 6 / 8 storeys over a
+  lobby floor, glass-panel balconies to the street, the corridor and the lift core at the back) and `MansionPencil`
+  (1フロア1住戸, 8 x 14 m, 9 storeys). Deeper and longer than the kit's `Apartment`, so a frontage row leaves less
+  empty ground behind it. Test layout: 177 placed.
+- **Luxury housing** (user, 2026-10-03): `TowerMansion` (タワマン: a 36 m square tower of 32 x 3.1 m over a 48 x 44 m
+  podium with a porte-cochere, ~111 m, wrap-around glass balconies, a sky lounge, a roof H pad; it fits no
+  street-front slot, so it is a `DEEP_BIG` type in the city and downtown: 5 on the test layout),
+  `LuxuryLowRise` (低層高級レジデンス: 4 x 3.4 m storeys, stone facade, deep planted balconies, a gated forecourt, the
+  underground car park ramp; `SPACING` 250 m) and `TerraceHouse4` (メゾネット: four two-storey family units in a row,
+  each with its own door, garden and balcony). **Any of these placeholders can become an enterable mission building**
+  the way the 18 kits/interiors buildings are (SafeHouseCityLarge, SecureMansion ...): an interiors `.blend` for the
+  type with its rooms, `DOOR_` / `EXIT_` / `LIFT_` / `MARK_` Empties (`interior_plans_jp.py` seeds one), its custom
+  row pointed at kit `interiors`, which gives `_Open` (locked, a mission unlocks it) and `_Shop` (always open)
+  scenes; a mission then places it at a plot (`island_civic_sites.PLOTS`) or an anchor
+  (`island_buildings.OPEN_BUILDINGS` / `PUBLIC_BUILDINGS`). Replacing only the LOOK is a hand edit of the piece in
+  library.blend (build_library.py keeps a hand-edited piece) and `build_buildings.sh`.

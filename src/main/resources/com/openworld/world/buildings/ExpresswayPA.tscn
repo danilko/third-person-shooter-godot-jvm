@@ -1,0 +1,38 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/ExpresswayPA_mesh.res" id="1_qsoec"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/ExpresswayPA_collision.res" id="2_xjp3j"]
+
+[node name="ExpresswayPA" type="Node3D" unique_id=571067831]
+metadata/building = {
+"aabb": [Vector3(-48.25, 0, -25), Vector3(96.5, 6.52, 50)],
+"base_m": 0.0,
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [96.5, 50.0],
+"height_m": 6.52,
+"id": "ExpresswayPA",
+"kit": "library",
+"landmark": true,
+"piece_count": 1,
+"probe_xz": [37.0, 10.0],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "expressway parking area inside the Wangan terminal loop, 100 x 50; PLACEHOLDER (library_jp_city.py)",
+"wall_top_m": 6.0
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=885599771]
+mesh = ExtResource("1_qsoec")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1110598838]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1557496098]
+shape = ExtResource("2_xjp3j")

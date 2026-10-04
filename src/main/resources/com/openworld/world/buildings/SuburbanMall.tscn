@@ -1,0 +1,40 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/SuburbanMall_mesh.res" id="1_ybur0"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/SuburbanMall_collision.res" id="2_rsehf"]
+
+[node name="SuburbanMall" type="Node3D" unique_id=1674880872]
+metadata/building = {
+"aabb": [Vector3(-80, 0, -55), Vector3(160, 28.52, 120)],
+"base_m": 0.0,
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [160.0, 120.0],
+"height_m": 28.52,
+"id": "SuburbanMall",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "suburban mall 160 x 130 plot with the rooftop cinema; PLACEHOLDER (library_jp_city.py), shut",
+"wall_top_m": 28.52
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1519313727]
+visibility_range_end = 642.24
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_ybur0")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=590916192]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1892480956]
+shape = ExtResource("2_rsehf")

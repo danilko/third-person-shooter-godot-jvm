@@ -1,0 +1,40 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/HotelBusiness_mesh.res" id="1_6fk85"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/HotelBusiness_collision.res" id="2_42gwq"]
+
+[node name="HotelBusiness" type="Node3D" unique_id=1304904998]
+metadata/building = {
+"aabb": [Vector3(-10.03, 0, -6.03), Vector3(20.06, 37.7, 16.53)],
+"base_m": 0.0,
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [20.06, 16.53],
+"height_m": 37.7,
+"id": "HotelBusiness",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "business / capsule hotel, 11 storeys on a 22 x 20 plot; PLACEHOLDER (library_jp_city.py), shut",
+"wall_top_m": 37.7
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1731868401]
+visibility_range_end = 752.4
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_6fk85")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=733404830]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1465616713]
+shape = ExtResource("2_42gwq")

@@ -106,6 +106,19 @@ class Builder:
             face = self.bm.faces.new([vs[i] for i in f])
             face.material_index = mi
 
+    def convex(self, pts, mat):
+        """The convex hull of `pts` (a sloped roof slab, a gable end's triangle): any convex solid by its corners."""
+        mi = self._mi(mat)
+        vs = [self.bm.verts.new(p) for p in pts]
+        res = bmesh.ops.convex_hull(self.bm, input=vs)
+        for g in res["geom"]:
+            if isinstance(g, bmesh.types.BMFace):
+                g.material_index = mi
+        rest = [g for g in res.get("geom_interior", []) + res.get("geom_unused", [])
+                if isinstance(g, bmesh.types.BMVert)]
+        if rest:
+            bmesh.ops.delete(self.bm, geom=rest, context="VERTS")
+
     def mesh(self):
         bmesh.ops.remove_doubles(self.bm, verts=self.bm.verts, dist=1e-5)
         me = bpy.data.meshes.new(self.name)
@@ -714,7 +727,11 @@ EDIT_NOTES = {  # (+ library_civic.CIVIC_NOTES, merged below)
     "front of the pole) are furniture.json `lamps` -- move a lens here, move it there. Faces -Y across the crosswalk.",
     "ShuriCastle": "Shuri castle (library_landmarks.shuri_castle): the Ryukyu-limestone platform is SH_PLAT_H (25 m) "
                    "tall because the measured site's ground rises 24 m under it (tools/island_sites.py); its top must "
-                   "clear the uphill ground. The Seiden faces -Y (the front, towards downtown). Collider = its mesh.",
+                   "clear the uphill ground. The Seiden faces -Y (the front, towards downtown). Collider = its mesh. "
+                   "THE WALK IN (2026-10-03): 守礼門 at x -76 and 歓会門 in the south (-X) wall, both on y SH_GATE_Y "
+                   "(40) -- the approach road (island_site_access jokamachi_sando) ends on that axis at x -88, so "
+                   "moving the gates means moving the road's end; then the lower court, 瑞泉門, 漏刻門, 下之御庭, "
+                   "広福門 and the steps to 奉神門. Keep every step <= 0.3 m (the character steps 0.35).",
 }
 
 

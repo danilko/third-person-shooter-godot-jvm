@@ -70,6 +70,15 @@ FLOOR_Z = 0.6                 # the city plain
 
 # --- the coast edits (v1, v6, v7, v9, v10) ---
 GULF_FILL = (300.0, 280.0, 900.0, 760.0)          # x0, z0, x1, z1: the gulf HEAD, filled
+#: THE SUBURB REACHES SOUTH (user, 2026-10-03: "the suburb's homes behind the dike, push the dike further south so
+#: there is room, and still leave enough beach -- extend further south if needed"). Reclaimed land (x0, z0, x1, z1) at
+#: the city floor south of the old resort coast, so the coastal ring (`ring_kita__6`, island_suburb_dike.py) can swing
+#: south round a suburb INSIDE it; the strip outside it is plain, then the ordinary bank and beach. SUBURB_SHELF is the
+#: sea in front laid as a shelving shore from the new coast (the old seabed there is 25 m deep and would leave a
+#: vertical face instead of a beach). Its east face stays a revetment (DIKE_NOT_BOXES): the bridge's crossing is
+#: measured along x 1250 on this grid and must not move.
+SUBURB_FILL = (880.0, 760.0, 1230.0, 1170.0)
+SUBURB_SHELF = (860.0, 1170.0, 1180.0, 1700.0)
 HARBOUR_TRIM = (-820.0, 300.0)                    # x range of the harbour peninsula...
 HARBOUR_TRIM_Z = 1492.0                           # ...trimmed south of this (1540 until 2026-09-29 night: the
                                                   # military area and the container terminal now share ONE straight
@@ -210,6 +219,7 @@ def reshape(base):
     sea0 = ~land0
     # 1. the coast edits, on the original coordinates
     fill = sea0 & box(xx, zz, GULF_FILL)
+    fill |= sea0 & box(xx, zz, SUBURB_FILL)
     qx, qz0, qz1, qw0, qw1 = HARBOUR_QUAY
     in_quay = (zz >= qz0) & (zz <= qz1) & (xx >= qw0) & (xx <= qw1)
     qfill = sea0 & in_quay & (xx <= qx)
@@ -232,6 +242,9 @@ def reshape(base):
     trim = quay | shore
     land = (land0 | fill) & ~trim
     g = np.where(fill, np.where(qfill, qplat, FLOOR_Z), np.where(trim, SEABED, base)).astype(np.float64)
+    # the suburb fill is ONE level platform: the old shore's beach and bank inside it come up to the floor too (they
+    # stood 0.3 m under the plain beside the new land)
+    g = np.where(box(xx, zz, SUBURB_FILL) & ~trim, np.maximum(g, FLOOR_Z), g)
     # ...and one level platform: a low cell the base carried inside it (a ditch left by the old coastline) comes up
     g = np.where(in_quay & (xx <= qx) & ~trim, np.maximum(g, qplat), g)
     # 2. the farm block moves 150 m south
@@ -239,6 +252,7 @@ def reshape(base):
     land = shift_south(land, xx, False)
     quay = shift_south(quay, xx, False)
     newsea = shift_south(shore, xx, True)                # the vacated north band is new sea as well
+    newsea |= ~land & box(xx, zz, SUBURB_SHELF)
     # 3. the mountain
     mtn = (xx < 350) & (zz < 150)
     wz = ramp(zz, -1450, -1250) * ramp(260 - zz, 0, 100)
@@ -293,10 +307,27 @@ def reshape(base):
     out = np.where(land, out, sea)
     out = slope_clamp(out, mass & land, COAST_SLOPE)
     out, dike, works = coastal_works(out, land, xx, zz)
+    # THE SUBURB FILL's OWN BANK AND BEACH (see SUBURB_FILL), laid outright: the works fade their beach out toward the
+    # deep old seabed round the fill and leave a 5 m face. From the fill's west and south edges: the plain falls at
+    # 1:SHORE_BANK to the dry sand's top, then a 1:BEACH beach through the water line onto the shelf in front.
+    x0, z0, x1, z1 = SUBURB_FILL
+    d = np.hypot(np.maximum(x0 - xx, 0.0), np.maximum(zz - z1, 0.0))
+    plain = FLOOR_Z + RAISE
+    bank = (plain - BEACH_TOP) * SHORE_BANK
+    p = np.where(d < bank, plain - d / SHORE_BANK, BEACH_TOP - (d - bank) / BEACH)
+    p = p - np.maximum(xx - SUBURB_SHELF[2], 0.0)        # the beach's east end falls 1:1 to the seabed (the revetment)
+    zone = (d > 0.0) & (xx <= SUBURB_SHELF[2] + 40.0) & (zz >= z0) & (xx >= x0 - 400.0) & (zz <= z1 + 500.0)
+    out = np.where(zone, np.maximum(out, p), out)
+    land = land | (zone & (out > LAND_Z))
     # THE MILITARY BASE's two finger piers and its air base strip (PLAN.md 3.30 L3, user 2026-09-26), at the
     # port platform's own height, vertical quay edges into the open deep water on every side
     for x0, x1, z0, z1 in MILITARY_PIERS:
         out = np.where((xx >= x0) & (xx <= x1) & (zz >= z0) & (zz <= z1), MILITARY_PIER_Z + RAISE, out)
+    # THE WANGAN'S WEST TERMINAL (NEXT PASS step 2, 2026-10-02): a reclaimed platform at the plain's height under its
+    # junction and turnaround loop, quay edges into the bay; land already higher (the dike) is left as it is
+    x0, x1, z0, z1 = WANGAN_TERMINAL_FILL
+    tbox = (xx >= x0) & (xx <= x1) & (zz >= z0) & (zz <= z1)
+    out = np.where(tbox, np.maximum(out, FLOOR_Z + RAISE), out)
     # THE AIRPORT ISLAND REACHES 60 m FURTHER SOUTH (user, 2026-09-29: "the airport's runway/island may need to extend,
     # or change side -- the runway may hit the bridge"): the runway moved to the island's SOUTH edge, behind the terminal,
     # away from the bridge, and at the old coast (z 1980) its paved strip stood 4 m from the water. A reclaimed strip at
@@ -348,6 +379,10 @@ MILITARY_PIERS = ((-1020.0, -740.0, 1300.0, 1350.0),
 # ONE pier (a finger pier berths a ship each side); the runway was on the platform's own south band until 2026-09-29. The 1 210 m reclaimed strip off the south-west coast and the second pier
 # are gone -- 1.4 km of empty paving between the pier and the runway's far end.
 MILITARY_PIER_Z = 4.6
+#: the Wangan's west terminal platform (Godot x0, x1, z0, z1): its junction (record (-850, -1128)) and its turnaround loop
+#: (out to x -985, z 1210, island_plan.WG_LOOP_*) + a 15 m verge, north to the old shore so no water pocket is left
+#: between it and the dike; 75 m of water stays between it and the military pier (z 1300)
+WANGAN_TERMINAL_FILL = (-1000.0, -820.0, 1040.0, 1225.0)
 #: the airport island's south extension (Godot x0, x1, z0, z1): the strip south of the old coast (z ~1980) to z1, over
 #: the island's own width there (x0..x1 only bound the search). See `reshape`.
 AIRPORT_SOUTH = (700.0, AIRPORT_END_X, 1980.0, 2040.0)
@@ -398,7 +433,8 @@ SHORE_BANK = 3.0         # outside the dike: the plain falls to the beach's top 
 DIKE_ACCESS = (("suburb", 1250.0, 880.0), ("city", 950.0, 880.0), ("residential_ne", 880.0, -1580.0),
                ("farm", 700.0, -1650.0), ("residential_west", -1250.0, 640.0), ("lighthouse", 1330.0, -1330.0))
 #: The gulf's west bank beside the city is a harbour inlet, not a beach, just outside the gulf zone's box.
-DIKE_NOT_BOXES = ((230.0, 300.0, 380.0, 820.0),)
+#: The suburb fill's east face beside the bridge (x0, x1, z0, z1) is a revetment, no beach: see SUBURB_FILL.
+DIKE_NOT_BOXES = ((230.0, 300.0, 380.0, 820.0), (1185.0, 1400.0, 880.0, 1500.0))
 DIKE_JSON = os.path.join(ROOT, "assets", "world_source", "island_dike.json")
 DIKE_SHELF_Z = -3.0      # open sea shallower than this beside the land is a shelving shore (a quay drops to -24 m)
 DIKE_NOT_ZONES = ("industrial_harbour", "gulf", "military_harbour", "airport_island", "fishing_port", "seawall")

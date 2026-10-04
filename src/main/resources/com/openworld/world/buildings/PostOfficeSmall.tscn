@@ -1,40 +1,200 @@
 [gd_scene format=3]
 
-[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/PostOfficeSmall_mesh.res" id="1_17g1s"]
-[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/PostOfficeSmall_collision.res" id="2_6re83"]
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/PostOfficeSmall_mesh.res" id="1_6re83"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/PostOfficeSmall_collision.res" id="2_67t0v"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/ParkedVehicle.java" id="3_w3p16"]
 
-[node name="PostOfficeSmall" type="Node3D" unique_id=441623398]
+[sub_resource type="BoxShape3D" id="BoxShape3D_dw7si"]
+size = Vector3(0.84, 2.2, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_psika"]
+size = Vector3(0.84, 2.2, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_v6338"]
+size = Vector3(0.9, 2.1, 0.14)
+
+[node name="PostOfficeSmall" type="Node3D" unique_id=1640021544]
 metadata/building = {
-"aabb": [Vector3(-5, 0, -6), Vector3(10, 8.3, 15.6)],
-"base_m": 0.0,
+"aabb": [Vector3(-7.4, -0.2, -9.8), Vector3(14.8, 5.5, 19.6)],
+"base_m": -0.2,
 "collision": "trimesh",
 "door_style": "swing",
-"doors": [],
+"doors": [{
+"center": [-3.6, 0.0, 4.9],
+"height": 2.2,
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "exit",
+"style": "slide",
+"width": 1.6
+}, {
+"center": [0.0, 0.0, -4.9],
+"height": 2.1,
+"module": 1.0,
+"outward": [0.0, 0.0, -1.0],
+"side": "exit",
+"style": "swing",
+"width": 0.9
+}],
 "doors_closed": true,
 "doors_locked": false,
 "doors_shop": false,
 "example": true,
 "facade_surfaces": {},
-"footprint_m": [10.0, 15.6],
-"height_m": 8.3,
+"footprint_m": [14.8, 19.6],
+"height_m": 5.5,
 "id": "PostOfficeSmall",
-"kit": "library",
+"inner_doors": [{
+"center": [4.2, 0.0, 0.25],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-3.6, 0.0, -4.0],
+"height": 2.0,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.8
+}],
+"kit": "interiors",
 "landmark": false,
+"marks": [{
+"name": "MARK_objective_01",
+"pos": [-4.6, 0.0, 2.1],
+"props": {
+"kind": "objective",
+"note": "the ゆうちょ ATMs"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_objective_02",
+"pos": [4.8, 0.0, -1.6],
+"props": {
+"kind": "objective",
+"note": "the office safe"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_spawn_01",
+"pos": [0.0, 0.0, 2.0],
+"props": {
+"kind": "spawn",
+"team": "civilian"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_02",
+"pos": [-3.4, 0.0, -0.8],
+"props": {
+"kind": "spawn",
+"team": "staff"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_03",
+"pos": [-1.0, 0.0, -0.8],
+"props": {
+"kind": "spawn",
+"team": "staff"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_04",
+"pos": [1.4, 0.0, -0.8],
+"props": {
+"kind": "spawn",
+"team": "staff"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_vehicle_01",
+"pos": [1.7, 0.0, -7.6],
+"props": {
+"kind": "vehicle",
+"note": "the branch's delivery van, in its back yard",
+"vehicle": "POV1"
+},
+"yaw": 0.0
+}],
 "piece_count": 1,
+"probe_xz": [1.0, -2.5],
 "solid_probes": [],
 "trimesh_pieces": 1.0,
-"use": "branch post office, 15 x 20 m plot; PLACEHOLDER massing (blender/tools/library_civic.py), shut",
-"wall_top_m": 8.3
+"use": "郵便局 (branch, user 2026-10-03): a one-storey 12 x 10 m post office on a 15 x 20 m plot for every residential district -- the ゆうちょ ATM corner, the 記載台, the 窓口 counter (郵便 / 貯金 / 保険), the back office with the 区分棚 and the safe, a staff WC; the red band, 〒 board and ポスト, two customer bays at the front and the DELIVERY YARD at the back with its POV-1 van. probe_xz is in the customer area. kits/interiors/PostOfficeSmall.blend (a PLACEHOLDER shell and fit-out).",
+"wall_top_m": 4.0
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1238980111]
-visibility_range_end = 399.6
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=2030984764]
+visibility_range_end = 363.6
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
-mesh = ExtResource("1_17g1s")
+mesh = ExtResource("1_6re83")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=788016765]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=575262664]
 collision_mask = 0
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1191588493]
-shape = ExtResource("2_6re83")
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=2086144101]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.2, 1.1, 4.9)
+shape = SubResource("BoxShape3D_dw7si")
+
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=1859573893]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1.1, 4.9)
+shape = SubResource("BoxShape3D_psika")
+
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=1813080827]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 0, 1.05, -4.9)
+shape = SubResource("BoxShape3D_v6338")
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1322347489]
+shape = ExtResource("2_67t0v")
+
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=135120879]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -3.6, 0, 4.9)
+
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=922790549]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -4.9)
+
+[node name="Markers" type="Node3D" parent="." unique_id=320457279]
+
+[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=256562922 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -4.6, 0, 2.1)
+metadata/note = "the ゆうちょ ATMs"
+metadata/kind = "objective"
+
+[node name="MARK_objective_02" type="Marker3D" parent="Markers" unique_id=1018458723 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 4.8, 0, -1.6)
+metadata/note = "the office safe"
+metadata/kind = "objective"
+
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1298634952 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
+metadata/team = "civilian"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=1022462696 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -3.4, 0, -0.8)
+metadata/team = "staff"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=1390299530 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -1, 0, -0.8)
+metadata/team = "staff"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_04" type="Marker3D" parent="Markers" unique_id=172737540 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 1.4, 0, -0.8)
+metadata/team = "staff"
+metadata/kind = "spawn"
+
+[node name="MARK_vehicle_01" type="Node3D" parent="Markers" unique_id=1077638017 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.7, 0, -7.6)
+script = ExtResource("3_w3p16")
+vehicle_id = "POV1"
+faction = "neutral"
+drop_height = 0.3
+metadata/vehicle = "POV1"
+metadata/note = "the branch's delivery van, in its back yard"
+metadata/kind = "vehicle"

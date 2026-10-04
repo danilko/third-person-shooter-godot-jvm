@@ -76,7 +76,7 @@ CASTLE_LOAD = 2000.0                 # a landmark on a hill is seen from across 
 #   * the tower stands in DOWNTOWN and wants nothing but flat ground and room (a 334 m tower is seen from
 #     everywhere, so the score is simply how central it is);
 #   * the terminal stands on the AIRPORT ISLAND (`island_coast.json`'s own box), on its flattest clear ground.
-TOWER_HALF = 55.0                    # TokyoTower is 94.6 m across; leave room round its legs
+TOWER_HALF = 55.0                    # the broadcast centre's site (100 x 96 m; was the Tokyo Tower's, 94.6 m)
 TOWER_RELIEF = 3.0
 TOWER_CLEAR = 70.0
 TOWER_LOAD = 3000.0                  # 334 m: it is the skyline
@@ -303,7 +303,7 @@ def search(g, net, only=None):
                          yaw=yaw_to(DOWNTOWN[0] - kx, -(DOWNTOWN[1] - ky)), size=[158.0, 128.0], load=CASTLE_LOAD,
                          ground="patch"))
     near = road_index(net)
-    if want("tokyo_tower"):
+    if want("broadcast_centre"):
         tower = flat_site(g, near, REGION_BOX["downtown"], (TOWER_HALF, TOWER_HALF), TOWER_RELIEF, TOWER_CLEAR,
                           DOWNTOWN, zmax=12.0)
         if tower is None:
@@ -311,8 +311,8 @@ def search(g, net, only=None):
                   % (TOWER_RELIEF, TOWER_CLEAR))
         else:
             tx, ty, tlo, thi = tower
-            print("island_sites: Tokyo Tower at (%d, %d), ground %.1f-%.1f m" % (tx, ty, tlo, thi))
-            rows.append(dict(id="tokyo_tower", scene="TokyoTower", x=tx, y=ty, yaw=0.0, size=[94.6, 94.6],
+            print("island_sites: broadcast centre at (%d, %d), ground %.1f-%.1f m" % (tx, ty, tlo, thi))
+            rows.append(dict(id="broadcast_centre", scene="BroadcastCentre", x=tx, y=ty, yaw=0.0, size=[100.0, 96.0],
                              load=TOWER_LOAD, ground="min"))
     if want("airport_terminal"):
         # THE TERMINAL BEHIND THE AIRPORT STATION (user, 2026-09-29: "combine with the air terminal, or at least a
@@ -452,18 +452,20 @@ def rail_stations(net=None):
 # the RESERVES that carry a building now (user, 2026-09-28): island_plan.RESERVES name -> (scene, yaw deg, load m). The
 # scene is centred on the reserve's box; a yaw of 0 puts its front (+Z) to the south.
 RESERVE_SITES = {
-    "resort_hotel_1": ("ResortHotel", 0.0, 1200.0),       # the sea-view side (its front) south, to the loop's leg
-    "resort_hotel_2": ("ResortHotel", 0.0, 1200.0),
-    "resort_hotel_3": ("ResortHotel", 0.0, 1200.0),
+    "resort_hotel_1": ("ResortHotelSite", 0.0, 1200.0),   # the sea side (its front) south to the beach; the forecourt
+    "resort_hotel_2": ("ResortHotelSite", 0.0, 1200.0),   # and car park north on the loop's bottom leg
     "logistics_truck_terminal": ("LogisticsTruckTerminal", 90.0, 1200.0),     # the gate (front) east to butsuryu_michi
     "logistics_distribution": ("LogisticsDistributionCentre", 270.0, 1200.0),  # the gate west to butsuryu_michi
     "fish_market": ("FishMarket", 0.0, 1200.0),          # the quay (its front) to the sea, south of the dike
     "military_base": ("MilitaryBase", 90.0, 1200.0),      # the gate (its front) east to the gate road, apron south
     "military_pier": ("MilitaryPier", 270.0, 1000.0),     # its +Z (the pier head) west, the terminal at the root
     "military_airfield": ("MilitaryAirfield", 0.0, 1500.0),
-    "waterfront_park": ("FerrisWheelPark", 180.0, 2500.0),   # the entrance plaza (its front) north to ring_kita; a landmark
+    "waterfront_park": ("FerrisWheelPark", 0.0, 2500.0),   # the beach (its front) south; the entrance at the NE corner
+                                                            # by the suburb loop's corner; a landmark
     "airport_airfield": ("AirportAirside", 180.0, 1500.0),  # the apron north by the terminal, the runway south
     "central_forecourt": ("CentralForecourt", 0.0, 1200.0),
+    "wangan_pa": ("ExpresswayPA", 0.0, 1200.0),          # the rest building east, by the junction
+    "airport_cargo": ("CargoShed", 0.0, 1500.0),         # the docks south, to the apron
     "airport_forecourt": ("AirportForecourt", 0.0, 1500.0),  # round the kuko_rotary loop, beside the Airport station  # the 駅前広場: its front (+Z) south to ekimae_dori
 }
 #: reserves whose ground is LEVELLED to footway height round the road running through them (the block-ground stage

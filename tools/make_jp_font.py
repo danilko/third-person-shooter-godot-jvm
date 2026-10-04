@@ -5,7 +5,7 @@ credited in CREDITS.md), holding only the characters the game actually shows, so
     python3 tools/make_jp_font.py [--src <NotoSansCJK .ttc/.otf>] [--check]
 
 Input characters: `IslandStreetNames.json`'s `chars` (every street name, written by tools/island_street_names.py) +
-ASCII + the kana. Output: `src/main/resources/com/openworld/ui/fonts/NotoSansJP-Signs.otf`, a STATIC Bold instance
+ASCII + the kana + `UI_WORDS` (what the HUD prints). Output: `src/main/resources/com/openworld/ui/fonts/NotoSansJP-Signs.otf`, a STATIC Bold instance
 (the variable font pinned at wght 700: a road sign is bold). Re-run after the street names change; `--check` exits 1
 when a character the names need is missing from the committed subset. Needs `fonttools` (pip install fonttools).
 """
@@ -20,6 +20,8 @@ NAMES = os.path.join(ROOT, "src/main/resources/com/openworld/world/IslandStreetN
 STATIONS = os.path.join(ROOT, "src/main/resources/com/openworld/world/StationNames.json")
 OUT = os.path.join(ROOT, "src/main/resources/com/openworld/ui/fonts/NotoSansJP-Signs.otf")
 SRC = "/usr/share/fonts/google-noto-sans-cjk-vf-fonts/NotoSansCJK-VF.ttc"
+# words the HUD itself prints (game.RespawnSystem's cards: hospitalized / arrested)
+UI_WORDS = "入院逮捕"
 KANA = "".join(chr(c) for c in range(0x3041, 0x3097)) + "".join(chr(c) for c in range(0x30A1, 0x30FB)) + "ー・、。「」"
 
 
@@ -29,7 +31,7 @@ def wanted():
     chars = set(st["words"])
     for v in st["stations"].values():
         chars |= set(v["ja"])
-    return set(doc["chars"]) | chars | set(chr(c) for c in range(0x20, 0x7F)) | set(KANA)
+    return set(doc["chars"]) | chars | set(UI_WORDS) | set(chr(c) for c in range(0x20, 0x7F)) | set(KANA)
 
 
 def main(argv):

@@ -367,6 +367,9 @@ def level_gores(net):
 RAMP_K = 6.0          # m per %: every ramp grade break is a vertical curve at least this flat (NEXT PASS step 1)
 RAMP_K_GROUND = 6.5   # ...for a ramp to the ground, whose grade is the tighter budget (7 % with both curves)
 RAMP_K_SOLVE = 9.0    # what `ramp_curves` aims for, so the exported Hermite between stations still clears RAMP_K
+#: a ramp whose descent overlaps its own plan turn reads ~30 % lower K on the exported Hermite than on the solve's 2 m
+#: samples: solve it to the JCT target (port_on: solved 6.7, exported 4.6 at the ground target)
+RAMP_K_OVERRIDE = {"shuto_port_on": 9.0}
 RAMP_GROUND_GRADE = 0.07   # a ramp to or from the ground at 40 km/h (道路構造令: 7 %)
 RAMP_JCT_GRADE = 0.06      # an expressway-to-expressway ramp
 CROSS_DZ = 3.0        # m: a road this far above or below the ramp, across its band, is one it crosses (else a gore)
@@ -459,7 +462,7 @@ def ramp_curves(net, k_target=None):
             P.tangent_mode = pm.MANUAL
             P.tangent = (plan[0] / m, plan[1] / m, g)
         ground = any(str(net.points[u].role) == "INTERSECTION" for u in (uids[0], uids[-1]))
-        kt = k_target or (RAMP_K_GROUND if ground else RAMP_K_SOLVE)
+        kt = k_target or RAMP_K_OVERRIDE.get(name) or (RAMP_K_GROUND if ground else RAMP_K_SOLVE)
         rpts = [net.resolved(u) for u in uids]
         sts = pp.stations(rpts, False, end_axes=pp.run_end_axes(net, rpts))
         smp = rp.resample(sts, False, step=RAMP_STEP)

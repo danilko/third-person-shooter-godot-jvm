@@ -1,0 +1,41 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/GangScrapyard_mesh.res" id="1_bchbh"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/GangScrapyard_collision.res" id="2_4p2lj"]
+
+[node name="GangScrapyard" type="Node3D" unique_id=1272100480]
+metadata/building = {
+"aabb": [Vector3(-25, 0, -20), Vector3(50, 8.265145, 40)],
+"base_m": 0.0,
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [50.0, 40.0],
+"height_m": 8.2651,
+"id": "GangScrapyard",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"probe_xz": [-19.0, 8.0],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "Aokiba-gumi front: scrapyard / used-car lot 50 x 40; PLACEHOLDER (library_jp_city.py)",
+"wall_top_m": 2.7
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1147951572]
+visibility_range_end = 399.18173
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_bchbh")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=697637535]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1632330050]
+shape = ExtResource("2_4p2lj")

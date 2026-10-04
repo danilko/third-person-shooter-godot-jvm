@@ -1,0 +1,41 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/ConstructionSite_mesh.res" id="1_1tutm"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/ConstructionSite_collision.res" id="2_65oos"]
+
+[node name="ConstructionSite" type="Node3D" unique_id=386058358]
+metadata/building = {
+"aabb": [Vector3(-20, 0, -20), Vector3(50, 52.02, 40.2)],
+"base_m": 0.0,
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [50.0, 40.2],
+"height_m": 52.02,
+"id": "ConstructionSite",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"probe_xz": [0.0, 0.0],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "construction site 40 x 40: hoarding, steel frame, tower crane; PLACEHOLDER (library_jp_city.py), climbable",
+"wall_top_m": 16.0
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1692095123]
+visibility_range_end = 900.0
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_1tutm")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=642893003]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=201941856]
+shape = ExtResource("2_65oos")

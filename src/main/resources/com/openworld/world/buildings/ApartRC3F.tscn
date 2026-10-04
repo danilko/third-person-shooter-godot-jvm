@@ -1,0 +1,40 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/ApartRC3F_mesh.res" id="1_ase43"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/ApartRC3F_collision.res" id="2_8u4lp"]
+
+[node name="ApartRC3F" type="Node3D" unique_id=1177053211]
+metadata/building = {
+"aabb": [Vector3(-6.0150003, 0, -5.7400002), Vector3(12.030001, 10.3, 11.48)],
+"base_m": 0.0,
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [12.03, 11.48],
+"height_m": 10.3,
+"id": "ApartRC3F",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "small RC three-storey アパート, 12 x 10 m, 2 units a floor, placed by the housing / city mixes; PLACEHOLDER (library_jp_city.py), shut",
+"wall_top_m": 10.3
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1899024313]
+visibility_range_end = 423.6
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_ase43")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1526073913]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1207886243]
+shape = ExtResource("2_8u4lp")

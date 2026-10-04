@@ -1,0 +1,40 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/Apato2F6_mesh.res" id="1_fy0gy"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/Apato2F6_collision.res" id="2_trnbi"]
+
+[node name="Apato2F6" type="Node3D" unique_id=1425545151]
+metadata/building = {
+"aabb": [Vector3(-13.17, 0, -5.39), Vector3(26.34, 7.3, 10.780001)],
+"base_m": 0.0,
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [26.34, 10.78],
+"height_m": 7.3,
+"id": "Apato2F6",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "old wooden two-storey アパート, 6 x 1K in one line, 26 x 11 m, placed by the housing / city mixes; PLACEHOLDER (library_jp_city.py), shut",
+"wall_top_m": 7.3
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1014714404]
+visibility_range_end = 387.6
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_fy0gy")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=170090024]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=865981095]
+shape = ExtResource("2_trnbi")

@@ -482,30 +482,32 @@ def park(material, Builder):
 
 
 def water_resort(material, Builder):
-    """温浴・プールリゾート on a 150 x 120 plot (an Oedo-Onsen / Summerland type): a 70 x 40 m indoor pool and spa hall
-    (glazed, 14 m, a barrel roof) at the street with the entrance canopy, outdoor pools behind it (a 50 m wave pool, a
-    lazy river loop, a kids' pool) on a deck, a 16 m slide tower with two chutes, changing blocks, a fence."""
+    """温浴・プールリゾート on a 150 x 70 plot (an Oedo-Onsen / Summerland type; 2026-10-03: 120 -> 70 deep, so it fits
+    inside the suburb loop beside the beach hotels, on the flat ground south of the dike's slope): a 70 x 24 m indoor
+    pool and spa hall (glazed, 14 m, a barrel roof) at the street with the entrance canopy, outdoor pools behind it (a
+    wave pool, a lazy river loop, a kids' pool) on a deck, a 16 m slide tower with two chutes, changing blocks, a
+    fence."""
     b = Builder("WaterResort", material)
-    ground(b, -74.0, 74.0, -59.0, 59.0, "MI_ConcreteSmooth")
-    b.box((-35.0, -58.0, 0.0), (35.0, -18.0, 10.0), "MI_TileWhite")
-    b.box((-33.0, -58.03, 0.3), (33.0, -58.0, 9.0), "MI_GlassClear")
-    b.frustum(0.0, -38.0, 10.0, 14.0, 35.0, 20.0, 35.0, 8.0, "MI_GlassClear")
-    b.box((-35.0, -58.3, 9.5), (35.0, -57.8, 10.3), "MI_PoolWater")
-    canopy(b, -10.0, 10.0, -59.5, -58.0, 5.0, posts=False)
-    sign(b, -12.0, 12.0, -58.3, 10.4, 12.4, "MI_SignCyan")
-    b.box((-60.0, -10.0, 0.0), (-10.0, 20.0, 0.35), "MI_Limestone")              # wave pool deck
-    b.box((-58.0, -8.0, 0.35), (-12.0, 18.0, 0.37), "MI_PoolWater")
-    for (x0, y0, x1, y1) in ((0.0, -10.0, 60.0, -4.0), (0.0, 44.0, 60.0, 50.0), (0.0, -4.0, 6.0, 44.0),
-                             (54.0, -4.0, 60.0, 44.0)):                              # lazy river
+    ground(b, -74.0, 74.0, -34.0, 34.0, "MI_ConcreteSmooth")
+    b.box((-35.0, -33.0, 0.0), (35.0, -9.0, 10.0), "MI_TileWhite")
+    b.box((-33.0, -33.03, 0.3), (33.0, -33.0, 9.0), "MI_GlassClear")
+    b.frustum(0.0, -21.0, 10.0, 14.0, 35.0, 12.0, 35.0, 4.8, "MI_GlassClear")
+    b.box((-35.0, -33.3, 9.5), (35.0, -32.8, 10.3), "MI_PoolWater")
+    canopy(b, -10.0, 10.0, -34.5, -33.0, 5.0, posts=False)
+    sign(b, -12.0, 12.0, -33.3, 10.4, 12.4, "MI_SignCyan")
+    b.box((-60.0, -4.0, 0.0), (-10.0, 16.0, 0.35), "MI_Limestone")               # wave pool deck
+    b.box((-58.0, -2.0, 0.35), (-12.0, 14.0, 0.37), "MI_PoolWater")
+    for (x0, y0, x1, y1) in ((0.0, -5.0, 60.0, -1.0), (0.0, 26.0, 60.0, 30.0), (0.0, -1.0, 5.0, 26.0),
+                             (55.0, -1.0, 60.0, 26.0)):                              # lazy river
         b.box((x0, y0, 0.0), (x1, y1, 0.35), "MI_Limestone")
         b.box((x0 + 0.8, y0 + 0.8, 0.35), (x1 - 0.8, y1 - 0.8, 0.37), "MI_PoolWater")
-    b.box((18.0, 12.0, 0.0), (38.0, 28.0, 0.37), "MI_PoolWater")                   # kids' pool
-    b.box((-66.0, 30.0, 0.0), (-58.0, 38.0, 16.0), "MI_PaintYellow")              # slide tower
+    b.box((18.0, 6.0, 0.0), (38.0, 18.0, 0.37), "MI_PoolWater")                    # kids' pool
+    b.box((-66.0, 20.0, 0.0), (-58.0, 27.0, 16.0), "MI_PaintYellow")              # slide tower
     for dx, mat in ((0.0, "MI_CraneRed"), (4.0, "MI_PoolWater")):
-        b.beam((-62.0 + dx, 30.0, 15.5), (-40.0 + dx, 6.0, 0.8), 1.2, mat)
+        b.beam((-62.0 + dx, 20.0, 15.5), (-40.0 + dx, 2.0, 0.8), 1.2, mat)
     for x in (-70.0, 62.0):
-        b.box((x, -12.0, 0.0), (x + 8.0, 20.0, 3.5), "MI_TileWhite")               # changing blocks
-    fence(b, -74.5, 74.5, -59.5, 59.5, h=2.4, gaps=[("f", 0.0, 22.0)])
+        b.box((x, -6.0, 0.0), (x + 8.0, 14.0, 3.5), "MI_TileWhite")                # changing blocks
+    fence(b, -74.5, 74.5, -34.5, 34.5, h=2.4, gaps=[("f", 0.0, 22.0)])
     return "WaterResort", "civic", b.mesh()
 
 
@@ -530,12 +532,16 @@ def resort_hotel(material, Builder):
 
 
 def fish_market(material, Builder):
-    """魚市場 for the 416 x 99 m quay reserve: a 180 x 50 m auction hall (a low sawtooth-roofed shed, open to the quay at
-    -Y on columns, 11 m), an ice plant, a 3-storey office, the fishing boats' quay edge with bollards, the truck bays
-    along the land side (+Y). The quay (-Y) faces the water."""
+    """魚市場 for the 165 x 70 m quay reserve (2026-10-02 night: the reserve's west part -- the Wangan's deck and the
+    Suburb ramps cross its old east end -- and only as deep as the flat land between the dike's slope and the shore,
+    57 m, plus a 13 m quay deck out over the water): a 90 x 36 m auction hall (a low sawtooth-roofed shed, open to the
+    quay at -Y on columns, 11 m), an ice plant, a 3-storey office, the truck bays along the land side (+Y); on the quay
+    (-Y, the water) bollards and fenders, and a floating pontoon (浮桟橋) for the small boats PARALLEL to the quay,
+    reached by a gangway -- parallel because the Wangan's viaduct runs 15-25 m off this quay, so finger piers would
+    stand under its deck. The plot's ground is the land, 5.6 m above the water: the pontoon floats at -5.0."""
     b = Builder("FishMarket", material)
-    ground(b, -205.0, 205.0, -48.0, 48.0, "MI_ConcreteSmooth")
-    x0, x1, y0, y1 = -90.0, 90.0, -35.0, 15.0
+    ground(b, -82.5, 82.5, -35.0, 35.0, "MI_ConcreteSmooth")
+    x0, x1, y0, y1 = -45.0, 45.0, -28.0, 8.0
     b.box((x0, y1 - 1.0, 0.0), (x1, y1, 8.0), "MI_Corrugated")                     # the land-side wall
     for x in range(int(x0), int(x1) + 1, 10):                                          # columns on the open side
         b.box((x - 0.4, y0 - 0.4, 0.0), (x + 0.4, y0 + 0.4, 8.0), "MI_PaintedMetal")
@@ -546,23 +552,28 @@ def fish_market(material, Builder):
         b.box((x, y0, 8.6), (x + 0.3, y1, 11.0), "MI_GlassClear")
         x += 10.0
     b.box((x0, y0, 0.0), (x1, y1, 0.05), "MI_TileWhite")                              # the washable floor
-    b.box((110.0, -10.0, 0.0), (140.0, 15.0, 10.0), "MI_Corrugated")                 # ice plant
-    b.box((-140.0, 0.0, 0.0), (-110.0, 15.0, 11.4), "MI_TileBeige")                  # office
-    ribbon_block(b, -140.0, -110.0, 0.0, 15.0, 0.0, 3, 3.8, wall="MI_TileBeige")
+    b.box((55.0, -15.0, 0.0), (78.0, 8.0, 10.0), "MI_Corrugated")                    # ice plant
+    b.box((-78.0, -8.0, 0.0), (-55.0, 8.0, 11.4), "MI_TileBeige")                    # office
+    ribbon_block(b, -78.0, -55.0, -8.0, 8.0, 0.0, 3, 3.8, wall="MI_TileBeige")
     sign(b, -20.0, 20.0, y0, 8.6, 10.0, "MI_Sign")
-    for k in range(40):                                                                 # the quay's bollards
-        xx = -195.0 + k * 10.0
-        b.box((xx - 0.3, -47.0, 0.0), (xx + 0.3, -46.4, 0.6), "MI_PaintedMetalDark")
+    for k in range(17):                                                                 # the quay's bollards
+        xx = -80.0 + k * 10.0
+        b.box((xx - 0.3, -34.0, 0.0), (xx + 0.3, -33.4, 0.6), "MI_PaintedMetalDark")
+    for k in range(16):                                                                 # fenders on the quay face
+        xx = -75.0 + k * 10.0
+        b.box((xx - 0.6, -35.4, -3.5), (xx + 0.6, -35.0, -1.0), "MI_PaintedMetalDark")
+    # the pontoon: 4 m wide, 6 m off the quay, along the west part (the Wangan's deck is furthest off there)
+    b.box((-75.0, -45.0, -5.6), (15.0, -41.0, -5.0), "MI_Wood")
+    for xx in range(-74, 16, 8):                                                       # its cleats
+        b.box((xx - 0.2, -44.9, -5.0), (xx + 0.2, -44.5, -4.7), "MI_PaintedMetalDark")
+    b.beam((-10.0, -35.6, 0.0), (-30.0, -41.6, -5.0), 1.6, "MI_Steel")             # the gangway, along the quay
+    for side in (-0.8, 0.8):                                                            # its handrails
+        b.beam((-10.0, -35.6 + side, 1.0), (-30.0, -41.6 + side, -4.0), 0.06, "MI_PaintedMetal")
     for k in range(20):                                                                 # truck bays, land side
-        xx = -95.0 + k * 9.5
-        b.box((xx, 25.0, 0.0), (xx + 0.12, 40.0, 0.01), "MI_PaintWhite")
+        xx = -48.0 + k * 4.8
+        b.box((xx, 14.0, 0.0), (xx + 0.12, 30.0, 0.01), "MI_PaintWhite")
     return "FishMarket", "civic", b.mesh()
 
-
-# ── the air base (航空自衛隊 基地 style) and the airport's airside ─────────────────────────────────────────────────
-# Public record: an F-15J is 19.43 m long, 13.05 m span, 5.63 m tall; a 737-800 is 39.5 m long, 35.8 m span, 12.5 m
-# tall. A JASDF base's buildings are plain concrete 4-5 storey blocks (本部庁舎, 隊舎), arched or flat hangars, a
-# control tower with a glass cab, and the apron in front of the hangars.
 
 def mil_hq(material, Builder):
     """本部庁舎 (base headquarters): 44 x 16 m, 4 storeys (4.0 m), plain beige concrete, a flag pole and name board."""
@@ -901,16 +912,19 @@ CIVIC_NOTES = {
     "Park": "Placeholder 公園 on a 60 x 60 plot, openings on all four sides; trees come from the nature kit (composite).",
     "WaterResort": "Placeholder 温浴・プールリゾート on a 150 x 120 plot, entrance on the street at -Y.",
     "ResortHotel": "Placeholder resort hotel for a 70 x 60 reserve, the balconies and pool deck to -Y (the sea).",
-    "FishMarket": "Placeholder 魚市場 for the 416 x 99 m quay reserve; the quay (water) at -Y, trucks at +Y.",
+    "FishMarket": "Placeholder 魚市場 for the 165 x 70 m quay reserve; the quay (water) at -Y, trucks at +Y; the "
+                  "pontoon (浮桟橋) at z -5 runs parallel to the quay (the Wangan's deck stands 12-25 m off it).",
     "Mil_FighterJet": "Placeholder F-15J-class fighter, nose -Y. Static prop; its collider is the boxes in "
                       "building_types.json (MilitaryBase props), not its mesh.",
     "Airport_Airliner": "Placeholder narrow-body airliner (737-800 class), nose -Y. Static prop; collider = boxes in "
                         "building_types.json (AirportAirside).",
     "Airport_Hangar": "Placeholder maintenance hangar, 70 x 60 m, open front -Y; the airliner stands inside it as a "
                       "separate prop (AirportAirside). Keep the doorway clear (32 m wide x 16.5 m high at least).",
-    "House_Detached": "Placeholder 一戸建て (7.3 x 9.1 m house, gabled roof, carport, block wall) -- a placed building "
+    "House_Detached": "Placeholder 一戸建て (9.1 x 7.28 m house, 平入り: its long side and ridge along the street, a 玄関 bay, "
+                      "one parking bay under a cantilever carport, a low wall with the gate pillar) -- a placed building "
                       "(type DetachedHouse): front (-Y) to the street; the carport's gap in the wall at the front.",
-    "House_DetachedB": "Placeholder 一戸建て, second colourway, carport on the left (type DetachedHouseB).",
+    "House_DetachedB": "Placeholder 一戸建て, the hipped (寄棟) variant: brown roof, white siding, parking and 玄関 on the left "
+                       "(type DetachedHouseB).",
     "Sign_Sodekanban": "Placeholder 袖看板 for the PencilBuilding front corner: stacked lit tenant panels 4-12.5 m.",
     "Mil_PatrolShip": "Placeholder patrol ship, 90 x 12 m, bow -Y, origin AT THE WATERLINE (the MilitaryPier composite "
                       "sets it 9.6 m below the pier deck: the pier's land height). Static prop, collider = its box.",
@@ -943,46 +957,115 @@ def build_all(material, Builder):
 # missing"; "袖看板 ... the single strongest Tokyo read") ────────────────────────────────────────────────────────────
 # PLATEAU (measure_building_types.py, Ota + Tama): a 2-storey 一戸建て is 7.1-7.5 x 10.2-10.4 m, 7.4-7.5 m tall.
 
-def _house(b, roof, wall, carport_side):
-    """A two-storey detached house: 7.3 x 9.1 m (4 x 5 ken), 2 x 2.9 m storeys, a gabled roof (ridge along the depth)
-    to 7.9 m, aluminium sliding windows (dark), a front door with a small canopy, and beside it a 3 x 5.5 m carport and
-    a 1.2 m concrete-block wall along the street (-Y) with a gap for the gate and the car."""
-    hx0, hx1, hy0, hy1 = -3.65, 3.65, -4.55, 4.55
-    b.box((hx0, hy0, 0.0), (hx1, hy1, 5.8), wall)
-    b.box((hx0, hy0, 0.0), (hx1, hy1, 0.4), "MI_ConcreteSmooth")                     # the base (基礎)
-    for z0 in (0.9, 3.8):                                                            # 引き違い windows, front + sides
-        b.box((-3.0, hy0 - 0.03, z0), (-0.8, hy0, z0 + 1.2), "MI_Window")
-        b.box((1.2, hy0 - 0.03, z0 + 0.4), (2.8, hy0, z0 + 1.2), "MI_Window")
-        b.box((hx0 - 0.03, -2.5, z0), (hx0, -0.5, z0 + 1.1), "MI_Window")
-        b.box((hx1, 0.5, z0), (hx1 + 0.03, 2.5, z0 + 1.1), "MI_Window")
-    b.box((-3.2, hy0 - 0.9, 2.9), (-0.6, hy0, 3.0), "MI_PaintedMetal")              # 2F balcony slab + rail
-    b.box((-3.2, hy0 - 0.95, 3.0), (-0.6, hy0 - 0.85, 3.9), "MI_PaintedMetal")
-    b.box((0.2, hy0 - 0.03, 0.4), (1.1, hy0, 2.4), "MI_Wood")                        # the 玄関 door
-    b.box((-0.1, hy0 - 0.8, 2.5), (1.4, hy0, 2.6), roof)                               # its canopy
-    gable(b, 0.0, 0.0, 5.8, 4.1, 5.0, 2.3, roof, along="y")
-    cx = 5.35 * carport_side                                                            # the carport
-    for x in (cx - 1.4, cx + 1.4):
-        b.box((x - 0.06, -4.3, 0.0), (x + 0.06, -4.18, 2.3), "MI_Steel")
-        b.box((x - 0.06, 1.0, 0.0), (x + 0.06, 1.12, 2.3), "MI_Steel")
-    b.box((cx - 1.6, -4.5, 2.3), (cx + 1.6, 1.3, 2.4), "MI_PlasticWhite")
-    b.box((cx - 1.5, -5.5, 0.0), (cx + 1.5, 1.3, 0.03), "MI_ConcreteSmooth")
-    # the block wall (ブロック塀) along the street: from the far side to the gate, gate gap 1.2 m, then the car gap
-    xa, xb = (-3.7, 3.7)
-    for x0, x1 in ((xa, -0.2), (1.4, xb)):
-        b.box((x0, -5.55, 0.0), (x1, -5.35, 1.2), "MI_ConcreteSmooth")
+def _gable_slabs(b, x0, x1, y0, y1, z, rise, roof, wall, over=0.6, t=0.18):
+    """A 切妻 roof with its ridge along X: two sloping slabs with real thickness and EAVES `over` past the walls (an
+    eave line and a fascia, not a solid wedge), and the two gable ends filled in the WALL material."""
+    yc = (y0 + y1) / 2.0
+    hy = (y1 - y0) / 2.0
+    k = rise / hy                                                  # the pitch
+    ze = z - over * k                                              # the eave line, `over` out and down the slope
+    for sg in (-1.0, 1.0):
+        ye = yc + sg * (hy + over)
+        b.convex([(x0 - over, ye, ze), (x1 + over, ye, ze), (x0 - over, yc, z + rise), (x1 + over, yc, z + rise),
+                  (x0 - over, ye, ze + t), (x1 + over, ye, ze + t), (x0 - over, yc, z + rise + t),
+                  (x1 + over, yc, z + rise + t)], roof)
+    for x in (x0, x1):                                              # the gable ends, in the wall
+        b.convex([(x - 0.01, y0, z), (x + 0.01, y0, z), (x - 0.01, y1, z), (x + 0.01, y1, z),
+                  (x - 0.01, yc, z + rise), (x + 0.01, yc, z + rise)], wall)
+
+
+def _house(b, roof, wall, side, hipped=False):
+    """一戸建て, a Japanese two-storey detached house as it faces the street (user, 2026-09-30, item 11b): 平入り -- its
+    LONG side (9.1 m, 5 ken) along the street (-Y) and the ridge parallel to it, 7.28 m (4 ken) deep; the entry bay
+    (玄関) projecting toward the street at the parking side under a small canopy, one step up; ONE parking bay beside
+    it under a polycarbonate carport on a one-sided cantilever (片側支持); a 1.6 m front garden behind a low wall with
+    the gate pillar (門柱: 表札 + letterbox) and a 門扉. The front: a 1F 掃き出し窓 onto the garden and a 2F one onto a
+    ベランダ (a slab, rails on three sides and a 物干し pole); 腰窓 and frosted side windows. `side` +1 puts the parking
+    on the right (+X), -1 on the left. A 4-寸 pitch to a 7.5 m ridge (PLATEAU p50 7.4-7.5 m); the foundation (基礎)
+    stands 2 cm proud of the wall (no z-fighting)."""
+    W, D, PW = 9.1, 7.28, 3.0                     # house width (along the street), depth, parking bay width
+    X0 = -(W + PW + 0.4) / 2.0                     # the plot runs X0 .. -X0 (12.5 m)
+    if side > 0:
+        hx0, hx1 = X0, X0 + W
+        px0, px1 = hx1 + 0.4, -X0
+    else:
+        hx0, hx1 = -X0 - W, -X0
+        px0, px1 = X0, hx0 - 0.4
+    hy0, hy1 = -3.8, 3.48                          # the house's front (street side) and back
+    fy = -5.6                                      # the front wall's line (the plot's street edge is fy - 0.2)
+    base, eave = 0.5, 6.1                          # 1F floor (the 基礎's top) and the wall top
+    b.box((hx0 - 0.02, hy0 - 0.02, 0.0), (hx1 + 0.02, hy1 + 0.02, base), "MI_ConcreteSmooth")   # the 基礎
+    b.box((hx0, hy0, base), (hx1, hy1, eave), wall)
+    # the entry bay (玄関), projecting 1.2 m toward the street at the parking end, one storey, with its own canopy
+    ex0, ex1 = (hx1 - 2.73, hx1) if side > 0 else (hx0, hx0 + 2.73)
+    b.box((ex0 - 0.02, hy0 - 1.22, 0.0), (ex1 + 0.02, hy0, base), "MI_ConcreteSmooth")
+    b.box((ex0, hy0 - 1.2, base), (ex1, hy0, 3.0), wall)
+    b.box((ex0 - 0.3, hy0 - 1.7, 3.0), (ex1 + 0.3, hy0, 3.15), roof)
+    dx = (ex0 + ex1) / 2.0
+    b.box((dx - 0.45, hy0 - 1.23, base), (dx + 0.45, hy0 - 1.2, base + 2.1), "MI_Wood")      # the 玄関 door
+    b.box((dx - 0.9, hy0 - 2.2, 0.0), (dx + 0.9, hy0 - 1.2, 0.25), "MI_ConcreteSmooth")      # the porch step
+    # the front windows: a 1F 掃き出し窓 onto the garden and a 腰窓, and a 2F 掃き出し窓 onto the ベランダ
+    wx0, wx1 = (hx0 + 0.6, hx0 + 3.2) if side > 0 else (hx1 - 3.2, hx1 - 0.6)
+    b.box((wx0, hy0 - 0.03, base + 0.05), (wx1, hy0, base + 2.05), "MI_Window")
+    kx = (wx1 + 0.9, wx1 + 2.5) if side > 0 else (wx0 - 2.5, wx0 - 0.9)
+    b.box((kx[0], hy0 - 0.03, base + 0.9), (kx[1], hy0, base + 2.0), "MI_Window")
+    f2 = base + 2.8
+    b.box((wx0, hy0 - 0.03, f2 + 0.05), (wx1, hy0, f2 + 1.95), "MI_Window")
+    b.box((kx[0], hy0 - 0.03, f2 + 0.9), (kx[1], hy0, f2 + 2.0), "MI_Window")
+    vx0, vx1 = wx0 - 0.4, wx1 + 0.4                                          # the ベランダ
+    b.box((vx0, hy0 - 1.0, f2 - 0.15), (vx1, hy0, f2), "MI_ConcreteSmooth")
+    b.box((vx0, hy0 - 1.0, f2), (vx1, hy0 - 0.9, f2 + 1.1), "MI_PaintedMetal")
+    for x in (vx0, vx1 - 0.1):
+        b.box((x, hy0 - 1.0, f2), (x + 0.1, hy0, f2 + 1.1), "MI_PaintedMetal")
+    b.beam((vx0 + 0.3, hy0 - 0.6, f2 + 1.7), (vx1 - 0.3, hy0 - 0.6, f2 + 1.7), 0.04, "MI_Steel")   # 物干し
+    for x in (vx0 + 0.3, vx1 - 0.3):
+        b.beam((x, hy0 - 0.6, f2 + 1.1), (x, hy0 - 0.6, f2 + 1.7), 0.04, "MI_Steel")
+    for z0 in (base, f2):                                                       # frosted side windows
+        b.box((hx0 - 0.03, -1.0, z0 + 1.0), (hx0, 0.2, z0 + 1.8), "MI_Window")
+        b.box((hx1, 0.6, z0 + 1.0), (hx1 + 0.03, 1.8, z0 + 1.8), "MI_Window")
+    # the roof
+    rise = (hy1 - hy0) / 2.0 * 0.38
+    if hipped:
+        over = 0.6
+        b.frustum((hx0 + hx1) / 2.0, (hy0 + hy1) / 2.0, eave, eave + rise, (hx1 - hx0) / 2.0 + over,
+                  (hy1 - hy0) / 2.0 + over, max(0.3, (hx1 - hx0 - (hy1 - hy0)) / 2.0), 0.12, roof)
+        b.box((hx0 - over, hy0 - over, eave - 0.18), (hx1 + over, hy1 + over, eave), roof)   # the eave's fascia
+    else:
+        _gable_slabs(b, hx0, hx1, hy0, hy1, eave, rise, roof, wall)
+    # the parking bay and its carport: a polycarbonate sheet on a one-sided cantilever (posts on the outer side)
+    b.box((px0, fy + 0.2, 0.0), (px1, hy1, 0.03), "MI_ConcreteSmooth")
+    post_x = px1 - 0.15 if side > 0 else px0 + 0.15
+    for y in (fy + 1.4, hy1 - 1.0):
+        b.box((post_x - 0.07, y - 0.07, 0.0), (post_x + 0.07, y + 0.07, 2.5), "MI_Steel")
+        b.beam((post_x, y, 2.45), ((px0 if side > 0 else px1), y, 2.3), 0.1, "MI_Steel")
+    b.box((px0, fy + 0.6, 2.35), (px1, hy1 - 0.4, 2.4), "MI_GlassClear")
+    # the front garden: a low block wall with the gate pillar and the 門扉 at the path to the porch
+    gx0, gx1 = dx - 0.6, dx + 0.6
+    lo, hi = (X0, gx0) if side > 0 else (gx1, -X0)
+    if side > 0:
+        b.box((hx0, fy, 0.0), (gx0, fy + 0.15, 0.8), "MI_ConcreteSmooth")
+    else:
+        b.box((gx1, fy, 0.0), (hx1, fy + 0.15, 0.8), "MI_ConcreteSmooth")
+    px = gx0 - 0.45 if side > 0 else gx1 + 0.05
+    b.box((px, fy - 0.05, 0.0), (px + 0.4, fy + 0.35, 1.25), "MI_TileBrown")        # 門柱
+    b.box((px + 0.05, fy - 0.07, 0.95), (px + 0.35, fy - 0.05, 1.1), "MI_PaintWhite")   # 表札
+    b.box((px + 0.08, fy - 0.07, 0.55), (px + 0.32, fy - 0.05, 0.8), "MI_PaintedMetalDark")  # letterbox
+    b.box((gx0, fy + 0.05, 0.0), (gx1, fy + 0.1, 1.0), "MI_PaintedMetalDark")            # 門扉
+    b.box((gx0, fy + 0.1, 0.0), (gx1, hy0 - 2.2, 0.03), "MI_ConcreteSmooth")             # the path to the porch
+    del lo, hi
 
 
 def detached_house(material, Builder):
-    """一戸建て (a detached house), a slate-grey roof, beige siding, the carport on the right."""
+    """一戸建て (a detached house): 切妻, a slate roof, beige siding, the parking on the right."""
     b = Builder("House_Detached", material)
     _house(b, "MI_RoofSlate", "MI_TileBeige", 1.0)
     return "House_Detached", "civic", b.mesh()
 
 
 def detached_house_b(material, Builder):
-    """一戸建て, variant: a brown roof, white siding, the carport on the left."""
+    """一戸建て, variant: 寄棟 (hipped), a brown roof, white siding, the parking and the 玄関 on the left."""
     b = Builder("House_DetachedB", material)
-    _house(b, "MI_TileBrown", "MI_PaintWhite", -1.0)
+    _house(b, "MI_TileBrown", "MI_PaintWhite", -1.0, hipped=True)
     return "House_DetachedB", "civic", b.mesh()
 
 
@@ -1356,55 +1439,56 @@ def build_all(material, Builder):
 # across on a 60 m hub (110 m to the top), on the gulf's east shore beside the resort hotels.
 
 def ferris_wheel_park(material, Builder):
-    """観覧車のある臨海公園 on a 110 x 200 plot (X across, Y along; the street side -Y, the bay +Y, the gulf +X): grass,
-    a 6 m promenade along the two waterfront edges, an entrance plaza on the street side with a path to the wheel, and
-    the wheel itself in the plot's water corner -- a 100 m rim (two rings 6 m apart, spokes, 32 gondolas) turning in the
-    Y-Z plane so its full circle faces the gulf and the Wangan (west) and the Rainbow Bridge (east), on two A-frame legs,
-    with a boarding hall under its low point."""
+    """観覧車のある臨海公園 on a 110 x 160 plot (2026-10-02 night: moved south of the Suburb WB entrance onto the plain
+    by the beach). X across (the gulf at -X), Y along (the beach and the open sea at -Y, the scene's front; the suburb
+    loop's corner at +X +Y): grass, a 6 m promenade along the two waterfront edges (-X, -Y), an entrance plaza at the
+    +X +Y corner with a path to the wheel, and the wheel in the water corner (-X -Y) -- a 100 m rim (two rings 6 m
+    apart, spokes, 32 gondolas) turning in the X-Z plane, so its full circle faces the open sea (-Y) (item 4: "the full
+    circle faces open water"), on two A-frame legs, with a boarding hall under its low point."""
     b = Builder("Park_FerrisWheel", material)
-    hx, hy = 55.0, 100.0
+    hx, hy = 55.0, 80.0
     ground(b, -hx, hx, -hy, hy, "MI_Grass")
-    b.box((hx - 6.0, -hy, 0.0), (hx, hy, 0.05), "MI_ConcreteSmooth")          # promenade, gulf side
-    b.box((-hx, hy - 6.0, 0.0), (hx, hy, 0.05), "MI_ConcreteSmooth")          # promenade, bay side
-    b.box((hx - 0.1, -hy, 0.05), (hx, hy, 1.1), "MI_PaintedMetal")               # the waterfront railing
-    b.box((-hx, hy - 0.1, 0.05), (hx, hy, 1.1), "MI_PaintedMetal")
-    b.box((-20.0, -hy, 0.0), (20.0, -hy + 22.0, 0.06), "MI_ConcreteSmooth")   # entrance plaza (street side)
-    b.box((-3.0, -hy + 22.0, 0.0), (3.0, 12.0, 0.05), "MI_ConcreteSmooth")    # path to the wheel
-    b.box((3.0, 6.0, 0.0), (hx - 6.0, 18.0, 0.05), "MI_ConcreteSmooth")       # ...and on to the promenade
-    cx, cy, hub, R = 22.0, 20.0, 60.0, 50.0                                   # the wheel: centre (x, y), hub z, radius
+    b.box((-hx, -hy, 0.0), (-hx + 6.0, hy, 0.05), "MI_ConcreteSmooth")         # promenade, gulf side (-X)
+    b.box((-hx, -hy, 0.0), (hx, -hy + 6.0, 0.05), "MI_ConcreteSmooth")         # promenade, sea side (-Y)
+    b.box((-hx, -hy, 0.05), (-hx + 0.1, hy, 1.1), "MI_PaintedMetal")             # the waterfront railing
+    b.box((-hx, -hy, 0.05), (hx, -hy + 0.1, 1.1), "MI_PaintedMetal")
+    b.box((hx - 30.0, hy - 22.0, 0.0), (hx, hy, 0.06), "MI_ConcreteSmooth")    # entrance plaza (+X +Y corner)
+    b.box((-3.0, -28.0, 0.0), (3.0, hy - 22.0, 0.05), "MI_ConcreteSmooth")     # path south to the wheel
+    b.box((3.0, hy - 28.0, 0.0), (hx - 30.0, hy - 22.0, 0.05), "MI_ConcreteSmooth")
+    cx, cy, hub, R = 0.0, -40.0, 60.0, 50.0                                   # the wheel: centre (x, y), hub z, radius
     n = 48
-    for side in (-3.0, 3.0):                                                  # two rims, 6 m apart across X
-        x = cx + side
-        pts = [(x, cy + R * math.cos(2 * math.pi * k / n), hub + R * math.sin(2 * math.pi * k / n)) for k in range(n)]
+    for side in (-3.0, 3.0):                                                  # two rims, 6 m apart across Y
+        y = cy + side
+        pts = [(cx + R * math.cos(2 * math.pi * k / n), y, hub + R * math.sin(2 * math.pi * k / n)) for k in range(n)]
         for k in range(n):
             b.beam(pts[k], pts[(k + 1) % n], 0.9, "MI_PaintWhite")
         for k in range(0, n, 3):                                              # spokes
-            b.beam((x, cy, hub), pts[k], 0.25, "MI_Steel")
+            b.beam((cx, y, hub), pts[k], 0.25, "MI_Steel")
     for k in range(0, n, 3):                                                  # cross ties between the rims
         a = 2 * math.pi * k / n
-        y, z = cy + R * math.cos(a), hub + R * math.sin(a)
-        b.beam((cx - 3.0, y, z), (cx + 3.0, y, z), 0.35, "MI_PaintWhite")
-    b.beam((cx - 5.0, cy, hub), (cx + 5.0, cy, hub), 2.4, "MI_Steel")          # the axle and hub
+        x, z = cx + R * math.cos(a), hub + R * math.sin(a)
+        b.beam((x, cy - 3.0, z), (x, cy + 3.0, z), 0.35, "MI_PaintWhite")
+    b.beam((cx, cy - 5.0, hub), (cx, cy + 5.0, hub), 2.4, "MI_Steel")          # the axle and hub
     for k in range(32):                                                       # gondolas hang below the rim
         a = 2 * math.pi * k / 32
-        y, z = cy + (R + 1.5) * math.cos(a), hub + (R + 1.5) * math.sin(a) - 2.2
+        x, z = cx + (R + 1.5) * math.cos(a), hub + (R + 1.5) * math.sin(a) - 2.2
         colour = ("MI_CraneRed", "MI_SignCyan", "MI_PaintYellow", "MI_SignPink")[k % 4]
-        b.box((cx - 1.4, y - 1.2, z - 1.2), (cx + 1.4, y + 1.2, z + 1.2), colour)
-        b.box((cx - 1.45, y - 1.25, z + 0.1), (cx + 1.45, y + 1.25, z + 0.9), "MI_GlassClear")
-    for side in (-1, 1):                                                      # A-frame legs, splayed across X
-        top = (cx + side * 5.0, cy, hub)
-        for dy in (-18.0, 18.0):
-            b.beam((cx + side * 16.0, cy + dy, 0.0), top, 1.6, "MI_PaintWhite")
-        b.box((cx + side * 16.0 - 2.0, cy - 20.0, 0.0), (cx + side * 16.0 + 2.0, cy + 20.0, 0.8), "MI_ConcreteSmooth")
+        b.box((x - 1.2, cy - 1.4, z - 1.2), (x + 1.2, cy + 1.4, z + 1.2), colour)
+        b.box((x - 1.25, cy - 1.45, z + 0.1), (x + 1.25, cy + 1.45, z + 0.9), "MI_GlassClear")
+    for side in (-1, 1):                                                      # A-frame legs, splayed across Y
+        top = (cx, cy + side * 5.0, hub)
+        for dx in (-18.0, 18.0):
+            b.beam((cx + dx, cy + side * 16.0, 0.0), top, 1.6, "MI_PaintWhite")
+        b.box((cx - 20.0, cy + side * 16.0 - 2.0, 0.0), (cx + 20.0, cy + side * 16.0 + 2.0, 0.8), "MI_ConcreteSmooth")
     lo = hub - R - 3.7                                                        # the boarding hall under the low point
-    b.box((cx - 12.0, cy - 9.0, 0.0), (cx + 12.0, cy + 9.0, 0.3), "MI_ConcreteSmooth")
-    b.box((cx - 12.0, cy - 9.0, 0.3), (cx + 12.0, cy - 8.8, lo - 0.5), "MI_GlassClear")
-    b.box((cx - 12.0, cy + 8.8, 0.3), (cx + 12.0, cy + 9.0, lo - 0.5), "MI_GlassClear")
-    b.box((cx - 12.5, cy - 9.5, lo - 0.5), (cx + 12.5, cy + 9.5, lo - 0.2), "MI_PaintedMetal")
-    b.box((cx + 12.0, cy - 9.0, 0.3), (cx + 12.2, cy + 9.0, lo - 0.5), "MI_TileWhite")
-    b.box((cx + 12.1, cy - 4.0, 2.2), (cx + 12.3, cy + 4.0, 3.6), "MI_SignPink")   # the ticket-hall sign
-    for (x, y) in ((-30.0, -60.0), (-30.0, -30.0), (-30.0, 0.0), (-30.0, 30.0), (0.0, 60.0), (30.0, 60.0),
-                   (hx - 9.0, -40.0), (hx - 9.0, -10.0), (hx - 9.0, 50.0), (-10.0, hy - 9.0), (20.0, hy - 9.0)):
+    b.box((cx - 9.0, cy - 12.0, 0.0), (cx + 9.0, cy + 12.0, 0.3), "MI_ConcreteSmooth")
+    b.box((cx - 9.0, cy - 12.0, 0.3), (cx - 8.8, cy + 12.0, lo - 0.5), "MI_GlassClear")
+    b.box((cx + 8.8, cy - 12.0, 0.3), (cx + 9.0, cy + 12.0, lo - 0.5), "MI_GlassClear")
+    b.box((cx - 9.5, cy - 12.5, lo - 0.5), (cx + 9.5, cy + 12.5, lo - 0.2), "MI_PaintedMetal")
+    b.box((cx - 9.0, cy + 12.0, 0.3), (cx + 9.0, cy + 12.2, lo - 0.5), "MI_TileWhite")
+    b.box((cx - 4.0, cy + 12.1, 2.2), (cx + 4.0, cy + 12.3, 3.6), "MI_SignPink")   # the ticket-hall sign
+    for (x, y) in ((-40.0, -10.0), (-40.0, 20.0), (-40.0, 50.0), (-25.0, -70.0), (10.0, -70.0), (35.0, -70.0),
+                   (20.0, 0.0), (20.0, 30.0), (-20.0, 60.0), (10.0, 60.0)):
         b.box((x - 0.9, y - 0.25, 0.4), (x + 0.9, y + 0.25, 0.5), "MI_Wood")       # benches
         b.box((x - 0.8, y - 0.2, 0.0), (x - 0.6, y + 0.2, 0.4), "MI_PaintedMetal")
         b.box((x + 0.6, y - 0.2, 0.0), (x + 0.8, y + 0.2, 0.4), "MI_PaintedMetal")
@@ -1412,12 +1496,23 @@ def ferris_wheel_park(material, Builder):
 
 
 CIVIC_NOTES["Park_FerrisWheel"] = (
-    "Placeholder 観覧車 waterfront park, 110 x 200 plot (street -Y, bay +Y, gulf +X): a 100 m wheel on a 60 m hub "
-    "(two white rims, 32 gondolas, A-frame legs) in the water corner, a boarding hall under its low point, a promenade "
-    "along both waterfront edges. The game assumes: the wheel's plane is Y-Z (its circle faces +-X), the wheel does not "
+    "Placeholder 観覧車 waterfront park, 110 x 160 plot (the sea -Y, the gulf -X, the entrance at +X +Y): a 100 m "
+    "wheel on a 60 m hub (two white rims, 32 gondolas, A-frame legs) in the water corner, a boarding hall under its low "
+    "point, a promenade along both waterfront edges. The game assumes: the wheel's plane is X-Z (its circle faces "
+    "+-Y, the open sea), the wheel does not "
     "turn yet (a later runtime job: rotate a separate rim + gondola object), and the collider is the mesh itself.")
 _BUILD_ALL_PLAZA = build_all
 
 
 def build_all(material, Builder):
     return _BUILD_ALL_PLAZA(material, Builder) + [ferris_wheel_park(material, Builder)]
+
+
+# the 2026-10-03 review's Japanese city types (gangs, pachinko, shotengai, danchi, hotels, the construction site, the
+# arena, the suburban mall + cinema, the campus, the small shops, the broadcast centre): blender/tools/library_jp_city.py
+CIVIC_NOTES.update(__import__("library_jp_city").NOTES)
+_BUILD_ALL_FERRIS = build_all
+
+
+def build_all(material, Builder):
+    return _BUILD_ALL_FERRIS(material, Builder) + __import__("library_jp_city").build_all(material, Builder)

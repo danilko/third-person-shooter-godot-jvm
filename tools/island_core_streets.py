@@ -73,18 +73,28 @@ STREETS = [
     # car park at x ~150 fronts it), then north to a T on wangan_dori (144 m from its x 254 junction).
     dict(name="kojo_waku", first="chuo_dori", corners=[(-135.0, -800.0), (110.0, -800.0), (110.0, -429.0)],
          last="wangan_dori"),
-    # THE SUBURB LOOP (PLAN.md, the plan's `kogai_michi` "suburb loop"): the suburb's land lies OUTSIDE the dike (the
-    # waterfront between the ring and the south-east shore, y -700..-880), and nothing reached it -- kogai_michi ends
-    # on the ring. A U off the ring's two junctions either side of it: down x 886, along y -800, up x 1160; the dike
-    # stage ramps both legs up onto the crest (island_dike raise, 5 %). The legs are ramps, so the grid planner's rows
-    # cannot T onto them: the suburb's buildings front the loop itself (its 270 m bottom leg, both sides).
-    # The EAST leg bends south-east before it meets the ring (the (1215, -705) corner, 2026-09-29): straight north it
-    # left the pad 40 deg from ring_kita__6's own arm, its mouth solved 46 m out, and the kerb corner between the two
-    # lay across ring_kita__6_F1 (probe_road_clear). From the south-east the arm is ~70 deg from ring_kita__6 and ~125
-    # from ring_kita__5; the elevated Main line (x 1250) passes over it 35 m on.
-    dict(name="kogai_loop", first="ring_kita", corners=[(886.0, -672.0), (886.0, -800.0), (1160.0, -800.0),
-                                                       (1215.0, -705.0), (1161.0, -610.0)],
-         last="ring_kita"),
+    # THE BLOCKS BEHIND THE BUILDINGS (user, 2026-10-03: "reduce large vacancy behind buildings, each building facing a
+    # street, add streets if needed"). Measured with a deep-vacancy scan (flat land > 48 m from any street a building
+    # can front): these three were the largest built-up pockets the grid planner cannot reach (one road only, or a
+    # junction too near). nishi_ura: the foothill triangle north of rinkai_dori, west of nishi_dori's bend -- a U from a
+    # T on rinkai_dori up the west side, across the foot and down onto nishi_dori.
+    # (its T on nishi_dori is at x -790: at x -720 the turn into it ran past the Blue line's 踏切 unit at x -723)
+    dict(name="nishi_ura", first="rinkai_dori", corners=[(-1060.0, -313.6), (-1060.0, -210.0), (-900.0, -125.0),
+                                                        (-790.0, -125.0), (-790.0, -204.6)], last="nishi_dori"),
+    # yamasoi: the strip between nishi_dori__3 and the massif's foot, 70 m inside nishi_dori, parallel to it, from a T
+    # on nishi_dori__3 (clear of the clinic and fire branch plots there) to a T on nishi_dori__4 north of the touge's
+    dict(name="yamasoi", first="nishi_dori", corners=[(-300.0, -124.3), (-331.0, -61.0), (-250.0, 110.0),
+                                                     (-235.0, 190.0), (-149.0, 180.0)], last="nishi_dori"),
+    # kojo_minami: the industry south of kojo_waku's east-west leg (between chuo_dori and the Harbour line, down to the
+    # dike) -- every grid line there met kojo_waku alone. A U off that leg, 135 m wide, its bottom 45 m inside the
+    # dike's land-side toe, so the factories front it on both sides.
+    dict(name="kojo_minami", first="kojo_waku", corners=[(-65.0, -800.0), (-65.0, -965.0), (70.0, -965.0),
+                                                        (70.0, -800.0)], last="kojo_waku"),
+    # (kojo_ura, the `after` street east of the old campus plot, went 2026-10-03: the campus is its real 260 x 220 now
+    # and fills that block. The `after` mechanism stays for the next street that must hang off the grid.)
+    # (THE SUBURB LOOP that stood here -- a U outside the dike whose legs were ramps onto the crest -- went 2026-10-03:
+    # the dike swings south round the suburb now, and `kogai_loop` is in the arterials input, inside it, at grade;
+    # tools/island_suburb_dike.py)
     # THE CENTRAL STATION'S 駅前ロータリー (user, 2026-09-28: the Tokyo Station placeholder is retired -- Central is the
     # kit's elevated hub -- and its forecourt gets "parking entrance / bus stop etc like a Japanese central hub"). A
     # ONE-WAY loop, two lanes, clockwise (Japan keeps left, so a rotary turns clockwise): in from ekimae_dori at x 690,
@@ -95,6 +105,33 @@ STREETS = [
     dict(name="ekimae_rotary", first="ekimae_dori", corners=[(690.0, 100.0), (690.0, 150.0), (880.0, 150.0),
                                                             (880.0, 100.0)],
          last="ekimae_dori", one_way=True, lanes=2, walks=(4.0, 2.0), spacing=10.0),
+    # VACANT BLOCKS (user, 2026-10-03: "add more streets around vacant blocks"): frames the grid planner's lines hang
+    # off (island_plan `koba_w`, `city_n`).
+    # Inside C1's north half the two blocks between yamate_dori (y ~295) and the viaduct had no street: C1 above is
+    # elevated, so a line there met one road. An east-west street at y 465 across the three trunk roads, in two halves
+    # meeting naka_hondori at one crossroads (the second half REUSEs the first's junction); 68 m south of the diamond's
+    # junction on naka_hondori (y ~533), 160 m north of yamate_dori's.
+    dict(name="c1_naka_yoko", first="nishi_hondori", corners=[(275.0, 465.0), (600.0, 465.0)], last="naka_hondori"),
+    dict(name="c1_naka_yoko_e", first="naka_hondori", corners=[(600.0, 465.0), (975.0, 465.0)],
+         last="higashi_hondori"),
+    # the west industrial block (x -1050..-500 between nishi_cho_413 y -413 and the dike, the Blue line down x -800,
+    # Residential station y -419..-603, Light Industry station y -883..): ~20 ha with no street. When this runs only
+    # kichi_dori exists there (nishi_cho_413 is the planner's, the dike's side road comes later), so the frame is a U
+    # off kichi_dori: west along y -655 across the track (52 m south of Residential's platform), down x -960, and back
+    # along y -783 -- the legs in line with the koba rows east of kichi_dori. The koba_w lines hang off it.
+    dict(name="koba_waku_w", first="kichi_dori", corners=[(-500.0, -655.0), (-960.0, -655.0), (-960.0, -783.0),
+                                                         (-500.0, -783.0)], last="kichi_dori"),
+    # THE STATION 商店街 (the second review, 2026-10-03): one local shopping street off each housing station's front,
+    # a short block street the shops line both sides of (island_buildings.STREET_MIXES keys the shop-house mix on the
+    # "eki_ginza" name). Castle Town's is its 参道, jokamachi_sando (island_site_access), keyed the same way.
+    # Suburb: west of the station (x 834..926), from rinkai_dori south to wangan_dori at the station's front
+    dict(name="eki_ginza_suburb", first="rinkai_dori", corners=[(790.0, -270.0), (790.0, -428.0)],
+         last="wangan_dori"),        # (ekimae_suburb, the station's own street, is built later -- island_site_access)
+    # Residential North: west off the farm frame's leg (nodo_waku x 1045) level with the station, then south to nishi_dori
+    dict(name="eki_ginza_res_north", first="nodo_waku", corners=[(1045.0, 850.0), (960.0, 850.0), (960.0, 779.0)],
+         last="nishi_dori"),
+    # (Residential's is the planner's x -650 line east of the station, koba_machi_w_650 -- an authored leg here sat 50 m
+    # from the koba x -650 line and took the whole koba grid down with it)
     # (north_e has no authored street: the strip between the Main line and the ring is 120 m wide and every road
     # into it lands on the ring's dike ramp -- an L off nishi_dori at x 1170 made a 43 % pad on the ramp.)
 ]
@@ -134,8 +171,15 @@ def _tee(net, prefix, at):
             continue
         for u in r.points:
             p = net.points[u]
-            d = math.hypot(p.pos[0] - at[0], p.pos[1] - at[1])
-            if d <= REUSE and any(l.type == pm.LINK_JUNCTION for l in p.links) and (best is None or d < best[0]):
+            if not any(l.type == pm.LINK_JUNCTION for l in p.links):
+                continue
+            # the mouth itself, or its junction's CENTRE (a street ending where another authored street's T already
+            # cut the road -- c1_naka_yoko's two halves -- finds the mouths MOUTH m out, past REUSE)
+            mem = [u] + [l.target for l in p.links if l.type == pm.LINK_JUNCTION]
+            cx = sum(net.points[m].pos[0] for m in mem) / len(mem)
+            cy = sum(net.points[m].pos[1] for m in mem) / len(mem)
+            d = min(math.hypot(p.pos[0] - at[0], p.pos[1] - at[1]), math.hypot(cx - at[0], cy - at[1]))
+            if d <= REUSE and (best is None or d < best[0]):
                 best = (d, u)
     if best:
         u = best[1]
@@ -170,14 +214,31 @@ def add(net, s, ground):
     return road
 
 
+#: the block splits (tools/island_block_split.py, derived once and frozen): `after` streets across the big blocks
+SPLITS = os.path.join(rg.ROOT, "assets", "world_source", "pieces", "IslandBlockSplits.json")
+
+
+def all_streets():
+    out = list(STREETS)
+    if os.path.exists(SPLITS):
+        import json
+        for s_ in json.load(open(SPLITS))["splits"]:
+            out.append(dict(s_, corners=[tuple(c) for c in s_["corners"]], after=True))
+    return out
+
+
 def main(argv):
     if not argv:
         raise SystemExit(__doc__)
     path = argv[0]
     net = pm.load_network(path)
-    missing = [s for s in STREETS if s["name"] not in net.roads]
+    STREETS_ = all_streets()
+    missing = [s for s in STREETS_ if s["name"] not in net.roads]
+    if "--check" not in argv:
+        # `after` streets hang off the grid planner's streets: they are added by a second run, `--after`
+        missing = [s for s in missing if bool(s.get("after")) == ("--after" in argv)]
     if "--check" in argv:
-        print("island_core_streets: %d of %d authored streets present" % (len(STREETS) - len(missing), len(STREETS)))
+        print("island_core_streets: %d of %d authored streets present" % (len(STREETS_) - len(missing), len(STREETS_)))
         return 1 if missing else 0
     if not missing:
         print("island_core_streets: every authored street already present")

@@ -24,6 +24,8 @@ and the Empties listed below.
 | `AdultServices.blend` | 風俗ビル (grey-zone, non-explicit) | 5 | F1 reception (lit menu board) + waiting room; F2 host-club lounge (box seats, bar); F3-F4 four private rooms a floor off a corridor; F5 back office (takings safes, camera monitors). No roof access. |
 | `BankSmall.blend` | 銀行 (small branch) | 1 (4.5) | ATM corner (own door), 風除室, lobby (ticket machine), teller counter + glass screen + staff gate, back office, VAULT (0.45 m walls, steel door), staff room + WC, 通用口. |
 | `BankLarge.blend` | 銀行 (main branch) | 3 (5.0 + 4.0 + 4.0) | ATM corner, 風除室, banking hall, high / low counters, back office, MAIN VAULT, 貸金庫, cash-in-transit bay (shutter); F2 consultation booths, manager (safe), meeting room; F3 offices, server room, lockers, canteen. 2 stairs + lift. |
+| `PostOfficeSmall.blend` | 郵便局 (branch, every residential district) | 1 (4.0) | 12 x 10 m on a 15 x 20 m plot: ゆうちょ ATM corner, 記載台, the 窓口 counter (郵便 / 貯金 / 保険) + glass screen + staff gate, back office (desks, 区分棚 shelves, safe, roll cage), staff WC, back door onto the DELIVERY YARD (a POV-1 van); red band, 〒 board, ポスト, two customer bays. |
+| `PostOffice.blend` | 郵便局 (集配 main office, the city) | 3 (5.0 + 4.0 + 4.0) | 36 x 26 m on a 40 x 40 m plot: 風除室, customer hall, 窓口 + ゆうパック counters, ATM corner, restrooms, the office strip (safes), the delivery depot (区分 sorting tables, roll cages) with two dock shutters onto the VAN YARD (a POT-1 box truck, two POV-1 vans); F2 offices + postmaster; F3 offices, server room, lockers, canteen. 2 stairs + lift. |
 | `ParkingGarage.blend` | 立体駐車場 (自走式) | ground + 3 decks | 23 x 40 m; UP ramps west, DOWN ramps east (20 m per 3 m storey = 15 %, 3.5 m wide, stacked), 2.5 x 5.0 bays both sides of a 6 m aisle, wheel stops, parapets, gate booth + arm, a stair tower. |
 | `AirportControlTower.blend` | 空港管制塔 (civil) | block 2 + tower to 36 m | operations block (security lobby, ops office, approach-radar room, briefing) and a tower with a LIFT and stair to a 14 x 14 m glass cab at 36 m (consoles, radar on the roof). |
 | `FashionBuilding.blend` | ファッションビル | 5 (4.5 each) | 30 x 24 m: cosmetics, fashion x2, electronics, the restaurant floor; an escalator atrium, 2 lifts, 4 corner stairs, WC blocks. |
@@ -65,6 +67,9 @@ Everything is placeholder. The fittings are library pieces (`kits/library/librar
 in every building that uses it after a regenerate -- or edit the copy here. What each building most wants:
 * **every building:** a real facade (the shells are flat boxes with punched / ribbon windows), window frames and
   sills, ceilings and lights, skirting, signage.
+* `PostOffice` / `PostOfficeSmall`: the JP Post logo and the 〒 board, a real ポスト model, the 窓口 numbered signs;
+  the vans (`assets/vehicles/POV1`, `POT1`, block placeholders from `blender/tools/make_placeholder_cars.py`) want
+  their red-and-white livery and the 〒 mark.
 * `Koban` / `PoliceStation`: the 旭日章 emblem, the 赤色灯 lamps and the KOBAN / 警察署 boards; barred cell DOORS (the
   game hangs a plain leaf in each cell opening today); real racks with the weapons' own silhouettes; a sally-port or
   garage for patrol cars.

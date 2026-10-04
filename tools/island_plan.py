@@ -253,6 +253,19 @@ STREET_REGIONS = (
     # boxes reach NORTH past the south-west grid's y -603 street / to wangan_dori: their other anchor was the ring road,
     # which is the raised dike now and not a crossing (island_dike), so a line needs a street north as well as the 側道
     ("koba", (-1000.0, -1040.0, -300.0, -590.0), "block", 130.0, 64.0),
+    # VACANT BLOCKS (user, 2026-10-03: "add more streets around vacant blocks"): koba_w and city_n hang their lines off
+    # the AUTHORED frames island_core_streets adds there (`koba_waku_w*`, `c1_naka_yoko*`); before those, every line
+    # in these blocks met ONE road and was dropped (no dead ends). Explicit line sets, boxes reaching the roads.
+    # koba_w: the west industrial block, either side of the Blue line (x -800): north-south lines from nishi_cho_413
+    # (y -413) down onto the authored U (y -655), one each side of the track
+    # (2026-10-03, the vacancy re-scan) the lines sit in the MIDDLE of the two empty blocks either side of the Blue
+    # line / Residential station (x -800, y -419..-603): x -910 (block x -1000..-820) and x -650 (block x -780..-500);
+    # at -870 / -700 one was dropped and the other hugged the track, leaving ~8 ha with no street
+    ("koba_w", (-1080.0, -800.0, -480.0, -400.0), "block", (-910.0, -650.0), ()),
+    # (Residential station's 商店街 is the x -650 line's north half, koba_machi_w_650: island_buildings.STREET_MIXES)
+    # city_n: inside C1's north half, between yamate_dori (y ~295) and c1_naka_yoko (y 465); the tower site stands at
+    # (680, 365), x 623..737
+    ("city_n", (250.0, 270.0, 1000.0, 490.0), "block", (360.0, 800.0), ()),
     # THE FARM IS JAPANESE PADDY SECTIONS (圃区, user 2026-09-25): 300 m east-west x 100 m north-south between farm
     # roads, laid round FARM STATION (1110, 1320, the Main line's terminus). The station road is the east-west line
     # y 1320, ending in a T on the station-front road x 1080; the 2 x 2 core is x 510..1080 x y 1220..1420, with a
@@ -277,10 +290,23 @@ STREET_REGIONS = (
     # (x 180..1020) is left out: a street under a descending ramp had 4.5 m of clearance
     ("north", (-330.0, 560.0, 180.0, 810.0), "lane", 120.0, 44.0),
     ("north_e", (1020.0, 560.0, 1250.0, 810.0), "lane", 120.0, 44.0),
-    ("industry", (-300.0, -1040.0, 280.0, -410.0), "block", 200.0, 200.0),
+    # (2026-10-03, the vacancy pass) 200 -> 140 m: a 200 m plot left ~100 m of empty ground behind every factory.
+    # The east-west lines are listed, clear of y -650, where Industry station's access road meets kojo_waku
+    ("industry", (-300.0, -1040.0, 280.0, -410.0), "block", 140.0, (-950.0, -810.0, -540.0)),
     ("logistics", (-820.0, -1540.0, -60.0, -1040.0), "block", 220.0, 220.0),
     # ONE ROW A SIDE (user, 2026-09-26): a 150 m square is two frontage rows and a car park of nothing in between
-    ("suburb", (880.0, -1060.0, 1300.0, -330.0), "block", 150.0, 64.0),
+    # (2026-10-03) from x 1000: the suburb's west is the station front (Suburb station's access T on wangan_dori at x 929)
+    # and kogai_michi; the loop inside the dike (island_suburb_dike.py) is authored
+    # ...and not inside the loop: the water resort (150 x 70) stands there (a hole, record box)
+    ("suburb", (1000.0, -1060.0, 1300.0, -330.0), "block", 150.0, 64.0, ((1000.0, -1000.0, 1130.0, -690.0),)),
+    # THE VACANCY PASS (user, 2026-10-03: "reduce large vacancy behind buildings ... add streets"): single lines found
+    # by a search over the deep-vacancy pockets (flat land > 48 m from any street) with this planner's own rules, each
+    # the line that served the most empty ground; planned last, against everything above
+    ("fill_c1w", (-254.0, 74.0, 506.0, 850.0), "block", (), (410.0,)),          # inside C1's west curve
+    ("fill_c1w2", (-254.0, 218.0, 506.0, 970.0), "block", (75.0,), (620.0,)),
+    ("fill_c1sw", (-266.0, -662.0, 474.0, 30.0), "block", (15.0,), (-345.0,)),  # C1's south-west, chuo_dori side
+    ("fill_wek", (-894.0, -898.0, -254.0, -170.0), "block", (-595.0,), ()),     # Residential station's west front
+    ("fill_r390", (-560.0, -640.0, -300.0, -280.0), "block", (-390.0,), ()),     # the sw grid's x -390 line, when a site cut it short
 )
 #: RESERVED GROUND (PLAN.md 3.30 L3/L4, user 2026-09-26: "the land-planning portion"): Godot-frame boxes
 #: (x0, z0, x1, z1) that no generated BUILDING may stand on -- their contents are placed later, by region, once
@@ -299,17 +325,38 @@ RESERVES = (
     ("military_airfield", (-1015.0, 1443.0, -475.0, 1491.0)),
     ("military_pier", (-1020.0, 1301.0, -740.0, 1371.0)),     # the pier (z 1300..1350) + the ship's berth south of it
                                                                # (centred on z 1336: the MilitaryPier composite's frame)
+    # the Wangan's west TERMINAL (NEXT PASS step 2, 2026-10-02): its junction and turnaround loop on a reclaimed platform
+    # (island_reshape.WANGAN_TERMINAL_FILL) -- no building inside the loop
+    ("wangan_terminal", (-1000.0, 1100.0, -820.0, 1225.0)),
+    # the MARINA + FERRY TERMINAL (user, 2026-10-03: the yacht "reserve ground now" and the ferry terminal): the cove
+    # strip OUTSIDE the dike west of the Wangan terminal (land at ~5.6 m, deep water to -17 m at its south edge). Ground
+    # only: no road reaches it yet (the dike crest is the ring road at ~13 m) -- an access ramp or a dike gap comes with
+    # the yacht / terminal models
+    ("harbour_marina", (-1170.0, 990.0, -1005.0, 1052.0)),
+    # the expressway PARKING AREA inside the Wangan terminal loop (the Daikoku shape: a PA inside a loop junction;
+    # third review, user 2026-10-03): car meets, race starts, a police checkpoint -- reached from the loop road the way
+    # every car park meets its street, so it needs no ramp of its own
+    ("wangan_pa", (-970.0, 1142.0, -866.0, 1196.0)),
+    # the airport's AIR-CARGO shed (the third review: a mission building on the airport island, cargo theft): the
+    # pocket between the forecourt (to z 1727) and the apron (from z 1784), west of kuko_service; its docks face the
+    # apron (south)
+    ("airport_cargo", (1050.0, 1730.0, 1120.0, 1780.0)),
     # the Bay Quarter's waterfront park and its FERRIS WHEEL (user, 2026-09-29): the gulf's east shore between ring_kita
     # (z 672) and the suburb loop's west leg (x 886, the resort hotels beyond) -- a bayside leisure park beside the
     # seaside hotels, Odaiba's Palette Town / Kasai Rinkai Park precedent. (It used to be drawn over x 760..1000, z 700..960,
     # which the loop and hotels 1-2 were later laid through.)
-    ("waterfront_park", (765.0, 690.0, 875.0, 890.0)),
-    # three resort hotels INSIDE the suburb loop (kogai_loop: legs x 886 / 1160, its bottom leg along z 800), fronting
-    # that leg -- the flat ground there is 78 m deep. (2026-09-28: they had been laid across the loop's bottom leg and
-    # #3 across the elevated Main line at x 1250; street sites now, so no street is planned through them)
-    ("resort_hotel_1", (905.0, 727.0, 975.0, 787.0)),
-    ("resort_hotel_2", (990.0, 727.0, 1060.0, 787.0)),
-    ("resort_hotel_3", (1075.0, 727.0, 1145.0, 787.0)),
+    # (2026-10-02 night, the waterfront review: the Suburb WB entrance `shuto_sb_on` runs through the old box, z 690..890;
+    # the park moved SOUTH of it, onto the plain that runs on to the beach at z ~960 -- its wheel faces the open sea)
+    # (2026-10-03: the dike's suburb stretch now runs down x 945 beside it, so the park is OUTSIDE the dike, beach
+    # leisure, reached on foot over the dike; no road reaches it)
+    ("waterfront_park", (760.0, 798.0, 870.0, 958.0)),
+    # the resort hotels (history: inside the old suburb loop, then 2026-10-02 night on the beach front OUTSIDE the dike).
+    # 2026-10-03 (user: "homes behind the dike, only beach leisure outside"): the ring swings south round the suburb
+    # (tools/island_suburb_dike.py), so the hotels stand INSIDE it, in the 68 m band between the suburb loop's bottom leg
+    # (kogai_loop, z 984) and the dike's land-side toe (~z 1055) -- their street side north, the sea over the dike. Two fit
+    # the band (190 m); the third was dropped.
+    ("resort_hotel_1", (980.0, 994.0, 1060.0, 1056.0)),
+    ("resort_hotel_2", (1070.0, 994.0, 1150.0, 1056.0)),
     # THE LOGISTICS HUB (user, 2026-09-28: "fill the empty middle with a logistics park ... restrict to 1, or 2 if it
     # makes sense, for level design"): the port platform's middle, between the base's gate road (kichi_mon_michi, x -460)
     # and the container terminal, south of the port road (kichi_dori, z 1230). ONE truck terminal west of the logistics
@@ -322,7 +369,10 @@ RESERVES = (
     # rebuild. Each is already reached by a road: the ring / dike side road, the airport's own loop roads, yamate_dori.
     # (The bay MARKET needs no reserve: the gulf head between wangan_dori and the ring's dike is one 84 m block fronting
     # both, and Fish Market station's 駅前 row already lines it with shop-houses -- the market's types replace them there.)
-    ("fish_market", (420.0, 676.0, 716.0, 775.0)),             # (x 300 -> 420, 2026-09-29: the Wangan's leg and
+    # (2026-10-02 night, the waterfront review: the Wangan's deck and both Suburb ramps crossed the old box's east part,
+    # x 585..716 -- FishMarket stood under the viaduct; the market keeps the west part, clear of all three)
+    ("fish_market", (405.0, 705.0, 570.0, 775.0)),   # and only z 705..775: the dike's slope ends
+    #                                                    at ~705 and the shore is at 762 (the quay deck runs on to 775)             # (x 300 -> 420, 2026-09-29: the Wangan's leg and
                                                                # the W JCT's flyovers pass over x 350..420)             # the 魚市場 + small-boat quay outside the dike, reached
                                                                # from the ring / dike side road (hatoba_dori is gone)
                                                                # (3.18(h), the Tsukiji/Toyosu pattern)
@@ -337,7 +387,7 @@ RESERVES = (
     # (island_expressway FORE_BOX) with its lanes and footways, between the Airport station's west wall and the
     # terminal's curb canopy; the AirportForecourt composite dresses it (tools/building_kit/site_airport_forecourt.py)
     ("airport_forecourt", (1045.0, 1611.0, 1233.0, 1727.0)),
-    ("tokyo_tower_parking", (728.0, -345.0, 792.0, -297.0)),  # the Tower's car park on yamate_dori, beside its east
+    ("broadcast_centre_parking", (728.0, -345.0, 792.0, -297.0)),  # the Tower's car park on yamate_dori, beside its east
                                                                # face (B9 kerb ramp); it has no car park of its own yet
     # THE CENTRAL STATION'S 駅前広場 (user, 2026-09-28): the ground between ekimae_dori (z -100, its paved edge -118.5)
     # and the station's south face (z -180), from naka_hondori's paved edge (x 619) to higashi_hondori's (x 956). The
@@ -360,7 +410,10 @@ STREET_DROP = (
 STREET_NAMES = {"city": ("machi", "cho"), "sw": ("nishi_machi", "nishi_cho"), "farm": ("hata_michi", "hata_yoko"),
                 "farm_w": ("hata_michi_w", "hata_yoko_w"), "farm_s": ("hata_michi_s", "hata_yoko_s"), "farm_n": ("hata_michi_n", "hata_yoko_n"),
                 "north": ("kita_machi", "kita_cho"), "north_e": ("kita_machi_e", "kita_cho_e"), "industry": ("kojo_michi", "kojo_yoko"),
-                "koba": ("koba_machi", "koba_cho"),
+                "koba": ("koba_machi", "koba_cho"), "koba_w": ("koba_machi_w", "koba_cho_w"),
+                "city_n": ("machi_n", "cho_n"),
+                "fill_c1w": ("machi_w", "cho_w"), "fill_c1w2": ("machi_w2", "cho_w2"), "fill_c1sw": ("machi_sw", "cho_sw"),
+                "fill_wek": ("ekimae_machi_w", "ekimae_cho_w"), "fill_r390": ("nishi_machi_f", "nishi_cho_f"),
                 "logistics": ("butsuryu_michi", "butsuryu_yoko"), "suburb": ("kogai_machi", "kogai_cho")}
 
 
@@ -445,12 +498,9 @@ W2_OFF_Y = 360.0
 E2_ON_Y = 360.0      # the airport -> C1 ramp crosses C1's EAST STRAIGHT (y ~95), never its SE corner
 E2_FLY_Z = 17.5
 #: THE WANGAN, phase 1 (R1: long sweepers, not a ruler; user 2026-09-30: "the Wangan to airport lane is built later,
-#: completely outside C1"): its WEST END is a T on the dike road (ring_kita) at WG_TERMINAL (a ring ramp there is
-#: PLAN.md 1b's follow-up), then the coast east to a quarter-turn north (WG_TURN_*) onto chuo_dori's median, over it
+#: completely outside C1"): its WEST END (a terminal loop since 2026-10-02, WG_LOOP_*), then the coast east to a quarter-turn north (WG_TURN_*) onto chuo_dori's median, over it
 #: to C1's west side (the W JCT). WG_CENTRE's vertices east of the turn are phase 2's line (PHASE2_CORRIDOR below
 #: holds that ground); the build takes only those west of the turn. Record frame.
-#: (WG_TERMINAL moved 2026-10-02 north-west onto the west coast road, see the notes above WG_WEST_PATH)
-WG_TERMINAL = (-1170.0, -900.0)
 WG_CENTRE = [(-1030.0, -1030.0), (-940.0, -1113.0), (-700.0, -1128.0), (-350.0, -1126.0), (-60.0, -1112.0),
              (150.0, -1060.0), (370.0, -840.0), (470.0, -805.0), (640.0, -795.0), (780.0, -655.0),
              (930.0, -505.0), (1060.0, -500.0)]
@@ -459,38 +509,32 @@ WG_Z = 12.0                 # the deck along the coast
 WG_TURN_Y = -1127.0         # the turn's corner, on the coast line, below chuo_dori
 WG_TURN_R = 100.0           # the quarter-turn north onto chuo_dori's line (a 50 km/h class JCT curve)
 #: THE COMPLETE WANGAN (user, 2026-09-30, second session: "make the Wangan from the airport spur to the west coastline
-#: the main line, the connection to C1 west a ramp"). The MAINLINE runs from the T on the dike road (WG_TERMINAL) along
+#: the main line, the connection to C1 west a ramp"). The MAINLINE runs from its west-end terminal loop along
 #: the coast, passes over Harbour station (lifted, see WG_HARBOUR_*), up the waterfront corridor and ends at a
 #: joint near the spur (WG_EAST_JOINT), where it parts into T1 (-> the spur SB, the airport) and T2 (the spur NB ->).
 #: The connector to C1 west is now its own road from a joint at CONN_J_Y, fed by Y1 (Wangan EB ->) and feeding Y2
 #: (-> Wangan WB, a flyover); Y3 (Wangan WB -> it) and Y4 (it -> Wangan EB) complete the four movements. Record frame.
-#: R2 (user, 2026-09-30): the west end is a STRAIGHT DESCENT -- the mainline leaves the dike road SQUARE to it (WG_MAIN[0]
-#: lies on the ring's perpendicular at WG_TERMINAL) and comes down its first ~120 m on that straight, then turns east
-#: offshore. No toll plaza for now; one can be placed on that straight later (a library composite, no road change).
 #: J0 (2026-10-01, the lane-split T): the mainline ENDS on the straight waterfront diagonal and each carriageway splits
 #: lane by lane into four one-lane ramps (分岐 / 合流), NW -> SE: T3 | T1 | median | T4 | T2 (see t_split)
 WG_J0 = (880.0, -530.0)
-WG_MAIN = [(-1270.0, -900.0), (-700.0, -1128.0), (-350.0, -1130.0), (-60.0, -1133.0),
+WG_MAIN = [(-850.0, -1128.0), (-700.0, -1128.0), (-350.0, -1130.0), (-60.0, -1133.0),
            (150.0, -1060.0), (370.0, -840.0), (470.0, -805.0), (640.0, -795.0), (780.0, -655.0), WG_J0]
-#: The west end after the square T: a straight of WG_WEST_STRAIGHT (the descent; a toll plaza may stand on it later),
-#: then ONE left arc of WG_WEST_R round the island's SW corner over the sea, out on its tangent to WG_MAIN[1]
-#: (2026-10-01 review: a 126 deg turn squeezed into ~100 m made it a ~50 m hairpin at 80 km/h). 110 m clips the
-#: military pier's west tip (x -1020, y -1301); 100 m after 160 m leaves its centreline ~30 m clear. WG_MAIN[0] is
-#: only the straight's DIRECTION (square to the ring at WG_TERMINAL); its radius in WG_MAIN_R is unused.
-#: OUT OF THE BAY, UP THE WEST COAST (user, 2026-10-02: "not so much in sea, more up in land ... further west north" and
-#: "unblock the military west/south side completely", reference/wangan_west_proposal_v8_20226-10-02.png). The old T
-#: square on the coast road's west diagonal sent the mainline 300 m into the bay and hooked it back R100: 617 m of deck
-#: over water, 30 m from the military pier (x -1020..-740, y -1301..-1371), across its approach from the open sea. Now
-#: the T is on the west coast road's north-south stretch (WG_TERMINAL), the mainline leaves it heading west, runs DOWN
-#: THE LAND STRIP OUTSIDE THE DIKE through WG_WEST_PATH's corners and then east along the bay's north shore onto the
-#: coast line: 184 m over water (the shore), 210 m from the pier, nothing south of y -1130 -- the bay is open. The T's
-#: own bend is as tight as the strip allows (R ~34, posted 40, its own road `wangan`); the rest keeps 80.
-#: Measured and not taken: a T at x -840 (85 m over water, 129 m from the pier, 380 m nearer the port -- the port's real
-#: fix is its own interchange, the 2026-10-02 review's R1).
-WG_WEST_PATH = [(-1240.0, -900.0), (-1220.0, -985.0), (-1020.0, -1062.0)]
-WG_WEST_RADII = [40.0, 120.0, 250.0]
-WG_WEST_STRAIGHT = 0.0      # (unused while WG_WEST_PATH is set)
-WG_WEST_R = 80.0            # (unused while WG_WEST_PATH is set)
+#: THE WEST END IS A TERMINAL LOOP (NEXT PASS step 2, 2026-10-02, user: "ground terminal loop"; the second independent
+#: review: a west-end TURNAROUND joins the two one-way systems in BOTH directions, where a port-side PA would join only
+#: one). The mainline comes down to the ground on its straight coast line and ends at WG_LOOP_J, a signalised 4-arm
+#: junction on a small reclaimed platform outside the dike (island_reshape.WANGAN_TERMINAL_FILL): east the mainline, north
+#: a short access road to a T on the dike road (ring_kita), west and south the two ends of a ONE-WAY turnaround loop, a
+#: rounded square (WG_LOOP_BOX, corners WG_LOOP_R) laid counter-clockwise -- out west, back from the south. WB -> the
+#: loop -> EB turns a car round; the access road serves the port and the west coast both ways. It replaces the west T on
+#: the coast road and its R 34 bend, and the port's EB entrance (port_on), whose T stood here. Record frame.
+#: (Was: the T on the west coast road at (-1170, -900) with WG_WEST_PATH's corners down the strip outside the dike.)
+WG_LOOP_J = (-850.0, -1128.0)      # on the coast line WG_MAIN[1] -> WG_MAIN[2] (y -1128..-1130), so the approach is straight
+WG_LOOP_BOX = (-985.0, -1210.0)    # the loop's far corner: its stations (the OUTER edge: a one-way road lays its lanes
+                                   # on its left, the inside of a counter-clockwise loop) run x -985..J, y -1210..J
+WG_LOOP_R = 38.0
+WG_LOOP_Z = 5.75                   # the platform (the plain, 5.6) + the stamp's clearance
+WG_WEST_RISE = 230.0               # the mainline climbs from the junction to WG_Z over this far (2.7 %), level by Y1's gore
+WG_APPROACH = 85.0                 # the approach's last stretch, posted 50 (its own road `shuto_wangan`)
 WG_MAIN_R = [90.0, 600.0, 1500.0, 1500.0, 250.0, 200.0, 150.0, 150.0, 120.0, 0.0]
 #: THE LANE-SPLIT T at the spur (2026-10-01, island_expressway.t_split): T1 (Wangan EB -> spur SB) runs along J0's
 #: line, turns right OVER T4, and makes ONE clockwise circle of T1_R over the spur (centre (T1_LEG_X - T1_R, T1_LOOP_Y)),
@@ -520,7 +564,7 @@ Y2_ON_X = -500.0             # Y2, the connector -> Wangan WB: its merge (WB ent
 CONN_J_Y = -930.0            # the connector's south joint (its two one-way halves start here)
 WG_CUT_X = -380.0            # a mainline joint between the Y's west ramps (Y1 EB exit, Y2 WB merge) and Y4 (EB merge)
 Y4_OFF_Y = -760.0            # Y4, the connector SB -> Wangan EB: it leaves the connector here (review 2026-09-30: it
-Y4_ON_X = 110.0              # closes the outer loop C1 -> connector -> Wangan -> spur -> C1), and merges here
+Y4_ON_X = 80.0              # closes the outer loop C1 -> connector -> Wangan -> spur -> C1), and merges here
 Y2_Z = 20.5                  # Y2 over the mainline (12, lifted to ~14 by the dike pass there) by 5.5 m + margin
 T1_ON_Y = -640.0             # T1 merges into the spur SB here: its lane closes by the bridge's north end (-696.5)
 T2_OFF_Y = -620.0            # T2 leaves the spur NB here
@@ -553,15 +597,13 @@ SB_ON_X = 640.0
 PORT_OFF_X = -200.0
 PORT_T = (-494.0, -1190.0)
 WG_CUT4_X = -10.0
+#: the port's EASTBOUND entrance (review 2026-10-02 night, port access (a)): from a new T on the dike road (ring_kita__11,
+#: moved ~16 m north by tools/island_dike_port_gap.py to make the room) east of Y1's crossing of it, down the gap and
+#: east, climbing the 5.6 m from the dike crest to the deck, merging onto EB's left at PORT_ON_X -- after Y1's exit
+#: (exit -> entrance, no weave) and in wangan__2's run, whose only other ramp is the WB port exit
+PORT_ON_T = (-440.0, -1082.0)
+PORT_ON_X = -270.0
 SB_JUNCTION = (848.0, -490.0)
-#: R1 (review 2026-10-02): the port's EASTBOUND entrance. At the port itself the dike road (ring_kita) runs 25 m north
-#: of the mainline and Y3/Y4 fill the strip east of chuo_dori, so it leaves a new T on the dike road WEST of the port
-#: (PORT_ON_T, ~55 m from the mainline there) and merges onto the EB carriageway's left at PORT_ON_X. Its added lane is
-#: carried across a mainline joint at WG_CUT5_X into Y1 and leaves with it (lane balance): port -> C1 through Y1,
-#: port -> the airport straight on. With the WB exit (PORT_OFF_X) the port has both directions.
-PORT_ON_X = -750.0
-PORT_ON_T = (-990.0, -1004.0)
-WG_CUT5_X = -675.0
 WG_CUT3_X = 400.0
 Y3_ON_Y = -700.0
 #: THE CONNECTOR (R3): the Wangan's last stretch runs north OVER chuo_dori's median (piers in the median) from

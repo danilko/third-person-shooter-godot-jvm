@@ -158,6 +158,12 @@ FACADE_MAT_RES = "res://assets/world_source/kits/quaternius_downtown_city/materi
 # real one has to Shinjuku: 雑居ビル packed shoulder to shoulder, no flats, and the same grey tone bias as the
 # working districts. It is inside downtown's box, so it must come FIRST to win the first-match rule.
 REGIONS = (
+    # THE CBD CORE (the second review, 2026-10-03: "downtown has no skyline"): the Marunouchi pattern -- towers stand
+    # at the main station and fall off toward C1's edge. A row round Central (782, 215) placed FIRST, so it wins over
+    # akiba / nightlife / downtown where they overlap; the island's skyline marker to steer by.
+    ("downtown_core", (560.0, -40.0, 960.0, 180.0), 1, 26.0,
+     {"OfficeTower": 4, "OfficeBlock": 2, "OfficeMid": 1.5, "PencilBuilding": 0.5, "KonbiniS": 0.4},
+     0.0, None),
     # 秋葉原 ELECTRIC TOWN (user, 2026-09-28; PLAN.md 3.18(w)): east of Central, where the signage pieces now exist
     # (Sign_AkibaVertical / Sign_AkibaBillboard on the AkibaElectric type) -- narrow electronics and hobby buildings
     # shoulder to shoulder, with a 横丁 row between them. First, so it wins over `downtown`'s box.
@@ -181,20 +187,28 @@ REGIONS = (
     #          builds on frontage, but it makes the district plan read wrong and it makes the HUD announce
     #          "Residential West" while you stand on a 300 m peak, because `Places.regionAt` reads these boxes.
     # (2026-09-26) its north edge is the farm's first row road, y 920: north of it is farmland (`farm` below)
+    # THE APARTMENT LADDER (user, 2026-10-03): the housing and city mixes carry the old wooden two-storey アパート
+    # (Apato2F4/6, cheap, units in one line), the small RC block (ApartRC3F), the 片廊下型 マンション (MansionLine4/6,
+    # units in one line over 6-8 storeys) and the pencil マンション (one unit a floor) -- deeper and longer than the
+    # kit's Apartment, so a frontage row leaves less empty ground behind it (library_jp_city.apartments)
     ("residential_north", (-330.0, 700.0, 1700.0, 920.0), 1, 20.0,
-     {"Apartment": 3, "ShopHouse": 2, "Mansion": 1, "KonbiniS": 0.5, "KonbiniL": 0.4, "GasStation": 0.3,
-      "ParkingLot4": 0.3, "DetachedHouse": 2, "DetachedHouseB": 2},
+     {"Apato2F4": 1.2, "Apato2F6": 0.8, "ApartRC3F": 1.2, "MansionLine4": 0.6, "MansionPencil": 0.4, "TerraceHouse4": 0.6, "LuxuryLowRise": 0.15, "Sento": 0.1, "HouseTraditional": 0.3, "Apartment": 3, "ShopHouse": 0.5, "Mansion": 1, "KonbiniS": 0.5, "KonbiniL": 0.4, "GasStation": 0.3,
+      "ParkingLot4": 0.3, "DetachedHouse": 3, "DetachedHouseB": 3, "CarDealer": 0.15, "ShrineSmall": 0.12,
+      "ShopRamen": 0.2, "ShopDrugstore": 0.2, "ShopCoinLaundry": 0.2, "ShopBookstore": 0.15, "ShopHundredYen": 0.15},
      0.15, None),
     ("residential_west", (-900.0, -200.0, -150.0, 400.0), 1, 18.0,
-     {"Apartment": 3, "ShopHouse": 1.5, "Mansion": 0.8, "KonbiniS": 0.3, "DetachedHouse": 2.5, "DetachedHouseB": 2.5},
+     {"Apato2F4": 1.2, "Apato2F6": 0.8, "ApartRC3F": 1.2, "MansionLine4": 0.6, "MansionPencil": 0.4, "TerraceHouse4": 0.6, "LuxuryLowRise": 0.15, "Sento": 0.15, "HouseTraditional": 0.4, "Apartment": 3, "ShopHouse": 0.5, "Mansion": 0.8, "KonbiniS": 0.3, "DetachedHouse": 3, "DetachedHouseB": 3,
+      "ShopCoinLaundry": 0.15, "ShopBookstore": 0.1, "ShrineSmall": 0.12},
      0.3, None),
     ("downtown", (150.0, 40.0, 1300.0, 720.0), 1, 24.0,
      {"OfficeMid": 4, "OfficeBlock": 1.5, "OfficeTower": 1, "PencilBuilding": 4, "Mansion": 2, "ShopHouse": 1.5,
-      "KonbiniS": 1, "FamilyRestaurant": 0.3},
+      "KonbiniS": 1, "FamilyRestaurant": 0.3, "TowerMansion": 0.3, "MansionPencil": 0.8},
      0.0, None),
     ("city", (-150.0, -330.0, 1700.0, 960.0), 1, 22.0,
-     {"Mansion": 3, "ShopHouse": 3, "PencilBuilding": 2, "Apartment": 2, "KonbiniS": 1, "OfficeMid": 0.5, "OfficeBlock": 0.3,
-      "FamilyRestaurant": 0.6, "KonbiniL": 0.6, "GasStation": 0.5, "ParkingLot4": 0.4}, 0.05, None),
+     {"MansionPencil": 1.5, "MansionLine4": 0.8, "MansionLine6": 0.5, "ApartRC3F": 1.0, "Apato2F4": 0.5, "TowerMansion": 0.25, "LuxuryLowRise": 0.4, "Sento": 0.12, "Mansion": 3, "ShopHouse": 3, "PencilBuilding": 2, "Apartment": 2, "KonbiniS": 1, "OfficeMid": 0.5, "OfficeBlock": 0.3,
+      "FamilyRestaurant": 0.6, "KonbiniL": 0.6, "GasStation": 0.5, "ParkingLot4": 0.4,
+      "ShopRamen": 0.4, "ShopGyudon": 0.3, "ShopDrugstore": 0.4, "ShopHundredYen": 0.3, "ShopCoinLaundry": 0.2,
+      "ShopBookstore": 0.2, "CarDealer": 0.25, "ShrineSmall": 0.1}, 0.05, None),
     # THE WEST SUB-CENTRE 副都心 (user, 2026-09-26: "combine the south-west with a CBD"): the second business district,
     # round the Blue line's Residential station where the housing meets the 準工業 district -- the Kamata / Kawasaki
     # shape: mid-rise offices and 雑居ビル on the station front, shops, flats over them. The main CBD stays inside C1.
@@ -202,11 +216,12 @@ REGIONS = (
     # ...and its 駅前商店街: the shopping street round the station itself -- shop-houses shoulder to shoulder, a konbini,
     # a family restaurant -- with the station shopping centre (the `west_station_mall` site, island_sites) beside it
     ("west_ekimae", (-900.0, -640.0, -560.0, -400.0), 1, 12.0,
-     {"ShopHouse": 5, "PencilBuilding": 2, "KonbiniS": 1, "FamilyRestaurant": 0.4, "YokochoRow": 1}, 0.0, None),
+     {"ShopHouse": 5, "PencilBuilding": 2, "KonbiniS": 1, "FamilyRestaurant": 0.4, "YokochoRow": 1,
+      "ShopRamen": 0.6, "ShopGyudon": 0.5, "ShopDrugstore": 0.6, "ShopHundredYen": 0.4, "ShopBookstore": 0.3}, 0.0, None),
     ("west_centre", (-950.0, -700.0, -400.0, -380.0), 1, 22.0,
      {"OfficeMid": 3, "OfficeBlock": 0.8, "PencilBuilding": 2.5, "ShopHouse": 2.5, "Mansion": 1.5, "KonbiniS": 1,
       "FamilyRestaurant": 0.5,
-      "KonbiniL": 0.3, "ParkingLot4": 0.3}, 0.05, None),
+      "KonbiniL": 0.3, "ParkingLot4": 0.3, "CarDealer": 0.2}, 0.05, None),
     # THE PORT (2026-09-28): the logistics function is ONE hub (island_plan.RESERVES logistics_*: a truck terminal and a
     # distribution centre beside the container terminal), not a sheds-on-every-frontage port -- the user's "compact,
     # not repeated": what fronts the port's roads is port offices, a konbini for the drivers and lorry parks
@@ -221,19 +236,21 @@ REGIONS = (
     # -- 町工場, trucking depots, used-car lots, coin laundries. Stand-ins: ShopHouse (a works with a flat over it),
     # Warehouse (a depot), ParkingLot8 (a used-car lot), KonbiniS, GasStation.
     ("light_industry", (-1400.0, -600.0, 300.0, -460.0), 1, 22.0,
-     {"ShopHouse": 2, "Warehouse": 0.4, "ParkingLot8": 0.5, "KonbiniS": 0.3, "GasStation": 0.2}, 0.3, "dark"),
+     {"ShopHouse": 0.6, "FactorySmall": 2.5, "Warehouse": 0.4, "ParkingLot8": 0.5, "KonbiniS": 0.3, "GasStation": 0.2,
+      "CarDealer": 0.2, "ShopCoinLaundry": 0.15}, 0.3, "dark"),
     # THE SOUTH-WEST 準工業 DISTRICT (user, 2026-09-26: "combine the south-west with the light industry"): the housing's
     # industrial edge and the west third of the old industry box are ONE mixed district, the Ota / Kamata 町工場 town --
     # small works with a flat over them, workers' flats, depots and a few used-car lots on block streets. It has TWO
     # stations on two lines: Light Industry (the Blue line's terminus, x -665) on its west side and Industry (the
     # Harbour line, x 185) past its east edge, so its commuters split instead of all changing at Bay.
     ("light_industry_w", (-1450.0, -1040.0, -300.0, -600.0), 1, 20.0,
-     {"ShopHouse": 3, "Apartment": 2, "Warehouse": 0.3, "ParkingLot8": 0.3, "KonbiniS": 0.4, "GasStation": 0.2},
+     {"ShopHouse": 0.8, "FactorySmall": 3, "Apartment": 2, "Warehouse": 0.3, "ParkingLot8": 0.3, "KonbiniS": 0.4,
+      "GasStation": 0.2, "ShrineSmall": 0.1},
      0.2, "dark"),
     # INDUSTRY: fewer, bigger plots with yards between (v6: "a 200 m grid at 50%") -- one row, a wide pitch, half skipped.
     # Warehouses are a MINORITY everywhere since 2026-09-28: the island's logistics is the one hub on the port platform
     ("industry", (-1000.0, -1040.0, 200.0, -600.0), 1, 60.0,
-     {"Warehouse": 1, "OfficeMid": 1, "ShopHouse": 0.5, "KonbiniS": 0.4, "GasStation": 0.3}, 0.5, "dark"),
+     {"Warehouse": 1, "OfficeMid": 1, "FactorySmall": 1.5, "KonbiniS": 0.4, "GasStation": 0.3}, 0.5, "dark"),
     # THE AIRPORT ISLAND (PLAN.md 3.18(s), the rail batch): it had no region, so nothing but the terminal site stood on
     # it. Record frame of island_sites.AIRPORT_BOX (Godot x 700..1500, z 1300..2304). Stand-ins until the hangar,
     # cargo-shed and control-tower models exist: Warehouse = hangars and cargo sheds, OfficeMid = the airport offices
@@ -241,13 +258,17 @@ REGIONS = (
     ("airport", (700.0, -2304.0, 1500.0, -1300.0), 1, 40.0,
      {"Warehouse": 0.5, "OfficeMid": 1, "GasStation": 0.4, "KonbiniL": 0.3, "FamilyRestaurant": 0.3}, 0.3, "dark"),
     ("residential", (-1800.0, -1160.0, -150.0, -200.0), 1, 18.0,
-     {"Apartment": 4, "ShopHouse": 2, "Mansion": 1, "KonbiniL": 0.6, "GasStation": 0.4, "FamilyRestaurant": 0.3,
-      "KonbiniS": 0.4, "ParkingLot4": 0.3, "DetachedHouse": 3, "DetachedHouseB": 3}, 0.15, None),
+     {"Apato2F4": 1.2, "Apato2F6": 0.8, "ApartRC3F": 1.2, "MansionLine4": 0.6, "MansionPencil": 0.4, "TerraceHouse4": 0.6, "LuxuryLowRise": 0.15, "Sento": 0.12, "HouseTraditional": 0.3, "Apartment": 4, "ShopHouse": 0.5, "Mansion": 1, "KonbiniL": 0.6, "GasStation": 0.4, "FamilyRestaurant": 0.3,
+      "CarDealer": 0.15, "ShrineSmall": 0.12,
+      "KonbiniS": 0.4, "ParkingLot4": 0.3, "DetachedHouse": 3, "DetachedHouseB": 3,
+      "ShopRamen": 0.2, "ShopDrugstore": 0.25, "ShopCoinLaundry": 0.25, "ShopBookstore": 0.15, "ShopHundredYen": 0.15},
+     0.15, None),
     # the SUBURB as a low-density beach resort (v3: "fewer, larger buildings ... 55% occupancy"): one row, wide pitch
     ("suburb", (850.0, -1000.0, 1320.0, -330.0), 1, 30.0,          # clipped to its land (east: the spur, the sea)
-     {"Apartment": 4, "ShopHouse": 1.5, "Mansion": 1, "KonbiniL": 0.6, "GasStation": 0.4,
-      "FamilyRestaurant": 0.4, "DetachedHouse": 2, "DetachedHouseB": 2}, 0.45, None),
-    ("farm", (350.0, 920.0, 1850.0, 1900.0), 1, 30.0, {"Apartment": 2, "Warehouse": 0.5, "KonbiniL": 0.2,
+     {"Apato2F4": 0.8, "ApartRC3F": 1.0, "MansionLine4": 0.5, "TerraceHouse4": 0.8, "LuxuryLowRise": 0.3, "HouseTraditional": 0.2, "Apartment": 4, "ShopHouse": 0.5, "Mansion": 1, "KonbiniL": 0.6, "GasStation": 0.4, "CarDealer": 0.2,
+      "FamilyRestaurant": 0.4, "DetachedHouse": 2, "DetachedHouseB": 2,
+      "ShopDrugstore": 0.2, "ShopCoinLaundry": 0.15}, 0.45, None),
+    ("farm", (350.0, 920.0, 1850.0, 1900.0), 1, 30.0, {"HouseTraditional": 1.5, "Apartment": 2, "Warehouse": 0.5, "KonbiniL": 0.2,
                                                         "DetachedHouse": 2, "DetachedHouseB": 2},
      0.65, None),
 )
@@ -257,6 +278,10 @@ REGIONS = (
 # district that is already a centre (downtown, nightlife, the west 駅前 which is authored) or a working one (the
 # harbour, industry, the port), nor at Central / Airport (their own sites).
 EKIMAE_HALF = 110.0
+# a RURAL / small station's 駅前 is a few shops, not a 220 m square of shop-houses in the fields (the second review);
+# their shopping street, where there is one, is a STREET_MIXES street instead
+EKIMAE_HALF_SMALL = 55.0
+EKIMAE_SMALL = {"Farm", "Castle Town", "Residential North", "Light Industry", "Suburb", "Waterpark", "Fish Market"}
 EKIMAE_SKIP = {"Central", "Airport", "Residential", "Harbour", "Industry"}
 EKIMAE_MIX = {"ShopHouse": 4, "PencilBuilding": 1.5, "KonbiniS": 1, "FamilyRestaurant": 0.3}
 
@@ -271,13 +296,14 @@ def _ekimae_rows():
         if kind != "station" or name in EKIMAE_SKIP:
             continue
         x, y = b["x"], b["y"]
-        rows.append(("ekimae", (x - EKIMAE_HALF, y - EKIMAE_HALF, x + EKIMAE_HALF, y + EKIMAE_HALF), 1, 12.0,
+        half = EKIMAE_HALF_SMALL if name in EKIMAE_SMALL else EKIMAE_HALF
+        rows.append(("ekimae", (x - half, y - half, x + half, y + half), 1, 12.0,
                      dict(EKIMAE_MIX), 0.05, None))
     return tuple(rows)
 
 
 REGIONS = _ekimae_rows() + REGIONS
-ARTERIAL_ONLY = {"GasStation", "KonbiniL", "FamilyRestaurant"}
+ARTERIAL_ONLY = {"GasStation", "KonbiniL", "FamilyRestaurant", "CarDealer"}
 # THE CAR PARK IS AN ADDITION, NOT PART OF THE STORE (user, 2026-09-25: "extract the parking lot out as an addition
 # instead of the left-over konbini lot"). A type named here gets that car park placed BESIDE it on the same row when
 # the land allows -- to its right along the street, else its left -- and stands without one otherwise.
@@ -286,7 +312,7 @@ PARKING = {"KonbiniL": "ParkingLot8"}
 # Shinjuku konbini is 駐車場なし, and a family restaurant there is on an upper floor); further out every store gets
 # one, larger the further out. Per region: {store type: car park type}. A region not named uses PARKING.
 PARKING_BY_REGION = {
-    "downtown": {}, "nightlife": {}, "west_ekimae": {},
+    "downtown": {}, "downtown_core": {}, "nightlife": {}, "west_ekimae": {},
     "west_centre": {"KonbiniL": "ParkingLot4"},
     "city": {"KonbiniL": "ParkingLot8", "KonbiniS": "ParkingLot4", "FamilyRestaurant": "ParkingLot8"},
     "residential": {"KonbiniL": "ParkingLot14", "KonbiniS": "ParkingLot8", "FamilyRestaurant": "ParkingLot14"},
@@ -304,7 +330,7 @@ def parking_for(t, reg):
     return PARKING_BY_REGION.get(name, PARKING).get(t)
 
 
-CAR_PARKS = {"ParkingLot4", "ParkingLot8", "ParkingLot14"}
+CAR_PARKS = {"ParkingLot4", "ParkingLot8", "ParkingLot14", "ParkingLot28", "ParkingLot56"}
 # コインパーキング (PLAN.md 3.24(d)): a 4-bay ParkingLot4 in a region's MIX is a coin-parking plot on the street front --
 # the most Japanese use of a gap between two buildings (city, the housing, the west sub-centre).
 # Every building ships SHUT (user, 2026-09-19), with two exceptions, both placed as a variant of the same type:
@@ -374,7 +400,7 @@ SITE_PLACES = {       # a SiteZones / Landmarks child -> its label (a landmark: 
     "ContainerTerminal": ("Container Terminal", 2),
     "ShuriCastle":       ("Hilltop Castle", 2),   # fictional labels (legal, 2026-09-30)
     "RainbowBridge":     ("Seagate Bridge", 2),
-    "TokyoTower":        ("Tower", 2),
+    "BroadcastCentre":   ("Broadcast Centre", 2),   # replaced the Tokyo Tower model (2026-10-03, legal)
     "AirportTerminal_Shop": ("Airport", 2),
     "StationMall":       ("Station Mall", 2),
     # the reserves' buildings (island_sites.RESERVE_SITES, user 2026-09-28)
@@ -383,17 +409,18 @@ SITE_PLACES = {       # a SiteZones / Landmarks child -> its label (a landmark: 
     "Reserve_airport_airfield": ("Airport Apron", 2),
     "Reserve_military_airfield": ("Air Base Runway", 2),
     "Reserve_waterfront_park": ("Ferris Wheel Park", 2),
+    "Reserve_wangan_pa": ("Parking Area", 2),
+    "Reserve_airport_cargo": ("Air Cargo", 2),
     "Reserve_military_pier": ("Base Harbour Terminal", 2),
     "Reserve_resort_hotel_1": ("Resort Hotel", 2),
     "Reserve_resort_hotel_2": ("Resort Hotel", 2),
-    "Reserve_resort_hotel_3": ("Resort Hotel", 2),
     "Reserve_logistics_truck_terminal": ("Truck Terminal", 2),
     "Reserve_logistics_distribution": ("Distribution Centre", 2),
     "Reserve_central_forecourt": ("Central Bus Terminal", 2),
     "Reserve_airport_forecourt": ("Airport Bus & Taxi", 2),   # the 駅前広場 (the station is "Central Station")
 }
 ANCHOR_REACH = 250.0   # ... and the furthest a WANTED TYPE may be found from the wish
-SPACING = {"GasStation": 450.0, "KonbiniL": 250.0, "FamilyRestaurant": 350.0, "KonbiniS": 120.0}
+SPACING = {"TowerMansion": 500.0, "LuxuryLowRise": 250.0, "CarDealer": 300.0, "GasStation": 450.0, "KonbiniL": 250.0, "FamilyRestaurant": 350.0, "KonbiniS": 120.0}
 SKIP_ROADS = ("shuto_", "shrine_touge", "kaigan_dori", "airport_", "kuko_")
 def _variants():
     """{base type: [its footprint variants]} (PLAN.md 3.19(c)), from the type table via the layout (one owner)."""
@@ -462,7 +489,7 @@ SPAWN_UID = "uid://ctq8u5jyp6ijf"
 # Pedestrians per 100 m of footway. Raised x3-5 (user, 2026-10-03: "only 1-2 on a street, small for a Japanese city")
 # now that a far ped is one VAT MultiMesh instance (bench: 600 peds 0.57 ms, 2000 peds 1.48 ms), not a skinned body.
 # Japanese reference: a busy shopping / station-front footway carries ~8-15 people per 100 m, a residential street 1-2.
-PED_DENSITY = {"akiba": 10.0, "nightlife": 12.0, "downtown": 9.0, "city": 4.0, "residential": 2.0, "residential_north": 2.0,
+PED_DENSITY = {"akiba": 10.0, "nightlife": 12.0, "downtown": 9.0, "downtown_core": 10.0, "city": 4.0, "residential": 2.0, "residential_north": 2.0,
                "residential_west": 1.2, "suburb": 1.5, "industry": 1.0, "harbour": 0.8, "farm": 0.4,
                "light_industry": 1.5, "light_industry_w": 2.0, "west_centre": 6.0, "west_ekimae": 10.0, "bay_processing": 1.5, "airport": 1.5,
                "ekimae": 8.0, None: 1.0}
@@ -534,6 +561,26 @@ def ped_walk_offset(walk):
     strip = min(furniture_strip(walk), max(0.0, walk - 2.0 * (PED_RADIUS + PED_EDGE)))
     return max(strip + PED_RADIUS + PED_EDGE,
                min(0.5 * (strip + walk), walk - PED_RADIUS - PED_EDGE))
+
+
+# A STREET-KEYED MIX (the second review, 2026-10-03): a local 商店街 is a STREET, not a box -- an `ekimae` box paints
+# every frontage near a station, arterials included, and makes no contiguous shopping street. A road whose base name
+# starts with a key here is lined with that mix whatever district it runs through (the station 商店街 authored in
+# island_core_streets, `eki_ginza_*`, Castle Town's 参道 jokamachi_sando -- the island's 国際通り-style street, with the
+# 公設市場 beside it -- and Residential's, the planner's x -650 line east of the station). Shaped like a REGIONS row, named
+# "ekimae" so its alleys and car parks are the 駅前 row's.
+STREET_MIX = {"ShopHouse": 4, "ShopRamen": 1, "ShopDrugstore": 1, "ShopHundredYen": 0.6, "ShopCoinLaundry": 0.5,
+              "ShopBookstore": 0.6, "ShopGyudon": 0.5, "KonbiniS": 0.6, "YokochoRow": 0.6, "ShrineSmall": 0.15}
+STREET_MIXES = {"eki_ginza": ("ekimae", (0.0, 0.0, 0.0, 0.0), 1, 10.0, STREET_MIX, 0.0, None),
+                "jokamachi_sando": ("ekimae", (0.0, 0.0, 0.0, 0.0), 1, 10.0, STREET_MIX, 0.0, None),
+                "koba_machi_w_650": ("ekimae", (0.0, 0.0, 0.0, 0.0), 1, 10.0, STREET_MIX, 0.0, None)}   # Residential's
+
+
+def street_region(owner):
+    for key, row in STREET_MIXES.items():
+        if str(owner).startswith(key):
+            return row
+    return None
 
 
 def region_of(x, y):
@@ -893,14 +940,29 @@ CIVIC_TYPES = {"police_station": "PoliceStation", "koban": "Koban", "fire_statio
                "safehouse_city_large": "SafeHouseCityLarge", "izakaya": "Izakaya", "maid_cafe": "MaidCafe",
                "adult_services": "AdultServices", "safehouse_city_small": "SafeHouseCitySmall",
                "bank_small": "BankSmall", "safehouse_small": "SafeHouseSmall", "safehouse_large": "SafeHouseLarge",
-               "secure_mansion": "SecureMansion", "warehouse_yard": "WarehouseYard", "onsen_ryokan": "OnsenRyokan"}
+               "secure_mansion": "SecureMansion", "warehouse_yard": "WarehouseYard", "onsen_ryokan": "OnsenRyokan",
+               # the review's Japanese city types (2026-10-03, blender/tools/library_jp_city.py placeholders)
+               "campus": "Campus", "university": "University", "public_library": "PublicLibrary",
+               "gang_office": "GangOffice", "gang_port_compound": "GangPortCompound", "gang_scrapyard": "GangScrapyard",
+               "pachinko": "Pachinko", "shotengai": "Shotengai", "danchi": "Danchi", "hotel_business": "HotelBusiness",
+               "hotel_love": "HotelLove", "karaoke": "Karaoke", "game_centre": "GameCentre",
+               "construction_site": "ConstructionSite", "arena": "Arena", "suburban_mall": "SuburbanMall",
+               "supermarket": "SupermarketSite", "repair_shop": "RepairShop", "temple_cemetery": "TempleCemetery",
+               "home_centre": "HomeCentre", "car_dealer": "CarDealer", "clothing_store": "ClothingStore",
+               "shooting_range": "ShootingRange", "impound_lot": "ImpoundLot", "parking_garage": "ParkingGarage",
+               "farm_barn": "FarmBarn", "super_sento": "SuperSento", "cargo_shed": "CargoShed",
+               "public_market": "PublicMarket"}
 #: which variant a civic building stands as: a MISSION building is enterable but LOCKED (`_Open`, a mission unlocks
 #: it), a shop is always open (`_Shop`); anything not listed ships shut (a placeholder civic building).
-CIVIC_SCENE = {"BankLarge": "_Open", "OfficeHQ": "_Open", "SafeHouseCityLarge": "_Open", "AdultServices": "_Open",
+CIVIC_SCENE = {"BankLarge": "_Open", "OfficeHQ": "_Open", "SafeHouseCityLarge": "_Open", "AdultServices": "_Shop",
                "SafeHouseCitySmall": "_Open", "BankSmall": "_Open", "SafeHouseSmall": "_Open",
                "SafeHouseLarge": "_Open", "SecureMansion": "_Open", "WarehouseYard": "_Open",
                "DepartmentStore": "_Shop", "FashionBuilding": "_Shop", "CivicCenter": "_Shop", "Izakaya": "_Shop",
-               "MaidCafe": "_Shop", "OnsenRyokan": "_Shop"}
+               "MaidCafe": "_Shop", "OnsenRyokan": "_Shop", "PostOffice": "_Shop", "PostOfficeSmall": "_Shop",
+               # open: a death respawns the player at a hospital door, and their counters sell medical supplies.
+               # Clinic is not listed: it is still a library massing with no interior (no _Shop scene)
+               "Hospital": "_Shop", "HospitalSmall": "_Shop", "SupermarketSite": "_Shop",
+               "ParkingGarage": "_Shop"}   # a 立体駐車場 is always open: a hiding place and a chase short-cut
 CIVIC_LABELS = {"PoliceStation": ("Police Station", 1), "Koban": ("Police Box", 1), "FireStation": ("Fire Station", 1),
                 "FireBranch": ("Fire Station", 1), "PostOffice": ("Post Office", 1),
                 "PostOfficeSmall": ("Post Office", 1), "WardOffice": ("Ward Office", 1), "Hospital": ("Hospital", 1),
@@ -912,7 +974,17 @@ CIVIC_LABELS = {"PoliceStation": ("Police Station", 1), "Koban": ("Police Box", 
                 "FashionBuilding": ("Fashion Building", 1), "Izakaya": ("Izakaya", 2), "MaidCafe": ("Maid Cafe", 2),
                 "AdultServices": ("Club", 2), "SafeHouseCityLarge": ("Hideout", 2), "SafeHouseCitySmall": ("Hideout", 2),
                 "SafeHouseSmall": ("Hideout", 2), "SafeHouseLarge": ("Residence", 2),
-                "SecureMansion": ("Mansion", 1), "WarehouseYard": ("Warehouse", 2), "OnsenRyokan": ("Onsen Ryokan", 1)}
+                "SecureMansion": ("Mansion", 1), "WarehouseYard": ("Warehouse", 2), "OnsenRyokan": ("Onsen Ryokan", 1),
+                "Campus": ("School", 1), "University": ("University", 1), "PublicLibrary": ("Library", 1),
+                "GangOffice": ("Gang Office", 2), "GangPortCompound": ("Compound", 2), "GangScrapyard": ("Scrapyard", 2),
+                "Pachinko": ("Pachinko", 1), "Shotengai": ("Shopping Arcade", 1), "Danchi": ("Housing Estate", 2),
+                "HotelBusiness": ("Hotel", 1), "HotelLove": ("Love Hotel", 2), "Karaoke": ("Karaoke", 2),
+                "GameCentre": ("Game Centre", 2), "ConstructionSite": ("Construction Site", 2), "Arena": ("Arena", 1),
+                "SuburbanMall": ("Mall & Cinema", 1), "SupermarketSite": ("Supermarket", 1),
+                "RepairShop": ("Garage", 1), "TempleCemetery": ("Temple", 1), "HomeCentre": ("Home Centre", 1),
+                "CarDealer": ("Car Dealer", 2), "ClothingStore": ("Clothing", 1), "ShootingRange": ("Shooting Range", 1),
+                "ImpoundLot": ("Impound", 2), "ParkingGarage": ("Car Park", 2), "FarmBarn": ("Farm", 2),
+                "SuperSento": ("Public Bath", 1), "CargoShed": ("Air Cargo", 2), "PublicMarket": ("Public Market", 1)}
 
 
 def civic_type(p):
@@ -1483,6 +1555,198 @@ def report_cover(field):
               % (r[0], n * cell, 100.0 * c / n, (n - c) * cell))
 
 
+#: THE DEEP POCKETS (user, 2026-10-03: "all areas still have a lot of vacancy around the stations and the highways").
+#: One street-facing row of buildings leaves the ground BEHIND it empty wherever the next street is far away -- which is
+#: everywhere an elevated expressway, a rail corridor, a station box or the dike stands instead of a street. Japan fills
+#: that ground with what needs no street frontage of its own: 平面駐車場 (a car park reached down a 路地 or a driveway)
+#: and 児童遊園 / 街区公園 (a small park). Neither is a building, so no building stands behind a building. After the
+#: frontage rows are placed, the pockets are filled biggest-first: a park where 60 x 60 m is free, else car parks.
+DEEP_REGIONS_SKIP = ("farm",)        # paddy is the farm's ground; None (no district) is never filled
+DEEP_ACCESS = {"Park": 20.0, "PocketPark": 20.0, "ParkingLot14": 8.0, "ParkingLot8": 8.0, "ParkingLot4": 8.0}   # a 路地 / road within
+DEEP_PARK_SPACING = 260.0            # parks no nearer each other than this (one per a few blocks)
+DEEP_MIN_CLEAR = 12                  # a pocket must hold a 24 m clear square: a sliver behind a row is a yard, not a lot
+DEEP_STEP = 6.0                      # candidate grid
+#: ...and a BIG pocket first takes one large flat building that a district has room for nowhere else (user, 2026-10-03:
+#: "if there is large vacancy, place a flat larger building instead of just parking / park"), set back from the street
+#: behind its own forecourt and reached by a driveway (DEEP_BIG_ACCESS) -- the Japanese supermarket / pachinko hall /
+#: スーパー銭湯 / 団地 / warehouse shape. Each type at most once within DEEP_BIG_SPACING.
+DEEP_BIG = {
+    "city": ("TowerMansion", "SupermarketSite", "Pachinko", "SuperSento", "ParkingGarage"),
+    "downtown": ("TowerMansion", "Pachinko", "ParkingGarage", "SupermarketSite"),
+    "downtown_core": ("ParkingGarage",), "nightlife": ("Pachinko", "ParkingGarage"), "akiba": ("Pachinko",),
+    "west_centre": ("SupermarketSite", "Pachinko", "ParkingGarage"), "west_ekimae": ("Pachinko", "SupermarketSite"),
+    "ekimae": ("SupermarketSite", "ParkingGarage"),
+    "residential": ("Danchi", "SupermarketSite", "SuperSento"), "residential_north": ("Danchi", "SupermarketSite"),
+    "residential_west": ("Danchi", "SupermarketSite", "SuperSento"), "suburb": ("SupermarketSite", "SuperSento"),
+    "industry": ("WarehouseYard", "CargoShed"), "light_industry": ("WarehouseYard", "CargoShed"),
+    "light_industry_w": ("WarehouseYard", "CargoShed"), "harbour": ("CargoShed", "WarehouseYard"),
+    "bay_processing": ("WarehouseYard",)}
+DEEP_BIG_ACCESS = 25.0
+DEEP_BIG_SPACING = 450.0
+#: ONE car park per pocket, as large as the pocket holds (user, 2026-10-03: "one larger car park instead of small ones
+#: spread around"), reached by its own DRIVEWAY straight to the street with a kerb ramp where it crosses the footway
+#: (the driveway is reserved like a 路地). At the airport the car park is a multi-storey building.
+DEEP_CARPARKS = ("ParkingLot56", "ParkingLot28", "ParkingLot14")
+DEEP_CARPARK_SPACING = 90.0
+#: ...per district (user, 2026-10-03: "the residential can have more parks, the light industry more car parks"): car
+#: parks closer in the industrial districts, sparser where people live; parks closer where people live
+DEEP_CARPARK_SPACING_BY = {"light_industry": 55.0, "light_industry_w": 55.0, "industry": 70.0, "harbour": 70.0,
+                           "residential": 160.0, "residential_north": 160.0, "residential_west": 160.0, "suburb": 160.0}
+DEEP_PARK_SPACING_BY = {"residential": 140.0, "residential_north": 140.0, "residential_west": 140.0, "suburb": 160.0}
+DEEP_GARAGE_REGIONS = {"airport": 140.0}       # region -> ParkingGarage spacing: there the car park is a building
+DRIVEWAY_W = 5.0
+DRIVEWAY_MAX = 70.0
+#: a park only where people live (user: "if not occupied, no need to force the land to be a park -- leave it empty")
+DEEP_PARK_REGIONS = ("residential", "residential_north", "residential_west", "suburb", "city", "west_centre")
+
+
+def deep_fill(field, placed, aabbs, frontage):
+    """Car parks and small parks in the empty ground behind the frontage rows (see DEEP_REGIONS_SKIP). Returns the
+    rows it placed, already appended to `placed`."""
+    np = field.np
+    n = field.n
+    free = ~(field.blocked | field.occupied | field.passage | field.road)
+    access = field.passage | field.road
+    # integral image of NOT free: a square window is all free when its sum is 0
+    nf = np.pad((~free).astype(np.int32), ((1, 0), (1, 0))).cumsum(0).cumsum(1)
+
+    def clear_sq(i, j, h):
+        i0, j0, i1, j1 = i - h, j - h, i + h + 1, j + h + 1
+        if i0 < 0 or j0 < 0 or i1 > n or j1 > n:
+            return False
+        return nf[j1, i1] - nf[j0, i1] - nf[j1, i0] + nf[j0, i0] == 0
+    # nearest frontage point (and so the facing) for every candidate: the street lines' samples
+    fpts = []
+    for _owner, line, _gap, _lanes, _k in frontage:
+        for (x, z, hh, yy) in line:
+            fpts.append((x, z, hh, yy))
+    F = np.array(fpts) if fpts else np.zeros((0, 4))
+    # a cheap clearance: the largest square half-size (1 m cells, up to 40) free round each grid point
+    step = int(DEEP_STEP / RES)
+    cands = []
+    for j in range(0, n, step):
+        row = free[j]
+        if not row.any():
+            continue
+        for i in np.nonzero(row[::step])[0] * step:
+            h = 4
+            if not clear_sq(i, j, h):
+                continue
+            while h < 72 and clear_sq(i, j, h + 4):
+                h += 4
+            cands.append((h, i, j))
+    cands.sort(key=lambda c: -c[0])
+    parks = []
+    bigs = {}
+    carparks = []
+    out = []
+    for h, i, j in cands:
+        x, z = (i + 0.5) * RES - HALF, (j + 0.5) * RES - HALF
+        if not free[j, i] or h < DEEP_MIN_CLEAR:
+            continue
+        reg = region_of(x, -z)
+        if reg is None or reg[0] in DEEP_REGIONS_SKIP:
+            continue
+        if F.shape[0]:
+            d2 = (F[:, 0] - x) ** 2 + (F[:, 1] - z) ** 2
+            k = int(d2.argmin())
+            fx, fz, fhalf, fy = F[k]
+            L = math.hypot(fx - x, fz - z) or 1.0
+            nx, nz = (fx - x) / L, (fz - z) / L
+        else:
+            nx, nz, L, fhalf, fy = 0.0, 1.0, 0.0, 0.0, 0.0
+        # four axis-snapped facings toward the street first (a lot square to its street reads as planned)
+        yaw0 = math.atan2(nx, nz)
+        order = []
+        for t in DEEP_BIG.get(reg[0], ()):
+            if t not in aabbs:
+                continue
+            bx0, bz0, bx1, bz1, _bh = aabbs[t]
+            if h * 2 >= 0.7 * max(bx1 - bx0, bz1 - bz0) and all(
+                    (x - px) ** 2 + (z - pz) ** 2 >= DEEP_BIG_SPACING ** 2 for px, pz in bigs.get(t, ())):
+                order.append(t)
+        psp = DEEP_PARK_SPACING_BY.get(reg[0], DEEP_PARK_SPACING)
+        if h >= 30 and reg[0] in DEEP_PARK_REGIONS and all(
+                (x - px) ** 2 + (z - pz) ** 2 >= psp ** 2 for px, pz in parks):
+            order.append("Park")
+        if reg[0] in DEEP_PARK_REGIONS and all(
+                (x - px) ** 2 + (z - pz) ** 2 >= (0.75 * psp) ** 2 for px, pz in parks):
+            order.append("PocketPark")              # the 27 m 児童遊園, where the 60 m park does not fit
+        gsp = DEEP_GARAGE_REGIONS.get(reg[0])
+        if gsp:
+            if all((x - px) ** 2 + (z - pz) ** 2 >= gsp ** 2 for px, pz in bigs.get("ParkingGarage", ())):
+                order.append("ParkingGarage")
+        elif all((x - px) ** 2 + (z - pz) ** 2 >= DEEP_CARPARK_SPACING_BY.get(reg[0], DEEP_CARPARK_SPACING) ** 2
+                 for px, pz in carparks):
+            order += list(DEEP_CARPARKS)
+        for t in order:
+            x0, z0, x1, z1, _hg = aabbs[t]
+            done = False
+            # a park may turn; anything with a DRIVEWAY faces its street square (the driveway runs straight to it)
+            loose = t in ("Park", "PocketPark") or (t not in CAR_PARKS and t != "ParkingGarage")   # a big building may also turn
+            for yaw in ((yaw0, yaw0 + math.pi / 2, yaw0 - math.pi / 2) if loose else (yaw0,)):
+                ii, jj = field.rect_points(x, z, yaw, x0, z0, x1, z1)
+                if ii.size == 0 or not free[jj, ii].all():
+                    continue
+                hs = field.heights(ii, jj)
+                if float(hs.min()) <= LAND_Z or float(hs.max() - hs.min()) > RELIEF:
+                    continue
+                drive = None
+                if t in ("Park", "PocketPark"):
+                    a = DEEP_ACCESS[t]
+                    ai, aj = field.rect_points(x, z, yaw, x0 - a, z0 - a, x1 + a, z1 + a)
+                    if not access[aj, ai].any():
+                        continue
+                else:
+                    # the driveway: from the lot's front edge straight to the kerb of the street it faces
+                    kz = L - fhalf
+                    ok = yaw == yaw0 and z1 < kz <= z1 + DRIVEWAY_MAX
+                    if ok:
+                        di, dj = field.rect_points(x, z, yaw, -DRIVEWAY_W / 2.0, z1, DRIVEWAY_W / 2.0, kz)
+                        ok = di.size > 0 and not field.occupied[dj, di].any() and not (field.owner[dj, di] == -1).any()
+                    if ok:
+                        drive = (kz, di, dj)
+                    elif loose:
+                        # a big building with no straight driveway is still reached down a 路地 or a lane
+                        a = DEEP_BIG_ACCESS
+                        ai, aj = field.rect_points(x, z, yaw, x0 - a, z0 - a, x1 + a, z1 + a)
+                        if not access[aj, ai].any():
+                            continue
+                    else:
+                        continue
+                top = float(hs.max())
+                field.occupied[jj, ii] = True
+                free[jj, ii] = False
+                field.owner[jj, ii] = len(placed) + 1
+                row = {"type": t, "region": reg[0], "key": "deep|%d|%d" % (i, j),
+                       "pos": [round(x, 3), round(top, 3), round(z, 3)], "yaw": round(math.degrees(yaw), 3),
+                       "lot": [round(x0, 3), round(z0, 3), round(x1, 3), round(z1, 3)],
+                       "lot_depth": round(top - float(hs.min()) + LOT_SKIRT, 3), "deep": True}
+                if drive is not None:
+                    kz, di, dj = drive
+                    field.passage[dj, di] = True
+                    free[dj, di] = False
+                    row["drive"] = round(kz, 3)
+                    row["drive_y"] = round(float(fy), 3)
+                placed.append(row)
+                out.append(row)
+                if t in ("Park", "PocketPark"):
+                    parks.append((x, z))
+                elif t in CAR_PARKS:
+                    carparks.append((x, z))
+                else:
+                    bigs.setdefault(t, []).append((x, z))
+                done = True
+                break
+            if done:
+                break
+    counts = {}
+    for r in out:
+        counts[r["type"]] = counts.get(r["type"], 0) + 1
+    print("island_buildings: deep pockets filled with %d car park(s) / park(s) %s" % (len(out), counts))
+    return out
+
+
 def derive(heights_path):
     net, grid, cors = solve_bands()
     field = Field(heights_path)
@@ -1637,7 +1901,7 @@ def derive(heights_path):
                 k = 0
                 while k < len(pts_rows):
                     px, pz, nx, nz, _y = pts_rows[k]
-                    reg = region_of(px, -pz)
+                    reg = street_region(owner) or region_of(px, -pz)
                     if reg is None or row >= reg[2]:
                         k += 1
                         continue
@@ -1716,6 +1980,9 @@ def derive(heights_path):
                         k += 1
     print("island_buildings: %d car park(s) placed beside their store, %d candidate spot(s) refused"
           % (sum(1 for b in placed if b["type"] in CAR_PARKS and b.get("with") is not None), parking_misses[0]))
+    for t_ in {"Park", "PocketPark", "ParkingGarage"} | set(DEEP_CARPARKS) | {t for ts in DEEP_BIG.values() for t in ts}:
+        aabbs.setdefault(t_, type_aabb(t_))
+    deep_fill(field, placed, aabbs, frontage)
     grow_lots(field, placed)
     assign_tones(placed)
     shops = 0
@@ -1907,7 +2174,8 @@ def drive_ramp(b):
     c, s = math.cos(a), math.sin(a)
     kz = b["drive"] + DRIVE_D / 2.0
     ox, oz = b["pos"][0] + s * kz, b["pos"][2] + c * kz
-    oy = b["pos"][1] - KERB_H + KERB_H / 2.0
+    # (a deep car park's driveway meets a street whose surface it records: `drive_y`)
+    oy = (b["drive_y"] if "drive_y" in b else b["pos"][1] - KERB_H) + KERB_H / 2.0
     # lot local x = (c, -s), local z (toward the road) = (s, c); prism x -> -local z, y -> up, z -> local x
     return ((-s, 0.0, -c), (0.0, 1.0, 0.0), (c, 0.0, -s)), (ox, oy, oz)
 

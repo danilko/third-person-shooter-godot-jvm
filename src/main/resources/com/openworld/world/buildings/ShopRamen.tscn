@@ -1,0 +1,40 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/ShopRamen_mesh.res" id="1_l6ajs"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/ShopRamen_collision.res" id="2_05l3w"]
+
+[node name="ShopRamen" type="Node3D" unique_id=1676267183]
+metadata/building = {
+"aabb": [Vector3(-3.5, 0, -7.45), Vector3(7, 7.5, 14.9)],
+"base_m": 0.0,
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [7.0, 14.9],
+"height_m": 7.5,
+"id": "ShopRamen",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "ラーメン屋, 7 x 14 m, 2 storey(s), placed by the district mixes; PLACEHOLDER (library_jp_city.py), shut",
+"wall_top_m": 7.5
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=645027279]
+visibility_range_end = 390.0
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_l6ajs")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=936393598]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=706892132]
+shape = ExtResource("2_05l3w")

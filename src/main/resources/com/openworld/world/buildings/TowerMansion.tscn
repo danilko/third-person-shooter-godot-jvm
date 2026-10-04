@@ -1,0 +1,40 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/TowerMansion_mesh.res" id="1_irxsi"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/TowerMansion_collision.res" id="2_hgfhd"]
+
+[node name="TowerMansion" type="Node3D" unique_id=1965977491]
+metadata/building = {
+"aabb": [Vector3(-24, 0, -25.5), Vector3(48, 112.5, 51)],
+"base_m": 0.0,
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [48.0, 51.0],
+"height_m": 112.5,
+"id": "TowerMansion",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "luxury tower, 32 storeys over a two-storey podium, ~111 m, 48 x 44 m footprint, placed by the city / housing mixes; PLACEHOLDER (library_jp_city.py), shut",
+"wall_top_m": 112.5
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1210202306]
+visibility_range_end = 900.0
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_irxsi")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1307592698]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=830514763]
+shape = ExtResource("2_hgfhd")

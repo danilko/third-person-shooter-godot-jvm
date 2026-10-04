@@ -1,0 +1,40 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/Arena_mesh.res" id="1_m4v67"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/Arena_collision.res" id="2_dx6pm"]
+
+[node name="Arena" type="Node3D" unique_id=2057877222]
+metadata/building = {
+"aabb": [Vector3(-75, 0, -60), Vector3(150, 32.02, 120)],
+"base_m": 0.0,
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [150.0, 120.0],
+"height_m": 32.02,
+"id": "Arena",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "arena 150 x 120 plot: domed hall, entrance deck; PLACEHOLDER (library_jp_city.py), shut",
+"wall_top_m": 32.02
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1070773206]
+visibility_range_end = 684.24
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_m4v67")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=454313847]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1540940807]
+shape = ExtResource("2_dx6pm")

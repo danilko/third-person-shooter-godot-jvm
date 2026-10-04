@@ -1916,10 +1916,183 @@ def secure_mansion(b):
                     "with a pond and stones; wall patrol spawns."}
 
 
+
+# ── 郵便局 (user, 2026-10-03): the branch in every residential district, the 集配 main office in the city ─────────
+# Japanese measurements: a branch 郵便局 (旧特定郵便局) is a one-storey ~120 m2 room -- the 窓口 counter across it (郵便 /
+# 貯金 / 保険 windows), the ゆうちょ ATM corner by the door, a writing desk (記載台), the back office behind the counter
+# with its safe and the sorting shelves, a staff WC and a back door; the red ポスト and the 〒 band outside, two or three
+# parking bays. A 集配 main office (中央郵便局) is a ~1 000 m2 footprint: the customer hall at the street with the ゆうパック
+# counter, the delivery depot (区分 sorting, roll cages, the red vans' loading dock) behind it, offices above.
+
+def post_box(b, x, y, z=0.0):
+    """The red ポスト: a 0.6 x 0.45 m pillar box, 1.35 m high, its two slots on the street side."""
+    b.box("Site", (x - 0.3, y - 0.22, z), (x + 0.3, y + 0.22, z + 1.35), "MI_PostRed")
+    b.box("Site", (x - 0.22, y - 0.24, z + 1.05), (x + 0.22, y - 0.22, z + 1.12), "MI_PaintedMetalDark")
+
+
+def post_office_small(b):
+    x0, x1, y0, y1 = -6.0, 6.0, -5.0, 5.0
+    H = 4.0
+    xi0, xi1, yf, yb = x0 + EXT_T, x1 - EXT_T, y0 + EXT_T, y1 - EXT_T
+    apron(b, -7.4, -9.8, 7.4, 9.8, "MI_ConcreteSmooth")
+    bay_lines(b, 1.5, 7.0, -9.6, -5.4, 0.0, along="y", pitch=2.5)                      # two parking bays
+    b.slab(x0, y0, x1, y1, 0.0, "MI_Terrazzo")
+    ext(b, x0, y0, x1, y1, 0.0, H, "MI_TileBeige", {
+        "f": ([(-3.6, -1, 1.6, "slide", "exit", 2.2)],
+              [Opening(-1.8, 4.8, 0.6, 2.8, glass="MI_GlassClear", frame="MI_PaintedMetal")]),
+        "b": ([(0.0, 1, 0.9, "swing", "exit", 2.1)], []),
+    })
+    roof(b, x0 + 0.02, y0 + 0.02, x1 - 0.02, y1 - 0.02, H, units=1)
+    b.box("Facade", (x0, y0 - 0.2, 3.1), (x1, y0, 3.7), "MI_PostRed")                 # the red band
+    b.box("Facade", (4.6, y0 - 0.3, 2.4), (5.6, y0 - 0.2, 3.4), "MI_PostRed")         # the 〒 board
+    post_box(b, -5.2, -6.0)
+    bay_lines(b, -6.8, 6.8, 5.4, 9.6, 0.0, along="x", pitch=3.4)                       # the delivery yard (back)
+    b.mark("vehicle", 1.7, 7.6, 0.0, 0.0, vehicle="POV1", note="the branch's delivery van, in its back yard")
+    Hi = H - 0.2
+    # the ゆうちょ ATM corner by the door, the writing desk, the waiting bench
+    for y in (-2.7, -1.6):
+        b.put("Shop_ATM", xi0 + 0.4, y, 270.0)
+    b.mark("objective", -4.6, -2.1, 0.0, 90.0, note="the ゆうちょ ATMs")
+    b.box("Furniture", (-1.6, -4.2, 0.0), (0.6, -3.6, 1.0), "MI_Wood")                 # 記載台 (writing desk)
+    b.put("Hosp_WaitingBench", 3.0, -3.7, 180.0)
+    b.mark("spawn", 0.0, -2.0, 0.0, 0.0, team="civilian")
+    # the 窓口 counter across the room (郵便 / 貯金 / 保険), the staff gate at its end
+    teller_counter(b, -4.6, 2.6, -0.6, 0.1)
+    part(b, "x", -0.25, 2.6, xi1, 0.0, Hi, doors=[(4.2, -1, 0.9, "swing", "door", 2.1)])
+    for x in (-3.4, -1.0, 1.4):
+        b.mark("spawn", x, 0.8, 0.0, 180.0, team="staff")
+    # the back office: desks, the sorting shelves, the safe; the staff WC; the back door
+    b.put("Office_DeskIsland", -1.0, 2.6, 0.0)
+    chairs_around(b, -1.0, 2.6, 2, 0.6, 0.85)
+    b.put("Office_Cabinet", 2.2, yb - 0.35, 0.0, repeat=(3, 0.95, 0.0))                 # 区分棚 (sorting shelves)
+    b.put("Office_Safe", xi1 - 0.4, 1.6, 270.0)
+    b.mark("objective", 4.8, 1.6, 0.0, 90.0, note="the office safe")
+    b.put("Warehouse_RollCage", 4.4, 2.9, 0.0)
+    part(b, "y", -3.6, 2.6, yb, 0.0, Hi, doors=[(4.0, 1, 0.8, "slide", "door", 2.0)])
+    part(b, "x", 2.6, xi0, -3.6, 0.0, Hi)
+    b.put("WC_Toilet", xi0 + 0.38, 4.2, 90.0)
+    b.put("WC_Basin", -5.3, 2.85, 180.0)
+    return {"note": "郵便局 (branch): a one-storey 12 x 10 m post office -- the ゆうちょ ATM corner by the door, the 記載台 "
+                    "writing desk, the 窓口 counter (郵便 / 貯金 / 保険) with its glass screen and staff gate, the back "
+                    "office (desks, the 区分棚 sorting shelves, the safe, a roll cage), the staff WC and the back door; "
+                    "outside the red band, the 〒 board, the red ポスト and two parking bays; behind it the delivery yard with its "
+                    "red van (POV-1)."}
+
+
+def post_office_large(b):
+    X0, X1, Y0, Y1 = -18.0, 18.0, -13.0, 13.0
+    LV, TOP = [0.0, 5.0, 9.0], 13.0
+    xi0, xi1, yf, yb = X0 + EXT_T, X1 - EXT_T, Y0 + EXT_T, Y1 - EXT_T
+    apron(b, -19.8, -19.8, 19.8, 19.8, "MI_ConcreteSmooth")
+    bay_lines(b, -19.0, -9.0, 14.2, 19.6, 0.0, along="y", pitch=3.0)                   # the red vans' bays (back yard)
+    b.mark("vehicle", -17.5, 17.0, 0.0, 0.0, vehicle="POT1", note="a 郵便 2 t box truck")
+    for x in (-14.5, -11.5):
+        b.mark("vehicle", x, 17.0, 0.0, 0.0, vehicle="POV1", note="a 郵便 delivery van")
+    wellA = (xi0, -2.6, xi0 + 2.4, 4.0)
+    wellB = (xi1 - 2.4, 6.2, xi1, yb)
+    shaft = b.lift(xi1 - 4.6, -0.6, 1.8, 1.6, LV, faces=1, turned=True)
+    holes = {z: [] for z in LV + [TOP]}
+    for i, z0 in enumerate(LV):
+        z1 = LV[i + 1] if i + 1 < len(LV) else TOP
+        holes[z1].append(b.ustair(*wellA, z0, z1 - z0, near="s", cap=(z1 == TOP)))
+        holes[z1].append(b.ustair(*wellB, z0, z1 - z0, near="s"))
+        if z1 != TOP:
+            holes[z1].append(shaft)
+    e = 0.02
+    for z in LV:
+        b.slab(X0 + e, Y0 + e, X1 - e, Y1 - e, z, "MI_Terrazzo", holes=holes[z])
+    roof(b, X0 + e, Y0 + e, X1 - e, Y1 - e, TOP, holes=holes[TOP][1:], units=6)
+    stair_house(b, wellB[0], wellB[1], wellB[2], wellB[3], TOP)
+    ext(b, X0, Y0, X1, Y1, 0.0, LV[1], "MI_TileBeige", {
+        "f": ([(-6.0, -1, 2.4, "slide", "exit", 2.6), (8.0, -1, 1.8, "slide", "exit", 2.4)],
+              [Opening(-15.0, -8.5, 0.4, 4.0, glass="MI_GlassClear", frame="MI_PaintedMetal"),
+               Opening(-3.5, 5.5, 0.4, 4.0, glass="MI_GlassClear", frame="MI_PaintedMetal"),
+               Opening(10.5, 16.0, 0.4, 4.0, glass="MI_GlassClear", frame="MI_PaintedMetal")]),
+        "b": ([(-14.0, 1, 4.0, "", "open", 3.6), (-9.0, 1, 4.0, "", "open", 3.6), (12.0, 1, 1.0, "swing", "exit", 2.1)],
+              []),
+        "r": ([(-8.0, 1, 1.0, "swing", "exit", 2.1)], []),
+    })
+    for i, z0 in enumerate(LV[1:]):
+        z1 = LV[i + 2] if i + 2 < len(LV) else TOP
+        ext(b, X0, Y0, X1, Y1, z0, z1 - z0, "MI_TileBeige", {
+            "f": ((), band_windows(b, xi0 + 1.0, xi1 - 1.0, z0, 3.8, every=3.0, w=2.2)),
+            "b": ((), band_windows(b, -12.0, 8.0, z0, 3.8, every=3.0, w=1.8)),
+            "l": ((), band_windows(b, -9.0, 9.0, z0, 3.8, every=3.0, w=1.8)),
+            "r": ((), band_windows(b, -9.0, 4.0, z0, 3.8, every=3.0, w=1.8))})
+    b.box("Facade", (X0, Y0 - 0.2, 4.6), (X1, Y0, 5.3), "MI_PostRed")                   # the red band
+    b.box("Facade", (-5.0, Y0 - 0.25, 10.4), (5.0, Y0, 12.6), "MI_PostRed")            # the 〒 name board
+    b.box("Facade", (-9.0, Y0 - 3.0, 4.0), (-3.0, Y0, 4.25), "MI_PaintedMetal")        # the entrance canopy
+    for x in (-12.0, -11.2):
+        post_box(b, x, Y0 - 1.6)
+    b.box("Facade", (-16.4, Y1, 3.6), (-6.6, Y1 + 0.35, 4.0), "MI_PaintedMetalDark")   # the raised dock shutters
+    Hi = LV[1] - 0.2
+    # ── F1 front: 風除室, the customer hall, the 窓口 counters, the ゆうパック counter, the ATM corner, restrooms
+    vestibule(b, -8.0, -4.0, yf, -10.2, 0.0, Hi, door_w=2.0)
+    for x in (-16.4, -15.3, -14.2, -13.1):
+        b.put("Shop_ATM", x, -10.4, 0.0)
+    b.mark("objective", -14.7, -9.6, 0.0, 180.0, note="the ゆうちょ ATM corner")
+    for x in (-2.0, 1.0):
+        b.box("Furniture", (x - 1.1, -9.0, 0.0), (x + 1.1, -8.4, 1.0), "MI_Wood")       # 記載台
+    for x in (-8.0, 4.0):
+        b.put("Hosp_WaitingBench", x, -6.6, 180.0)
+    b.put("Station_TicketMachine", 6.5, -10.6, 0.0)
+    b.mark("spawn", -2.0, -6.0, 0.0, 0.0, team="civilian")
+    teller_counter(b, -12.0, 8.0, -3.6, -2.9)                                          # 郵便 / 貯金 / 保険
+    counter(b, 9.6, -3.6, 15.6, -2.9, 0.0, 1.05, mat="MI_Wood", top="MI_Terrazzo")     # ゆうパック (parcels)
+    part(b, "x", -3.25, xi0, -12.0, 0.0, Hi, doors=[(-14.5, -1, 1.0, "swing", "door", 2.1)])
+    part(b, "x", -3.25, 15.6, xi1, 0.0, Hi)
+    part(b, "x", -3.25, 8.0, 9.6, 0.0, Hi, doors=[(8.8, -1, 0.9, "swing", "door", 2.1)])
+    wc_block(b, 0.0, Hi, 10.0, xi1, yf + 3.6, yf + 0.3)
+    for x in (-9.0, -3.0, 3.0):
+        b.mark("spawn", x, -2.2, 0.0, 180.0, team="staff")
+    # ── F1 back: the office strip, then the delivery depot (区分 sorting tables, roll cages) and its loading dock
+    for x in (-8.0, -2.0, 4.0):
+        b.put("Office_DeskIsland", x, -0.6, 0.0)
+        chairs_around(b, x, -0.6, 2, 0.6, 0.85)
+    b.put("Office_Safe", 9.0, 1.3, 180.0)
+    b.put("Office_Safe", 10.0, 1.3, 180.0)
+    b.mark("objective", 9.5, 0.4, 0.0, 0.0, note="the 貯金 safes")
+    part(b, "x", 2.0, xi0 + 2.6, xi1 - 2.6, 0.0, Hi, doors=[(-12.0, 1, 1.8, "slide", "door", 2.4),
+                                                          (6.0, 1, 1.8, "slide", "door", 2.4)])
+    for x in (-10.0, -4.0, 2.0, 8.0):
+        b.box("Furniture", (x - 2.0, 5.2, 0.0), (x + 2.0, 6.4, 0.95), "MI_PaintedMetal")   # 区分 sorting tables
+    for x in (-16.0, -15.0, -14.0, -6.0, -5.0, 12.0, 13.0):
+        b.put("Warehouse_RollCage", x, 9.8, 0.0)
+    b.mark("objective", -2.0, 8.5, 0.0, 0.0, note="the delivery depot (集配): today's registered mail")
+    b.mark("spawn", 4.0, 9.0, 0.0, 180.0, team="staff")
+    # ── F2: offices; F3: offices, the server room, lockers, the canteen
+    for z, rows in ((LV[1], "office"), (LV[2], "top")):
+        h_ = (LV[2] if z == LV[1] else TOP) - z - 0.2
+        part(b, "x", -2.0, xi0 + 2.6, xi1 - 2.6, z, h_, doors=[(-8.0, -1, 0.9, "swing", "door"),
+                                                             (6.0, -1, 0.9, "swing", "door")])
+        for x in (-10.0, -4.0, 2.0, 8.0):
+            b.put("Office_DeskIsland", x, -7.0, 0.0, z=z)
+            chairs_around(b, x, -7.0, 2, 0.6, 0.85, z=z)
+        if rows == "office":
+            b.put("Office_MeetingTable", 4.0, 6.0, 0.0, z=z)
+            b.put("Office_Desk", -8.0, 8.0, 0.0, z=z)
+            b.put("Office_Chair", -8.0, 8.65, 180.0, z=z)
+            b.mark("spawn", -8.0, 8.7, z, 180.0, team="vip", note="the postmaster (局長)")
+        else:
+            b.put("Office_ServerRack", 2.0, 9.6, 0.0, repeat=(5, 1.0, 0.0), z=z)
+            b.mark("objective", 4.0, 8.0, z, 0.0, note="the server room")
+            for x in (-10.0, -6.0):
+                b.put("Rest_Table", x, 6.0, 0.0, z=z)
+            b.put("Office_Locker", -16.0, 11.4, 0.0, repeat=(4, 0.95, 0.0), z=z)
+        wc_block(b, z, h_, 10.0, xi1, -2.0 - 3.6, -2.0 - 0.3)
+    return {"note": "郵便局 (main, 集配局): a three-storey 36 x 26 m post office -- F1 the 風除室, the customer hall "
+                    "(記載台, sofas, ticket machine), the 窓口 counters (郵便 / 貯金 / 保険) and the ゆうパック parcel "
+                    "counter, the ゆうちょ ATM corner, restrooms, the office strip with the safes, and behind it the "
+                    "delivery depot (区分 sorting tables, roll cages) with two dock shutters onto the van yard; F2 "
+                    "offices, the postmaster, a meeting table; F3 offices, the server room, lockers, the canteen. Two "
+                    "stairs (B to the roof), a lift; the red band, the 〒 board, two red ポスト; the van yard behind the docks "
+                    "(a POT-1 box truck, two POV-1 vans)."}
+
 PLANS = {"SafeHouseSmall": safehouse_small, "SafeHouseLarge": safehouse_large, "Izakaya": izakaya, "SafeHouseCitySmall": safehouse_city_small,
          "SafeHouseCityLarge": safehouse_city_large, "MaidCafe": maid_cafe, "AdultServices": adult_services,
          "BankSmall": bank_small, "BankLarge": bank_large,
          "ParkingGarage": parking_garage, "AirportControlTower": airport_control_tower,
          "FashionBuilding": fashion_building, "DepartmentStore": department_store,
          "CivicCenter": civic_center, "OnsenRyokan": onsen_ryokan,
-         "SecureMansion": secure_mansion}
+         "SecureMansion": secure_mansion,
+         "PostOfficeSmall": post_office_small, "PostOffice": post_office_large}

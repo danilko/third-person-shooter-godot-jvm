@@ -133,8 +133,16 @@ public final class RoadGraph {
         public final double offset;
         public final double distance;
         public final double[] point;
+        /** A start that changed lanes: the seed it changed off, driven {@link #lead} metres first (an aux
+         *  lane opens part-way along its run, so the change is made where the neighbour starts). */
+        final Snap via;
+        final double lead;
         Snap(Lane lane, double offset, double distance, double[] point) {
+            this(lane, offset, distance, point, null, 0);
+        }
+        Snap(Lane lane, double offset, double distance, double[] point, Snap via, double lead) {
             this.lane = lane; this.offset = offset; this.distance = distance; this.point = point;
+            this.via = via; this.lead = lead;
         }
     }
 
@@ -430,10 +438,14 @@ public final class RoadGraph {
             double rest = s.lane.length() - s.offset;
             for (Lane n : s.lane.succ) relax(E, prev, viaSide, pq, n, s.distance + rest, s, false);
             // Lane change off the seed lane, then on to the neighbour's successors.
-            for (Lane side : s.lane.side)
+            // The two lanes need not start together: the seed point is mapped onto the neighbour by
+            // position, never by offset (an aux lane opening 84 m into the run made a route skip 85 m).
+            for (Lane side : s.lane.side) {
+                double lead = sideLead(s, side), on = sideOffset(s, side, lead);
                 for (Lane n : side.succ)
-                    relax(E, prev, viaSide, pq, n, s.distance + LANE_CHANGE_COST + (side.length() - s.offset),
-                            new Snap(side, s.offset, s.distance, s.point), true);
+                    relax(E, prev, viaSide, pq, n, s.distance + LANE_CHANGE_COST + lead + (side.length() - on),
+                            new Snap(side, on, s.distance, s.point, s, lead), true);
+            }
         }
         while (!pq.isEmpty()) {
             Object[] top = pq.poll();
@@ -457,7 +469,10 @@ public final class RoadGraph {
                 boolean same = s.lane == g.lane, side = s.lane.side.contains(g.lane);
                 if (!same && !side) continue;
                 if (g.offset < s.offset) continue;
-                double c = s.distance + (side ? LANE_CHANGE_COST : 0) + g.offset - s.offset + g.distance;
+                double lead = side ? sideLead(s, g.lane) : 0;
+                double on = side ? sideOffset(s, g.lane, lead) : s.offset;
+                if (g.offset < on) continue;
+                double c = s.distance + (side ? LANE_CHANGE_COST : 0) + lead + g.offset - on + g.distance;
                 if (c < bestCost) { bestCost = c; bestGoal = g; bestSeed = s; bestSeedSide = side; }
             }
         }
@@ -466,8 +481,10 @@ public final class RoadGraph {
         // Rebuild the legs back to front.
         List<Leg> legs = new ArrayList<>();
         if (bestSeed != null) {
-            if (bestSeedSide) legs.add(new Leg(bestSeed.lane, bestSeed.offset, bestSeed.offset));
-            legs.add(new Leg(bestGoal.lane, bestSeed.offset, bestGoal.offset));
+            double lead = bestSeedSide ? sideLead(bestSeed, bestGoal.lane) : 0;
+            double on = bestSeedSide ? sideOffset(bestSeed, bestGoal.lane, lead) : bestSeed.offset;
+            if (bestSeedSide) legs.add(new Leg(bestSeed.lane, bestSeed.offset, bestSeed.offset + lead));
+            legs.add(new Leg(bestGoal.lane, on, bestGoal.offset));
             Collections.reverse(legs);
         } else {
             legs.add(new Leg(bestGoal.lane, 0, bestGoal.offset));
@@ -478,6 +495,7 @@ public final class RoadGraph {
                 boolean side = viaSide.getOrDefault(cur, false);
                 if (p instanceof Snap s) {
                     legs.add(new Leg(s.lane, s.offset, s.lane.length()));
+                    if (s.via != null) legs.add(new Leg(s.via.lane, s.via.offset, s.via.offset + s.lead));
                     break;
                 }
                 Lane pl = (Lane) p;
@@ -515,6 +533,18 @@ public final class RoadGraph {
         double[] flat = new double[pts.size() * 3];
         for (int i = 0; i < pts.size(); i++) System.arraycopy(pts.get(i), 0, flat, 3 * i, 3);
         return new Route(legs, flat, length, bestCost, bestGoal.point);
+    }
+
+    /** How far along a seed's own lane it drives before changing onto {@code side}: 0 unless the neighbour
+     *  only opens further on. */
+    private static double sideLead(Snap s, Lane side) {
+        return Math.max(0, s.lane.leadTo(side) - s.offset);
+    }
+
+    /** Where a lane change off seed {@code s} lands on {@code side}, by position. */
+    private static double sideOffset(Snap s, Lane side, double lead) {
+        double[] at = s.lane.at(s.offset + lead);
+        return side.alongXZ(at[0], at[2]);
     }
 
     private static void relax(Map<Lane, Double> E, Map<Lane, Object> prev, Map<Lane, Boolean> viaSide,

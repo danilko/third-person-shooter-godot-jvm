@@ -65,6 +65,13 @@ TUNING = {
     "FIE1": {"name": "FIE-1", "mass": 7000, "rest": 0.45, "spring": 56000, "damping": 20000, "over": 0.25,
              "max_speed": 30.0, "accel": 42000.0, "crash_hp": 3.0, "health": 1400, "paint": "",
              "extra_seats": [[-0.45, 1.55, 1.30], [0.45, 1.55, 1.30]]},
+    # the post offices' vans (user, 2026-10-03): a kei van and a 2 t box truck, Japan Post red
+    "POV1": {"name": "POV-1", "mass": 1000, "rest": 0.30, "spring": 10500, "damping": 3800, "over": 0.2,
+             "max_speed": 36.0, "accel": 7200.0, "crash_hp": 6.0, "health": 450, "paint": "",
+             "extra_seats": [[-0.34, -0.55, 0.72], [0.34, -0.55, 0.72]]},
+    "POT1": {"name": "POT-1", "mass": 3500, "rest": 0.40, "spring": 30000, "damping": 11000, "over": 0.22,
+             "max_speed": 32.0, "accel": 22000.0, "crash_hp": 4.0, "health": 950, "paint": "",
+             "extra_seats": [[-0.42, 1.10, 1.05], [0.42, 1.10, 1.05]]},
     # a container truck: tractor + 20 ft chassis made rigid, loaded (user, 2026-09-29); governed like the crate truck
     "COT1": {"name": "COT-1", "mass": 16000, "rest": 0.50, "spring": 120000, "damping": 44000, "over": 0.25,
              "max_speed": 24.0, "accel": 85000.0, "crash_hp": 2.5, "health": 2200, "paint": "car",

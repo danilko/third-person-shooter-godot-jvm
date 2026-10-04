@@ -1,0 +1,40 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/Karaoke_mesh.res" id="1_hkrs5"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/Karaoke_collision.res" id="2_12jjd"]
+
+[node name="Karaoke" type="Node3D" unique_id=560596982]
+metadata/building = {
+"aabb": [Vector3(-6.03, 0, -9), Vector3(12.06, 25.2, 20)],
+"base_m": 0.0,
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [12.06, 20.0],
+"height_m": 25.2,
+"id": "Karaoke",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "karaoke box, 7 storeys on a 14 x 20 plot; PLACEHOLDER (library_jp_city.py), shut",
+"wall_top_m": 25.2
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=722912261]
+visibility_range_end = 602.4
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_hkrs5")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=376317499]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=525770131]
+shape = ExtResource("2_12jjd")

@@ -1,0 +1,40 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/TerraceHouse4_mesh.res" id="1_drqlv"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/TerraceHouse4_collision.res" id="2_dcqxd"]
+
+[node name="TerraceHouse4" type="Node3D" unique_id=1777210688]
+metadata/building = {
+"aabb": [Vector3(-12.5, 0, -7.5), Vector3(25, 7.62, 15)],
+"base_m": 0.0,
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [25.0, 15.0],
+"height_m": 7.62,
+"id": "TerraceHouse4",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "four two-storey family units in a row, each with its own door and garden, 24 x 14.5 m, placed by the city / housing mixes; PLACEHOLDER (library_jp_city.py), shut",
+"wall_top_m": 7.62
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1730884782]
+visibility_range_end = 391.44
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_drqlv")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=612654746]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=508651652]
+shape = ExtResource("2_dcqxd")

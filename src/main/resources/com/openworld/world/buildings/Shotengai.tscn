@@ -1,0 +1,40 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/Shotengai_mesh.res" id="1_lo3aj"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/Shotengai_collision.res" id="2_ghvxw"]
+
+[node name="Shotengai" type="Node3D" unique_id=1018753812]
+metadata/building = {
+"aabb": [Vector3(-12, 0, -55), Vector3(24, 9.8, 110.5)],
+"base_m": 0.0,
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [24.0, 110.5],
+"height_m": 9.8,
+"id": "Shotengai",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "covered shopping street, 24 x 110 plot running back from the street; PLACEHOLDER (library_jp_city.py), walkable",
+"wall_top_m": 9.8
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=2140320903]
+visibility_range_end = 417.6
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_lo3aj")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=716569286]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=468438562]
+shape = ExtResource("2_ghvxw")

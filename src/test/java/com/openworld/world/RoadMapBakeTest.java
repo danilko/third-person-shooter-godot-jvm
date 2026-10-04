@@ -80,10 +80,19 @@ class RoadMapBakeTest {
             assertEquals(0, a[r * px + c], "paint 60 m from every road at " + x + ", " + z);
         }
         // A divided road is ONE road: the 3 m median between chuo_dori's carriageways is painted.
-        // The longest chuo_dori forward lane: its id depends on where the zone grid split the road.
+        // The longest chuo_dori forward lane: its id depends on where the zone grid split the road. Only a
+        // stretch with no OTHER road within 20 m of its middle -- an elevated road passing over it is painted
+        // too, and "past the outer edge" would then land on that road's own paving.
         RoadGraph.Lane f = null;
         for (RoadGraph.Lane l : island.lanes()) {
-            if (l.id.startsWith("chuo_dori") && l.id.endsWith("_F0") && (f == null || l.length() > f.length())) f = l;
+            if (!(l.id.startsWith("chuo_dori") && l.id.endsWith("_F0")) || (f != null && l.length() <= f.length())) continue;
+            double[] m = l.at(l.length() * 0.5);
+            boolean alone = true;
+            for (RoadGraph.Lane o : island.lanes()) {
+                if (o.roadName.equals(l.roadName)) continue;
+                if (RoadGraph.snap(o, m[0], m[1], m[2], 0).distance < 20) { alone = false; break; }
+            }
+            if (alone) f = l;
         }
         assertNotNull(f, "a chuo_dori lane");
         String stem = f.id.substring(0, f.id.length() - 3);

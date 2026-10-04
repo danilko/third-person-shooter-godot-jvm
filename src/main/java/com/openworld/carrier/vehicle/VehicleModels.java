@@ -34,7 +34,9 @@ public final class VehicleModels {
             DIR + "LIP1.tscn",         // 16: LIP-1 light plane (flyable, inherits Airplane.tscn)
             DIR + "WOB1.tscn",         // 17: WOB-1 harbour work boat (drivable, inherits Boat.tscn)
             DIR + "FIB1.tscn",         // 18: FIB-1 small fishing boat (drivable, inherits Boat.tscn)
-            DIR + "COT1.tscn");        // 19: COT-1 container truck (tractor + 20 ft ISO box, one rigid body)
+            DIR + "COT1.tscn",         // 19: COT-1 container truck (tractor + 20 ft ISO box, one rigid body)
+            DIR + "POV1.tscn",         // 20: POV-1 postal kei van (郵便 軽バン)
+            DIR + "POT1.tscn");        // 21: POT-1 postal 2 t box truck
     // 5-14 are PLACEHOLDER block models (blender/tools/make_placeholder_cars.py), 15-18 placeholder craft
     // (blender/tools/make_placeholder_craft.py + tools/build_craft_scenes.py), until an artist models them.
 
@@ -51,13 +53,13 @@ public final class VehicleModels {
 
     /**
      * Civilian traffic, a Japanese street's mix (one entry = one twentieth): kei cars are the biggest share, then the
-     * coupe, kei trucks, taxis, a few classics and the odd crate truck.
+     * coupe, kei trucks, taxis, a few classics, the odd crate truck and a postal van.
      */
     private static final String[] CIVILIAN = {
             DIR + "KEC1.tscn", DIR + "KEC1.tscn", DIR + "KEC1.tscn", DIR + "KEC1.tscn", DIR + "KEC1.tscn",
             DIR + "KEC1.tscn", DIR + "SPC1.tscn", DIR + "SPC1.tscn", DIR + "SPC1.tscn", DIR + "SPC1.tscn",
             DIR + "KET1.tscn", DIR + "KET1.tscn", DIR + "KET1.tscn", DIR + "TAX1.tscn", DIR + "TAX1.tscn",
-            DIR + "TAX1.tscn", DIR + "CLC1.tscn", DIR + "CLC1.tscn", DIR + "CRT1.tscn", DIR + "KEC1.tscn"};
+            DIR + "TAX1.tscn", DIR + "CLC1.tscn", DIR + "CLC1.tscn", DIR + "CRT1.tscn", DIR + "POV1.tscn"};
     /** Police: patrol cars, and one in four a mini patrol car. */
     private static final String[] POLICE = {DIR + "POC1.tscn", DIR + "POC1.tscn", DIR + "POC1.tscn", DIR + "MPC1.tscn"};
 

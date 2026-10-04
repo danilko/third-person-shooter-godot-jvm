@@ -3,9 +3,9 @@
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/FerrisWheelPark_mesh.res" id="1_2qoji"]
 [ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/FerrisWheelPark_collision.res" id="2_ugyit"]
 
-[node name="FerrisWheelPark" type="Node3D" unique_id=3133857]
+[node name="FerrisWheelPark" type="Node3D" unique_id=226262729]
 metadata/building = {
-"aabb": [Vector3(-55, -0.24277201, -100), Vector3(110, 111.10517, 200)],
+"aabb": [Vector3(-55, -0.24277201, -80), Vector3(110, 111.10977, 160)],
 "base_m": 0.0,
 "collision": "trimesh",
 "door_style": "swing",
@@ -15,25 +15,25 @@ metadata/building = {
 "doors_shop": false,
 "example": true,
 "facade_surfaces": {},
-"footprint_m": [110.0, 200.0],
+"footprint_m": [110.0, 160.0],
 "height_m": 111.11,
 "id": "FerrisWheelPark",
 "kit": "library",
 "landmark": true,
-"piece_count": 14,
-"probe_xz": [25.0, -45.0],
+"piece_count": 20,
+"probe_xz": [0.0, 40.0],
 "props_top_m": 9.1824,
 "solid_probes": [],
 "trimesh_pieces": 1.0,
-"use": "waterfront park with a 100 m Ferris wheel (110 m to the top) on a 110 x 200 m plot on the gulf's east shore, beside the resort hotels: Odaiba's Palette Town / Kasai Rinkai Park precedent (user, 2026-09-29). Its entrance plaza faces the street (ring_kita, north), the wheel stands in the water corner, visible from the Wangan and the Rainbow Bridge. PLACEHOLDER (library_civic.py) + nature-kit trees; the wheel does not turn yet",
-"wall_top_m": 110.8624
+"use": "waterfront park with a 100 m Ferris wheel (110 m to the top) on a 110 x 160 m plot on the south-east beach, beside the resort hotels and the water resort (2026-10-02 night: moved south of the Suburb ramp): Odaiba's Palette Town / Kasai Rinkai Park precedent. Its entrance plaza is at the suburb loop's corner (north-east), the wheel stands in the water corner with its full circle facing the open sea. PLACEHOLDER (library_civic.py) + nature-kit trees; the wheel does not turn yet",
+"wall_top_m": 110.867
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1772535320]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1014640307]
 mesh = ExtResource("1_2qoji")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=136589207]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=796331471]
 collision_mask = 0
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=652511427]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=967373902]
 shape = ExtResource("2_ugyit")

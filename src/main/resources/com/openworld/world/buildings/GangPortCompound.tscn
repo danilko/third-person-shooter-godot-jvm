@@ -1,0 +1,41 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/GangPortCompound_mesh.res" id="1_mgvbw"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/GangPortCompound_collision.res" id="2_sdtma"]
+
+[node name="GangPortCompound" type="Node3D" unique_id=1527434114]
+metadata/building = {
+"aabb": [Vector3(-35, 0, -27.5), Vector3(70, 10.52, 55.1)],
+"base_m": 0.0,
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [70.0, 55.1],
+"height_m": 10.52,
+"id": "GangPortCompound",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"probe_xz": [-22.0, 15.5],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "Aokiba-gumi HQ: walled port yard 70 x 55; PLACEHOLDER (library_jp_city.py), shut",
+"wall_top_m": 6.8
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=2069695621]
+visibility_range_end = 426.24
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_mgvbw")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1109431634]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1930823079]
+shape = ExtResource("2_sdtma")

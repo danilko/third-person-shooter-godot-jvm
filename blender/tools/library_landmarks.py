@@ -127,46 +127,8 @@ def rainbow_bridge(material, Builder):
     return "RainbowBridge", "structure", b.mesh()
 
 
-# ── Tokyo Tower (東京タワー) ──────────────────────────────────────────────────────────────────────────────────
-# Public record (PLATEAU has no lattice tower): 332.9 m to the antenna tip; base ~88 m square; Main Deck at 150 m,
-# Top Deck at 249.6 m; international-orange and white aviation bands.
-TT_BASE_HALF = 44.0
-TT_WAIST_Z, TT_WAIST_HALF = 90.0, 8.0
-TT_MAIN_Z, TT_TOP_Z, TT_TIP = 150.0, 249.6, 332.9
-
-
-def tokyo_tower(material, Builder):
-    b = Builder("TokyoTower", material)
-
-    def band(z):
-        return "MI_AviationOrange" if int(z // 24.0) % 2 == 0 else "MI_PaintWhite"
-
-    # four legs splaying from the base corners to the waist, in banded segments, with arches between them
-    for sx in (-1, 1):
-        for sy in (-1, 1):
-            segs = 6
-            for k in range(segs):
-                t0, t1 = k / segs, (k + 1) / segs
-                h0 = TT_BASE_HALF + (TT_WAIST_HALF - TT_BASE_HALF) * t0
-                h1 = TT_BASE_HALF + (TT_WAIST_HALF - TT_BASE_HALF) * t1
-                z0, z1 = TT_WAIST_Z * t0, TT_WAIST_Z * t1
-                b.beam((sx * h0, sy * h0, z0), (sx * h1, sy * h1, z1), 5.0, band(z0))
-    for z, h in ((22.0, 34.0), (48.0, 23.0), (70.0, 14.0)):
-        for (x0, y0, x1, y1) in ((-h, -h, h, -h), (h, -h, h, h), (h, h, -h, h), (-h, h, -h, -h)):
-            b.beam((x0, y0, z), (x1, y1, z), 2.0, band(z))
-    # the shaft: tapered banded segments, the two decks, the antenna
-    for z0, z1, h0, h1 in ((TT_WAIST_Z, TT_MAIN_Z, TT_WAIST_HALF, 6.0), (TT_MAIN_Z + 6.0, TT_TOP_Z, 6.0, 3.5)):
-        n = int((z1 - z0) // 12)
-        for k in range(n):
-            za, zb = z0 + (z1 - z0) * k / n, z0 + (z1 - z0) * (k + 1) / n
-            ha, hb = h0 + (h1 - h0) * k / n, h0 + (h1 - h0) * (k + 1) / n
-            b.frustum(0, 0, za, zb, ha, ha, hb, hb, band(za))
-    b.box((-15, -15, TT_MAIN_Z), (15, 15, TT_MAIN_Z + 6.0), "MI_GlassClear")
-    b.box((-16, -16, TT_MAIN_Z - 0.5), (16, 16, TT_MAIN_Z), "MI_PaintWhite")
-    b.box((-8, -8, TT_TOP_Z), (8, 8, TT_TOP_Z + 4.0), "MI_GlassClear")
-    b.frustum(0, 0, TT_TOP_Z + 4.0, TT_TIP - 30.0, 2.5, 2.5, 1.2, 1.2, "MI_AviationOrange")
-    b.frustum(0, 0, TT_TIP - 30.0, TT_TIP, 1.2, 1.2, 0.4, 0.4, "MI_PaintWhite")
-    return "TokyoTower", "structure", b.mesh()
+# (Tokyo Tower was removed 2026-10-03 -- user: no copyright / trademark exposure; its site carries the ORIGINAL
+# broadcast centre, library_jp_city.broadcast_centre)
 
 
 # ── Tokyo Station, Marunouchi building (東京駅丸の内駅舎) ───────────────────────────────────────────────────────
@@ -302,46 +264,162 @@ def runway_end(material, Builder):
 # the Hokuden and Nanden to either side and the Houshinmon gate opposite, all inside curved Ryukyu-limestone walls
 # (石垣). Here the walls are one platform, SH_PLAT_H tall, that the hill slopes into: its top clears the uphill ground,
 # and on the downhill side it stands as the castle wall. The Seiden faces -Y (the piece's front, +Z in Godot).
-SH_PLAT_H = 25.0
-SH_PLAT = (75.0, 60.0)          # half-sizes of the platform's top
+SH_PLAT_H = 25.0                # the 御庭 (Una) level, over the piece's origin (the site's lowest ground)
+# THE WALK IN (user, 2026-10-03: "more detailed placeholder of the gates / entire castle"; the approach road ends on
+# the outer gate's axis). Piece frame: -Y faces the CITY (the Seiden's front, Godot +Z), -X is the castle's SOUTH side,
+# where the approach (jokamachi_sando) arrives. The path is Shuri's own sequence, compressed: 守礼門 (a freestanding
+# ceremonial gate) on the approach -> 歓会門 (the arched gate in the outer wall) into a lower court -> stairs up the
+# south terrace through 瑞泉門 and 漏刻門 -> 下之御庭 (the front terrace) -> 広福門 -> steps up to 奉神門 -> the 御庭 and
+# the Seiden. Every surface is walkable: the scene's collider is the mesh (trimesh).
+SH_GATE_Y = 40.0                # the 歓会門 / 守礼門 axis (piece y); the approach road ends on it at x SH_ROAD_X
+SH_ROAD_X = -88.0
+SH_INNER = (-48.0, 72.0, -48.0, 60.0)    # the inner citadel (x0, x1, y0, y1), top SH_PLAT_H
+SH_STRIP_X = (-66.0, -48.0)              # the south terrace
+SH_FRONT = (-66.0, 46.0, -64.0, -48.0)   # 下之御庭, top 22
+SH_COURT_Z = 4.0
+
+
+def _ring(b, cx, cy, r, z0, z1, mat, n=12):
+    b.convex([(cx + r * math.cos(2 * math.pi * k / n), cy + r * math.sin(2 * math.pi * k / n), z)
+              for k in range(n) for z in (z0, z1)], mat)
+
+
+def _yagura(b, x0, x1, y0, y1, z, h=3.0, roof_rise=2.5):
+    """A red wooden gate house on a wall top, with a red-tile hip roof."""
+    b.box((x0, y0, z), (x1, y1, z + h), "MI_LacquerRed")
+    hx, hy = (x1 - x0) / 2, (y1 - y0) / 2
+    b.frustum((x0 + x1) / 2, (y0 + y1) / 2, z + h, z + h + 0.3, hx + 1.2, hy + 1.2, hx + 1.2, hy + 1.2, "MI_RoofTileRed")
+    b.frustum((x0 + x1) / 2, (y0 + y1) / 2, z + h + 0.3, z + h + roof_rise, hx + 1.2, hy + 1.2,
+              max(0.3, hx - hy + 0.4), 0.3, "MI_RoofTileRed")
+
+
+def _steps(b, x0, x1, y_from, y_to, z_from, z_to, rise=0.25, mat="MI_Limestone", parapet_x=None):
+    """A stair along Y from (y_from, z_from) to (y_to, z_to), each step a solid from the ground; `parapet_x` = the
+    outer edge's x (a 0.6 m parapet, 1.2 m over each step)."""
+    n = max(1, int(round(abs(z_to - z_from) / rise)))
+    for k in range(n):
+        ya = y_from + (y_to - y_from) * k / n
+        yb = y_from + (y_to - y_from) * (k + 1) / n
+        z = z_from + (z_to - z_from) * (k + 1) / n
+        lo, hi = min(ya, yb), max(ya, yb)
+        b.box((x0, lo, 0.0), (x1, hi, z), mat)
+        if parapet_x is not None:
+            b.box((parapet_x, lo, z), (parapet_x + 0.6, hi, z + 1.2), mat)
 
 
 def shuri_castle(material, Builder):
     b = Builder("ShuriCastle", material)
-    hx, hy = SH_PLAT
     top = SH_PLAT_H
-    b.frustum(0, 0, 0.0, top, hx + 4.0, hy + 4.0, hx, hy, "MI_Limestone")        # the walls, battered
-    for (x0, y0, x1, y1) in ((-hx, -hy, hx, -hy + 1.2), (-hx, hy - 1.2, hx, hy),   # the parapet round the top
-                             (-hx, -hy, -hx + 1.2, hy), (hx - 1.2, -hy, hx, hy)):
-        b.box((x0, y0, top), (x1, y1, top + 1.4), "MI_Limestone")
-    b.box((-8.0, -hy - 0.2, top), (8.0, -hy + 1.4, top + 1.4), "MI_Limestone")    # (the gate's gap is its own box)
-    # the Una: red and white stripes, 2 m bands running toward the Seiden
+    ix0, ix1, iy0, iy1 = SH_INNER
+    sx0, sx1 = SH_STRIP_X
+    fx0, fx1, fy0, fy1 = SH_FRONT
+    L = "MI_Limestone"
+    # --- the inner citadel and its parapets (an opening for the 奉神門 steps at the front)
+    b.box((ix0, iy0, 0.0), (ix1, iy1, top), L)
+    for (a0, b0, a1, b1) in ((ix0, iy0, ix0 + 0.6, iy1), (ix1 - 0.6, iy0, ix1, iy1), (ix0, iy1 - 0.6, ix1, iy1),
+                             (ix0, iy0, -8.0, iy0 + 0.6), (8.0, iy0, ix1, iy0 + 0.6)):
+        b.box((a0, b0, top), (a1, b1, top + 1.2), L)
+    # --- 下之御庭 (the front terrace) and its parapets
+    b.box((fx0, fy0, 0.0), (fx1, fy1, 22.0), L)
+    b.box((fx0, fy0, 22.0), (fx1, fy0 + 0.6, 23.2), L)
+    b.box((fx1 - 0.6, fy0, 22.0), (fx1, fy1, 23.2), L)
+    # --- the south terrace: the lower court, three stairs, two landings, the corner at 22
+    b.box((sx0, 30.0, 0.0), (sx1, iy1, SH_COURT_Z), "MI_StoneWall")                  # the court's floor
+    _steps(b, sx0, sx1, 30.0, 10.0, SH_COURT_Z, 12.0, parapet_x=sx0)
+    b.box((sx0, -2.0, 0.0), (sx1, 10.0, 12.0), L)                                   # 瑞泉門's landing
+    b.box((sx0, -2.0, 12.0), (sx0 + 0.6, 10.0, 13.2), L)
+    _steps(b, sx0, sx1, -2.0, -18.0, 12.0, 18.0, parapet_x=sx0)
+    b.box((sx0, -28.0, 0.0), (sx1, -18.0, 18.0), L)                                 # 漏刻門's landing
+    _steps(b, sx0, sx1, -28.0, -40.0, 18.0, 22.0, parapet_x=sx0)
+    b.box((sx0, fy0, 0.0), (sx1, -40.0, 22.0), L)                                   # the corner, into 下之御庭
+    b.box((sx0, fy0, 22.0), (sx0 + 0.6, -40.0, 23.2), L)
+    # the lower court's high outer wall (to 9 m) with 歓会門's arched opening on the gate axis
+    g0, g1 = SH_GATE_Y - 3.0, SH_GATE_Y + 3.0
+    b.box((sx0 - 1.0, 30.0, 0.0), (sx0, g0, 9.0), L)
+    b.box((sx0 - 1.0, g1, 0.0), (sx0, iy1, 9.0), L)
+    b.box((sx0 - 1.0, g0, SH_COURT_Z + 4.2), (sx0, g1, 9.0), L)                       # over the arch
+    b.box((sx0 - 1.0, iy1 - 1.0, 0.0), (sx1, iy1, 9.0), L)                           # the court's back wall
+    _yagura(b, sx0 - 1.5, sx0 + 4.0, g0 - 1.0, g1 + 1.0, 9.0)                        # 歓会門's gate house
+    # the steps up through the arch, and the approach (paved) to the piece's edge
+    for k in range(6):
+        x = sx0 - 6.0 + k * 1.0
+        b.box((x, g0, 0.0), (x + 1.0, g1, 2.5 + (SH_COURT_Z - 2.5) * (k + 1) / 6), L)
+    b.wedge_x(-79.0, sx0 - 6.0, g0 - 1.0, g1 + 1.0, 0.9, 2.5, "MI_StoneWall")
+    # 守礼門 on the approach: four red pillars, a two-tier red-tile roof, the plaque
+    sx, sy = -76.0, SH_GATE_Y
+    for dx in (-1.5, 1.5):
+        for dy in (-4.6, -1.6, 1.6, 4.6):
+            b.box((sx + dx - 0.25, sy + dy - 0.25, 0.0), (sx + dx + 0.25, sy + dy + 0.25, 6.3), "MI_LacquerRed")
+    b.frustum(sx, sy, 6.3, 7.5, 3.2, 7.0, 2.0, 5.6, "MI_RoofTileRed")
+    b.box((sx - 1.3, sy - 4.0, 7.5), (sx + 1.3, sy + 4.0, 8.2), "MI_LacquerRed")
+    b.frustum(sx, sy, 8.2, 9.4, 2.4, 5.4, 0.3, 4.2, "MI_RoofTileRed")
+    b.box((sx - 1.62, sy - 1.0, 5.0), (sx - 1.55, sy + 1.0, 5.9), "MI_Gold")         # 守禮之邦
+    # 瑞泉門: two stone piers and a gate house across the south terrace's first landing
+    b.box((sx0, 2.0, 12.0), (sx0 + 3.0, 6.0, 17.0), L)
+    b.box((sx1 - 3.0, 2.0, 12.0), (sx1, 6.0, 17.0), L)
+    _yagura(b, sx0, sx1, 1.5, 6.5, 17.0, 2.8)
+    # 漏刻門: a stone arch on the second landing
+    b.box((sx0, -25.0, 18.0), (sx0 + 6.0, -21.0, 24.0), L)
+    b.box((sx1 - 6.0, -25.0, 18.0), (sx1, -21.0, 24.0), L)
+    b.box((sx0 + 6.0, -25.0, 22.2), (sx1 - 6.0, -21.0, 24.0), L)
+    _yagura(b, sx0 + 4.0, sx1 - 4.0, -25.5, -20.5, 24.0, 2.2, 2.0)
+    # 広福門: a red gate building across 下之御庭
+    b.box((-34.0, fy0, 22.0), (-28.0, fy0 + 4.0, 27.0), "MI_LacquerRed")
+    b.box((-34.0, fy1 - 4.0, 22.0), (-28.0, fy1, 27.0), "MI_LacquerRed")
+    _yagura(b, -34.5, -27.5, fy0, fy1, 27.0, 0.8, 2.6)
+    # the steps up to 奉神門 (22 -> 25)
+    for k in range(12):
+        y = -60.0 + k * 1.0
+        b.box((-8.0, y, 0.0), (8.0, y + 1.0, 22.0 + 3.0 * (k + 1) / 12), L)
+    # 奉神門: three openings, the middle one the king's
+    for x0_, x1_ in ((-12.0, -10.0), (-5.0, -3.0), (3.0, 5.0), (10.0, 12.0)):
+        b.box((x0_, -40.0, top), (x1_, -34.0, top + 6.0), "MI_LacquerRed")
+    b.box((-12.0, -40.0, top + 4.5), (12.0, -34.0, top + 6.0), "MI_LacquerRed")
+    b.frustum(0, -37.0, top + 6.0, top + 9.0, 14.0, 4.5, 11.0, 1.0, "MI_RoofTileRed")
+    # the rounded corners of the Ryukyu walls
+    for (cx, cy, z) in ((sx0, fy0, 23.2), (ix1, iy1, top + 1.2), (ix1, iy0, top + 1.2), (fx1, fy0, 23.2),
+                        (sx0 - 0.5, iy1, 9.0)):
+        _ring(b, cx, cy, 2.2, 0.0, z, L)
+    # --- the 御庭 (Una): red and white stripes, the stone 浮道 down its middle
     ux0, ux1, uy0, uy1 = -22.0, 22.0, -30.0, 12.0
     for k in range(22):
         x = ux0 + 2.0 * k
         b.box((x, uy0, top), (x + 2.0, uy1, top + 0.03), "MI_RoofTileRed" if k % 2 else "MI_PaintWhite")
-    # the Seiden, at the back of the Una
-    sx, sy, sy0 = 14.5, 8.45, 22.0
-    b.box((-sx, sy0 - sy, top), (sx, sy0 + sy, top + 9.0), "MI_LacquerRed")
-    b.frustum(0, sy0, top + 9.0, top + 11.5, sx + 2.5, sy + 2.5, sx - 1.0, sy - 1.0, "MI_RoofTileRed")
-    b.box((-sx + 2.0, sy0 - sy + 2.0, top + 11.5), (sx - 2.0, sy0 + sy - 2.0, top + 15.0), "MI_LacquerRed")
-    b.frustum(0, sy0, top + 15.0, top + 21.0, sx + 1.0, sy + 1.0, sx - 6.0, 1.0, "MI_RoofTileRed")
-    b.box((-sx + 5.5, sy0 - 0.4, top + 21.0), (sx - 5.5, sy0 + 0.4, top + 22.0), "MI_RoofTileRed")   # the ridge
-    b.box((-7.0, sy0 - sy - 4.0, top + 8.0), (7.0, sy0 - sy + 0.5, top + 11.0), "MI_RoofTileRed")    # karahafu
-    for x in (-4.0, 4.0):                                                            # the gold dragon pillars
-        b.box((x - 0.5, sy0 - sy - 3.2, top), (x + 0.5, sy0 - sy - 2.2, top + 8.0), "MI_Gold")
-    b.box((-5.0, sy0 - sy - 3.6, top), (5.0, sy0 - sy, top + 0.6), "MI_Limestone")  # the steps
-    # the Hokuden (north) and the Nanden (south) flank the Una
-    for x0, x1, mat in ((-44.0, -26.0, "MI_LacquerRed"), (26.0, 44.0, "MI_Plaster")):
-        b.box((x0, -24.0, top), (x1, 6.0, top + 7.0), mat)
-        b.frustum((x0 + x1) / 2, -9.0, top + 7.0, top + 11.0, (x1 - x0) / 2 + 1.5, 16.5, 2.0, 12.0, "MI_RoofTileRed")
-    # the Houshinmon gate, opposite the Seiden
-    b.box((-12.0, -40.0, top), (12.0, -34.0, top + 6.0), "MI_LacquerRed")
-    b.frustum(0, -37.0, top + 6.0, top + 9.0, 14.0, 4.5, 11.0, 1.0, "MI_RoofTileRed")
+    b.box((-1.5, -34.0, top), (1.5, uy1 + 1.0, top + 0.05), "MI_Limestone")
+    # --- the Seiden: two storeys, red lacquer, two red-tile hip roofs, the 唐破風 over the entrance, gold dragon pillars,
+    # 龍頭 ornaments on the ridge ends, stone steps with balustrades
+    sx_, sy_, sy0 = 14.5, 8.45, 22.0
+    b.box((-sx_, sy0 - sy_, top), (sx_, sy0 + sy_, top + 9.0), "MI_LacquerRed")
+    for x in (-10.0, -5.0, 5.0, 10.0):                                           # the front's door bays
+        b.box((x - 1.6, sy0 - sy_ - 0.05, top + 0.4), (x + 1.6, sy0 - sy_, top + 6.0), "MI_Gold")
+    b.frustum(0, sy0, top + 9.0, top + 11.5, sx_ + 2.5, sy_ + 2.5, sx_ - 1.0, sy_ - 1.0, "MI_RoofTileRed")
+    b.box((-sx_ + 2.0, sy0 - sy_ + 2.0, top + 11.5), (sx_ - 2.0, sy0 + sy_ - 2.0, top + 15.0), "MI_LacquerRed")
+    b.frustum(0, sy0, top + 15.0, top + 21.0, sx_ + 1.0, sy_ + 1.0, sx_ - 6.0, 1.0, "MI_RoofTileRed")
+    b.box((-sx_ + 5.5, sy0 - 0.4, top + 21.0), (sx_ - 5.5, sy0 + 0.4, top + 22.0), "MI_RoofTileRed")
+    for x in (-sx_ + 5.5, sx_ - 5.5):
+        b.box((x - 0.6, sy0 - 0.6, top + 21.0), (x + 0.6, sy0 + 0.6, top + 23.5), "MI_Gold")   # 龍頭棟飾
+    b.convex([(-7.0, sy0 - sy_ - 4.0, top + 8.0), (7.0, sy0 - sy_ - 4.0, top + 8.0), (-7.0, sy0 - sy_ + 0.5, top + 8.0),
+              (7.0, sy0 - sy_ + 0.5, top + 8.0), (-5.0, sy0 - sy_ - 4.0, top + 11.0), (5.0, sy0 - sy_ - 4.0, top + 11.0),
+              (-5.0, sy0 - sy_ + 0.5, top + 11.5), (5.0, sy0 - sy_ + 0.5, top + 11.5),
+              (0.0, sy0 - sy_ - 4.6, top + 12.0)], "MI_RoofTileRed")                 # 唐破風
+    for x in (-4.0, 4.0):
+        b.box((x - 0.5, sy0 - sy_ - 3.2, top), (x + 0.5, sy0 - sy_ - 2.2, top + 8.0), "MI_Gold")
+    for k in range(3):
+        b.box((-5.0, sy0 - sy_ - 3.6 - k * 0.6, top), (5.0, sy0 - sy_, top + 0.6 - k * 0.2), L)
+    for x in (-5.4, 5.0):
+        b.box((x, sy0 - sy_ - 5.4, top), (x + 0.4, sy0 - sy_, top + 1.2), L)
+    # --- the Hokuden (north, red) and the Nanden (south, plain) flank the Una; the 書院 behind the Nanden
+    for x0_, x1_, mat in ((-44.0, -26.0, "MI_LacquerRed"), (26.0, 44.0, "MI_Plaster")):
+        b.box((x0_, -24.0, top), (x1_, 6.0, top + 7.0), mat)
+        b.frustum((x0_ + x1_) / 2, -9.0, top + 7.0, top + 11.0, (x1_ - x0_) / 2 + 1.5, 16.5, 2.0, 12.0,
+                  "MI_RoofTileRed")
+    b.box((48.0, -24.0, top), (66.0, 10.0, top + 5.0), "MI_Hinoki")                   # 書院
+    b.frustum(57.0, -7.0, top + 5.0, top + 8.0, 10.5, 18.5, 1.5, 15.0, "MI_RoofTileRed")
+    b.box((48.0, 20.0, top), (68.0, 55.0, top + 0.03), "MI_Grass")                     # the back garden
     return "ShuriCastle", "building", b.mesh()
 
 
 def build_all(material, Builder):
-    return [rainbow_bridge(material, Builder), tokyo_tower(material, Builder), tokyo_station(material, Builder),
+    return [rainbow_bridge(material, Builder), tokyo_station(material, Builder),
             osaka_castle(material, Builder), shuri_castle(material, Builder), haneda_terminal(material, Builder),
             runway_section(material, Builder), runway_end(material, Builder)]

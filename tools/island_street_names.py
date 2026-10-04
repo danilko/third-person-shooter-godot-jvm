@@ -76,6 +76,7 @@ NAMED = {
     "nodo_waku": ("田園通り", "Den-en-dori", "farm"),
     "kojo_waku": ("工場通り", "Kojo-dori", "street"),
     "teibo_sokudo": ("堤防側道", "Teibo-sokudo", "street"),
+    "wangan_iriguchi": ("潮風口通り", "Shiokaze-guchi-dori", "access"),    # the Shiokaze line's west terminal
     "shuto_c1": ("海都高速 環状線", "Kaito Expwy Loop", "expressway"),
     "shuto_wangan": ("海都高速 潮風線", "Kaito Expwy Shiokaze", "expressway"),
     "shuto_spur": ("海都高速 空港連絡線", "Kaito Expwy Airport Link", "expressway"),

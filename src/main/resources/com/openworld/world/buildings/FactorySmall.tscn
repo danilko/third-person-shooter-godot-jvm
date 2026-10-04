@@ -1,0 +1,40 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/FactorySmall_mesh.res" id="1_un6ge"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/FactorySmall_collision.res" id="2_47ko0"]
+
+[node name="FactorySmall" type="Node3D" unique_id=2062116810]
+metadata/building = {
+"aabb": [Vector3(-6, 0, -9.1), Vector3(12, 10.9, 18.2)],
+"base_m": 0.0,
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [12.0, 18.2],
+"height_m": 10.9,
+"id": "FactorySmall",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "small works with a flat above, 12 x 18, placed by the industry / 準工業 mixes; PLACEHOLDER (library_jp_city.py), shut",
+"wall_top_m": 10.9
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1328246653]
+visibility_range_end = 430.8
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_un6ge")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1207126328]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1918133608]
+shape = ExtResource("2_47ko0")

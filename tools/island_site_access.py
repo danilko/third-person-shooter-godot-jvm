@@ -59,7 +59,10 @@ ACCESS = [
          # castle wall 2.6 m above the 踏切 with 20 m between them -- a climb no road makes and a crossing the Blue line
          # stood 1.5 m under (probe_rail_track). Drivers park at Castle Town station's lot, which opens onto this
          # street just south of the track, and walk up; the street follows the ground, so it crosses LEVEL.
-         end=(-608.4, -150.0), parking=None),
+         # (2026-10-03, the castle's walk in) it ENDS ON THE OUTER GATE'S AXIS: the castle's 歓会門 / 守礼門 line
+         # (library_landmarks SH_GATE_Y, piece x SH_ROAD_X = -88, i.e. 9 m outside the site's footprint), the last
+         # 29 m along that axis so a visitor looks straight up it at 守礼門. Move the gates, move these two points.
+         via=[(-609.4, -164.2)], end=(-616.9, -135.2), parking=None),
     # FARM STATION'S STREET (駅前通り, 2026-09-28): the farm row hata_yoko_1220 continued east from its nodo_waku
     # junction, over the Main line (a 踏切 beside the station's end buildings, whose ramps come down to it), ending
     # just past the track; the station's car park stands on it (island_rail_layout STATION_FRONT)

@@ -30,6 +30,9 @@ Dimensions are the real vehicle's, rounded (length x width x height, wheelbase, 
         the vehicle runtime has one rigid body with four wheels, so this is the pair made rigid -- the front axle
         under the tractor, the rear under the chassis's bogie. A rigid 40 ft rig (16.5 m, a 13 m wheelbase) could
         not turn at a junction, which is why the box is the 20 ft one (user, 2026-09-29).
+  POV1  postal van (郵便 軽バン, Suzuki Every / Honda N-VAN class, red) 3.395 x 1.475 x 1.90   wb 2.43
+  POT1  postal truck (郵便 2 t box truck, Isuzu Elf / Toyota Dyna class) 4.69 x 1.695 x 2.95  wb 2.50  cab-over
+(POV1 / POT1: user, 2026-10-03 -- the post offices' vans, small and large, placed by their MARK_vehicle markers.)
 (AMB1 / FIE1 / LAT1: user, 2026-09-28 -- the hospital's and the fire stations' vehicles, placed by the mission
 buildings' MARK_vehicle markers.)
 """
@@ -52,7 +55,7 @@ COLOURS = {
     "lamp_red": (0.85, 0.04, 0.04), "taxi_body": (0.05, 0.07, 0.22), "taxi_lamp": (0.95, 0.80, 0.25),
     "olive": (0.22, 0.26, 0.15), "crate": (0.35, 0.30, 0.20),
     "container": (0.55, 0.12, 0.08), "frame": (0.08, 0.08, 0.09),
-    "amb_white": (0.93, 0.93, 0.92), "fire_red": (0.72, 0.05, 0.04), "steel": (0.62, 0.63, 0.65),
+    "amb_white": (0.93, 0.93, 0.92), "post_red": (0.80, 0.06, 0.05), "fire_red": (0.72, 0.05, 0.04), "steel": (0.62, 0.63, 0.65),
     # lamps: the runtime finds these faces BY MATERIAL NAME and lights them (Vehicle.LAMP_SURFACE_*)
     "front.lamp.light": (0.85, 0.85, 0.82), "back.lamp.light": (0.45, 0.03, 0.03), "back.lamp.reverse": (0.75, 0.75, 0.75),
 }
@@ -92,6 +95,12 @@ CARS = {
                  seats=[(-0.55, 3.85, 1.50), (0.55, 3.85, 1.50)]),
     "COT1": dict(L=10.40, W=2.49, H=3.79, wb=7.80, r=0.53, tw=0.46, shape="tractor", cab=2.10, cab_h=3.05, doors=2,
                  body="car", upper="car", seats=[(-0.55, 4.05, 1.55), (0.55, 4.05, 1.55)]),
+    "POV1": dict(L=3.395, W=1.475, H=1.90, wb=2.43, r=0.28, tw=0.16, shape="wagon", doors=4,
+                 body="post_red", upper="post_red",
+                 seats=[(-0.34, 0.25, 0.70), (0.34, 0.25, 0.70)]),
+    "POT1": dict(L=4.69, W=1.695, H=2.95, wb=2.50, r=0.33, tw=0.20, shape="cabover", cab=1.55, doors=2, crate=True,
+                 crate_mat="post_red", body="post_red", upper="amb_white",
+                 seats=[(-0.42, 1.60, 1.05), (0.42, 1.60, 1.05)]),
 }
 ISO_20 = (6.058, 2.438, 2.591)       # the container terminal's 20 ft box (blender/tools/build_zombie_yard.py ISO_20)
 CLEAR = 0.20                   # ground to the underside of the body

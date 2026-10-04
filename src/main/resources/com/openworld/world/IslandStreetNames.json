@@ -1,10 +1,20 @@
 {
- "chars": " -0123456789ABCDEFGHIJKLMNORSTUWXYabcdeghijkmnoprstuwxyz←↑→↓のり丁上下丘中交作倉側先光入出前北南参口台周和園地城埠基堤場外大天央学寿峠工差市平庫弁所手料新方月本杏東桜業橋正汐江河流浜海港潮灯点物状環産田町目磯社神稲空終絡線若荷菊葉藤蘭裏製西見路農辺通速連運道郊都金鈴鉄銀錦門防陽青面頭風駅高",
+ "chars": " -0123456789ABCDEFGHIJKLMNORSTUWXYabcdeghijkmnoprstuwxyz←↑→↓のり丁上下丘中交仲作倉側先光入八出前化北南原参口台周和商園地城埠基堤場士外大天央宮富寿峠工差市幡平店庫弁所手文料新方日旭星月朝本杏東松柳栄桜梅業橋正汐江河流浜海港潮灯点物状環田町目磯社神稲空紅終絡緑線若荷菊葉藤蘭街裏製西見路農辺通速連運道郊都金鈴銀錦門防陽青面頭風駅高",
  "notes": "Written by tools/island_street_names.py from assets/world_source/pieces/IslandRoads.roads.json: each road's BASE name (no __ suffix) -> its Japanese street name. Read by world.StreetNames.",
  "roads": {
   "butsuryu_michi": {
    "en": "Butsuryu-dori",
    "ja": "物流通り",
+   "kind": "street"
+  },
+  "c1_naka_yoko": {
+   "en": "Aoba-dori",
+   "ja": "青葉通り",
+   "kind": "street"
+  },
+  "c1_naka_yoko_e": {
+   "en": "Yoko-dori",
+   "ja": "陽光通り",
    "kind": "street"
   },
   "c1_ura_higashi": {
@@ -27,6 +37,16 @@
    "ja": "大通り",
    "kind": "street"
   },
+  "cho_sw_345": {
+   "en": "Momiji-dori",
+   "ja": "紅葉通り",
+   "kind": "street"
+  },
+  "cho_w_410": {
+   "en": "Miyamae-dori",
+   "ja": "宮前通り",
+   "kind": "street"
+  },
   "chuo_dori": {
    "en": "Chuo-oji",
    "ja": "中央大路",
@@ -36,6 +56,16 @@
    "en": "Higashi-kanjo-dori",
    "ja": "東環状通り",
    "kind": "arterial"
+  },
+  "eki_ginza_res_north": {
+   "en": "Matsubara-dori",
+   "ja": "松原通り",
+   "kind": "street"
+  },
+  "eki_ginza_suburb": {
+   "en": "Sakura-dori",
+   "ja": "桜通り",
+   "kind": "street"
   },
   "eki_minami_dori": {
    "en": "Eki-minami-dori",
@@ -67,9 +97,14 @@
    "ja": "稲荷通り",
    "kind": "street"
   },
+  "ekimae_machi_w_595": {
+   "en": "Suzuran-dori",
+   "ja": "鈴蘭通り",
+   "kind": "street"
+  },
   "ekimae_rotary": {
-   "en": "Sakura-dori",
-   "ja": "桜通り",
+   "en": "Hoshimi-dori",
+   "ja": "星見通り",
    "kind": "street"
   },
   "ekimae_suburb": {
@@ -142,24 +177,19 @@
    "ja": "銀杏通り",
    "kind": "street"
   },
-  "koba_cho_685": {
-   "en": "Sangyo-doro",
-   "ja": "産業道路",
-   "kind": "street"
-  },
-  "koba_cho_783": {
-   "en": "Tekko-dori",
-   "ja": "鉄工通り",
-   "kind": "street"
-  },
-  "koba_cho_847": {
+  "koba_machi_w_650": {
    "en": "Soko-dori",
    "ja": "倉庫通り",
    "kind": "street"
   },
-  "koba_machi_390": {
-   "en": "Unga-dori",
-   "ja": "運河通り",
+  "koba_machi_w_850": {
+   "en": "Futo-dori",
+   "ja": "埠頭通り",
+   "kind": "street"
+  },
+  "koba_waku_w": {
+   "en": "Seisakusho-dori",
+   "ja": "製作所通り",
    "kind": "street"
   },
   "kogai_loop": {
@@ -172,14 +202,9 @@
    "ja": "郊外通り",
    "kind": "street"
   },
-  "kojo_michi_10": {
-   "en": "Futo-dori",
-   "ja": "埠頭通り",
-   "kind": "street"
-  },
-  "kojo_michi_220": {
-   "en": "Seisakusho-dori",
-   "ja": "製作所通り",
+  "kojo_minami": {
+   "en": "Kogyo-dori",
+   "ja": "工業通り",
    "kind": "street"
   },
   "kojo_waku": {
@@ -187,9 +212,39 @@
    "ja": "工場通り",
    "kind": "street"
   },
-  "kojo_yoko_525": {
-   "en": "Hamacho-dori",
-   "ja": "浜町通り",
+  "kojo_yoko_480": {
+   "en": "Unga-dori",
+   "ja": "運河通り",
+   "kind": "street"
+  },
+  "kojo_yoko_920": {
+   "en": "Konan-dori",
+   "ja": "港南通り",
+   "kind": "street"
+  },
+  "kukaku_0": {
+   "en": "Wakaba-dori",
+   "ja": "若葉通り",
+   "kind": "street"
+  },
+  "kukaku_1": {
+   "en": "Bunka-dori",
+   "ja": "文化通り",
+   "kind": "street"
+  },
+  "kukaku_2": {
+   "en": "Asahi-dori",
+   "ja": "朝日通り",
+   "kind": "street"
+  },
+  "kukaku_3": {
+   "en": "Shotengai-dori",
+   "ja": "商店街通り",
+   "kind": "street"
+  },
+  "kukaku_4": {
+   "en": "Yamato-dori",
+   "ja": "大和通り",
    "kind": "street"
   },
   "kuko_rotary": {
@@ -208,8 +263,8 @@
    "kind": "arterial"
   },
   "machi_132": {
-   "en": "Wakaba-dori",
-   "ja": "若葉通り",
+   "en": "Midoricho-dori",
+   "ja": "緑町通り",
    "kind": "street"
   },
   "machi_432": {
@@ -220,6 +275,26 @@
   "machi_522": {
    "en": "Kazami-dori",
    "ja": "風見通り",
+   "kind": "street"
+  },
+  "machi_n_360": {
+   "en": "Asahi-dori",
+   "ja": "旭通り",
+   "kind": "street"
+  },
+  "machi_n_830": {
+   "en": "Fujimi-dori",
+   "ja": "富士見通り",
+   "kind": "street"
+  },
+  "machi_sw_15": {
+   "en": "Shiomi-dori",
+   "ja": "汐見通り",
+   "kind": "street"
+  },
+  "machi_w2_75": {
+   "en": "Naka-dori",
+   "ja": "仲通り",
    "kind": "street"
   },
   "michinoeki_michi": {
@@ -233,8 +308,8 @@
    "kind": "arterial"
   },
   "nishi_cho_355": {
-   "en": "Shiomi-dori",
-   "ja": "汐見通り",
+   "en": "Sakae-dori",
+   "ja": "栄通り",
    "kind": "street"
   },
   "nishi_cho_413": {
@@ -242,14 +317,9 @@
    "ja": "南町通り",
    "kind": "street"
   },
-  "nishi_cho_517": {
-   "en": "Yoko-dori",
-   "ja": "陽光通り",
-   "kind": "street"
-  },
-  "nishi_cho_619": {
-   "en": "Gakuen-dori",
-   "ja": "学園通り",
+  "nishi_cho_561": {
+   "en": "Kotobuki-dori",
+   "ja": "寿通り",
    "kind": "street"
   },
   "nishi_dori": {
@@ -263,23 +333,33 @@
    "kind": "arterial"
   },
   "nishi_machi_1050": {
-   "en": "Aoba-dori",
-   "ja": "青葉通り",
+   "en": "Ume-dori",
+   "ja": "梅通り",
    "kind": "street"
   },
   "nishi_machi_200": {
-   "en": "Suzuran-dori",
-   "ja": "鈴蘭通り",
+   "en": "Hachiman-dori",
+   "ja": "八幡通り",
    "kind": "street"
   },
   "nishi_machi_280": {
-   "en": "Kotobuki-dori",
-   "ja": "寿通り",
+   "en": "Hinode-dori",
+   "ja": "日の出通り",
    "kind": "street"
   },
   "nishi_machi_390": {
    "en": "Ichiba-dori",
    "ja": "市場通り",
+   "kind": "street"
+  },
+  "nishi_machi_940": {
+   "en": "Nakamachi-dori",
+   "ja": "中町通り",
+   "kind": "street"
+  },
+  "nishi_ura": {
+   "en": "Shinmachi-dori",
+   "ja": "新町通り",
    "kind": "street"
   },
   "nodo_waku": {
@@ -432,6 +512,11 @@
    "ja": "海都高速 潮風線",
    "kind": "expressway"
   },
+  "shuto_wangan_loop": {
+   "en": "Kaito Expwy Shiokaze",
+   "ja": "海都高速 潮風線",
+   "kind": "expressway"
+  },
   "shuto_y1": {
    "en": "Kaito Expwy",
    "ja": "海都高速",
@@ -506,6 +591,16 @@
    "en": "Irie-dori",
    "ja": "入江通り",
    "kind": "arterial"
+  },
+  "wangan_iriguchi": {
+   "en": "Shiokaze-guchi-dori",
+   "ja": "潮風口通り",
+   "kind": "access"
+  },
+  "yamasoi": {
+   "en": "Yanagi-dori",
+   "ja": "柳通り",
+   "kind": "street"
   },
   "yamate_dori": {
    "en": "Okate-dori",

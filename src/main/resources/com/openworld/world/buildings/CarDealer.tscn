@@ -1,0 +1,40 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/CarDealer_mesh.res" id="1_e7ebr"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/CarDealer_collision.res" id="2_xr836"]
+
+[node name="CarDealer" type="Node3D" unique_id=489477840]
+metadata/building = {
+"aabb": [Vector3(-20, 0, -18), Vector3(40, 9.02, 36)],
+"base_m": 0.0,
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [40.0, 36.0],
+"height_m": 9.02,
+"id": "CarDealer",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "car dealer 40 x 36: glazed showroom + display lot; arterial-only in the mixes, one frozen plot; PLACEHOLDER (library_jp_city.py), shut",
+"wall_top_m": 9.02
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1701055391]
+visibility_range_end = 408.24
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_e7ebr")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=107681405]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=289604968]
+shape = ExtResource("2_xr836")

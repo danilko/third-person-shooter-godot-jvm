@@ -514,7 +514,7 @@ OVER_CLEAR = 7.5          # an expressway deck's surface over the dike road's (r
 #: It is ACCEPTED here at 6.0 (still over the 5.5 m rule): it is planned at 6.3 on 5 m samples of its own, and a sample
 #: 0.3 m short on the window's edge was enough for this pass to lift the crossing -- and its 4 % cone then carried the
 #: lift down the exit's 6.8 % descent to the mouth, 5.4 m over its junction (2026-10-01: a 74 % pad).
-PLANNED_OVER = {"shuto_sb_off": 5.8}
+PLANNED_OVER = {"shuto_sb_off": 5.6}
 #: EVERY expressway RAMP is solved against this pass's own 5 m samples (`island_grades.ramp_curves` floors its profile
 #: at them), so the 2 m margin for decks that never see the embankment does not apply to it either: at 7.5 Y1 and E1
 #: had to climb 1.3 m in the 28 m between their gore and the ring, which no vertical curve fits (K 2.2 on the lanekits)
@@ -661,7 +661,11 @@ JOIN_GAP = 120.0             # m: two ring corridors across one junction pad
 #: eased in and out with a cosine over the reach. By the Suburb exit (island_expressway.suburb_exit) the side road and
 #: its kogai_michi junction move 25 m inland, so the exit has room to come down off the dike at 7 % (it measured 7.4 %
 #: into the junction where the rule left it, 158 m from the ring).
-SIDE_EXTRA = [(820.0, -672.0, 260.0, 60.0)]   # R5 (2026-10-02): 25 -> 60, the exit at <= 6 %
+SIDE_EXTRA = [(820.0, -672.0, 260.0, 60.0)]
+#: dike roads the 側道 does not follow: `ring_kita__6` swings south round the suburb (2026-10-03, island_suburb_dike.py),
+#: a U 240 m across whose town-side offset (the ramp length, ~180 m) folds on itself -- the whole line was dropped as
+#: not simple, taking the side road along ring_kita__7 with it. Nothing inside the U joins the dike, so it needs none.
+SIDE_SKIP = ("ring_kita__6",)   # R5 (2026-10-02): 25 -> 60, the exit at <= 6 %
 
 
 def side_extra(x, y):
@@ -703,9 +707,18 @@ def sokudo(net, ground):
     # cross, so they are chained end to end across the pads (the nearest free end within JOIN_GAP)
     runs = []
     for nodes in dike_corridors(net):
-        run = [ps[0].pos for ps in nodes if is_dike_road(road_of[ps[0].uid])]
-        if len(run) >= 2:
-            runs.append([(q[0], q[1], q[2]) for q in run])
+        # a stretch in SIDE_SKIP breaks the line (its offset would fold on itself: the suburb's U)
+        run = []
+        for ps in nodes + [None]:
+            n_ = road_of[ps[0].uid] if ps else None
+            if ps and is_dike_road(n_) and n_ not in SIDE_SKIP:
+                run.append(ps[0].pos)
+                continue
+            if ps and not is_dike_road(n_):
+                continue
+            if len(run) >= 2:
+                runs.append([(q[0], q[1], q[2]) for q in run])
+            run = []
     lines_ = []
     while runs:
         runs.sort(key=len)

@@ -1,0 +1,418 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/PostOfficeSmall_Open_mesh.res" id="1_kmwki"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/PostOfficeSmall_Open_collision.res" id="2_6gta2"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Door.java" id="3_kmom5"]
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/GlassLeaf_0800_2200_mesh.res" id="4_ss3wc"]
+[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_DoorLeaf_White.tres" id="5_op4h1"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_Plaster.tres" id="6_a7tq2"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/ParkedVehicle.java" id="7_y4rst"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_apd7h"]
+size = Vector3(0.84, 2.2, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_l055n"]
+size = Vector3(3, 2.4, 2.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_rmlsw"]
+size = Vector3(0.84, 2.2, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1fupb"]
+size = Vector3(3, 2.4, 2.4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_sieey"]
+size = Vector3(0.9, 2.1, 0.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_g8sj7"]
+size = Vector3(0.9, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_rg1d8"]
+size = Vector3(2.3, 2.3, 2.4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_ju63f"]
+size = Vector3(0.9, 2.1, 0.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_43iry"]
+size = Vector3(0.9, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_006wh"]
+size = Vector3(2.3, 2.3, 2.4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_0071a"]
+size = Vector3(0.88, 2.04, 0.04)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_o37mr"]
+size = Vector3(0.8, 2, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_6ghx1"]
+size = Vector3(2.2, 2.2, 2.4)
+
+[node name="PostOfficeSmall_Open" type="Node3D" unique_id=1325342156]
+metadata/building = {
+"aabb": [Vector3(-7.4, -0.2, -9.8), Vector3(14.8, 5.5, 19.6)],
+"base_m": -0.2,
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [{
+"center": [-3.6, 0.0, 4.9],
+"height": 2.2,
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "exit",
+"style": "slide",
+"width": 1.6
+}, {
+"center": [0.0, 0.0, -4.9],
+"height": 2.1,
+"module": 1.0,
+"outward": [0.0, 0.0, -1.0],
+"side": "exit",
+"style": "swing",
+"width": 0.9
+}],
+"doors_closed": false,
+"doors_locked": true,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [14.8, 19.6],
+"height_m": 5.5,
+"id": "PostOfficeSmall",
+"inner_doors": [{
+"center": [4.2, 0.0, 0.25],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-3.6, 0.0, -4.0],
+"height": 2.0,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.8
+}],
+"kit": "interiors",
+"landmark": false,
+"marks": [{
+"name": "MARK_objective_01",
+"pos": [-4.6, 0.0, 2.1],
+"props": {
+"kind": "objective",
+"note": "the ゆうちょ ATMs"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_objective_02",
+"pos": [4.8, 0.0, -1.6],
+"props": {
+"kind": "objective",
+"note": "the office safe"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_spawn_01",
+"pos": [0.0, 0.0, 2.0],
+"props": {
+"kind": "spawn",
+"team": "civilian"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_02",
+"pos": [-3.4, 0.0, -0.8],
+"props": {
+"kind": "spawn",
+"team": "staff"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_03",
+"pos": [-1.0, 0.0, -0.8],
+"props": {
+"kind": "spawn",
+"team": "staff"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_04",
+"pos": [1.4, 0.0, -0.8],
+"props": {
+"kind": "spawn",
+"team": "staff"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_vehicle_01",
+"pos": [1.7, 0.0, -7.6],
+"props": {
+"kind": "vehicle",
+"note": "the branch's delivery van, in its back yard",
+"vehicle": "POV1"
+},
+"yaw": 0.0
+}],
+"piece_count": 1,
+"probe_xz": [1.0, -2.5],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "郵便局 (branch, user 2026-10-03): a one-storey 12 x 10 m post office on a 15 x 20 m plot for every residential district -- the ゆうちょ ATM corner, the 記載台, the 窓口 counter (郵便 / 貯金 / 保険), the back office with the 区分棚 and the safe, a staff WC; the red band, 〒 board and ポスト, two customer bays at the front and the DELIVERY YARD at the back with its POV-1 van. probe_xz is in the customer area. kits/interiors/PostOfficeSmall.blend (a PLACEHOLDER shell and fit-out).",
+"wall_top_m": 4.0
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1583779956]
+visibility_range_end = 363.6
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_kmwki")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=2093307108]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=834412723]
+shape = ExtResource("2_6gta2")
+
+[node name="Doors" type="Node3D" parent="." unique_id=1480596315]
+
+[node name="Door0" type="StaticBody3D" parent="Doors" unique_id=965354079]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.8, 0, 4.9)
+collision_mask = 0
+script = ExtResource("3_kmom5")
+open_mode = "SLIDE"
+open_angle_deg = 90.0
+slide_offset = Vector3(0.8, 0, 0)
+open_speed = 4.0
+auto_open = false
+sensor_path = NodePath("../Sensor0")
+locked = true
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door0" unique_id=472610027]
+mesh = ExtResource("4_ss3wc")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door0" unique_id=1328570891]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.1, 0)
+shape = SubResource("BoxShape3D_apd7h")
+
+[node name="Sensor0" type="Area3D" parent="Doors" unique_id=913395481]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.8, 0, 4.9)
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Sensor0" unique_id=1725118998]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 1.1, 0)
+shape = SubResource("BoxShape3D_l055n")
+
+[node name="Door1" type="StaticBody3D" parent="Doors" unique_id=801205314]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.6, 0, 4.9)
+collision_mask = 0
+script = ExtResource("3_kmom5")
+open_mode = "SLIDE"
+open_angle_deg = 90.0
+slide_offset = Vector3(-0.8, 0, 0)
+open_speed = 4.0
+auto_open = false
+sensor_path = NodePath("../Sensor1")
+locked = true
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door1" unique_id=1134772412]
+mesh = ExtResource("4_ss3wc")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door1" unique_id=1394697374]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.1, 0)
+shape = SubResource("BoxShape3D_rmlsw")
+
+[node name="Sensor1" type="Area3D" parent="Doors" unique_id=1394319520]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.6, 0, 4.9)
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Sensor1" unique_id=369659514]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1, 0)
+shape = SubResource("BoxShape3D_1fupb")
+
+[node name="Door2" type="StaticBody3D" parent="Doors" unique_id=1814126990]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -0.45, 0, -4.9)
+collision_mask = 0
+script = ExtResource("3_kmom5")
+open_mode = "ROTATE"
+open_angle_deg = 90.0
+slide_offset = Vector3(0, 0, 1)
+open_speed = 4.0
+auto_open = false
+sensor_path = NodePath("Sensor")
+locked = true
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door2" unique_id=240993842]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
+material_override = ExtResource("5_op4h1")
+mesh = SubResource("BoxMesh_sieey")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door2" unique_id=1015816355]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
+shape = SubResource("BoxShape3D_g8sj7")
+
+[node name="Sensor" type="Area3D" parent="Doors/Door2" unique_id=1577518303]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door2/Sensor" unique_id=192385956]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
+shape = SubResource("BoxShape3D_rg1d8")
+
+[node name="Door3" type="StaticBody3D" parent="Doors" unique_id=25970556]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.6499996, 0, 0.25)
+collision_mask = 0
+script = ExtResource("3_kmom5")
+open_mode = "ROTATE"
+open_angle_deg = 90.0
+slide_offset = Vector3(0, 0, 1)
+open_speed = 4.0
+auto_open = true
+sensor_path = NodePath("Sensor")
+locked = false
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door3" unique_id=1057396606]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
+material_override = ExtResource("5_op4h1")
+mesh = SubResource("BoxMesh_ju63f")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door3" unique_id=981922476]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
+shape = SubResource("BoxShape3D_43iry")
+
+[node name="Sensor" type="Area3D" parent="Doors/Door3" unique_id=590447078]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door3/Sensor" unique_id=522709365]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
+shape = SubResource("BoxShape3D_006wh")
+
+[node name="Door4" type="StaticBody3D" parent="Doors" unique_id=1982292757]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -3.49, 0, -4.4)
+collision_mask = 0
+script = ExtResource("3_kmom5")
+open_mode = "SLIDE"
+open_angle_deg = 90.0
+slide_offset = Vector3(-3.4969112e-08, 0, -0.8)
+open_speed = 4.0
+auto_open = true
+sensor_path = NodePath("../Sensor4")
+locked = false
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door4" unique_id=1042308251]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.02, 0)
+material_override = ExtResource("6_a7tq2")
+mesh = SubResource("BoxMesh_0071a")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door4" unique_id=1810903276]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1, 0)
+shape = SubResource("BoxShape3D_o37mr")
+
+[node name="Sensor4" type="Area3D" parent="Doors" unique_id=774058160]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -3.49, 0, -4.4)
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Sensor4" unique_id=1739337153]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1, 0)
+shape = SubResource("BoxShape3D_6ghx1")
+
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=1796627893]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -3.6, 0, 4.9)
+
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=403255939]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -4.9)
+
+[node name="Markers" type="Node3D" parent="." unique_id=1960582477]
+
+[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=2107019061 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -4.6, 0, 2.1)
+metadata/note = "the ゆうちょ ATMs"
+metadata/kind = "objective"
+
+[node name="MARK_objective_02" type="Marker3D" parent="Markers" unique_id=1308689624 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 4.8, 0, -1.6)
+metadata/note = "the office safe"
+metadata/kind = "objective"
+
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1354061993 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
+metadata/team = "civilian"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=1138399403 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -3.4, 0, -0.8)
+metadata/team = "staff"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=1967246050 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -1, 0, -0.8)
+metadata/team = "staff"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_04" type="Marker3D" parent="Markers" unique_id=2036675734 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 1.4, 0, -0.8)
+metadata/team = "staff"
+metadata/kind = "spawn"
+
+[node name="MARK_vehicle_01" type="Node3D" parent="Markers" unique_id=2067023190 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.7, 0, -7.6)
+script = ExtResource("7_y4rst")
+vehicle_id = "POV1"
+faction = "neutral"
+drop_height = 0.3
+metadata/vehicle = "POV1"
+metadata/note = "the branch's delivery van, in its back yard"
+metadata/kind = "vehicle"

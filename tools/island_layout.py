@@ -151,6 +151,8 @@ def derive(out):
     # planner, so its farm rows end on the frame's legs
     sys.stdout.write(run(os.path.join(HERE, "island_core_streets.py"), out))
     sys.stdout.write(run(os.path.join(HERE, "island_streets.py"), out))
+    # authored streets that end on the planner's streets (island_core_streets `after`)
+    sys.stdout.write(run(os.path.join(HERE, "island_core_streets.py"), out, "--after"))
     sys.stdout.write(run(os.path.join(HERE, "island_site_access.py"), out))
     sys.stdout.write(run(os.path.join(HERE, "island_turnarounds.py"), out))
     sys.stdout.write(run(os.path.join(HERE, "island_dike.py"), "raise", out))     # ramps for the later roads

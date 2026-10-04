@@ -1465,10 +1465,65 @@ def signal_plan(table, lanes_doc, ground=None):
                                    "size": d["size"]})
         c = j.get("center") or [0.0, 0.0, 0.0]
         out.append({"id": jid, "centre": c, "arms": rows, "groups": g, "lamps": lamps, "plates": plates})
-    return {"schema": 1, "green": float(r.get("signal_green", 22.0)), "yellow": float(r.get("signal_yellow", 3.0)),
-            "all_red": float(r.get("signal_all_red", 2.0)), "junctions": out,
+    green, yellow, all_red = (float(r.get("signal_green", 22.0)), float(r.get("signal_yellow", 3.0)),
+                              float(r.get("signal_all_red", 2.0)))
+    coordinate(out, green + yellow + all_red)
+    return {"schema": 1, "green": green, "yellow": yellow, "all_red": all_red, "junctions": out,
             "notes": "Written by roadkit_cli gltf (point_furniture.signal_plan); read by world.TrafficSignals. "
                      "Godot frame of the lanekit (the network's own transform is applied at runtime)."}
+
+
+COORD_REACH = 100.0     # signalised junctions this close along one road run as ONE controller (系統制御)
+COORD_SPEED = 12.0      # m/s: the progression speed the second junction's green follows the first's at
+
+
+def coordinate(junctions, phase):
+    """NEXT PASS step 6 (2026-10-02): closely spaced signals are coordinated. Each junction's place in the cycle is a
+    hash of its id (`SignalTiming.offset`), so two junctions 74 m apart (a diamond's pair) ran at random to each other
+    and a platoon let go by one stopped at the next. Junctions within COORD_REACH whose arms carry the SAME road (by
+    base name) and the same number of phase groups (so one cycle) join one controller: a spanning tree from its
+    lowest id, each junction's offset = its parent's + the shared road's group aligned + the travel time between them
+    at COORD_SPEED (a green wave in the tree's direction). Written as `coord` = {"root": id, "rel": s}; the runtime
+    takes offset(root) + rel. Mutates `junctions`."""
+    import math as _m
+    by = {j["id"]: j for j in junctions}
+
+    def road_group(j, road):
+        return next((a["group"] for a in j["arms"] if a["road"].split("__")[0] == road), None)
+
+    edges = {}
+    for i, a in enumerate(junctions):
+        ra = {x["road"].split("__")[0] for x in a["arms"]}
+        for b in junctions[i + 1:]:
+            if a["groups"] != b["groups"] or a["groups"] < 2:
+                continue
+            d = _m.dist((a["centre"][0], a["centre"][2]), (b["centre"][0], b["centre"][2]))
+            if d > COORD_REACH:
+                continue
+            shared = sorted(ra & {x["road"].split("__")[0] for x in b["arms"]})
+            if not shared:
+                continue
+            edges.setdefault(a["id"], []).append((b["id"], shared[0], d))
+            edges.setdefault(b["id"], []).append((a["id"], shared[0], d))
+    seen = set()
+    for root in sorted(edges):
+        if root in seen:
+            continue
+        seen.add(root)
+        by[root]["coord"] = {"root": root, "rel": 0.0}
+        queue = [root]
+        while queue:
+            a = queue.pop(0)
+            ja = by[a]
+            for b, road, d in sorted(edges[a]):
+                if b in seen:
+                    continue
+                seen.add(b)
+                jb = by[b]
+                cyc = phase * jb["groups"]
+                rel = ja["coord"]["rel"] - d / COORD_SPEED + (road_group(jb, road) - road_group(ja, road)) * phase
+                jb["coord"] = {"root": root, "rel": round(rel % cyc, 3)}
+                queue.append(b)
 
 
 # ------------------------------------------------------------------------------------------- self-test
@@ -1682,6 +1737,16 @@ def self_test():
         plan = expressway_sign_plan(table, {"lanes": list(L.values())})
         assert len(plan["signs"]) == 2 and all(s_["size"][0] > 2.0 for s_ in plan["signs"]), plan
         print("OK: an exit sign 120 m before the diverge on the left, naming the street; an entrance sign on the on-ramp")
+    # coordinated signals: a pair 74 m apart on one road shares a controller, the second's offset = the first's +
+    # the shared road's group aligned - the travel time; a third far away, or with another cycle, keeps its own
+    def jn(i, x, groups, road_group):
+        arms = [{"road": "naka", "group": road_group}, {"road": "cross%d" % i, "group": 1 - road_group}]
+        return {"id": "j%d" % i, "centre": [x, 0.0, 0.0], "groups": groups, "arms": arms}
+    js = [jn(1, 0.0, 2, 0), jn(2, 74.0, 2, 1), jn(3, 400.0, 2, 0), jn(4, 60.0, 3, 0)]
+    coordinate(js, 27.0)
+    assert js[0]["coord"] == {"root": "j1", "rel": 0.0}
+    assert js[1]["coord"]["root"] == "j1" and abs(js[1]["coord"]["rel"] - ((27.0 - 74.0 / COORD_SPEED) % 54.0)) < 1e-3
+    assert "coord" not in js[2] and "coord" not in js[3]
     print("point_furniture self-test OK")
 
 

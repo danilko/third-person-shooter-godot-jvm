@@ -1,0 +1,41 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/Sento_mesh.res" id="1_uxr30"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/Sento_collision.res" id="2_7cteq"]
+
+[node name="Sento" type="Node3D" unique_id=1173764458]
+metadata/building = {
+"aabb": [Vector3(-7.5, 0, -11.05), Vector3(15, 18, 22.1)],
+"base_m": 0.0,
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [15.0, 22.1],
+"height_m": 18.0,
+"id": "Sento",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"probe_xz": [-5.0, 5.0],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "neighbourhood bathhouse 14 x 20 + chimney, placed by the housing / city mixes, shut; PLACEHOLDER (library_jp_city.py)",
+"wall_top_m": 6.0
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1000816483]
+visibility_range_end = 516.0
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_uxr30")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=151938254]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=69012610]
+shape = ExtResource("2_7cteq")

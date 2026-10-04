@@ -197,7 +197,13 @@ public class TrafficSignals extends Node3D {
             j.frame = b;
             j.centre = frame.times(vec(jm.get("centre")));
             j.groups = (int) num(jm.get("groups"), 1);
-            j.offset = SignalTiming.offset(j.id, SignalTiming.cycle(j.groups, green, yellow, allRed));
+            double cyc = SignalTiming.cycle(j.groups, green, yellow, allRed);
+            j.offset = SignalTiming.offset(j.id, cyc);
+            // NEXT PASS step 6: a coordinated junction (point_furniture.coordinate) runs on its controller's clock --
+            // the root junction's offset plus its own place in the green wave
+            if (jm.get("coord") instanceof Map<?, ?> cm) {
+                j.offset = SignalTiming.offset(prefix + ":" + cm.get("root"), cyc) + num(cm.get("rel"), 0.0);
+            }
             for (Object ao : (List<Object>) jm.get("arms")) {
                 Map<String, Object> am = (Map<String, Object>) ao;
                 Arm a = new Arm();
