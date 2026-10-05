@@ -7963,6 +7963,9 @@ it and the kerb or barrier, and a raised median has a side strip (側帯) with a
     6.5 m face spanning the kerb at 34 deg stood 0.09 m over a lane; the self-test's 35 deg case, control 0.10 m).
   - `road_surface_z` asks each LEG of the road (heights within 1 m) for its nearest segment: a neighbouring segment
     clamped to its end read that end's height, 4 cm off on a 5 % road.
+- **OPEN (next session, PLAN.md "NEXT FIX FOR A CLEAN SESSION"): the panel and its flush rails step up ~0.15 m over
+  the sidewalk** (they follow `footway_rel`). Decided: the crossing is ONE level plane at road + PANEL_RISE; the
+  sidewalk's kerb drops to road level over the crossing (a derived LEVEL entry in `drop_entries`, 2 m ramps outside).
 - **No markings on a 踏切, and an 一時停止 stop line before it** (Road Traffic Act art. 33): a road built against the
   rail (`--avoid`) clips every lane and centre line `CROSSING_MARK_CLEAR` 0.5 m short of a track band crossed at its
   height (`clip_crossings`), and paints a stop line square to the road per approach (keep-left: travel along the
