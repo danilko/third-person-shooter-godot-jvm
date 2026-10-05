@@ -7951,10 +7951,19 @@ it and the kerb or barrier, and a raised median has a side strip (側帯) with a
   section /----\ : a flat top `PANEL_RISE` 3 cm over the ground, the two long edges (what a wheel or a foot crosses)
   sloping down over `PANEL_CHAMFER` 0.15 m to `PANEL_FOOT` 1 cm under it, closed `PANEL_DEPTH` under; the road is
   NOT cut. In the road collision; the rails lie flush with its top.
-  - **Every vertex stands on `crossing_ground`**: the crossed road's own surface (`road_surface_z`, projected onto
-    the spine: on a graded road crossed obliquely a panel on the rail's profile stood 0.12 m proud) plus, past the
-    kerb, that side's footway level (`Band.footway_rel`, from the new `Band.walks` rows). So the panel runs over the
-    FOOTWAYS too and steps down the kerb where the kerb is (the rail's bed, fence and car wall were already cut there).
+  - **The 踏切 is ONE LEVEL PLANE** (user, 2026-10-05; option 2 of three, chosen for performance, maintenance and
+    Japanese practice). Every vertex stands on `crossing_ground` = the crossed road's own surface (`road_surface_z`,
+    projected onto the spine: on a graded road crossed obliquely a panel on the rail's profile stood 0.12 m proud),
+    over the FOOTWAYS too, so the panel and its flush rails lie in one plane from sidewalk to sidewalk. The ROAD brings
+    its kerb and footway DOWN to it: a road built against the rail (`--avoid`) runs each kerb / footway edge through
+    `point_edges.level_spans` (the edge, its footway middle or back edge inside a rail band at the road's height,
+    `LEVEL_DZ` 1 m, + `LEVEL_MARGIN` 0.3 m) and `level_crossings` (kerb -> 0 there, eased back over `ENTRY_RAMP` 2 m
+    each side, an `EntryKerb` whose `outer` falls too, so the whole footway is lowered and furniture keeps off it).
+    DERIVED, never authored (no `entry_style` value). The rail band (~5 m half) is wider than the panel (3.25 m), so the
+    ramps lie outside the panel. The pedestrian zone is PAINTED: a white line along each kerb line across the panel's
+    top (`crossing_ped_lines`, `<rail>__xmarks`, `PED_LINE_W` 0.15). Rejected: raising the panel over the footways (a
+    15 cm step inside the crossing, rails stepped) and raising the track over the road (a hump at every 踏切).
+    `Band.footway_rel` now only CLASSIFIES a crossing point as footway (`crossing_class`).
   - **The carrier is densified once** (`densify_crossings`, every `CROSSING_STEP` 0.25 m inside a crossing, each
     road / footway edge bisected), and a span counts as crossing when ANY of the panel's two edges, its centre or a
     track centre is on the road or footway: on an oblique crossing the panel's end is square to the track and reaches PAST
@@ -7963,9 +7972,6 @@ it and the kerb or barrier, and a raised median has a side strip (側帯) with a
     6.5 m face spanning the kerb at 34 deg stood 0.09 m over a lane; the self-test's 35 deg case, control 0.10 m).
   - `road_surface_z` asks each LEG of the road (heights within 1 m) for its nearest segment: a neighbouring segment
     clamped to its end read that end's height, 4 cm off on a 5 % road.
-- **OPEN (next session, PLAN.md "NEXT FIX FOR A CLEAN SESSION"): the panel and its flush rails step up ~0.15 m over
-  the sidewalk** (they follow `footway_rel`). Decided: the crossing is ONE level plane at road + PANEL_RISE; the
-  sidewalk's kerb drops to road level over the crossing (a derived LEVEL entry in `drop_entries`, 2 m ramps outside).
 - **No markings on a 踏切, and an 一時停止 stop line before it** (Road Traffic Act art. 33): a road built against the
   rail (`--avoid`) clips every lane and centre line `CROSSING_MARK_CLEAR` 0.5 m short of a track band crossed at its
   height (`clip_crossings`), and paints a stop line square to the road per approach (keep-left: travel along the

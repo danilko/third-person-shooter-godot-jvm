@@ -641,6 +641,86 @@ def drop_entries(points, walk, kerb, wall, spans):
     return pts, wk, kb, wl
 
 
+#: A LEVEL CROSSING (踏切) is ONE level plane (user, 2026-10-05): where a road's kerb / footway edge crosses a RAIL band
+#: (`--avoid` the rail record) at the road's own height, the kerb drops to 0 and the footway lies at ROAD level across
+#: the band, eased back over `ENTRY_RAMP` each side -- so the 踏切 panel and its flush rails lie in one plane from
+#: sidewalk to sidewalk (Japan builds crossings level). DERIVED, never authored: no `entry_style` value, nothing in the
+#: record. The span is the band's width plus this margin, so the ramps sit outside the panel.
+LEVEL_MARGIN = 0.3
+#: The edge run is classified this often along its length when looking for a rail band.
+LEVEL_STEP = 0.25
+#: A rail band within this of the edge's height is crossed AT the road (`point_mesh.CROSSING_DZ`).
+LEVEL_DZ = 1.0
+
+
+def _on_rail(rails, x, y, z):
+    for b in rails:
+        if b.bbox_hit(x, y, 0.5) and _signed_depth(b.poly, x, y) > -LEVEL_MARGIN \
+                and abs(b.lowest_surface_z(x, y) - z) < LEVEL_DZ:
+            return True
+    return False
+
+
+def level_spans(points, walk, sgn, rails):
+    """`[(a0, a1)]` arc-length intervals of the edge polyline `points` where it -- or its footway's back edge, `2 walk`
+    out on side `sgn` -- lies in a crossed rail band. Empty when no band is near."""
+    if not rails or len(points) < 2:
+        return []
+    xs, ys = [p[0] for p in points], [p[1] for p in points]
+    reach = 2.0 * max([float(w) for w in walk] or [0.0]) + 2.0
+    near = [b for b in rails if b.x1 >= min(xs) - reach and b.x0 <= max(xs) + reach
+            and b.y1 >= min(ys) - reach and b.y0 <= max(ys) + reach]
+    if not near:
+        return []
+    arc = _arc(points)
+    flags, at = [], []
+    for i in range(len(points) - 1):
+        a, b = points[i], points[i + 1]
+        seg = arc[i + 1] - arc[i]
+        if seg < 1e-9:
+            continue
+        tx, ty = (b[0] - a[0]) / seg, (b[1] - a[1]) / seg
+        nx, ny = -ty * sgn, tx * sgn
+        n = max(1, int(math.ceil(seg / LEVEL_STEP)))
+        for k in range(n + (1 if i == len(points) - 2 else 0)):
+            t = k / n
+            x, y, z = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t
+            w = float(walk[i]) + (float(walk[i + 1]) - float(walk[i])) * t
+            hit = any(_on_rail(near, x + nx * o, y + ny * o, z) for o in (0.0, w, 2.0 * w))
+            flags.append(hit)
+            at.append(arc[i] + seg * t)
+    out, start = [], None
+    for f, a in zip(flags, at):
+        if f and start is None:
+            start = a
+        elif not f and start is not None:
+            out.append((start, a))
+            start = None
+    if start is not None:
+        out.append((start, at[-1]))
+    return out
+
+
+def level_crossings(points, walk, kerb, wall, spans):
+    """`(points, walk, kerb, wall)` with the kerb at 0 over each of `spans` (`level_spans`) and ramped back to its own
+    height over `ENTRY_RAMP` each side. The kerb comes back as an `EntryKerb` whose `outer` falls with it, so the whole
+    footway -- not only its lip -- is lowered to road level (and every placer keeps furniture off it)."""
+    if not spans or len(points) < 2:
+        return points, walk, kerb, wall
+    cuts = []
+    for a0, a1 in spans:
+        cuts += [a0 - ENTRY_RAMP, a0, a1, a1 + ENTRY_RAMP]
+    pts, wk, kb, wl, ar = _insert_at(points, walk, kerb, wall, cuts)
+    for j, a in enumerate(ar):
+        off = min(max(0.0, a0 - a, a - a1) for a0, a1 in spans)       # 0 inside a span, then metres up the ramp
+        if off >= ENTRY_RAMP - 1e-9 or float(kb[j]) <= 0.0:
+            continue
+        f = off / ENTRY_RAMP
+        outer = getattr(kb[j], "outer", float(kb[j]))
+        kb[j] = EntryKerb(float(kb[j]) * f, outer * f)
+    return pts, wk, kb, wl
+
+
 def split_entries(points, walk, kerb, wall, spans):
     """`[(tag, points, walk, kerb, wall)]`: the run cut at each DROP_ASPHALT and CUT entry's two ends (run
     `drop_entries` first: it put the vertices there). A DROP_ASPHALT core comes back tagged "asphalt" -- its footway is
@@ -685,11 +765,13 @@ def exit_walls(values, side):
     return [0.0 if o else v["rka_wall_h"] for o, v in zip(exit_open(values, side), values)]
 
 
-def road_edge_runs(solve, bands):
+def road_edge_runs(solve, bands, rails=None):
     """`[(suffix, points, walk, kerb, wall, sgn)]` -- one road run's kerb/footway carriers, over the
     OPEN runs only. THE one enumeration of edge runs: `point_build.build_edges` sweeps these and
     `roadkit_cli.py bands` draws them, so the draft and the build cannot disagree about where a
-    kerb stops. `sgn` is which side of the polyline the furniture stands on (+1 = its left)."""
+    kerb stops. `sgn` is which side of the polyline the furniture stands on (+1 = its left).
+    `rails`: the RAIL bands a road is built against (`--avoid`); where an edge crosses one at the road's height its
+    kerb and footway come down to road level (`level_crossings`)."""
     out = []
     runs = kerb_runs(solve, bands)
     walls = {side: exit_walls(solve.values, side) for side in ("left", "right")}
@@ -705,6 +787,8 @@ def road_edge_runs(solve, bands):
                                                run_values(walls[side], run))
             spans = entry_spans(solve.points, side, pts)
             pts, walk, kerb, wall = drop_entries(pts, walk, kerb, wall, spans)
+            sgn = 1.0 if side == "left" else -1.0
+            pts, walk, kerb, wall = level_crossings(pts, walk, kerb, wall, level_spans(pts, walk, sgn, rails))
             for k_, (tag, p_, w_, kb_, wl_) in enumerate(split_entries(pts, walk, kerb, wall, spans)):
                 # the first piece keeps the run's old name, so a road with no special entry builds byte-identical
                 sfx = "%s_%d" % (side, n) + ("_e%d" % k_ if k_ else "") + ("_asphalt" if tag == "asphalt" else "")

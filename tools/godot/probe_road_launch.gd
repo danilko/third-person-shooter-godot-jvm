@@ -144,6 +144,8 @@ func _spawn(lane_name: String, speed: float, offset: float, corner_accel: float 
 	car = (load(VEHICLE) as PackedScene).instantiate()
 	ctrl = load(CTRL).new()
 	ctrl.set("cruise_speed", speed)
+	# the 一時停止 at every 踏切 would stop the car short of the crossing it is here to drive over at speed
+	ctrl.set("crossing_stops", false)
 	# `--driver=standard` (PLAN.md DRIVING (a)): the TRAFFIC rules -- the lane's own speed limit (20 km/h on a turn
 	# connector), the corner governor, the junction throttle, and eyes for other cars -- i.e. how an ordinary driver
 	# takes this road. The default `stress` is the launch test: flat out at --speed, blind, no junction slowdown.
@@ -188,6 +190,10 @@ const GATE_CASES := [
 	["link_F1", 35.0, 0.0, 3.2], ["link_R1", 35.0, 3.0, 3.2],
 	["w_ns__x1_F0", 30.0, 0.0, 5.5], ["w_ns__x1_R0", 30.0, -2.0, 5.5],
 	["w_ring__x2_R1", 35.0, 3.0, 4.3], ["w_ring__x2__x1_F1", 35.0, -3.0, 4.3],
+	# R-18: both 踏切 (one level plane: panel, flush rails, the footway brought down to the road), on the lane
+	# centre and with the outer wheels on the kerb line where the kerb ramps down to the crossing and back up
+	["w_ns_F0", 30.0, 0.0, 7.0], ["w_ns_R0", 30.0, -2.0, 7.0],
+	["w_ew_e_F0", 30.0, 0.0, 7.0], ["w_ew_e_R0", 30.0, -2.0, 7.0],
 ]
 
 func _initialize() -> void:

@@ -747,8 +747,9 @@ def _span_runs(n, flags, want):
 #: It LIES ON the road (user, 2026-10-05: the road surface is not cut), a section /----\ : a flat top PANEL_RISE over
 #: the road, its two long edges -- the ones a wheel or a foot crosses -- sloping down to the road over PANEL_CHAMFER
 #: and meeting it PANEL_FOOT under its surface, so nothing meets a lip; the prism closes PANEL_DEPTH under the road.
-#: It runs over the crossed road's FOOTWAYS too, at the footway's level (`Band.footway_rel`), stepping down the kerb
-#: where the kerb is. The rails lie flush with its top. In the road collision.
+#: It runs over the crossed road's FOOTWAYS too, at ROAD level: the road brings its kerb and footway down to the
+#: carriageway across the crossing (`point_edges.level_crossings`, user 2026-10-05: one level plane, the rails in one
+#: plane). The rails lie flush with its top. In the road collision.
 PANEL_HALF = 1.25
 PANEL_RISE = 0.03
 PANEL_CHAMFER = 0.15
@@ -871,13 +872,14 @@ def densify_crossings(pts, lats, near, probes=(0.0, -PANEL_HALF, PANEL_HALF)):
 
 
 def crossing_ground(near, x, y, ref, band=None):
-    """The ground a 踏切 panel stands on at plan point (x, y): the crossed road's own surface (`road_surface_z`), plus
-    its footway level past the kerb. `band` is the crossing's when the point is past every band's reach (a panel's
+    """The ground a 踏切 panel stands on at plan point (x, y): the crossed road's own surface (`road_surface_z`), over
+    its footways too -- the road's kerb and footway come DOWN to road level across the crossing
+    (`point_edges.level_crossings`), so the panel and its flush rails are one plane from sidewalk to sidewalk. `band` is the crossing's when the point is past every band's reach (a panel's
     outer corner)."""
     b = crossing_band(near, x, y, ref, footways=True) or band
     if b is None:
         return ref
-    return road_surface_z(b, x, y, ref) + b.footway_rel(x, y)
+    return road_surface_z(b, x, y, ref)
 
 
 def crossing_track(pts, lats, offsets, spans, near):
@@ -929,6 +931,63 @@ def crossing_track(pts, lats, offsets, spans, near):
                         acc.append((x, y, crossing_ground(near, x, y, p[2], band) + PANEL_RISE + ps.PAINT_Z_BIAS))
                 flush += _face_up(_strip(left, right))
     return panels, flush
+
+
+#: The pedestrian zone of a 踏切 is PAINTED, not raised: a white line on the panel along each kerb line of the crossed
+#: road, this wide, sampled every PANEL_TOP_STEP across the panel's flat top.
+PED_LINE_W = 0.15
+
+
+def crossing_ped_lines(pts, lats, offsets, spans, near):
+    """`[tri]`: on every 踏切 run (`crossing_track`'s runs), a painted line along each KERB LINE of the crossed road --
+    where the panel passes from the carriageway onto the footway -- across the panel's flat top, PAINT_Z_BIAS over
+    it. Found per lateral sample by bisecting along the run for the road band's boundary."""
+    out = []
+    lo, hi = panel_span(offsets)
+    a, b = lo + PANEL_CHAMFER, hi - PANEL_CHAMFER
+    n = max(1, int(math.ceil((b - a) / PANEL_TOP_STEP)))
+    lat_s = [a + (b - a) * k / n for k in range(n + 1)]
+
+    def lerp(u, v, t):
+        return tuple(u[q] + (v[q] - u[q]) * t for q in range(len(u)))
+    for run in _span_runs(len(pts), [c > 0 for c in spans], True):
+        rp, rl = [pts[i] for i in run], [lats[i] for i in run]
+        mid = rp[len(rp) // 2]
+        band = crossing_band(near, mid[0], mid[1], mid[2], footways=True)
+        if band is None:
+            continue
+        lines = {}
+        for o in lat_s:
+            def depth(i, t):
+                p, l = lerp(rp[i], rp[i + 1], t), lerp(rl[i], rl[i + 1], t)
+                return ped._signed_depth(band.poly, p[0] + l[0] * o, p[1] + l[1] * o)
+            k = 0
+            for i in range(len(rp) - 1):
+                d0, d1 = depth(i, 0.0), depth(i, 1.0)
+                if (d0 >= 0.0) == (d1 >= 0.0):
+                    continue
+                t0, t1 = 0.0, 1.0
+                for _ in range(20):
+                    m = 0.5 * (t0 + t1)
+                    if (depth(i, m) >= 0.0) == (d0 >= 0.0):
+                        t0 = m
+                    else:
+                        t1 = m
+                p, l = lerp(rp[i], rp[i + 1], 0.5 * (t0 + t1)), lerp(rl[i], rl[i + 1], 0.5 * (t0 + t1))
+                f = _norm((rp[i + 1][0] - rp[i][0], rp[i + 1][1] - rp[i][1], 0.0))
+                x, y = p[0] + l[0] * o, p[1] + l[1] * o
+                lines.setdefault(k, []).append((x, y, f))
+                k += 1
+        for line in lines.values():
+            if len(line) < 2:
+                continue
+            left, right = [], []
+            for x, y, f in line:
+                for sg, acc in ((1.0, left), (-1.0, right)):
+                    qx, qy = x + f[0] * sg * 0.5 * PED_LINE_W, y + f[1] * sg * 0.5 * PED_LINE_W
+                    acc.append((qx, qy, crossing_ground(near, qx, qy, mid[2], band) + PANEL_RISE + ps.PAINT_Z_BIAS))
+            out += _face_up(_strip(left, right))
+    return out
 
 
 def sleepers(pts, offsets, holes, spacing=SLEEPER_SPACING):
@@ -1410,7 +1469,8 @@ def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=
                 if over > 0.0 and report is not None:
                     report.setdefault("pier_overhang", []).append((name, style.pier()["name"], round(over, 2)))
             edge_names = []
-            for sfx, epts, walk, kerb, wall, sgn in ped.road_edge_runs(s, bands):
+            for sfx, epts, walk, kerb, wall, sgn in ped.road_edge_runs(s, bands, _near_bands(foreign, pts)
+                                                                        if foreign and not rail else None):
                 edge_names.append("%s__edges_%s" % (name, sfx))
                 _edge_run(objs, edge_names[-1], epts, walk, kerb, wall, sgn, style)
             if foreign and not rail:
@@ -1445,6 +1505,7 @@ def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=
                 pan, fl = crossing_track(dp, dl, offs, spans, near)
                 _add(objs, name + "__xpanel", PANEL_MATERIAL, pan)
                 _add(objs, name + "__rails", RAIL_MATERIAL, fl)
+                _add(objs, name + "__xmarks", style.material("mark_w"), crossing_ped_lines(dp, dl, offs, spans, near))
                 # sleepers keep off the footways of a crossing too
                 holes_walk = [crossing_band(near, p[0], p[1], p[2], footways=True) is not None for p in pts]
                 slab = [slab_span(v) for v in values]
@@ -1734,14 +1795,14 @@ def self_test():
     assert sbx.walk > 1.0, sbx.walk
 
     def ground(x, y, z):
-        return road_surface_z(sbx, x, y, z) + sbx.footway_rel(x, y)
+        return road_surface_z(sbx, x, y, z)              # ONE level plane: the footway comes down to the road
     tops = [p for t in xp if _up(t) > 1e-9 and _normal_z(t) > 0.995 for p in t]
     assert tops and max(abs(p[2] - (ground(p[0], p[1], p[2]) + PANEL_RISE)) for p in tops) < 2e-3, \
         "a panel top is off its ground + PANEL_RISE"
     zs = [p[2] for p in tops]
     assert max(zs) - min(zs) > 0.2, "the graded street did not tilt the panel"
     # no face of the panel stands vertical OVER the ground: every steep face lies below the ground under it, except
-    # the kerb step and the two end caps (faces square to the track, which nothing drives across)
+    # the two end caps (faces square to the track, which nothing drives across)
     for t in xp:
         nx, ny, nz = _unit_normal(t)
         if abs(nz) > 0.2:
@@ -1749,18 +1810,24 @@ def self_test():
         along = abs(nx * 1.0 + ny * 0.0)               # the track runs along x
         if along > 0.9:
             continue
-        if len({sbx.footway_rel(q[0], q[1]) > 0.0 for q in t}) > 1:
-            continue                                    # the kerb step, where the panel meets the kerb's own drop
         tc = _centroid(t)
         assert max(q[2] for q in t) <= ground(tc[0], tc[1], tc[2]) + 1e-3, ("a lip over the road", t)
-    # across the road AND its footways: the panel spans the footway reach, and stands at the footway level there
+    # across the road AND its footways: the panel spans the footway reach, at ROAD level there (one plane)
     span = (min(p[0] for t in xp for p in t), max(p[0] for t in xp for p in t))
     want = (min(q[0] for q in sbx.poly) - sbx.walk / 2.0, max(q[0] for q in sbx.poly) + sbx.walk / 2.0)
     assert span[0] <= want[0] + 0.05 and span[1] >= want[1] - 0.05, ("the panel stops at the kerb", span, want)
     on_walk = [p for p in tops if sbx.footway_rel(p[0], p[1]) > 0.0]
-    assert on_walk and all(abs(p[2] - (road_surface_z(sbx, p[0], p[1], p[2]) + sbx.footway_rel(p[0], p[1])
-                                       + PANEL_RISE)) < 2e-3 for p in on_walk), "no panel on the footway"
+    assert on_walk and all(abs(p[2] - (road_surface_z(sbx, p[0], p[1], p[2]) + PANEL_RISE)) < 2e-3
+                           for p in on_walk), "the panel steps up onto the footway"
     lo_, hi_ = panel_span(track_offsets(rnet.roads["line"]))
+    # the pedestrian zone is PAINTED on the panel: a white line along each kerb line of the street, on the panel's top
+    xm = [t for ts in o.get("line__xmarks", {}).values() for t in ts]
+    kerb_x = (min(q[0] for q in sbx.poly), max(q[0] for q in sbx.poly))
+    for kx in kerb_x:
+        on = [t for t in xm if abs(_centroid(t)[0] - kx) < PED_LINE_W]
+        assert on and abs(max(p[1] for t in on for p in t) - min(p[1] for t in on for p in t)
+                          - (hi_ - lo_ - 2.0 * PANEL_CHAMFER)) < 0.05, ("no ped-zone line along the kerb", kx)
+        assert all(abs(p[2] - (ground(p[0], p[1], p[2]) + PANEL_RISE + ps.PAINT_Z_BIAS)) < 2e-3 for t in on for p in t)
     assert any(abs(p[1] - hi_) < 1e-3 for t in xp for p in t) and any(abs(p[1] - lo_) < 1e-3 for t in xp for p in t)
     # ...and ONE panel over the double track: its top is continuous between the tracks (no asphalt strip)
     topf = [t for t in xp if _up(t) > 1e-9 and _normal_z(t) > 0.995]
@@ -1799,6 +1866,27 @@ def self_test():
                              for t in marks), "a lane mark inside the 踏切"
     ys = sorted({round(_centroid(t)[1], 1) for t in crossing_stop_lines(*_street_carrier(so, fnet), [rbx])})
     assert len(ys) >= 2 and ys[0] < 0.0 < ys[-1], ("one stop line per approach", ys)
+    # ...and the STREET brings its kerb and footway DOWN to road level across the track (one plane), ramped back up
+    # OUTSIDE the panel: nothing of the edge stands over road + PANEL_RISE inside the panel's reach, and the kerb is
+    # its full height again ENTRY_RAMP + LEVEL_MARGIN past the rail band
+    pan_y = (min(p[1] for t in xp for p in t), max(p[1] for t in xp for p in t))
+
+    def edge_tops(objs_):
+        return [p for n, m in objs_.items() if n.startswith("street__edges") for tt in m.values() for t in tt
+                for p in t]
+    eg = edge_tops(so)
+    inside = [p for p in eg if lo_ - 0.05 <= p[1] <= hi_ + 0.05]
+    assert inside and max(p[2] - (road_surface_z(sbx, p[0], p[1], p[2]) + PANEL_RISE) for p in inside) < 1e-3, \
+        ("a kerb / footway stands over the 踏切 panel", max(p[2] - road_surface_z(sbx, p[0], p[1], p[2]) for p in inside))
+    rb_y = (min(q[1] for q in rbx.poly), max(q[1] for q in rbx.poly))
+    far = [p for p in eg if p[1] > rb_y[1] + ped.LEVEL_MARGIN + ped.ENTRY_RAMP + 0.5]
+    assert far and max(p[2] - road_surface_z(sbx, p[0], p[1], p[2]) for p in far) > 0.14, "the kerb never comes back"
+    ramp = [p for p in eg if rb_y[1] + ped.LEVEL_MARGIN < p[1] < rb_y[1] + ped.LEVEL_MARGIN + ped.ENTRY_RAMP]
+    assert hi_ < rb_y[1] + ped.LEVEL_MARGIN and ramp, ("the ramp is not outside the panel", hi_, rb_y)
+    # control: the street built with no rail keeps its kerb proud over the track
+    eg0 = edge_tops(build(fnet))
+    assert max(p[2] - road_surface_z(sbx, p[0], p[1], p[2]) for p in eg0 if lo_ <= p[1] <= hi_) > 0.14, \
+        "control: no kerb to drop"
     no = build(fnet)                                    # control: no rail, no stop line, the lines run through
     marks0 = [t for n, m in no.items() if n.startswith("street") and "__marks" in n for tt in m.values() for t in tt]
     assert any(ped._signed_depth(rbx.poly, *_centroid(t)[:2]) > 0.0 for t in marks0), "control: no line to clip"
@@ -1846,7 +1934,7 @@ def self_test():
     rl2 = [t for ts in o2["line__rails"].values() for t in ts]
     assert not rep2.get("crossings") and \
         max(p[2] for t in rl2 for p in t if abs(_centroid(t)[0] - 100.0) < 2.0) > 0.3 + RAIL_H - 1e-6
-    print("OK: rail -- two rails a track at %.3f m gauge, flush and bed/fence/car wall cut out over a 踏切 and its footways, proud elsewhere"
+    print("OK: rail -- two rails a track at %.3f m gauge, flush and bed/fence/car wall cut out over a 踏切 and its footways, proud elsewhere; the street's kerb and footway level across it"
           % RAIL_GAUGE)
     # JAPANESE TRACK: at grade PC sleepers on ballast; on a viaduct slab track -- slabs, a cylindrical stopper in every
     # joint, a derailment guard inside a rail, no sleepers -- and seismic side stoppers on each pier cap.
