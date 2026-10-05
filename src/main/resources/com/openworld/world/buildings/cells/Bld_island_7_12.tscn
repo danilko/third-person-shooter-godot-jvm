@@ -9,7 +9,6 @@
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_DarkCool2.tres" id="tone0_3"]
 [ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_7_12.res" id="hlod"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/item/WeaponPad.java" id="pad"]
 
 [sub_resource type="BoxMesh" id="LotBox"]
 material = ExtResource("lotmat")
@@ -68,43 +67,6 @@ buffer = PackedFloat32Array(0.4118, 0.0000, 1.9612, -159.5470, 0.0000, 0.4000, 0
 size = Vector3(2.100, 0.400, 2.000)
 
 [node name="Bld_island_7_12" type="Node3D"]
-
-[node name="Pads_000" type="Node3D" parent="."]
-
-[node name="Pad_PIS1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -146.593, 9.992, 1204.077)
-script = ExtResource("pad")
-weapon_id = "PIS1"
-
-[node name="Pad_PIS2" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -146.973, 9.992, 1205.215)
-script = ExtResource("pad")
-weapon_id = "PIS2"
-
-[node name="Pad_REV1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -147.825, 9.992, 1203.664)
-script = ExtResource("pad")
-weapon_id = "REV1"
-
-[node name="Pad_DUP1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -148.206, 9.992, 1204.802)
-script = ExtResource("pad")
-weapon_id = "DUP1"
-
-[node name="Pad_SMG1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -149.058, 9.992, 1203.252)
-script = ExtResource("pad")
-weapon_id = "SMG1"
-
-[node name="Pad_MEW1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -149.439, 9.992, 1204.390)
-script = ExtResource("pad")
-weapon_id = "MEW1"
-
-[node name="Pad_FRG1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150.291, 9.992, 1202.839)
-script = ExtResource("pad")
-weapon_id = "FRG1"
 
 [node name="HLOD" type="MeshInstance3D" parent="."]
 mesh = ExtResource("hlod")

@@ -4,7 +4,7 @@
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/PocketPark.tscn" id="2"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/PostOfficeSmall_Shop.tscn" id="3"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ShopHouse_H3.tscn" id="4"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/SupermarketSite.tscn" id="5"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/SupermarketSite_Shop.tscn" id="5"]
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_DarkCool2.tres" id="tone0_3"]
 [ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_8_4.res" id="hlod"]
@@ -65,10 +65,10 @@ transform = Transform3D(0.994473, 0, 0.104997, 0, 1, 0, -0.104997, 0, 0.994473, 
 [node name="Mesh" parent="./PocketPark_000" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="SupermarketSite_001" parent="." instance=ExtResource("5")]
+[node name="SupermarketSite_Shop_001" parent="." instance=ExtResource("5")]
 transform = Transform3D(0.999183, 0, -0.040411, 0, 1, 0, 0.040411, 0, 0.999183, 114.500, 5.625, -833.500)
 
-[node name="Mesh" parent="./SupermarketSite_001" index="0"]
+[node name="Mesh" parent="./SupermarketSite_Shop_001" index="0"]
 surface_material_override/1 = ExtResource("tone0_3")
 visibility_parent = NodePath("../../HLOD")
 

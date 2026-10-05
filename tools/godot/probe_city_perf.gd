@@ -133,10 +133,16 @@ func _road_path(road: String, eye: float) -> Array:
 
 var street_level := false   # true on a street leg: `pos.y` is eye height ABOVE the ground there
 func _place(pos: Vector3, look: Vector3) -> void:
-	var g := _ground(pos.x, pos.z) if street_level else 0.0
-	cam.global_position = pos + Vector3(0, g, 0)
-	cam.look_at(look + Vector3(0, g, 0), Vector3.UP)
-	player.global_position = Vector3(pos.x, (g if street_level else 0.0) + 2.0, pos.z)
+	# the ground is the terrain under the spot ON EVERY LEG: a typed absolute height from before the land raise
+	# (0.75 on a 5.6 m plain) put the camera and the player under the ground (user, 2026-10-04)
+	var g := _ground(pos.x, pos.z)
+	if street_level:
+		cam.global_position = pos + Vector3(0, g, 0)
+		cam.look_at(look + Vector3(0, g, 0), Vector3.UP)
+	else:
+		cam.global_position = Vector3(pos.x, maxf(pos.y, g + 1.65), pos.z)
+		cam.look_at(Vector3(look.x, maxf(look.y, _ground(look.x, look.z) + 1.0), look.z), Vector3.UP)
+	player.global_position = Vector3(pos.x, g + 0.5, pos.z)
 
 func _settle(seconds: float) -> void:
 	# streaming starts on the ZoneManager's 0.5 s tick and parses on worker threads: wait at least 4 s, then until

@@ -352,21 +352,9 @@ PUBLIC_BUILDINGS = (      # (Godot x, z, why, wanted TYPE, "", ROLE): a specific
 # the safe house is on the map as an ordinary Convenience Store; `armoury` is only how the safe house finds its street
 ROLE_PLACES = {"safehouse": ("Safehouse", 2)}
 ARMOURY_REACH = 1200.0   # the weapon counter is the nearest large konbini, however far (there are only a few)
-# Every konbini sells weapons (free for now), each store in its OWN frame (front +Z):
-# * KonbiniS (12.74 x 18.2 m): the clear aisle between the right-hand gondola run (x <= 2.67) and the side wall
-#   (x 6.37), from the drink wall's front (z -6.29) to the customer toilet room (z >= 1.82) -- pistols and light
-#   weapons only;
-# * KonbiniL (21.84 m square): the clear floor between the gondola run at x 2.3 (<= 2.67) and the counter
-#   (x >= 9.08), south of the WC partition (z -3.64) -- the whole catalog, in a 3 x 4 grid.
-KONBINI_PADS = {
-    # on free sales floor in front of the gondolas (the interiors were re-planned 2026-09-27: the counter, the staff
-    # aisle and the back-of-house rooms are where the pads used to be)
-    "KonbiniS": tuple((wid, 1.0 + 1.2 * (i % 2), -2.0 + 1.3 * (i // 2)) for i, wid in enumerate(
-        ("PIS1", "PIS2", "REV1", "DUP1", "SMG1", "MEW1", "FRG1"))),
-    "KonbiniL": tuple((wid, -1.5 + 1.3 * (i % 4), (2.8, 4.1, 7.4)[i // 4]) for i, wid in enumerate(
-        ("PIS1", "PIS2", "REV1", "DUP1", "SMG1", "ASR1", "ASR2", "SHG1", "SNR1", "ATL1", "FRG1", "MEW1"))),
-}
-PAD_SCRIPT = "res://src/main/java/com/openworld/item/WeaponPad.java"
+# What a shop SELLS is no longer written here: its counter (item.ShopCounter) and its clerk are MARK_ Empties in the
+# shop's own model (kits/shops/Shop_<Id>.blend, kits/interiors/<Id>.blend; PLAN.md W3/W7), built into its `_Shop`
+# scene -- this file only decides WHERE the shop stands. The floor weapon pads that were placed from here are gone.
 # (Godot x, z, why, wanted TYPE or "", the `Missions` child to move onto it or ""): locked until its mission
 # unlocks it, and wins over the two above.
 #
@@ -489,10 +477,15 @@ SPAWN_UID = "uid://ctq8u5jyp6ijf"
 # Pedestrians per 100 m of footway. Raised x3-5 (user, 2026-10-03: "only 1-2 on a street, small for a Japanese city")
 # now that a far ped is one VAT MultiMesh instance (bench: 600 peds 0.57 ms, 2000 peds 1.48 ms), not a skinned body.
 # Japanese reference: a busy shopping / station-front footway carries ~8-15 people per 100 m, a residential street 1-2.
-PED_DENSITY = {"akiba": 10.0, "nightlife": 12.0, "downtown": 9.0, "downtown_core": 10.0, "city": 4.0, "residential": 2.0, "residential_north": 2.0,
-               "residential_west": 1.2, "suburb": 1.5, "industry": 1.0, "harbour": 0.8, "farm": 0.4,
-               "light_industry": 1.5, "light_industry_w": 2.0, "west_centre": 6.0, "west_ekimae": 10.0, "bay_processing": 1.5, "airport": 1.5,
-               "ekimae": 8.0, None: 1.0}
+# The CITY reads busier than the port (user, 2026-10-04: "heavier crowd in the city than other regions ... the crowd
+# seems more on the harbour"). Measured in play (tools/godot/probe_crowd_by_region.gd) the city WAS denser -- 130
+# people within 150 m in the nightlife quarter against 7 at the harbour -- but a city street is boxed in by buildings
+# while an open quay shows its few people across hundreds of metres, so the contrast is widened: city districts up
+# ~50 %, working districts halved.
+PED_DENSITY = {"akiba": 15.0, "nightlife": 18.0, "downtown": 13.0, "downtown_core": 15.0, "city": 7.0,
+               "residential": 2.5, "residential_north": 2.5, "residential_west": 1.2, "suburb": 1.5, "industry": 0.5,
+               "harbour": 0.4, "farm": 0.4, "light_industry": 1.0, "light_industry_w": 1.2, "west_centre": 9.0,
+               "west_ekimae": 14.0, "bay_processing": 0.8, "airport": 1.5, "ekimae": 12.0, None: 0.6}
 PED_MAX = 200          # a single cell's crowd, however much footway it holds
 PED_LOAD = 300.0       # > the cell's own half-diagonal (178 m) and just over the 252 m cell pitch, so the four
                        # orthogonal neighbours stream too and a crowd exists before it is in view
@@ -1616,11 +1609,17 @@ def deep_fill(field, placed, aabbs, frontage):
             return False
         return nf[j1, i1] - nf[j0, i1] - nf[j1, i0] + nf[j0, i0] == 0
     # nearest frontage point (and so the facing) for every candidate: the street lines' samples
+    # ...with the street's own DIRECTION there (user, 2026-10-04: "some generated parking lots are at a slope angle,
+    # aligned to neither the street nor the neighbouring buildings"): the facing used to be the direction to the
+    # nearest sample, which near a corner or a bend is oblique to the street. A lot faces SQUARE to its street.
     fpts = []
     for _owner, line, _gap, _lanes, _k in frontage:
-        for (x, z, hh, yy) in line:
-            fpts.append((x, z, hh, yy))
-    F = np.array(fpts) if fpts else np.zeros((0, 4))
+        for q, (x, z, hh, yy) in enumerate(line):
+            a = line[max(q - 1, 0)]
+            b = line[min(q + 1, len(line) - 1)]
+            tl = math.hypot(b[0] - a[0], b[1] - a[1]) or 1.0
+            fpts.append((x, z, hh, yy, (b[0] - a[0]) / tl, (b[1] - a[1]) / tl))
+    F = np.array(fpts) if fpts else np.zeros((0, 6))
     # a cheap clearance: the largest square half-size (1 m cells, up to 40) free round each grid point
     step = int(DEEP_STEP / RES)
     cands = []
@@ -1650,9 +1649,12 @@ def deep_fill(field, placed, aabbs, frontage):
         if F.shape[0]:
             d2 = (F[:, 0] - x) ** 2 + (F[:, 1] - z) ** 2
             k = int(d2.argmin())
-            fx, fz, fhalf, fy = F[k]
-            L = math.hypot(fx - x, fz - z) or 1.0
-            nx, nz = (fx - x) / L, (fz - z) / L
+            fx, fz, fhalf, fy, tx, tz = F[k]
+            # the street's normal, pointing from the candidate toward the street; L the square distance to it
+            nx, nz = -tz, tx
+            if nx * (fx - x) + nz * (fz - z) < 0.0:
+                nx, nz = -nx, -nz
+            L = abs(nx * (fx - x) + nz * (fz - z)) or 1.0
         else:
             nx, nz, L, fhalf, fy = 0.0, 1.0, 0.0, 0.0, 0.0
         # four axis-snapped facings toward the street first (a lot square to its street reads as planned)
@@ -2186,6 +2188,10 @@ def drive_ramp(b):
 
 
 def scene_of(b):
+    # a DEEP-pocket big building of a type a civic plot opens (a supermarket sells at its counter, a 立体駐車場 is always
+    # open) stands as the same variant: one rule for "which of this type are walked into", wherever it was placed
+    if "scene" not in b and b.get("deep") and b["type"] in CIVIC_SCENE:
+        return b["type"] + CIVIC_SCENE[b["type"]]
     return b.get("scene", b["type"])
 
 
@@ -2352,23 +2358,7 @@ def cell_scene(name, blds, passages=(), fields=(), aprons=()):
         ext.append('[ext_resource type="ArrayMesh" path="%s/%s.res" id="hlod"]\n' % (HLOD_RES, name))
     if fields:
         ext.append('[ext_resource type="Script" path="%s" id="crop"]\n' % CROP_SCRIPT)
-    # every konbini sells weapons (user, 2026-09-26), the one beside the safe house included
-    shops = [b for b in blds if b["type"] in KONBINI_PADS]
-    if shops:
-        ext.append('[ext_resource type="Script" path="%s" id="pad"]\n' % PAD_SCRIPT)
     ext.append("\n")
-    for k, b in enumerate(shops):
-        a = math.radians(b["yaw"])
-        bs, bc = math.sin(a), math.cos(a)
-        px, py, pz = b["pos"]
-        holder = "Pads_%03d" % k
-        nodes.append('\n[node name="%s" type="Node3D" parent="."]\n' % holder)
-        for wid, lx, lz in KONBINI_PADS[b["type"]]:
-            nodes.append('\n[node name="Pad_%s" type="Area3D" parent="%s"]\n'
-                         'transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, %.3f, %.3f, %.3f)\n'
-                         'script = ExtResource("pad")\nweapon_id = "%s"\n'
-                         % (wid, holder, px + lx * bc + lz * bs, py + LOT_RAISE + FLOOR_LIFT + 0.1,
-                            pz - lx * bs + lz * bc, wid))
     if fields:
         # the paddy (user, 2026-09-25): world.CropField builds the crop quads from these chunks at load
         nodes.append('\n[node name="Crops" type="Node3D" parent="."]\nscript = ExtResource("crop")\n'
@@ -2764,14 +2754,13 @@ START_HOLDER = "WeaponCounter"
 
 
 def patch_start(text, doc):
-    """PLAN.md 3 (user, 2026-09-22): the game starts at the SAFE HOUSE and the weapons are at the WEAPON COUNTER.
+    """PLAN.md 3 (user, 2026-09-22): the game starts at the SAFE HOUSE, beside a konbini that sells weapons.
 
     One owner, like `patch_missions`: the anchors in PUBLIC_BUILDINGS choose the buildings, and this puts
       * `PlayerSpawn` (read by GameManager for every joining player and by WorldBounds for a fall-out recovery)
         and the `Player` 1.5 m out from the safe house's front door, facing the street;
       * the starting car (`VehicleRoot`) parked OFF the carriageway, nose to the street, in the nearest lot space
         beside the house (never in a lane: the traffic brain cannot pass a parked car);
-      * the counter's `WeaponPad`s inside the weapon-counter konbini, in its own frame;
     and deletes the loose `Pickups` that used to lie at the old spawn point."""
     roles = doc.get("roles", {})
     home, shop = roles.get("safehouse"), roles.get("armoury")
@@ -2905,6 +2894,38 @@ def patch_start(text, doc):
     return new
 
 
+KEEP_OUT = os.path.join(ROOT, "assets", "world_source", "pieces", "IslandRoads.keepout.json")
+KEEP_OUT_MARGIN = 1.5    # m either side of an entrance kept clear of street furniture
+KEEP_OUT_REACH = 6.0     # m from the lot's street edge out across the footway
+
+
+def keep_out_boxes(buildings):
+    """The car-park ENTRANCES road furniture must leave clear (user, 2026-10-04: "on some parking exits a tree stands
+    in front and blocks part of the exit -- clear trees if it is a parking space"): [cx, cz, ux, uz, half_across,
+    half_deep] in the Godot frame, u the unit direction INTO the lot. A deep-pocket car park's entrance is its
+    driveway's mouth at the kerb (`drive`, DRIVEWAY_W wide); a street-front car park opens along its whole front.
+    `roadkit_cli --keep-out` reads them, and each road piece's digest takes the boxes near it, so a moved car park
+    rebuilds only the road pieces it touches."""
+    out = []
+    for b in buildings:
+        t = b["type"]
+        if "drive" not in b and not t.startswith("Parking"):
+            continue
+        x0, z0, x1, z1, _h = type_aabb(SIGN_OF.get(t, t))
+        a = math.radians(b["yaw"])
+        c, s_ = math.cos(a), math.sin(a)
+        # lot local x = (c, -s), local z (toward the road) = (s, c)
+        if "drive" in b:
+            lx, kz, half = 0.0, b["drive"] - KEEP_OUT_REACH / 2.0 + 1.0, DRIVEWAY_W / 2.0 + KEEP_OUT_MARGIN
+        else:
+            lx, kz, half = (x0 + x1) / 2.0, z1 + KEEP_OUT_REACH / 2.0 - 0.5, (x1 - x0) / 2.0 + KEEP_OUT_MARGIN
+        cx = b["pos"][0] + lx * c + kz * s_
+        cz = b["pos"][2] - lx * s_ + kz * c
+        out.append([round(cx, 3), round(cz, 3), round(-s_, 5), round(-c, 5), round(half, 3),
+                    round(KEEP_OUT_REACH / 2.0 + 0.5, 3)])
+    return out
+
+
 def write(check):
     doc = json.load(open(OUT))
     cells = {}
@@ -3008,6 +3029,14 @@ def write(check):
     new = patch_peds(new, peds, doc["network_y"])
     new = patch_missions(new, doc.get("anchored_missions", {}))
     new = patch_start(new, doc)
+    ko = json.dumps({"schema": 1, "source": "tools/island_buildings.py write",
+                     "note": "car-park entrances road furniture keeps clear of: [cx, cz, ux, uz, half_across, "
+                             "half_deep], Godot frame, u into the lot (roadkit_cli --keep-out)",
+                     "boxes": keep_out_boxes(doc["buildings"])}, separators=(",", ":")) + "\n"
+    if not os.path.exists(KEEP_OUT) or open(KEEP_OUT).read() != ko:
+        changed.append(KEEP_OUT)
+        if not check:
+            open(KEEP_OUT, "w").write(ko)
     if new != text:
         changed.append(SCENE)
         if not check:

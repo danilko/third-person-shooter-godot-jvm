@@ -49,7 +49,6 @@
 [ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_10_4.res" id="hlod"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/world/CropField.java" id="crop"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/item/WeaponPad.java" id="pad"]
 
 [sub_resource type="BoxMesh" id="LotBox"]
 material = ExtResource("lotmat")
@@ -303,105 +302,6 @@ buffer = PackedFloat32Array(0.1596, 0.0000, 1.9942, 722.0890, 0.0000, 0.4000, 0.
 size = Vector3(2.100, 0.400, 2.000)
 
 [node name="Bld_island_10_4" type="Node3D"]
-
-[node name="Pads_000" type="Node3D" parent="."]
-
-[node name="Pad_PIS1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 531.038, 5.875, -789.434)
-script = ExtResource("pad")
-weapon_id = "PIS1"
-
-[node name="Pad_PIS2" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 532.334, 5.875, -789.531)
-script = ExtResource("pad")
-weapon_id = "PIS2"
-
-[node name="Pad_REV1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 533.630, 5.875, -789.628)
-script = ExtResource("pad")
-weapon_id = "REV1"
-
-[node name="Pad_DUP1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 534.927, 5.875, -789.725)
-script = ExtResource("pad")
-weapon_id = "DUP1"
-
-[node name="Pad_SMG1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 531.135, 5.875, -788.137)
-script = ExtResource("pad")
-weapon_id = "SMG1"
-
-[node name="Pad_ASR1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 532.431, 5.875, -788.235)
-script = ExtResource("pad")
-weapon_id = "ASR1"
-
-[node name="Pad_ASR2" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 533.728, 5.875, -788.332)
-script = ExtResource("pad")
-weapon_id = "ASR2"
-
-[node name="Pad_SHG1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 535.024, 5.875, -788.429)
-script = ExtResource("pad")
-weapon_id = "SHG1"
-
-[node name="Pad_SNR1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 531.382, 5.875, -784.847)
-script = ExtResource("pad")
-weapon_id = "SNR1"
-
-[node name="Pad_ATL1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 532.678, 5.875, -784.944)
-script = ExtResource("pad")
-weapon_id = "ATL1"
-
-[node name="Pad_FRG1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 533.974, 5.875, -785.041)
-script = ExtResource("pad")
-weapon_id = "FRG1"
-
-[node name="Pad_MEW1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 535.271, 5.875, -785.138)
-script = ExtResource("pad")
-weapon_id = "MEW1"
-
-[node name="Pads_001" type="Node3D" parent="."]
-
-[node name="Pad_PIS1" type="Area3D" parent="Pads_001"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 591.965, 5.725, -937.140)
-script = ExtResource("pad")
-weapon_id = "PIS1"
-
-[node name="Pad_PIS2" type="Area3D" parent="Pads_001"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 593.165, 5.725, -937.140)
-script = ExtResource("pad")
-weapon_id = "PIS2"
-
-[node name="Pad_REV1" type="Area3D" parent="Pads_001"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 591.965, 5.725, -935.840)
-script = ExtResource("pad")
-weapon_id = "REV1"
-
-[node name="Pad_DUP1" type="Area3D" parent="Pads_001"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 593.165, 5.725, -935.840)
-script = ExtResource("pad")
-weapon_id = "DUP1"
-
-[node name="Pad_SMG1" type="Area3D" parent="Pads_001"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 591.965, 5.725, -934.540)
-script = ExtResource("pad")
-weapon_id = "SMG1"
-
-[node name="Pad_MEW1" type="Area3D" parent="Pads_001"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 593.165, 5.725, -934.540)
-script = ExtResource("pad")
-weapon_id = "MEW1"
-
-[node name="Pad_FRG1" type="Area3D" parent="Pads_001"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 591.965, 5.725, -933.240)
-script = ExtResource("pad")
-weapon_id = "FRG1"
 
 [node name="Crops" type="Node3D" parent="."]
 script = ExtResource("crop")

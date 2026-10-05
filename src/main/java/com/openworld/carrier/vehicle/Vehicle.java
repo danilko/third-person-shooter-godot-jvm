@@ -8,6 +8,7 @@ import com.openworld.world.manager.ExplosionManager;
 import com.openworld.game.EventBus;
 import com.openworld.net.NetworkManager;
 import com.openworld.world.BreakableProps;
+import com.openworld.world.PropBreakRules;
 import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
@@ -436,6 +437,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         }
 
         sweepStreetPoles(delta);
+        sweepPeople(delta);
 
         // Drop a stale occupant pin BEFORE dereferencing it: under streamed traffic (PLAN.md I3c) a
         // seated AI driver can be freed/removed out from under us by a despawn race, and reading its
@@ -566,6 +568,85 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             setLinearVelocity(getLinearVelocity().times(keep));
             wakeUp();
         }
+    }
+
+    // ── A car hits a PERSON (user, 2026-10-04: "the character is like a tree or a wall: the car takes the damage and
+    // the person has no issue"). A character is a kinematic body -- infinite mass to the solver -- so a car meeting
+    // one stops dead (measured: 14.7 -> 1.8 m/s, 75 HP of crash damage to the car, 0 to the person), and the contact
+    // damage below read the car's speed AFTER the solver had stopped it, under vehicleCollisionMinSpeed. So the
+    // person is asked BEFORE the step, the pole sweep's way: anyone the car reaches this step at or above that speed
+    // takes the hit (damage + throw) here, and one it kills is excepted from the car's collision for a moment, so the
+    // car drives on through where the body was (GTA's run-over) and keeps all but a person's share of its momentum.
+    // A living person (a slow nudge) is still met by the physics. Simulating peer only: damage is applied there.
+    /** Off = the old behaviour (a person is a wall). */
+    @godot.annotation.Visible public boolean knockPeople = true;
+    private static final double PERSON_MASS = 80.0;
+    private static final double PERSON_RADIUS = 0.4;
+    private static final double PASS_THROUGH_SECONDS = 1.5;
+    /** How far ahead (s of travel) a PLAYER's car promotes light crowd peds into bodies, so they are there to hit. */
+    private static final double PROMOTE_AHEAD_SECONDS = 0.5;
+    private final java.util.Map<Character, Double> passThrough = new java.util.HashMap<>();
+    private final java.util.List<Node> peopleScratch = new ArrayList<>();
+    private int peopleHits;
+
+    /** Probe readout: people this car has hit at speed. */
+    @Register public int peopleHitNow() { return peopleHits; }
+
+    private void sweepPeople(double delta) {
+        if (!passThrough.isEmpty()) {
+            java.util.Iterator<java.util.Map.Entry<Character, Double>> it = passThrough.entrySet().iterator();
+            while (it.hasNext()) {
+                java.util.Map.Entry<Character, Double> e = it.next();
+                double left = e.getValue() - delta;
+                if (left > 0.0 && GD.isInstanceValid(e.getKey())) {
+                    e.setValue(left);
+                    continue;
+                }
+                if (GD.isInstanceValid(e.getKey())) removeCollisionExceptionWith(e.getKey());
+                it.remove();
+            }
+        }
+        if (!knockPeople || delta <= 0.0 || !isLocallySimulated() || isFreezeEnabled() || parked) return;
+        VehicleConfig cfg = getConfig();
+        if (cfg == null || cfg.vehicleCollisionMinSpeed <= 0) return;
+        Vector3 vel = getLinearVelocity();
+        double speed = Math.hypot(vel.getX(), vel.getZ());
+        if (speed < cfg.vehicleCollisionMinSpeed) return;
+        if (hullHalfWidth < 0.0) measureHull();
+        Vector3 pos = getGlobalPosition();
+        Basis basis = getGlobalBasis();
+        Vector3 bx = basis.getColumn(0), bz = basis.getColumn(2);
+        double vlx = vel.dot(bx), vlz = vel.dot(bz);
+        // a PLAYER's car promotes the light peds just ahead (they have no collider; promotion is a few ms, so only
+        // for the car the player is driving, and only a few)
+        if (occupant instanceof Player && occupant.isLocallyOwnedPlayer()) {
+            Vector3 fwd = vel.normalized();
+            Vector3 nose = pos.plus(fwd.times((float) hullHalfLength));
+            com.openworld.world.PedCrowd.promoteNear(nose, nose.plus(vel.times((float) PROMOTE_AHEAD_SECONDS)),
+                    hullHalfWidth, 3);
+        }
+        peopleScratch.clear();
+        float reach = (float) (hullHalfLength + speed * delta * PropBreakRules.LOOKAHEAD_STEPS + 2.0);
+        SpatialEntityGrid grid = SpatialEntityGrid.get();
+        if (grid != null) grid.queryRadius(pos, reach, peopleScratch);
+        else for (Node n : getTree().getNodesInGroup(new StringName("characters"))) peopleScratch.add(n);
+        double keep = 1.0;
+        for (Node n : peopleScratch) {
+            if (!(n instanceof Character c) || c == occupant || c.currentVehicleNode != null || !c.isAlive()
+                    || passThrough.containsKey(c) || !GD.isInstanceValid(c)) continue;
+            Vector3 d = c.getGlobalPosition().minus(pos);
+            if (Math.abs(d.getY()) > 2.5) continue;
+            if (!PropBreakRules.reachesPole(d.dot(bx), d.dot(bz), hullHalfWidth, hullHalfLength, PERSON_RADIUS,
+                    vlx, vlz, delta)) continue;
+            peopleHits++;
+            applyVehicleCollisionDamage(c, (float) speed, cfg);
+            if (!c.isAlive()) {
+                addCollisionExceptionWith(c);
+                passThrough.put(c, PASS_THROUGH_SECONDS);
+                keep *= PropBreakRules.keepFraction(getMass(), PERSON_MASS);
+            }
+        }
+        if (keep < 1.0) setLinearVelocity(vel.times((float) keep));
     }
 
     private void measureHull() {

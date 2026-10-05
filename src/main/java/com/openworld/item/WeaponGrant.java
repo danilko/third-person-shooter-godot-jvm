@@ -6,7 +6,7 @@ import com.openworld.weapon.WeaponItem;
 import godot.api.Node;
 
 /**
- * Hand a character one catalog weapon -- the ONE grant path a weapon pad and a shop counter share (and the debug
+ * Hand a character one catalog weapon -- the ONE grant path a shop counter uses (and the debug
  * console's {@code give} idea): a weapon already carried is REFILLED (magazine and reserve), else a fresh catalog
  * instance is put in the tree and queued into the inventory through {@code requestEquip}, so slot choice,
  * displacement and the HUD stay the weapon controller's. Call it on the authoritative peer only.

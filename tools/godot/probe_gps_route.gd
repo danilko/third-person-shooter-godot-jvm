@@ -339,7 +339,8 @@ func _check_places(which: String) -> void:
 	var enterable: Array[Vector2] = []
 	for b in bdoc["buildings"]:
 		# ...or a CIVIC building (island_civic_sites.py): shut, but the map names it by design (police, hospital ...)
-		if b.get("scene", b["type"]) != b["type"] or b.has("civic"):
+		# ...or a DEEP-pocket big building (a supermarket, a park, a car park behind the frontage): named by design
+		if b.get("scene", b["type"]) != b["type"] or b.has("civic") or b.get("deep", false):
 			enterable.append(Vector2(b["pos"][0], b["pos"][2]))
 	var orphans := 0
 	var sites := 0

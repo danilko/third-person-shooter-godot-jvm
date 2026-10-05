@@ -276,6 +276,8 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
 
     // ── UI input lock (set by radial menu / pause / any overlay that must own the mouse) ──
     public boolean inputBlocked = false;
+    /** For probes: is an overlay (shop menu, radial menu, console) holding this body's input. */
+    @Register public boolean inputBlockedNow() { return inputBlocked; }
 
     /** Yen carried (a robbed till, PLAN.md W3). Kept on the authoritative peer; nothing spends it yet. */
     public int cash = 0;

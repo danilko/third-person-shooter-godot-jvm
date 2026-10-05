@@ -46,10 +46,53 @@ public class ParkedVehicle extends Node3D {
     private static final Map<String, Vehicle> SPAWNED = new HashMap<>();
     private static long sceneId = -1;
 
+    /**
+     * The vehicle exists only while a player is near (2026-10-04, measured with probe_walk_perf.gd: the 74 parked
+     * vehicles in range downtown cost 4.2 ms p50 and 6.6 ms at the station, each a full rigid body with its wheels'
+     * rays and its scripts): spawned within {@link #SPAWN_NEAR}, and taken back beyond {@link #DESPAWN_FAR} while it is
+     * still UNTOUCHED (nobody in it, where it was parked, undamaged). A vehicle someone drove, moved or damaged stays a
+     * real vehicle wherever it is. A world with no registered player (a bare probe stand) spawns at once.
+     */
+    static final double SPAWN_NEAR = 150.0, DESPAWN_FAR = 230.0;
+    private double nearScan;
+
     @Register
     @Override
     public void _ready() {
-        callDeferred(new StringName("spawn_now"));
+        if (com.openworld.game.PlayerRegistry.getPlayers().isEmpty()) callDeferred(new StringName("spawn_now"));
+    }
+
+    @Register
+    @Override
+    public void _physicsProcess(double delta) {
+        nearScan -= delta;
+        if (nearScan > 0.0) return;
+        nearScan = 0.5 + 0.1 * GD.randf();          // spread over frames: a cell holds several
+        java.util.List<com.openworld.character.Player> ps = com.openworld.game.PlayerRegistry.getPlayers();
+        Vector3 here = getGlobalPosition();
+        double d = ps.isEmpty() ? 0.0 : Double.MAX_VALUE;
+        for (com.openworld.character.Player p : ps) {
+            if (GD.isInstanceValid(p)) d = Math.min(d, p.getGlobalPosition().distanceTo(here));
+        }
+        Vehicle v = (Vehicle) spawnedNow();
+        if (v == null && d < SPAWN_NEAR) spawnNow();
+        else if (v != null && d > DESPAWN_FAR && untouched(v, here)) {
+            Node net = getNodeOrNull("/root/NetworkManager");
+            if (net instanceof NetworkManager nm && v.getCharacterInfo() != null)
+                nm.announceDespawn(v.getCharacterInfo().characterId);
+            SPAWNED.remove(key());
+            v.queueFree();
+        }
+    }
+
+    private boolean untouched(Vehicle v, Vector3 spot) {
+        if (v.getOccupant() != null || v.getGlobalPosition().distanceTo(spot) > 1.5) return false;
+        return !(v.getNodeOrNull("Health") instanceof com.openworld.character.Health h) || h.getCurrentHealth() >= h.maxHealth;
+    }
+
+    private String key() {
+        Vector3 o = getGlobalTransform().getOrigin();
+        return String.format("%s@%.1f,%.1f,%.1f", vehicleId, o.getX(), o.getY(), o.getZ());
     }
 
     /** Spawn the vehicle if this peer is authoritative and the one from an earlier load is gone. */

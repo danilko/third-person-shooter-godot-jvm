@@ -50,7 +50,6 @@
 
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/Station_Farm_Shop.tscn" id="dbg_station"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/KonbiniS_Shop.tscn" id="dbg_konbini"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/item/WeaponPad.java" id="dbg_pad"]
 
 [sub_resource type="NavigationMesh" id="NavigationMesh_world"]
 cell_size = 0.5
@@ -553,42 +552,5 @@ transform = Transform3D(6.12323e-17, 0, -1, 0, 1, 0, 1, 0, 6.12323e-17, -115.000
 
 [node name="Konbini" parent="." instance=ExtResource("dbg_konbini")]
 transform = Transform3D(-1, 0, 1.22465e-16, 0, 1, 0, -1.22465e-16, 0, -1, -330.0000, 5.6200, 24.0000)
-
-[node name="KonbiniPads" type="Node3D" parent="."]
-
-[node name="Pad_PIS1" type="Area3D" parent="KonbiniPads"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, -331.0000, 5.7200, 26.0000)
-script = ExtResource("dbg_pad")
-weapon_id = "PIS1"
-
-[node name="Pad_PIS2" type="Area3D" parent="KonbiniPads"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, -332.2000, 5.7200, 26.0000)
-script = ExtResource("dbg_pad")
-weapon_id = "PIS2"
-
-[node name="Pad_REV1" type="Area3D" parent="KonbiniPads"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, -331.0000, 5.7200, 24.7000)
-script = ExtResource("dbg_pad")
-weapon_id = "REV1"
-
-[node name="Pad_DUP1" type="Area3D" parent="KonbiniPads"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, -332.2000, 5.7200, 24.7000)
-script = ExtResource("dbg_pad")
-weapon_id = "DUP1"
-
-[node name="Pad_SMG1" type="Area3D" parent="KonbiniPads"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, -331.0000, 5.7200, 23.4000)
-script = ExtResource("dbg_pad")
-weapon_id = "SMG1"
-
-[node name="Pad_MEW1" type="Area3D" parent="KonbiniPads"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, -332.2000, 5.7200, 23.4000)
-script = ExtResource("dbg_pad")
-weapon_id = "MEW1"
-
-[node name="Pad_FRG1" type="Area3D" parent="KonbiniPads"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, -331.0000, 5.7200, 22.1000)
-script = ExtResource("dbg_pad")
-weapon_id = "FRG1"
 
 [connection signal="body_entered" from="AmmoRefill" to="AmmoRefill" method="on_body_entered"]

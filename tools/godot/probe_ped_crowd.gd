@@ -91,6 +91,12 @@ func _walkers() -> Array:
 
 
 func _put_player(at: Vector3) -> void:
+	# never under the terrain (user, 2026-10-04): the typed heights predate the 5.6 m plain
+	var wb := current_scene.find_child("WorldBounds", true, false) if current_scene else null
+	if wb != null:
+		var h: float = wb.call("terrain_height", at.x, at.z)
+		if not is_nan(h):
+			at.y = maxf(at.y, h + 0.5)
 	player.global_position = at
 
 

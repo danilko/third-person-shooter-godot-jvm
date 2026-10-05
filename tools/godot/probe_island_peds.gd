@@ -18,7 +18,11 @@ const COVER_R := 150.0          # "the street around the player has people on it
 const COVER_MIN := 20
 const AHEAD_R := 300.0          # ... and so does the one two blocks ahead, BEFORE you get there: the crowd
 const AHEAD_MIN := 15           # must already be walking when it comes into view, which is the load radius
-const BUDGET := 150             # measured in probe_city_perf.gd --crowd: 150 peds is p50 12.7 ms downtown
+# The budget is of LIGHT peds in range (VAT, one draw per body type). 150 was the skinned crowd's (p50 12.7 ms at 150);
+# re-measured 2026-10-04 with probe_walk_perf.gd standing ON the ground (an older run walked under the terrain): the
+# whole crowd at 693 worst in range costs +6.8 ms p50 downtown and +5.9 at the station, most of it the <= 12 PROMOTED
+# bodies (ZoneManager.walkerBudget), not the light tier
+const BUDGET := 750
 const PED_MAX := 40             # island_buildings.PED_MAX
 
 var w: Node

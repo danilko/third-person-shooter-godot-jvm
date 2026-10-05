@@ -32,6 +32,9 @@ ONLY = {n for a in argv if a.startswith("--only=") for n in a[len("--only="):].s
 FORCE = {n for a in argv if a.startswith("--force=") for n in a[len("--force="):].split(",") if n}
 
 
+SHOP_MARKS = ("MARK_shop_counter_", "MARK_clerk_")
+
+
 def fingerprint(col):
     h = hashlib.sha1()
     for o in sorted(col.objects, key=lambda o: o.name):
@@ -66,6 +69,20 @@ def build(bid):
     if col is not None and col.get("ib_generated") and col["ib_generated"] != fingerprint(col) and bid not in FORCE:
         print("[build_interior_blends] KEPT %s: edited by hand (--force=%s overwrites the artist's edit; ask first)"
               % (bid, bid))
+        # ...but a SHOP's counter and clerk (MARK_shop_counter_ / MARK_clerk_, PLAN.md W3/W7) are added to a kept
+        # piece when it has none: a store edited before they existed still sells. One already there is never moved.
+        b = IK.Bld(bid, Builder, material)
+        PLANS[bid](b)
+        have = {o.name.split(".")[0] for o in col.objects}
+        want = [e for e in b.empties if e[0].startswith(SHOP_MARKS) and e[0] not in have]
+        if want:
+            b.groups, b.objs, b.empties = {}, [], want
+            b.install(col, {})
+            for o in col.objects:
+                if o.name.split(".")[0] in {e[0] for e in want}:
+                    o["edit_note"] = col.get("edit_note", "")
+            bpy.ops.wm.save_as_mainfile(filepath=path, compress=True)
+            print("[build_interior_blends]   ... added %d missing shop MARK_ Empties to it" % len(want))
         return True
     b = IK.Bld(bid, Builder, material)
     spec = PLANS[bid](b)

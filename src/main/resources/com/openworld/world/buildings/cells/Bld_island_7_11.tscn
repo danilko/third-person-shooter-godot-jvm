@@ -10,7 +10,7 @@
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ParkingLot28.tscn" id="8"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ShootingRange.tscn" id="9"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/Warehouse.tscn" id="10"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/WarehouseYard.tscn" id="11"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/WarehouseYard_Open.tscn" id="11"]
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_DarkCool.tres" id="tone3_1"]
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_WhiteWarm.tres" id="tone1_2"]
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_DarkCool2.tres" id="tone4_3"]
@@ -18,7 +18,6 @@
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_CharcoalCool.tres" id="tone2_7"]
 [ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_7_11.res" id="hlod"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/item/WeaponPad.java" id="pad"]
 
 [sub_resource type="BoxMesh" id="LotBox"]
 material = ExtResource("lotmat")
@@ -123,43 +122,6 @@ size = Vector3(2.100, 0.400, 2.000)
 
 [node name="Bld_island_7_11" type="Node3D"]
 
-[node name="Pads_000" type="Node3D" parent="."]
-
-[node name="Pad_PIS1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -40.551, 5.875, 779.891)
-script = ExtResource("pad")
-weapon_id = "PIS1"
-
-[node name="Pad_PIS2" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -39.351, 5.875, 779.891)
-script = ExtResource("pad")
-weapon_id = "PIS2"
-
-[node name="Pad_REV1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -40.551, 5.875, 781.191)
-script = ExtResource("pad")
-weapon_id = "REV1"
-
-[node name="Pad_DUP1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -39.351, 5.875, 781.191)
-script = ExtResource("pad")
-weapon_id = "DUP1"
-
-[node name="Pad_SMG1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -40.551, 5.875, 782.491)
-script = ExtResource("pad")
-weapon_id = "SMG1"
-
-[node name="Pad_MEW1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -39.351, 5.875, 782.491)
-script = ExtResource("pad")
-weapon_id = "MEW1"
-
-[node name="Pad_FRG1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -40.551, 5.875, 783.791)
-script = ExtResource("pad")
-weapon_id = "FRG1"
-
 [node name="HLOD" type="MeshInstance3D" parent="."]
 mesh = ExtResource("hlod")
 cast_shadow = 0
@@ -173,10 +135,10 @@ transform = Transform3D(-0.971118, 0, 0.238601, 0, 1, 0, -0.238601, 0, -0.971118
 [node name="Mesh" parent="./Koban_000" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="WarehouseYard_001" parent="." instance=ExtResource("11")]
+[node name="WarehouseYard_Open_001" parent="." instance=ExtResource("11")]
 transform = Transform3D(0.216968, 0, 0.976179, 0, 1, 0, -0.976179, 0, 0.216968, -227.500, 5.623, 792.500)
 
-[node name="Mesh" parent="./WarehouseYard_001" index="0"]
+[node name="Mesh" parent="./WarehouseYard_Open_001" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
 [node name="FireBranch_002" parent="." instance=ExtResource("2")]

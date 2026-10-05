@@ -106,7 +106,7 @@ def _grow(box, x, y):
     return (min(box[0], x), min(box[1], y), max(box[2], x), max(box[3], y))
 
 
-def context_of(box, foreign=(), keep_clear=()):
+def context_of(box, foreign=(), keep_clear=(), keep_out=()):
     """What of ANOTHER network a piece whose plan box is `box` (x0, y0, x1, y1, record frame) is built against: the
     foreign bands (`--avoid`, the rail against the roads) and keep-clear lanes (`--keep-clear-lanekits`, the roads
     against the rail) within `CONTEXT_REACH` of it. Part of the piece's digest, so an edit to one network rebuilds only
@@ -123,10 +123,16 @@ def context_of(box, foreign=(), keep_clear=()):
             lanes.append([l.get("id"), l.get("width"), pts])
     bands.sort(key=lambda d: (d["owner"], json.dumps(_canon(d["poly"]))))
     lanes.sort(key=lambda r: str(r[0]))
-    return {"foreign": bands, "keep_clear": lanes}
+    out = {"foreign": bands, "keep_clear": lanes}
+    # the furniture keep-out boxes (car-park entrances) that reach the piece: only when there are any, so a piece no
+    # car park touches keeps the digest it had before keep-outs existed
+    ko = sorted([round(v, 3) for v in k] for k in keep_out if x0 <= k[0] <= x1 and y0 <= k[1] <= y1)
+    if ko:
+        out["keep_out"] = ko
+    return out
 
 
-def piece_digests(net, zones, ground=None, foreign=(), keep_clear=()):
+def piece_digests(net, zones, ground=None, foreign=(), keep_clear=(), keep_out=()):
     """`{zone_id: sha1}` for every piece `point_zones.partition(net, zones)` cuts (the resident piece is
     `point_zones.RESIDENT`). Without zones the network is one piece, keyed `point_zones.RESIDENT`.
     `foreign` / `keep_clear`: the other network this one is built against (`context_of`)."""
@@ -176,8 +182,9 @@ def piece_digests(net, zones, ground=None, foreign=(), keep_clear=()):
         body = {"salt": salt, "runs": content["runs"], "pads": content["pads"], "gores": content["gores"],
                 "roads": [roads[n] for n in sorted(content["roads"]) if n in roads], "lanekit": sub,
                 "successor_turns": succ}
-        ctx = context_of(content["box"], foreign, keep_clear) if (foreign or keep_clear) and content["box"] else None
-        if ctx and (ctx["foreign"] or ctx["keep_clear"]):
+        ctx = (context_of(content["box"], foreign, keep_clear, keep_out)
+               if (foreign or keep_clear or keep_out) and content["box"] else None)
+        if ctx and (ctx["foreign"] or ctx["keep_clear"] or ctx.get("keep_out")):
             body["context"] = ctx          # nothing near: the same digest as with no other network at all
         out[z] = hashlib.sha1(json.dumps(_canon(body), sort_keys=True).encode()).hexdigest()
     return out

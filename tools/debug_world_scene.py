@@ -11,7 +11,7 @@ rewrites the same nodes instead of adding more (idempotent). What it does:
   * moves the spawn, the player, the parked cars, the ammo refill and the pickup row onto the new ground;
   * sets the world bounds, the two road zone markers (`ZoneA` / `ZoneB`) and their radii;
   * adds (or rewrites) the `DebugRail` Road Kit network, its zone markers (`RailZones/RailA|RailB`), the two stations
-    (`Stations/DebugStationA|B`) and the konbini with its weapon pads (`Konbini`, `KonbiniPads`).
+    (`Stations/DebugStationA|B`) and the konbini (`Konbini`; it sells at its own counter).
 """
 import argparse
 import json
@@ -24,7 +24,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, ".."))
 SCENE = os.path.join(ROOT, "src/main/resources/com/openworld/world/DebugWorld.tscn")
 LAYOUT = os.path.join(ROOT, "assets/world_source/debug_world_layout.json")
-PAD_SCRIPT = "res://src/main/java/com/openworld/item/WeaponPad.java"
 RAIL_RECORD = "res://assets/world_source/pieces/DebugRail.roads.json"
 
 
@@ -144,8 +143,7 @@ def main(argv):
 
     # ---- new ext resources + sub resources, inserted before the first sub_resource / node
     ext = ['[ext_resource type="PackedScene" path="%s" id="dbg_station"]' % L["stations"][0]["scene"],
-           '[ext_resource type="PackedScene" path="%s" id="dbg_konbini"]' % L["konbini"]["scene"],
-           '[ext_resource type="Script" path="%s" id="dbg_pad"]' % PAD_SCRIPT]
+           '[ext_resource type="PackedScene" path="%s" id="dbg_konbini"]' % L["konbini"]["scene"]]
     subs = []
     for z in L["rail_zones"]:
         subs.append(('[sub_resource type="Resource" id="RailZone_%s"]' % z["zone_id"],
@@ -178,11 +176,6 @@ def main(argv):
     k = L["konbini"]
     add.append(('[node name="Konbini" parent="." instance=ExtResource("dbg_konbini")]',
                 "transform = %s\n\n" % xform(*k["pos"], k["yaw_deg"])))
-    add.append(('[node name="KonbiniPads" type="Node3D" parent="."]', "\n"))
-    for pad in k["pads"]:
-        add.append(('[node name="Pad_%s" type="Area3D" parent="KonbiniPads"]' % pad["weapon"],
-                    'transform = %s\nscript = ExtResource("dbg_pad")\nweapon_id = "%s"\n\n' % (xform(*pad["pos"]),
-                                                                                           pad["weapon"])))
     conn = next((i for i, s in enumerate(secs) if s[0].startswith("[connection")), len(secs))
     if conn and not secs[conn - 1][1].endswith("\n\n"):
         secs[conn - 1][1] = secs[conn - 1][1].rstrip("\n") + "\n\n"

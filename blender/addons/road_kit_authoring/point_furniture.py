@@ -220,15 +220,32 @@ def godot_to_kit(p):
 class Furniture(object):
     """What `place` returns for ONE piece: `paint` `{material: [tri]}`, `collision` `[tri]`, `placements`."""
 
-    def __init__(self):
+    def __init__(self, keep_out=()):
         self.paint = {}
         self.collision = []
         self.placements = []
         self.counts = {}
+        # KEEP-OUT boxes (user, 2026-10-04: "a tree in front of a parking exit blocks part of it"): the car-park
+        # entrances `island_buildings.py write` records, as (cx, cy, ux, uy, half_across, half_deep) in the kit frame,
+        # u the unit direction INTO the lot. Nothing that stands up is placed in one; a signal or a sign is a lane's
+        # (it stands where its junction needs it), and paint, a drain and a manhole are flat.
+        self.keep_out = list(keep_out or ())
+
+    def blocked(self, asset, pos):
+        if not self.keep_out or "signal" in asset or "sign" in asset or asset in ("drain", "manhole"):
+            return False   # a drain or a manhole is a flat grate a car drives over
+        for cx, cy, ux, uy, ha, hd in self.keep_out:
+            dx, dy = pos[0] - cx, pos[1] - cy
+            if abs(dx * ux + dy * uy) <= hd and abs(-dx * uy + dy * ux) <= ha:
+                return True
+        return False
 
     def put(self, table, asset, pos, fwd, road=None):
         a = table.assets.get(asset)
         if a is None or (road is not None and excluded(a, road)):
+            return False
+        if self.blocked(asset, pos):
+            self.counts["keep_out_skipped"] = self.counts.get("keep_out_skipped", 0) + 1
             return False
         lift = float(a.get("lift", 0.0)) - a["lo"][1] * a["scale"][1]
         self.placements.append({"asset": asset, "path": a["res"], "pos": (pos[0], pos[1], pos[2] + lift),
@@ -1004,12 +1021,14 @@ def _median_walls(fur, table, solves, mine_run):
             fur.put(table, "median_wall", (p[0], p[1], p[2] + mz), d, s.road.name)
 
 
-def place(table, solved, lanes_doc, mine_lane, mine_run, mine_pad, mark_mat, ground=None, keep_clear=None):
+def place(table, solved, lanes_doc, mine_lane, mine_run, mine_pad, mark_mat, ground=None, keep_clear=None,
+          keep_out=None):
     """One piece's furniture. `solved` is `point_edges.solve_all`'s tuple; `lanes_doc` the WHOLE network's lanes and
     junctions (a mouth's connectors may stream with the pad's piece); `mine_*` say what belongs to this piece;
     `mark_mat(lane)` is the paint material of that lane's road. `keep_clear` is ANOTHER network's lanes (the rail's
-    tracks, 2026-09-26): nothing solid of this network stands in them, but nothing is placed FOR them either."""
-    fur = Furniture()
+    tracks, 2026-09-26): nothing solid of this network stands in them, but nothing is placed FOR them either.
+    `keep_out`: boxes nothing that stands up is placed in (`Furniture.keep_out`: car-park entrances)."""
+    fur = Furniture(keep_out)
     if table is None:
         return fur
     solves, jsolves, _gsolves, bands = solved
@@ -1559,6 +1578,10 @@ def self_test():
     q = _up_quad((0, 0, 0), (0, 1, 0), (1, 1, 0), (1, 0, 0))
     a, b, c = q[0]
     assert (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) > 0.0
+    # a KEEP-OUT box (a car-park entrance, deep along +y): a tree inside is refused, beside it allowed, a signal kept
+    ko = Furniture([(0.0, 0.0, 0.0, 1.0, 3.0, 2.0)])
+    assert ko.blocked("tree", (2.5, 1.5, 0.0)) and not ko.blocked("tree", (3.5, 0.0, 0.0))
+    assert not ko.blocked("tree", (0.0, 2.5, 0.0)) and not ko.blocked("ped_signal", (0.0, 0.0, 0.0))
     assert godot_to_kit((1.0, 2.0, 3.0)) == (1.0, -3.0, 2.0)
 
     # R4: a road along +Y crossing a rail along +X at the origin, 4.5 m of paving each side: one signal on the LEFT

@@ -10951,6 +10951,58 @@ checks its "Wired in code" table against the enum. Licence rule as for art: CC0 
   the sign words). Probe readouts: `expressway_signs_now`, `built_signs_now`, `sign_text_near`. Self-test in
   `point_furniture.py`; pictures with `tools/godot/shot_city.gd` (display).
 
+## Shop counters are in the shop's model; a car runs a person over; car-park entrances stay clear (2026-10-04)
+
+- **A shop's counter and clerk are `MARK_` Empties in its own .blend** (PLAN.md W3/W7): `MARK_shop_counter_<n>`
+  (props `stock`, `title`, `w`/`d`/`h` = the sensor box; the marker at the box's floor centre, its X along the counter)
+  and `MARK_clerk_<n>` (props `surrender`, `weapons`, `till`, `responders`; -Z = facing). `build_building_scenes.gd`
+  turns them into `item.ShopCounter` / `world.ShopClerkSpot`, **only in a `_Shop`/`_Open` variant** (a clerk is an AI
+  body; nobody can reach one in a shut building), and takes the kind from the NAME when the `kind` property is
+  missing. Seeds: `tools/building_kit/shop_interiors.py` `MARKS` (konbini S/L, family restaurant, supermarket;
+  `build_shop_blends.py` ADDS a missing mark even to a hand-edited, KEPT piece and never moves one) and
+  `interior_plans*.py` `b.mark("shop_counter"|"clerk", ...)` (hospital pharmacy, izakaya, the adult shop as gang_a's
+  gray-area front; `build_interior_blends.py` adds them to a kept piece the same way). The floor `WeaponPad`s,
+  `KONBINI_PADS`, the cells' `Pads_NNN` and DebugWorld's `KonbiniPads` are DELETED. A DEEP-pocket building of a type
+  `CIVIC_SCENE` opens (a supermarket, a 立体駐車場) now stands as that open variant too (`island_buildings.scene_of`).
+  Gates: `probe_weapon_counter.gd` (island 13 checks, `--world=debug` 9; it counts its checks so an aborted coroutine
+  cannot print PASS), `probe_shop_clerk`, `probe_wanted_respawn`, `probe_underground` (each with `--control`).
+- **A car hitting a person** (user-reported: "the character is like a wall; the car takes damage, the person none").
+  A character is a kinematic body, infinite mass to the solver: measured 14.7 -> 1.8 m/s, 75 HP of crash damage to
+  the car, 0 to the person -- and the contact damage read the speed AFTER the solver stopped the car. `Vehicle
+  .sweepPeople` (the pole sweep's shape, before the step, simulating peer only): anyone the car reaches this step at
+  >= `vehicleCollisionMinSpeed` takes the hit damage and the throw; one it kills is excepted from the car's collision
+  for 1.5 s, so the car drives on (keeps 1300/(1300+80) of its speed); a living one (a slow nudge) is met by physics.
+  A PLAYER's car also promotes the light crowd peds 0.5 s ahead (`PedCrowd.promoteNear`) so they are bodies to hit.
+  `knockPeople` (`@Visible`) is the control. Gate `tools/godot/probe_car_hits_ped.gd` (bare stand; 15 and 8 m/s
+  PASS; `--control` fails 3).
+- **Car-park entrances keep clear of street furniture** (user: "a tree in front of a parking exit"; measured 17 trees,
+  25 lamps, 17 planters and 3 bollards in 70 of 158 entrances). `island_buildings.py write` writes
+  `pieces/IslandRoads.keepout.json` (every `Parking*` lot's front, every `drive`'s mouth at the kerb), `roadkit_cli
+  pieces|gltf --keep-out` reads it, `point_furniture.Furniture.blocked` refuses any standing prop inside (signals, signs,
+  drains and manholes excepted), and each road piece's digest includes the boxes near it. The boxes come from the
+  PREVIOUS buildings derive (roads are built before buildings): after a layout change run the road build once more.
+- **Crowd density: the city reads busier than the port** (user). Measured in play (`tools/godot/probe_crowd_by_region.gd`)
+  the city was already denser (130 people within 150 m in the nightlife quarter, 7 at the harbour), but a city
+  street is boxed in by buildings while an open quay shows its few people across hundreds of metres, so
+  `PED_DENSITY` widens the contrast (city districts ~+50 %, working districts halved).
+- **Dynamic content exists only near a player** (measured on the ground with `probe_walk_perf.gd`, downtown / station
+  p50): a shop's CLERK (`ShopClerkSpot`, spawned within 60 m, returned past 100 m while calm; one that surrendered,
+  fought or died is `spent` while the shop stays loaded) took 47 -> 19 / 49 -> 26 ms -- every open shop in range had
+  spawned a full AI body at load; a PARKED VEHICLE (`ParkedVehicle`, spawned within 150 m, returned past 230 m while
+  untouched: nobody in it, within 1.5 m of its spot, undamaged) took another 4.2 / 6.6 ms off (74 in range). A world
+  with no registered player (a bare stand) spawns both at once. End state: 14 / 18 ms p50, p95 24 / 27 (over 16.7;
+  next lever the <= 12 promoted crowd bodies). `--no-parked` is the probe's control for the vehicles. The same rule for
+  any future dynamic content of a building: geometry streams with the cell (and draws through HLOD / visibility
+  ranges), bodies and vehicles spawn on proximity, and a mission that needs them earlier calls the spawn itself.
+- **A deep-pocket lot faces SQUARE to its street** (user: "some parking lots are at a slope angle, aligned to neither
+  street nor neighbours"): `deep_fill` took the facing from the direction to the nearest footway sample, oblique near a
+  corner or a bend; it now takes the street's normal there (the frontage line's own tangent) and measures the
+  driveway square to it. Lands at the next buildings derive (needs `--from terrain`).
+- **Perf and crowd probes stand ON the ground**: `probe_walk_perf.gd`'s legs had heights typed before the land raise
+  (y 1.65 on a 5.6 m plain): the player walked UNDER the terrain. Each placement now takes the walkable surface under
+  it (a downward ray bounded by `WorldBounds.terrain_height`; an elevated leg takes the deck) and the run FAILS if any
+  frame has the player under the terrain. `probe_city_perf.gd` and `probe_ped_crowd.gd` ground the same way.
+
 ## Known Quirks / Gotchas
 
 - **Godot re-imports a glTF only when the `.gltf` FILE changes; it never hashes the `.bin`** (2026-09-29). A

@@ -353,6 +353,39 @@ def supermarket():
 
 
 
+# THE COUNTER AND THE CLERK (PLAN.md W3/W7, 2026-10-04): what a shop SELLS and who stands behind its register are
+# content of the shop's model, never of the island generator. Each is a MARK_ Empty in `Shop_<Id>.blend`
+# (build_shop_blends.py writes a missing one, never moves one an artist placed); the scene builder turns
+# `shop_counter` into item.ShopCounter (a sensor box w x h x d on the CUSTOMER side of the register, the marker at
+# the box's floor centre, its local X along the counter) and `clerk` into world.ShopClerkSpot (behind the register,
+# -Z the way the clerk faces). Frame and yaw as the plans above (Godot axes; yaw 0 faces -Z, 90 faces -X).
+FOOD = "onigiri,bento,energy_drink"
+KONBINI_S_STOCK = "PIS1,PIS2,REV1,DUP1,SMG1,MEW1,FRG1," + FOOD
+KONBINI_L_STOCK = "PIS1,PIS2,REV1,DUP1,SMG1,ASR1,ASR2,SHG1,SNR1,ATL1,FRG1,MEW1," + FOOD
+
+
+def counter_mark(x, z, yaw, stock, title, w=3.0, d=1.4, h=2.0):
+    return {"kind": "shop_counter", "pos": [r(x), 0.0, r(z)], "yaw": float(yaw),
+            "props": {"stock": stock, "title": title, "w": w, "d": d, "h": h}}
+
+
+def clerk_mark(x, z, yaw, surrender=0.6, weapons="SHG1,ASR2,SMG1", till=30000):
+    return {"kind": "clerk", "pos": [r(x), 0.0, r(z)], "yaw": float(yaw),
+            "props": {"surrender": surrender, "weapons": weapons, "till": till}}
+
+
+MARKS = {
+    # the counter runs along Z at x 3.59 (staff at +X): customers stand at x ~2.4 in front of the two registers
+    "KonbiniS": [counter_mark(2.42, -0.89, 90, KONBINI_S_STOCK, "KONBINI"), clerk_mark(4.55, -0.89, 90)],
+    "KonbiniL": [counter_mark(3.83, 2.0, 90, KONBINI_L_STOCK, "KONBINI"), clerk_mark(5.95, 2.0, 90)],
+    # the service counter in front of the pass (staff at -Z, toward the kitchen)
+    "FamilyRestaurant": [counter_mark(-4.0, -1.38, 0, "teishoku,bento", "RESTAURANT"),
+                         clerk_mark(-3.0, -3.45, 180, surrender=0.9, weapons="MEW1", till=20000)],
+    # the konbini corner's counter at x 14.0 (staff at -X), customers between it and the right wall
+    "Supermarket": [counter_mark(15.15, 7.5, 90, FOOD, "SUPERMARKET", d=1.2),
+                    clerk_mark(13.05, 7.5, 270, surrender=0.8)],
+}
+
 PLANS = {"KonbiniS": konbini_s, "KonbiniL": konbini_l, "FamilyRestaurant": restaurant, "Supermarket": supermarket}
 #: the exterior doors each plan was drawn for (building_types.json `doors`): a door moved there must stay clear of
 #: the rooms, which the layout's door check asserts

@@ -55,12 +55,14 @@ step "4/7 build"
 # rail lanes and bands near it, so a rail change rebuilds only the road pieces it reaches
 # and its PIERS keep off the rail's tracks (`--avoid` the rail record: point_mesh.pier_on_road over its bands too --
 # a C1 column stood on the Main line where it passes under the ring, probe_rail_track's gauge 2026-09-26)
+# ...and out of every car park's entrance (`island_buildings.py write` records them: a tree stood in an exit)
+KEEP_OUT=""; [ -f "$P/IslandRoads.keepout.json" ] && KEEP_OUT="--keep-out $P/IslandRoads.keepout.json"
 RAIL_AVOID=""; [ -f "$P/IslandRail.roads.json" ] && RAIL_AVOID="--avoid $P/IslandRail.roads.json"
 [ -f "$P/IslandRail.ground.json" ] && RAIL_AVOID="$RAIL_AVOID --avoid-ground $P/IslandRail.ground.json"
 # SKIP_PIECES=1 (2026-10-04): the ground and stamps only -- for a change that moves no road (the block ground, a
 # builder edit whose output is unchanged). The pieces' digests then stay stale and the next ordinary run rebuilds them.
 [ -n "${SKIP_PIECES:-}" ] && echo "   SKIP_PIECES: road pieces not rebuilt" || \
-GLTF_EXTRA="--keep-clear-lanekits $P/Roads_IslandRail_ $RAIL_AVOID" NAV_FIT=1 DIRTY_ONLY=1 \
+GLTF_EXTRA="--keep-clear-lanekits $P/Roads_IslandRail_ $RAIL_AVOID $KEEP_OUT" NAV_FIT=1 DIRTY_ONLY=1 \
     blender/tools/build_roads_piece.sh "$P/IslandRoads.roads.json" Roads_IslandRoads \
     "$P/IslandRoads.zones.json" "$P/IslandRoads.ground.json" | grep -E "gate:|^── 3/3|FAIL|ERROR" || true
 # a zone the cut no longer makes leaves its piece behind, and every later step globs the lanekits: remove it

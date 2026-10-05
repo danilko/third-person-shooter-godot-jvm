@@ -35,6 +35,8 @@ const DOOR_SCRIPT := "res://src/main/java/com/openworld/world/Door.java"
 const GATE_SCRIPT := "res://src/main/java/com/openworld/world/TicketGate.java"
 const LIFT_SCRIPT := "res://src/main/java/com/openworld/world/Elevator.java"
 const PARKED_SCRIPT := "res://src/main/java/com/openworld/world/ParkedVehicle.java"
+const COUNTER_SCRIPT := "res://src/main/java/com/openworld/item/ShopCounter.java"
+const CLERK_SCRIPT := "res://src/main/java/com/openworld/world/ShopClerkSpot.java"
 const GATE_FLAP_LO := 0.45       # a ticket gate's flap: its visible panel (the collider reaches the floor)
 const GATE_FLAP_HI := 0.95
 const DOOR_LEAF := "res://assets/world_source/kits/quaternius_downtown_city/pieces/doors/Door_1.gltf"
@@ -886,6 +888,15 @@ func _build(b: Dictionary, variant: String) -> bool:
 		marks_root.owner = root
 		for mkd in marks:
 			var props0: Dictionary = mkd.get("props", {})
+			# the kind is the marker's own `kind` property, else its NAME: MARK_<kind>_<n> (an artist who copies a
+			# marker and forgets the property still gets what the name says)
+			if str(props0.get("kind", "")) == "":
+				var kn := str(mkd["name"]).get_slice(".", 0).trim_prefix("MARK_")
+				var cut := kn.rfind("_")
+				if cut > 0 and kn.substr(cut + 1).is_valid_int():
+					kn = kn.substr(0, cut)
+				props0 = props0.duplicate()
+				props0["kind"] = kn
 			# a WATER marker (kits/interiors MARK_water_: an onsen's tub, a pool) is a water SURFACE, never solid --
 			# a quad w x d at the marker in its material (props `material`: onsen -> water_onsen.tres), no collider,
 			# no shadow. The basin under it is the piece's own geometry (user, 2026-09-29: the hot spring on the
@@ -906,6 +917,38 @@ func _build(b: Dictionary, variant: String) -> bool:
 				marks_root.add_child(wm)
 				wm.owner = root
 				continue
+			# a SHOP'S COUNTER and CLERK (PLAN.md W3/W7, MARK_shop_counter_ / MARK_clerk_ in the shop's model): the
+			# counter is an item.ShopCounter (a sensor box w x h x d at the marker, its X along the counter, `stock` and
+			# `title`), the clerk a world.ShopClerkSpot (it spawns the clerk on the authoritative peer). Only in a
+			# variant someone can walk into: a shut building gets neither (a clerk is an AI body nobody can reach).
+			var mkind := str(props0.get("kind", ""))
+			if mkind == "shop_counter" or mkind == "clerk":
+				if not open_variant:
+					continue
+				var sn := Node3D.new() if mkind == "clerk" else Area3D.new()
+				sn.set_script(load(CLERK_SCRIPT if mkind == "clerk" else COUNTER_SCRIPT))
+				if mkind == "clerk":
+					for ck in ["surrender", "weapons", "faction", "responders", "till"]:
+						if props0.has(ck):
+							# JSON numbers arrive as floats: a JVM int property silently drops a float, and vice versa
+							var cv = props0[ck]
+							if ck == "till":
+								cv = int(cv)
+							elif ck == "surrender":
+								cv = float(cv)
+							else:
+								cv = str(cv)
+							sn.set(ck, cv)
+				else:
+					sn.set("stock", str(props0.get("stock", "")))
+					sn.set("title", str(props0.get("title", "SHOP")))
+					sn.set("size", Vector3(float(props0.get("w", 3.0)), float(props0.get("h", 2.0)), float(props0.get("d", 1.4))))
+				sn.name = str(mkd["name"]).replace(".", "_")
+				var sp: Array = mkd["pos"]
+				sn.transform = Transform3D(Basis(Vector3.UP, deg_to_rad(float(mkd.get("yaw", 0.0)))), Vector3(sp[0], sp[1], sp[2]))
+				marks_root.add_child(sn)
+				sn.owner = root
+				continue
 			# a VEHICLE marker that names a model is a parked, drivable vehicle (world.ParkedVehicle spawns it on the
 			# authoritative peer; user, 2026-09-28: the fire engines, the ambulance, the patrol cars, the yard truck)
 			var m3: Node3D = Marker3D.new()
@@ -917,9 +960,8 @@ func _build(b: Dictionary, variant: String) -> bool:
 			m3.name = str(mkd["name"]).replace(".", "_")
 			var mp: Array = mkd["pos"]
 			m3.transform = Transform3D(Basis(Vector3.UP, deg_to_rad(float(mkd.get("yaw", 0.0)))), Vector3(mp[0], mp[1], mp[2]))
-			var props: Dictionary = mkd.get("props", {})
-			for pk in props:
-				m3.set_meta(StringName(str(pk)), props[pk])
+			for pk in props0:
+				m3.set_meta(StringName(str(pk)), props0[pk])
 			m3.add_to_group("mission_marker", true)
 			marks_root.add_child(m3)
 			m3.owner = root

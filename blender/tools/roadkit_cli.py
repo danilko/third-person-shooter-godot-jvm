@@ -158,6 +158,17 @@ def _context(a):
     return foreign, keep_clear
 
 
+def _keep_out(a):
+    """`--keep-out <json>`: the boxes road furniture leaves empty (car-park entrances, `island_buildings.py write`), as
+    the kit frame's (cx, cy, ux, uy, half_across, half_deep). The file is in the GODOT frame; record (x, y) = (x, -z)."""
+    path = getattr(a, "keep_out", "") or ""
+    if not path or not os.path.exists(path):
+        return []
+    with open(path) as fh:
+        doc = json.load(fh)
+    return [(b[0], -b[1], b[2], -b[3], b[4], b[5]) for b in doc.get("boxes", ())]
+
+
 def cmd_pieces(a):
     """B6: cut ONE network into a piece per zone (`point_zones`). Writes `<out_dir>/<piece>.lanekit.json`
     per piece and reports the table the build script and the plugin's marker wiring both read -- so
@@ -179,7 +190,8 @@ def cmd_pieces(a):
     # the OTHER network this one is built against (the same `--avoid` / `--keep-clear-lanekits` the gltf step takes)
     # is part of each piece's digest -- only what reaches that piece (`point_digest.context_of`)
     foreign, keep_clear = _context(a)
-    digests = (pdg.piece_digests(net, zones, pg.load_ground(a.ground) if a.ground else None, foreign, keep_clear)
+    digests = (pdg.piece_digests(net, zones, pg.load_ground(a.ground) if a.ground else None, foreign, keep_clear,
+                                 _keep_out(a))
                if not gate["errors"] else {})
     pieces = []
     for zone in sorted(counts):
@@ -476,6 +488,7 @@ def cmd_gltf(a):
     for lk in sorted(glob.glob(glob.escape(kc) + "*.lanekit.json")) if kc else ():
         with open(lk) as fh:
             keep_clear += json.load(fh).get("lanes", [])
+    keep_out = _keep_out(a)
     crossing_plan = {}
     for zone in sorted(part.pieces()):
         piece = pz.piece_name(a.prefix, zone)
@@ -487,7 +500,7 @@ def cmd_gltf(a):
                         (lambda l, z=zone: l.get("zone_id", pz.RESIDENT) == z) if zones else (lambda l: True),
                         (lambda s, z=zone: part.run_zone(s.uids) == z) if zones else (lambda s: True),
                         (lambda j, z=zone: part.pad_zone(j.uids) == z) if zones else (lambda j: True),
-                        mark_mat, grid, keep_clear)
+                        mark_mat, grid, keep_clear, keep_out)
         if table is not None:
             # this piece's own level crossings (the rows its build just reported) get their signals (R4)
             n_units = len(fur.placements)
@@ -679,7 +692,7 @@ def main(argv=None):
     s.add_argument("--gated", action="store_true"); s.add_argument("--lanekits", default="")
     s.add_argument("--no-furniture", action="store_true")
     s.add_argument("--avoid", default=""); s.add_argument("--avoid-ground", default="")
-    s.add_argument("--keep-clear-lanekits", default="")
+    s.add_argument("--keep-clear-lanekits", default=""); s.add_argument("--keep-out", default="")
     s.set_defaults(fn=cmd_gltf)
     s = sub.add_parser("bands"); s.add_argument("record"); s.add_argument("--ground", default="")
     s.set_defaults(fn=cmd_bands)
@@ -691,7 +704,7 @@ def main(argv=None):
     s.add_argument("out_dir"); s.add_argument("prefix"); s.add_argument("--dry-run", action="store_true")
     s.add_argument("--ground", default="")
     s.add_argument("--avoid", default=""); s.add_argument("--avoid-ground", default="")
-    s.add_argument("--keep-clear-lanekits", default="")
+    s.add_argument("--keep-clear-lanekits", default=""); s.add_argument("--keep-out", default="")
     s.set_defaults(fn=cmd_pieces)
     s = sub.add_parser("merge"); s.add_argument("record"); s.add_argument("uids")
     s.add_argument("--keep", default=""); s.add_argument("--at-keep", action="store_true")

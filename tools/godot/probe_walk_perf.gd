@@ -9,7 +9,7 @@ extends SceneTree
 ## `postal 12-7-5 tp` in the debug console goes straight to.
 ##
 ##   <godot> --path . --script tools/godot/probe_walk_perf.gd [-- --legs=a,b] [--budget=16.7] [--top=12]
-##       [--no-peds] [--no-traffic] [--no-buildings] [--no-hlod]      (controls: remove that derived block before the world loads)
+##       [--no-peds] [--no-traffic] [--no-buildings] [--no-hlod] [--no-parked]      (controls: remove that derived block before the world loads)
 
 const WORLD := "res://src/main/resources/com/openworld/world/World.tscn"
 var w: Node
@@ -35,7 +35,26 @@ func _code(p: Vector3) -> String:
 func _info(kind: int) -> int:
 	return RenderingServer.viewport_get_render_info(vp_rid, RenderingServer.VIEWPORT_RENDER_INFO_TYPE_VISIBLE, kind)
 
+## The walkable surface under (x, z), so the player never stands UNDER the terrain (user, 2026-10-04: the legs had
+## their heights typed from before the land raise -- y 1.65 on a 5.6 m plain -- and walked under the ground, which
+## streams and draws a different world). An `elevated` leg (a hint over 10 m: C1) takes the topmost surface, i.e. the
+## deck; a ground leg casts down from 2.5 m over the terrain, so a deck overhead is never taken for the street.
+var under_terrain := 0
+var world_bounds: Node
+func _ground(pos: Vector3) -> Vector3:
+	var wb := world_bounds
+	var h: float = wb.call("terrain_height", pos.x, pos.z) if wb != null else NAN
+	if is_nan(h):
+		return pos
+	var top := h + (60.0 if pos.y > 10.0 else 2.5)
+	var q := PhysicsRayQueryParameters3D.create(Vector3(pos.x, top, pos.z), Vector3(pos.x, h - 1.0, pos.z), 1)
+	q.exclude = [player.get_rid()]
+	var hit := player.get_world_3d().direct_space_state.intersect_ray(q)
+	var y: float = (hit["position"].y if not hit.is_empty() else h) + 0.1
+	return Vector3(pos.x, maxf(y, h + 0.05), pos.z)
+
 func _place(pos: Vector3, fwd: Vector3) -> void:
+	pos = _ground(pos)
 	player.global_position = pos
 	var f := Vector3(fwd.x, 0, fwd.z)
 	if f.length() < 1e-3:
@@ -79,6 +98,14 @@ func _leg(label: String, path: Array, speed: float) -> void:
 		var phys := Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
 		var proc := Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
 		var chars := get_nodes_in_group("characters").size()
+		if world_bounds != null:
+			var th: float = world_bounds.call("terrain_height", player.global_position.x, player.global_position.z)
+			if not is_nan(th) and player.global_position.y < th - 0.2:
+				under_terrain += 1
+		if _arg("no-parked", false) and Engine.get_physics_frames() % 30 == 0:
+			# control: the placed-but-unused vehicles (world.ParkedVehicle remembers a spot, so it does not respawn)
+			for pv in get_nodes_in_group("parked_vehicle"):
+				pv.queue_free()
 		var code := _code(player.global_position)
 		if not cells.has(code):
 			cells[code] = {"ft": [], "phys": [], "proc": [], "ticks": [], "dc": [], "tris": [], "chars": [], "legs": {}}
@@ -172,6 +199,7 @@ func _initialize() -> void:
 	root.add_child(w)
 	current_scene = w
 	player = w.get_node("Characters/Player")
+	world_bounds = w.find_child("WorldBounds", true, false)
 	player.get_node("Health").set("max_health", 1000000.0)
 	player.set_physics_process(false)      # moved by the probe; everything that reads its position still does
 	cam = Camera3D.new()
@@ -222,5 +250,8 @@ func _initialize() -> void:
 	var worst_p95 := 0.0
 	for l in legs_out:
 		worst_p95 = maxf(worst_p95, l[2])
+	print("  frames with the player UNDER the terrain: %d (must be 0, or the numbers are of the wrong world)" % under_terrain)
+	if under_terrain > 0:
+		worst_p95 = INF
 	print("RESULT %s worst leg p95 %.2f ms (budget %.1f)" % ["PASS" if worst_p95 <= budget else "FAIL", worst_p95, budget])
 	quit(0 if worst_p95 <= budget else 1)

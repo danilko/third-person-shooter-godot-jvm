@@ -26,7 +26,7 @@ import java.util.List;
  * in the aisles where pedestrians and AI walk: a counter is a sensor volume in front of the register, no collider,
  * nothing on a walkway.
  *
- * <p>A pick is granted through {@link WeaponGrant} (the pad's path) on the authoritative peer; a client sends
+ * <p>A pick is granted through {@link WeaponGrant} on the authoritative peer; a client sends
  * {@code MSG_SHOP_REQUEST} and the host checks the buyer is the character's owner and stands at a counter that sells
  * it. FREE until money exists. Group {@code shop_counter} is how the host finds counters.
  */

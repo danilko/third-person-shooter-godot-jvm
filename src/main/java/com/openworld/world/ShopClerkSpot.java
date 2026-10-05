@@ -65,11 +65,29 @@ public class ShopClerkSpot extends Node3D {
     private int state;
     private double scan;
 
+    /**
+     * The clerk is a full AI body, so it exists only while a player is near (2026-10-04: every open shop in range
+     * spawning its clerk at load cost frame time downtown, measured with probe_walk_perf.gd): spawned within
+     * {@link #SPAWN_NEAR}, returned beyond {@link #DESPAWN_FAR} while still calm. A clerk who surrendered, fought or
+     * died is not brought back while this shop stays loaded (`spent`).
+     */
+    static final double SPAWN_NEAR = 60.0, DESPAWN_FAR = 100.0;
+    private boolean spent;
+    private double nearScan;
+
     @Register
     @Override
     public void _ready() {
         addToGroup(new godot.core.StringName(GROUP), true);
-        callDeferred(new godot.core.StringName("spawn_clerk"));
+    }
+
+    private double nearestPlayer() {
+        double best = Double.MAX_VALUE;
+        Vector3 here = getGlobalPosition();
+        for (Player p : PlayerRegistry.getPlayers()) {
+            if (GD.isInstanceValid(p)) best = Math.min(best, p.getGlobalPosition().distanceTo(here));
+        }
+        return best;
     }
 
     private boolean authority() {
@@ -102,8 +120,20 @@ public class ShopClerkSpot extends Node3D {
     @Register
     @Override
     public void _physicsProcess(double delta) {
+        nearScan -= delta;
+        if (nearScan <= 0.0 && authority()) {
+            nearScan = 0.5;
+            double d = nearestPlayer();
+            if (clerk == null && !spent && d < SPAWN_NEAR) spawnClerk();
+            else if (clerk != null && state == 0 && d > DESPAWN_FAR && GD.isInstanceValid(clerk) && !clerk.isDead()) {
+                if (getNodeOrNull("/root/NetworkManager") instanceof com.openworld.net.NetworkManager net)
+                    net.announceDespawn(clerk.getCharacterInfo().characterId);
+                clerk.queueFree();
+                clerk = null;
+            }
+        }
         if (clerk == null || state == 2) return;
-        if (!GD.isInstanceValid(clerk) || clerk.isDead()) { clerk = null; return; }
+        if (!GD.isInstanceValid(clerk) || clerk.isDead()) { clerk = null; spent = true; return; }
         scan -= delta;
         if (scan > 0 || state == 1) return;
         scan = 0.2;
@@ -154,11 +184,13 @@ public class ShopClerkSpot extends Node3D {
         if (!responders.isBlank()) callResponders(pid);
         if (rollsSurrender(clerk.characterInfo.characterId, surrender)) {
             state = 1;
+            spent = true;
             still.surrendered = true;
             GD.print("ShopClerkSpot: the clerk surrenders");
             return;
         }
         state = 2;
+        spent = true;
         String[] list = weapons.split(",");
         String w = list[Math.floorMod(clerk.characterInfo.characterId.hashCode(), list.length)].trim();
         if (!w.isEmpty()) WeaponGrant.grant(clerk, w, this);

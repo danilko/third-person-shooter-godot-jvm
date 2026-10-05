@@ -7,7 +7,7 @@
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/Koban.tscn" id="5"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/KonbiniS_Shop.tscn" id="6"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/Mansion_H8.tscn" id="7"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ParkingGarage.tscn" id="8"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ParkingGarage_Shop.tscn" id="8"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ParkingLot14.tscn" id="9"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ParkingLot4.tscn" id="10"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/PencilBuilding_H4.tscn" id="11"]
@@ -37,7 +37,6 @@
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_CharcoalCool.tres" id="tone5_7"]
 [ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_7_8.res" id="hlod"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/item/WeaponPad.java" id="pad"]
 
 [sub_resource type="BoxMesh" id="LotBox"]
 material = ExtResource("lotmat")
@@ -189,117 +188,6 @@ buffer = PackedFloat32Array(0.5439, 0.0000, 1.9318, -34.0150, 0.0000, 0.4000, 0.
 size = Vector3(2.100, 0.400, 2.000)
 
 [node name="Bld_island_7_8" type="Node3D"]
-
-[node name="Pads_000" type="Node3D" parent="."]
-
-[node name="Pad_PIS1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -245.831, 5.875, 247.615)
-script = ExtResource("pad")
-weapon_id = "PIS1"
-
-[node name="Pad_PIS2" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -244.639, 5.875, 247.476)
-script = ExtResource("pad")
-weapon_id = "PIS2"
-
-[node name="Pad_REV1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -245.681, 5.875, 248.906)
-script = ExtResource("pad")
-weapon_id = "REV1"
-
-[node name="Pad_DUP1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -244.489, 5.875, 248.767)
-script = ExtResource("pad")
-weapon_id = "DUP1"
-
-[node name="Pad_SMG1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -245.530, 5.875, 250.197)
-script = ExtResource("pad")
-weapon_id = "SMG1"
-
-[node name="Pad_MEW1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -244.338, 5.875, 250.059)
-script = ExtResource("pad")
-weapon_id = "MEW1"
-
-[node name="Pad_FRG1" type="Area3D" parent="Pads_000"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -245.380, 5.875, 251.489)
-script = ExtResource("pad")
-weapon_id = "FRG1"
-
-[node name="Pads_001" type="Node3D" parent="."]
-
-[node name="Pad_PIS1" type="Area3D" parent="Pads_001"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -229.576, 5.875, 113.730)
-script = ExtResource("pad")
-weapon_id = "PIS1"
-
-[node name="Pad_PIS2" type="Area3D" parent="Pads_001"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -230.505, 5.875, 114.489)
-script = ExtResource("pad")
-weapon_id = "PIS2"
-
-[node name="Pad_REV1" type="Area3D" parent="Pads_001"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -230.399, 5.875, 112.723)
-script = ExtResource("pad")
-weapon_id = "REV1"
-
-[node name="Pad_DUP1" type="Area3D" parent="Pads_001"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -231.328, 5.875, 113.482)
-script = ExtResource("pad")
-weapon_id = "DUP1"
-
-[node name="Pad_SMG1" type="Area3D" parent="Pads_001"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -231.221, 5.875, 111.716)
-script = ExtResource("pad")
-weapon_id = "SMG1"
-
-[node name="Pad_MEW1" type="Area3D" parent="Pads_001"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -232.150, 5.875, 112.475)
-script = ExtResource("pad")
-weapon_id = "MEW1"
-
-[node name="Pad_FRG1" type="Area3D" parent="Pads_001"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -232.044, 5.875, 110.709)
-script = ExtResource("pad")
-weapon_id = "FRG1"
-
-[node name="Pads_002" type="Node3D" parent="."]
-
-[node name="Pad_PIS1" type="Area3D" parent="Pads_002"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.329, 5.875, 92.122)
-script = ExtResource("pad")
-weapon_id = "PIS1"
-
-[node name="Pad_PIS2" type="Area3D" parent="Pads_002"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.565, 5.875, 93.299)
-script = ExtResource("pad")
-weapon_id = "PIS2"
-
-[node name="Pad_REV1" type="Area3D" parent="Pads_002"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15.604, 5.875, 91.866)
-script = ExtResource("pad")
-weapon_id = "REV1"
-
-[node name="Pad_DUP1" type="Area3D" parent="Pads_002"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15.840, 5.875, 93.043)
-script = ExtResource("pad")
-weapon_id = "DUP1"
-
-[node name="Pad_SMG1" type="Area3D" parent="Pads_002"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16.878, 5.875, 91.610)
-script = ExtResource("pad")
-weapon_id = "SMG1"
-
-[node name="Pad_MEW1" type="Area3D" parent="Pads_002"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17.114, 5.875, 92.787)
-script = ExtResource("pad")
-weapon_id = "MEW1"
-
-[node name="Pad_FRG1" type="Area3D" parent="Pads_002"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18.153, 5.875, 91.354)
-script = ExtResource("pad")
-weapon_id = "FRG1"
 
 [node name="HLOD" type="MeshInstance3D" parent="."]
 mesh = ExtResource("hlod")
@@ -484,10 +372,10 @@ transform = Transform3D(0.200394, 0, 0.979715, 0, 1, 0, -0.979715, 0, 0.200394, 
 [node name="Mesh" parent="./ParkingLot14_023" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ParkingGarage_024" parent="." instance=ExtResource("8")]
+[node name="ParkingGarage_Shop_024" parent="." instance=ExtResource("8")]
 transform = Transform3D(0.159416, 0, 0.987211, 0, 1, 0, -0.987211, 0, 0.159416, -95.500, 5.625, 54.500)
 
-[node name="Mesh" parent="./ParkingGarage_024" index="0"]
+[node name="Mesh" parent="./ParkingGarage_Shop_024" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
 [node name="ShopCoinLaundry_025" parent="." instance=ExtResource("15")]

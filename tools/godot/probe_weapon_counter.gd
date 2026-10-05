@@ -11,13 +11,27 @@ extends SceneTree
 ##   6. `ui_cancel` closes the menu and gives the player their input back.
 
 const WORLD := "res://src/main/resources/com/openworld/world/World.tscn"
-## -- --world=debug: DebugWorld's konbini (tools/debug_world_layout.py) -- the small store's 7 pads, no safe house
+## -- --world=debug: DebugWorld's konbini (tools/debug_world_layout.py) -- the small store's counter, no safe house
 const DEBUG_WORLD := "res://src/main/resources/com/openworld/world/DebugWorld.tscn"
 var debug := false
 const PLACES := "res://src/main/resources/com/openworld/world/places/World.places.json"
 var fails := 0
+## every check that must have run: a GDScript error inside an awaited coroutine aborts it and lets the caller print
+## its RESULT line, so a probe that skipped half its cases would otherwise read PASS
+var checks := 0
+const EXPECT_ISLAND := 13
+const EXPECT_DEBUG := 9
+
+func _finish() -> void:
+	var want := EXPECT_DEBUG if debug else EXPECT_ISLAND
+	if checks < want:
+		print("  FAIL  only %d of %d checks ran (a script error aborted the probe)" % [checks, want])
+		fails += 1
+	print("RESULT %s (%d failures)" % ["PASS" if fails == 0 else "FAIL", fails])
+	quit(0 if fails == 0 else 1)
 
 func _check(label: String, ok: bool, detail: String = "") -> void:
+	checks += 1
 	if not ok:
 		fails += 1
 	print("  %s  %-60s %s" % ["PASS" if ok else "FAIL", label, detail])
@@ -90,8 +104,7 @@ func _run() -> void:
 			best = d
 			counter = c
 	await _counter_cycle(counter, p, spawn, "ASR1", 10)
-	print("RESULT %s (%d failures)" % ["PASS" if fails == 0 else "FAIL", fails])
-	quit(0 if fails == 0 else 1)
+	_finish()
 
 
 func _counters(n: Node) -> Array:
@@ -172,7 +185,7 @@ func _counter_cycle(counter: Area3D, p: CharacterBody3D, spawn: Node3D, weapon: 
 	_check("buying %s carries one" % food, int(p.call("supply_count_now", food)) == 1)
 	await _press("ui_cancel")
 	await _tick(2)
-	_check("ui_cancel closes the menu and gives the input back", _menu(root) == null and not bool(p.get("input_blocked")))
+	_check("ui_cancel closes the menu and gives the input back", _menu(root) == null and not bool(p.call("input_blocked_now")))
 	var h: Node = p.get_node("Health")
 	var mh := float(h.get("max_health"))
 	h.call("apply_replicated_health", mh - 40.0)
@@ -182,9 +195,9 @@ func _counter_cycle(counter: Area3D, p: CharacterBody3D, spawn: Node3D, weapon: 
 	_check("use_supply eats it and heals", healed > 1.0 and int(p.call("supply_count_now", food)) == 0, "+%.0f HP" % healed)
 
 
-## DebugWorld: the konbini's counter (`KonbiniCounter`), the same cycle as the island's.
+## DebugWorld: the konbini's own counter (a MARK_shop_counter in its model), the same cycle as the island's.
 func _debug_counter(w: Node, spawn: Node3D, p: CharacterBody3D) -> void:
 	await _tick(240)
-	await _counter_cycle(w.get_node_or_null("KonbiniCounter") as Area3D, p, spawn, "PIS1", 5)
-	print("RESULT %s (%d failures)" % ["PASS" if fails == 0 else "FAIL", fails])
-	quit(0 if fails == 0 else 1)
+	var cs := _counters(w)
+	await _counter_cycle((cs[0] if cs.size() == 1 else null) as Area3D, p, spawn, "PIS1", 5)
+	_finish()

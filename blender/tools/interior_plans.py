@@ -674,6 +674,9 @@ def hospital(b):
     b.put("Hosp_WaitingBench", -9.2, -10.6, 180.0)
     b.put("Shop_ATM", -21.5, -10.0, 90.0)
     b.mark("spawn", -14.0, -7.0, F1, 0.0, team="civilian")
+    # the pharmacy window at the east reception counter (PLAN.md W3): medical supplies, bought at the counter
+    b.mark("shop_counter", -9.0, -6.2, F1, 0.0, stock="bandage,first_aid,med_kit", title="PHARMACY", w=3.0,
+           d=1.4, h=2.0)
     for cx in (-3.5, 1.5, 6.5, 11.5):
         b.put("Office_Desk", cx - 1.2, -10.8, 0.0)
         b.put("Office_Chair", cx - 1.2, -10.15, 180.0)

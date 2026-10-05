@@ -162,9 +162,38 @@ def install(tid, out, name):
     for o in col.objects:
         o["edit_note"] = NOTE
     col.instance_offset = (0.0, 0.0, 0.0)
+    add_marks(tid, col)
     bpy.context.view_layer.update()
     col["sh_generated"] = fingerprint(col)
     return col
+
+
+def add_marks(tid, col):
+    """The shop's MARK_ Empties (its counter and its clerk, shop_interiors.MARKS): a missing one is ADDED, one already
+    there is left exactly where the artist put it -- also in a piece that is KEPT for a hand edit, so a store edited
+    before the marks existed still gets them. Returns how many were added."""
+    added = 0
+    for i, m in enumerate(SI.MARKS.get(tid, ())):
+        name = "MARK_%s_%d" % (m["kind"], i)
+        if any(o.name.split(".")[0] == name for o in col.objects):
+            continue
+        e = bpy.data.objects.new(name, None)
+        e.empty_display_type = "CUBE" if m["kind"] == "shop_counter" else "SINGLE_ARROW"
+        e.empty_display_size = 0.5
+        e.location = blender(m["pos"])
+        if m["kind"] == "clerk":
+            # a single arrow draws along local +Z: lay it on the floor along -Y (the clerk's facing at yaw 0)
+            e.rotation_euler = (math.radians(-90.0), 0.0, math.radians(m["yaw"]))
+        else:
+            e.rotation_euler = (0.0, 0.0, math.radians(m["yaw"]))
+        e["kind"] = m["kind"]
+        for k, v in m["props"].items():
+            e[k] = v
+        e["edit_note"] = NOTE
+        e.hide_render = True
+        col.objects.link(e)
+        added += 1
+    return added
 
 
 def reference(shell):
@@ -206,6 +235,9 @@ def build(tid):
         kept = True
         print("[build_shop_blends] KEPT %s: edited by hand (--force=%s overwrites the artist's edit; ask first)"
               % (name, name))
+        n = add_marks(tid, col)
+        if n:
+            print("[build_shop_blends]   ... added %d missing MARK_ Empties to it" % n)
     else:
         before = col.get("sh_generated") if col is not None else None
         install(tid, out, name)
