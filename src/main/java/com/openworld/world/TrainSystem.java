@@ -86,6 +86,8 @@ public class TrainSystem extends Node3D {
     @Visible public boolean debugHits = false;
     /** Run the timetable on GAME time (physics frames) instead of the shared wall clock, for a headless probe. */
     @Visible public boolean gameClock = false;
+    /** Probe-only: every level crossing reads OPEN (the 一時停止 rule is then measured on its own). */
+    @Visible public boolean crossingsForcedOpen = false;
     /** A set's cars are instanced within this of the camera (m), and freed past it + 150. */
     @Export public float spawnDistance = 650.0f;
     /** Crossing units within this of the camera flash (m). */
@@ -223,7 +225,8 @@ public class TrainSystem extends Node3D {
     static final class Crossing { Track track; double s; String lane; double laneS; Vector3 pos; }
 
     /** A 踏切 signal unit's two lamps. */
-    static final class Unit { Vector3 pos, fwd; List<Crossing> crossings = new ArrayList<>(); MeshInstance3D[] lamp; }
+    static final class Unit { Vector3 pos, fwd; List<Crossing> crossings = new ArrayList<>(); MeshInstance3D[] lamp;
+        BreakableProps props; int poleIndex = -1; }
 
     private final List<Track> tracks = new ArrayList<>();
     /** The stations' ids (the rail reserve's / DebugWorld's), the names StationNames.json displays. */
@@ -633,7 +636,7 @@ public class TrainSystem extends Node3D {
     static final double CLOCK_EASE = 0.2;
 
     private boolean closed(Crossing c, double t) {
-        if (!enabled) return false;
+        if (!enabled || crossingsForcedOpen) return false;
         for (TrainSet set : sets) {
             int ti = set.trackIndex(c.track);
             if (ti < 0 || set.outOfService(t)) continue;
@@ -657,6 +660,33 @@ public class TrainSystem extends Node3D {
             if (best < 0 || d < best) best = Math.max(0.0, d);
         }
         return best;
+    }
+
+    /** Crossings of one lane closer than this along it are ONE 踏切 (a double track is two `Crossing`s 4 m apart). */
+    public static final double CROSSING_GROUP = 25.0;
+
+    /**
+     * The next LEVEL CROSSING on road lane {@code laneId} ahead of {@code progress}, open or closed, ignoring any whose
+     * lane position is at or before {@code skipThroughS}: {@code {nose distance to its hold line, the lane position its
+     * far side ends at (its last track + HOLD_BACK)}}, or null. What the traffic brain's 一時停止 asks
+     * (Road Traffic Act art. 33: stop before every 踏切, enter only with room past it).
+     */
+    public double[] nextCrossing(String laneId, double progress, double skipThroughS) {
+        if (!enabled) return null;
+        List<Crossing> cs = byLane.get(laneId);
+        if (cs == null) return null;
+        double first = Double.MAX_VALUE;
+        for (Crossing c : cs) {
+            if (c.laneS <= skipThroughS) continue;
+            if (c.laneS - HOLD_BACK - progress - NOSE < -COMMITTED) continue;
+            first = Math.min(first, c.laneS);
+        }
+        if (first == Double.MAX_VALUE) return null;
+        double last = first;
+        for (Crossing c : cs) {
+            if (c.laneS >= first && c.laneS <= first + CROSSING_GROUP) last = Math.max(last, c.laneS);
+        }
+        return new double[]{Math.max(0.0, first - HOLD_BACK - progress - NOSE), last + HOLD_BACK};
     }
 
     // ── the cars and the lamps ───────────────────────────────────────────────
@@ -1305,6 +1335,9 @@ public class TrainSystem extends Node3D {
             boolean near = enabled && u.pos.distanceTo(eye) < lampRadius;
             boolean on = false;
             if (near) for (Crossing c : u.crossings) if (closed(c, t)) { on = true; break; }
+            // a unit a car has knocked down (it is a breakable pole, BreakableProps) flashes nothing: the cars stop
+            // from the timetable, never from the unit, so a crossing with its units down still closes for a train
+            if (on && unitDown(u)) on = false;
             if (!near || !on) {
                 if (u.lamp != null) for (MeshInstance3D m : u.lamp) m.setVisible(false);
                 continue;
@@ -1313,6 +1346,17 @@ public class TrainSystem extends Node3D {
             u.lamp[0].setVisible(phaseA);
             u.lamp[1].setVisible(!phaseA);
         }
+    }
+
+    /** Is this unit's baked pole knocked down (or not streamed in)? */
+    private static boolean unitDown(Unit u) {
+        if (u.props == null || !GD.isInstanceValid(u.props)) {
+            Object[] f = TrafficSignals.findPole(u.pos);
+            if (f == null) return false;          // an unbreakable or unbaked unit: nothing to knock down
+            u.props = (BreakableProps) f[0];
+            u.poleIndex = (Integer) f[1];
+        }
+        return u.props.poleBroken(u.poleIndex);
     }
 
     private MeshInstance3D[] buildLamps(Unit u) {
@@ -1359,6 +1403,12 @@ public class TrainSystem extends Node3D {
     @Register public int setCountNow() { return sets.size(); }
     @Register public int trackCountNow() { return tracks.size(); }
     @Register public int crossingCountNow() { return crossings.size(); }
+    /** Probe readout: every level crossing as "lane|lane position". */
+    @Register public String crossingLanesNow() {
+        StringBuilder b = new StringBuilder();
+        for (Crossing c : crossings) b.append(c.lane).append('|').append(c.laneS).append(';');
+        return b.toString();
+    }
     @Register public int unitCountNow() { return units.size(); }
     @Register public int carsNow() { int n = 0; for (TrainSet s : sets) n += s.cars.size(); return n; }
     @Register public int hitsNow() { return hitCount; }

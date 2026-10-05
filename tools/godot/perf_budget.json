@@ -1,0 +1,16 @@
+{
+  "_note": "PLAN.md R-9: the Steam Deck proxy and the per-system budgets every later world item is measured against. deck_ms of a frame = max(cpu_ms x cpu_factor, gpu_ms x gpu_factor), CPU = the frame's wall time on this PC with vsync off, GPU = the viewport's measured GPU time. The factors are ESTIMATES (Ryzen 9 7900X vs the Deck's Zen 2 at 3.5 GHz, single-thread ~2.2x; RTX 4070 SUPER vs the Deck's 1.6 TFLOP RDNA2 at the same 1280x800, ~12x) until a real Deck run calibrates them. Systems are attributed by removing each derived block (probe_walk_perf.gd --no-peds / --no-traffic / --no-buildings) and timing the difference.",
+  "resolution": [1280, 800],
+  "cpu_factor": 2.2,
+  "gpu_factor": 12.0,
+  "frame_deck_ms_p95": 33.3,
+  "systems_deck_ms_p50": {
+    "peds": 4.0,
+    "traffic": 5.0,
+    "buildings": 8.0
+  },
+  "counts_p95": {
+    "draws": 2500,
+    "characters": 60
+  }
+}

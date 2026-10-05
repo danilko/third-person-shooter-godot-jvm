@@ -158,6 +158,15 @@ public class ZoneManager extends Node {
 	 * tick (3.6), so the budget is what bounds the frame. 0 = unlimited (the control).
 	 */
 	@Export public int trafficBudget = 20;
+	/**
+	 * THE FAR TRAFFIC TIER (PLAN.md R-10): script-free cars on the lanes from the simulation ring out to 700 m
+	 * ({@link FarTraffic}), local to each peer. Off = the old behaviour, an empty street past the ring (the control).
+	 */
+	@Export public boolean farTraffic = true;
+	private FarTraffic farTrafficNode;
+
+	/** Probe readout: cars in the far tier (0 with it off). */
+	@Register public int farTrafficCarsNow() { return farTrafficNode == null ? 0 : farTrafficNode.carsNow(); }
 
 	/**
 	 * How many promoted SIDEWALK bodies may exist at once, across every zone (user, 2026-09-27). A crowd ped is
@@ -360,6 +369,11 @@ public class ZoneManager extends Node {
 	@Override
 	public void _ready() {
 		instance = this;
+		if (farTraffic) {
+			farTrafficNode = new FarTraffic();
+			farTrafficNode.setName("FarTraffic");
+			addChild(farTrafficNode);
+		}
 	}
 
 	/**

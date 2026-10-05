@@ -13,6 +13,7 @@ import com.openworld.world.VehicleRoute;
 import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
+import godot.annotation.Visible;
 import godot.api.Node;
 import godot.api.RayCast3D;
 import godot.core.StringName;
@@ -326,9 +327,85 @@ public class VehicleAIController extends Controller {
         com.openworld.world.TrainSystem trains = com.openworld.world.TrainSystem.get();
         double dx = trains == null ? -1.0 : trains.stopDistance(lane, routeProgress);
         if (dx >= 0.0 && (d < 0.0 || dx < d)) d = dx;
+        // ...and an OPEN one is still a stop: 一時停止 (Road Traffic Act art. 33) -- stop at the hold line, wait
+        // LX_STOP_SECONDS, and enter only once the far side has room for this car (PLAN.md R-1 / decision 1)
+        double lx = trains == null || !crossingStops ? -1.0 : crossingHold(trains, lane);
+        if (lx >= 0.0 && (d < 0.0 || lx < d)) d = lx;
         if (d < 0.0) return Float.MAX_VALUE;
         heldAtSignal = true;
         return (float) Math.sqrt(2.0 * SIGNAL_DECEL * Math.max(0.0, d - 0.3));
+    }
+
+    /** Seconds a car stands at a 踏切's hold line before it may cross (Road Traffic Act art. 33). */
+    public static final double LX_STOP_SECONDS = 1.0;
+    /** Below this speed (m/s), within LX_AT_LINE of the hold line, a car counts as stopped there. */
+    static final double LX_STOPPED_SPEED = 0.5, LX_AT_LINE = 1.5;
+    /** Room a car needs past a 踏切's far side before it enters: its own length and a margin (m). */
+    static final double LX_ROOM = 7.0;
+    /** A vehicle in that room slower than this (m/s) is a queue the car must not enter behind. */
+    static final double LX_QUEUE_SPEED = 2.0;
+
+    /** Stop at every level crossing (off: the old behaviour, which stops only for a closed one). Racers never do. */
+    @Visible public boolean crossingStops = true;
+
+    private String lxDoneLane = "";
+    private double lxDoneS = -1.0;
+    private long lxStoppedSinceMs = -1;
+    private int lxStops;
+
+    /** Probe readout: how many 踏切 stops this car has completed. */
+    @Register
+    public int crossingStopsNow() { return lxStops; }
+
+    /**
+     * The 一時停止 at the next 踏切 on {@code lane}: the nose distance to its hold line while this car must still stop
+     * there (it has not stood LX_STOP_SECONDS yet, or the far side is queued), else -1. Once a stop is complete the
+     * crossing is remembered (lane + its far side), so the same 踏切 never stops the car twice.
+     */
+    private double crossingHold(com.openworld.world.TrainSystem trains, String lane) {
+        double skip = lane.equals(lxDoneLane) ? lxDoneS : Double.NEGATIVE_INFINITY;
+        double[] nx = trains.nextCrossing(lane, routeProgress, skip);
+        if (nx == null) { lxStoppedSinceMs = -1; return -1.0; }
+        double dh = nx[0];
+        // the PHYSICS clock: a wall-clock second lasts many steps under --fixed-fps or a slow frame
+        long now = godot.api.Engine.INSTANCE.getPhysicsFrames() * 1000L
+                / Math.max(1, godot.api.Engine.INSTANCE.getPhysicsTicksPerSecond());
+        if (dh <= LX_AT_LINE && currentSpeed() < LX_STOPPED_SPEED) {
+            if (lxStoppedSinceMs < 0) lxStoppedSinceMs = now;
+        } else if (dh > LX_AT_LINE) {
+            lxStoppedSinceMs = -1;
+        }
+        boolean waited = lxStoppedSinceMs >= 0 && now - lxStoppedSinceMs >= LX_STOP_SECONDS * 1000.0;
+        if (waited && !farSideQueued(nx[1])) {
+            lxDoneLane = lane;
+            lxDoneS = nx[1] - com.openworld.world.TrainSystem.HOLD_BACK;
+            lxStoppedSinceMs = -1;
+            lxStops++;
+            return -1.0;
+        }
+        return dh;
+    }
+
+    /** Is a vehicle standing (or crawling) between here and LX_ROOM past lane position {@code farS}? A car that
+     *  entered behind it would be left standing ON the tracks (PLAN.md R-1). Asked along the lane, segment by segment. */
+    private boolean farSideQueued(double farS) {
+        if (route == null || vehicleBody == null || !vehicleBody.isInsideTree()) return false;
+        godot.api.PhysicsDirectSpaceState3D space = vehicleBody.getWorld3d().getDirectSpaceState();
+        double s0 = routeProgress, s1 = Math.min(route.total(), farS + LX_ROOM);
+        Vector3 up = new Vector3(0, 0.8, 0);
+        godot.core.VariantArray<godot.core.RID> ex = new godot.core.VariantArray<>(godot.core.RID.class);
+        ex.append(vehicleBody.getRid());
+        for (double s = s0; s < s1; s += 4.0) {
+            Vector3 a = route.pointAtLength(s).plus(up), b = route.pointAtLength(Math.min(s1, s + 4.0)).plus(up);
+            godot.api.PhysicsRayQueryParameters3D q = godot.api.PhysicsRayQueryParameters3D.create(a, b,
+                    com.openworld.util.CollisionLayers.VEHICLE, ex);
+            godot.core.Dictionary<Object, Object> hit = space.intersectRay(q);
+            if (hit == null || hit.isEmpty()) continue;
+            Object col = hit.get("collider");
+            if (col instanceof com.openworld.carrier.vehicle.Vehicle v
+                    && v.getLinearVelocity().length() < LX_QUEUE_SPEED) return true;
+        }
+        return false;
     }
 
     /** True while the last {@link #signalSpeedLimit} held this car for a light. */

@@ -194,11 +194,11 @@ REGIONS = (
     ("residential_north", (-330.0, 700.0, 1700.0, 920.0), 1, 20.0,
      {"Apato2F4": 1.2, "Apato2F6": 0.8, "ApartRC3F": 1.2, "MansionLine4": 0.6, "MansionPencil": 0.4, "TerraceHouse4": 0.6, "LuxuryLowRise": 0.15, "Sento": 0.1, "HouseTraditional": 0.3, "Apartment": 3, "ShopHouse": 0.5, "Mansion": 1, "KonbiniS": 0.5, "KonbiniL": 0.4, "GasStation": 0.3,
       "ParkingLot4": 0.3, "DetachedHouse": 3, "DetachedHouseB": 3, "CarDealer": 0.15, "ShrineSmall": 0.12,
-      "ShopRamen": 0.2, "ShopDrugstore": 0.2, "ShopCoinLaundry": 0.2, "ShopBookstore": 0.15, "ShopHundredYen": 0.15},
+      "ShopRamen": 0.2, "ShopDrugstore": 0.2, "ShopCoinLaundry": 0.06, "ShopBookstore": 0.15, "ShopHundredYen": 0.15},
      0.15, None),
     ("residential_west", (-900.0, -200.0, -150.0, 400.0), 1, 18.0,
      {"Apato2F4": 1.2, "Apato2F6": 0.8, "ApartRC3F": 1.2, "MansionLine4": 0.6, "MansionPencil": 0.4, "TerraceHouse4": 0.6, "LuxuryLowRise": 0.15, "Sento": 0.15, "HouseTraditional": 0.4, "Apartment": 3, "ShopHouse": 0.5, "Mansion": 0.8, "KonbiniS": 0.3, "DetachedHouse": 3, "DetachedHouseB": 3,
-      "ShopCoinLaundry": 0.15, "ShopBookstore": 0.1, "ShrineSmall": 0.12},
+      "ShopCoinLaundry": 0.045, "ShopBookstore": 0.1, "ShrineSmall": 0.12},
      0.3, None),
     ("downtown", (150.0, 40.0, 1300.0, 720.0), 1, 24.0,
      {"OfficeMid": 4, "OfficeBlock": 1.5, "OfficeTower": 1, "PencilBuilding": 4, "Mansion": 2, "ShopHouse": 1.5,
@@ -207,7 +207,7 @@ REGIONS = (
     ("city", (-150.0, -330.0, 1700.0, 960.0), 1, 22.0,
      {"MansionPencil": 1.5, "MansionLine4": 0.8, "MansionLine6": 0.5, "ApartRC3F": 1.0, "Apato2F4": 0.5, "TowerMansion": 0.25, "LuxuryLowRise": 0.4, "Sento": 0.12, "Mansion": 3, "ShopHouse": 3, "PencilBuilding": 2, "Apartment": 2, "KonbiniS": 1, "OfficeMid": 0.5, "OfficeBlock": 0.3,
       "FamilyRestaurant": 0.6, "KonbiniL": 0.6, "GasStation": 0.5, "ParkingLot4": 0.4,
-      "ShopRamen": 0.4, "ShopGyudon": 0.3, "ShopDrugstore": 0.4, "ShopHundredYen": 0.3, "ShopCoinLaundry": 0.2,
+      "ShopRamen": 0.4, "ShopGyudon": 0.3, "ShopDrugstore": 0.4, "ShopHundredYen": 0.3, "ShopCoinLaundry": 0.06,
       "ShopBookstore": 0.2, "CarDealer": 0.25, "ShrineSmall": 0.1}, 0.05, None),
     # THE WEST SUB-CENTRE 副都心 (user, 2026-09-26: "combine the south-west with a CBD"): the second business district,
     # round the Blue line's Residential station where the housing meets the 準工業 district -- the Kamata / Kawasaki
@@ -237,7 +237,7 @@ REGIONS = (
     # Warehouse (a depot), ParkingLot8 (a used-car lot), KonbiniS, GasStation.
     ("light_industry", (-1400.0, -600.0, 300.0, -460.0), 1, 22.0,
      {"ShopHouse": 0.6, "FactorySmall": 2.5, "Warehouse": 0.4, "ParkingLot8": 0.5, "KonbiniS": 0.3, "GasStation": 0.2,
-      "CarDealer": 0.2, "ShopCoinLaundry": 0.15}, 0.3, "dark"),
+      "CarDealer": 0.2, "ShopCoinLaundry": 0.045}, 0.3, "dark"),
     # THE SOUTH-WEST 準工業 DISTRICT (user, 2026-09-26: "combine the south-west with the light industry"): the housing's
     # industrial edge and the west third of the old industry box are ONE mixed district, the Ota / Kamata 町工場 town --
     # small works with a flat over them, workers' flats, depots and a few used-car lots on block streets. It has TWO
@@ -261,13 +261,13 @@ REGIONS = (
      {"Apato2F4": 1.2, "Apato2F6": 0.8, "ApartRC3F": 1.2, "MansionLine4": 0.6, "MansionPencil": 0.4, "TerraceHouse4": 0.6, "LuxuryLowRise": 0.15, "Sento": 0.12, "HouseTraditional": 0.3, "Apartment": 4, "ShopHouse": 0.5, "Mansion": 1, "KonbiniL": 0.6, "GasStation": 0.4, "FamilyRestaurant": 0.3,
       "CarDealer": 0.15, "ShrineSmall": 0.12,
       "KonbiniS": 0.4, "ParkingLot4": 0.3, "DetachedHouse": 3, "DetachedHouseB": 3,
-      "ShopRamen": 0.2, "ShopDrugstore": 0.25, "ShopCoinLaundry": 0.25, "ShopBookstore": 0.15, "ShopHundredYen": 0.15},
+      "ShopRamen": 0.2, "ShopDrugstore": 0.25, "ShopCoinLaundry": 0.075, "ShopBookstore": 0.15, "ShopHundredYen": 0.15},
      0.15, None),
     # the SUBURB as a low-density beach resort (v3: "fewer, larger buildings ... 55% occupancy"): one row, wide pitch
     ("suburb", (850.0, -1000.0, 1320.0, -330.0), 1, 30.0,          # clipped to its land (east: the spur, the sea)
      {"Apato2F4": 0.8, "ApartRC3F": 1.0, "MansionLine4": 0.5, "TerraceHouse4": 0.8, "LuxuryLowRise": 0.3, "HouseTraditional": 0.2, "Apartment": 4, "ShopHouse": 0.5, "Mansion": 1, "KonbiniL": 0.6, "GasStation": 0.4, "CarDealer": 0.2,
       "FamilyRestaurant": 0.4, "DetachedHouse": 2, "DetachedHouseB": 2,
-      "ShopDrugstore": 0.2, "ShopCoinLaundry": 0.15}, 0.45, None),
+      "ShopDrugstore": 0.2, "ShopCoinLaundry": 0.045}, 0.45, None),
     ("farm", (350.0, 920.0, 1850.0, 1900.0), 1, 30.0, {"HouseTraditional": 1.5, "Apartment": 2, "Warehouse": 0.5, "KonbiniL": 0.2,
                                                         "DetachedHouse": 2, "DetachedHouseB": 2},
      0.65, None),
@@ -556,13 +556,15 @@ def ped_walk_offset(walk):
                min(0.5 * (strip + walk), walk - PED_RADIUS - PED_EDGE))
 
 
+# R-12 (senior review, 2026-10-05): coin laundries were 72 against 59 konbini; every ShopCoinLaundry weight x0.3
+# (<= ~1/3 of the konbini). Lands with the next buildings derive.
 # A STREET-KEYED MIX (the second review, 2026-10-03): a local 商店街 is a STREET, not a box -- an `ekimae` box paints
 # every frontage near a station, arterials included, and makes no contiguous shopping street. A road whose base name
 # starts with a key here is lined with that mix whatever district it runs through (the station 商店街 authored in
 # island_core_streets, `eki_ginza_*`, Castle Town's 参道 jokamachi_sando -- the island's 国際通り-style street, with the
 # 公設市場 beside it -- and Residential's, the planner's x -650 line east of the station). Shaped like a REGIONS row, named
 # "ekimae" so its alleys and car parks are the 駅前 row's.
-STREET_MIX = {"ShopHouse": 4, "ShopRamen": 1, "ShopDrugstore": 1, "ShopHundredYen": 0.6, "ShopCoinLaundry": 0.5,
+STREET_MIX = {"ShopHouse": 4, "ShopRamen": 1, "ShopDrugstore": 1, "ShopHundredYen": 0.6, "ShopCoinLaundry": 0.15,
               "ShopBookstore": 0.6, "ShopGyudon": 0.5, "KonbiniS": 0.6, "YokochoRow": 0.6, "ShrineSmall": 0.15}
 STREET_MIXES = {"eki_ginza": ("ekimae", (0.0, 0.0, 0.0, 0.0), 1, 10.0, STREET_MIX, 0.0, None),
                 "jokamachi_sando": ("ekimae", (0.0, 0.0, 0.0, 0.0), 1, 10.0, STREET_MIX, 0.0, None),

@@ -7945,26 +7945,38 @@ it and the kerb or barrier, and a raised median has a side strip (側帯) with a
 - **Roads whose section predates this** (the island's arterials input): `tools/island_shoulders.py` applies
   `point_presets.add_shoulders` (by road class; `CLASS_SHOULDERS`; a road that has a shoulder keeps it). It runs in
   `island_layout.derive` on the input before the generators and again after the turnarounds. Idempotent.
-- **A level crossing keeps the track's surface** (`point_mesh.crossing_panels`): a precast concrete 踏切 panel per track,
-  `PANEL_HALF` 1.25 m each side of the track centre, top `PANEL_LIFT` 1 cm over the road, sunk 0.15 m, clipped
-  to the road's edges (bisected along the track), in the rail's road collision. The rails lie flush with the panel's
-  top. It used to be rails flush in the road's own asphalt.
-  - **The panel follows the ROAD's surface, not the rail's profile** (`point_mesh.on_road_surface` /
-    `road_surface_z`, applied to the panels and the flush rails over them). The rail is held at the road's height
-    only near its own stations, so on a road graded along its length and crossed obliquely, a panel laid on the rail
-    stood up to 0.12 m proud of the lane, and it is collision (`probe_rail_track` check 3, 4 of 59 crossings on
-    the first rebuild). Every vertex column is re-heighted to the road's interpolated spine (projected, not the
-    nearest 4 m sample) + `PANEL_LIFT`, thickness kept, grouped per crossed band so a prism moves whole.
+- **A level crossing keeps the track's surface: a 踏切 panel LYING ON the road** (`point_mesh.crossing_track`,
+  user decisions 2026-10-05). ONE precast concrete panel over the whole line (`panel_span`: `PANEL_HALF` 1.25 m past
+  each outer track's centre; a double track is paved between its tracks too, as a Japanese 踏切 is),
+  section /----\ : a flat top `PANEL_RISE` 3 cm over the ground, the two long edges (what a wheel or a foot crosses)
+  sloping down over `PANEL_CHAMFER` 0.15 m to `PANEL_FOOT` 1 cm under it, closed `PANEL_DEPTH` under; the road is
+  NOT cut. In the road collision; the rails lie flush with its top.
+  - **Every vertex stands on `crossing_ground`**: the crossed road's own surface (`road_surface_z`, projected onto
+    the spine: on a graded road crossed obliquely a panel on the rail's profile stood 0.12 m proud) plus, past the
+    kerb, that side's footway level (`Band.footway_rel`, from the new `Band.walks` rows). So the panel runs over the
+    FOOTWAYS too and steps down the kerb where the kerb is (the rail's bed, fence and car wall were already cut there).
+  - **The carrier is densified once** (`densify_crossings`, every `CROSSING_STEP` 0.25 m inside a crossing, each
+    road / footway edge bisected), and a span counts as crossing when ANY of the panel's two edges, its centre or a
+    track centre is on the road or footway: on an oblique crossing the panel's end is square to the track and reaches PAST
+    the slanted footway edge, so the footway is paved over to a straight edge (user: no angled cap). The flat top
+    carries a vertex every `PANEL_TOP_STEP` 0.5 m across, so on an oblique crossing each follows its own ground (one
+    6.5 m face spanning the kerb at 34 deg stood 0.09 m over a lane; the self-test's 35 deg case, control 0.10 m).
+  - `road_surface_z` asks each LEG of the road (heights within 1 m) for its nearest segment: a neighbouring segment
+    clamped to its end read that end's height, 4 cm off on a 5 % road.
+- **No markings on a 踏切, and an 一時停止 stop line before it** (Road Traffic Act art. 33): a road built against the
+  rail (`--avoid`) clips every lane and centre line `CROSSING_MARK_CLEAR` 0.5 m short of a track band crossed at its
+  height (`clip_crossings`), and paints a stop line square to the road per approach (keep-left: travel along the
+  carrier arrives on the left), across that direction's half, its downstream edge `CROSSING_STOP_GAP` 2 m outside the
+  band at both of its ends (`crossing_stop_lines`, `CROSSING_STOP_W` 0.45 m).
   - **A raised median is broken at a 踏切** (`point_mesh.median_runs`): the kerbed island stops
     `MEDIAN_RAIL_CLEAR` (1 m) short of a rail band crossed at the road's own height, each side a capped island,
     the carriageway asphalt (which runs under the island) left across the track. It used to run straight over the
     rails, a 0.15 m kerb a train's wheels met, and the rail gauge sweep (from 0.5 m over the bed) cannot see it.
 - Gates: `point_profile.py` (edge lines and their control), `point_mesh.py` (the panel ON a street climbing 5 %
-  through the crossing, its thickness and collision, the flush rails on it, the median broken over the track on a
-  trunk road; controls: the panel left on the rail profile fails by 0.16 m, a road built with no rail keeps its
-  island over the track).
-- **Open: the road's lane lines are still painted across the 踏切 panels** (Japan stops the markings at the panel);
-  clip the mark polylines to the crossing as `point_furniture.clear_zones` does for a stop line.
+  through the crossing: its top at ground + PANEL_RISE, no steep face over the ground but the kerb step and the end
+  caps, across the footway at footway level, in the collision, the flush rails on it; no lane mark inside the track
+  band, a stop line each approach, and the control built with no rail whose lines run through; the median broken
+  over the track on a trunk road).
 
 ## Ground is Terrain3D; road-generator was tried and REMOVED (2026-09-06 → 2026-09-13)
 
@@ -10882,6 +10894,40 @@ Written while an island rebuild ran, so compiled and unit-tested only; the gates
   Gate `tools/godot/probe_underground.gd` (3 cases, `--control`).
 - **`./gradlew test` replaces `jvm/main.jar`** (shadowJar + copyDesktopJars). While Godot bakes are running, test with
   `./gradlew test -x shadowJar -x copyDesktopJars -x packageBootstrapJar`.
+
+## 踏切 rules for traffic, a breakable 踏切 unit, the far traffic tier, the Deck perf proxy (2026-10-05)
+
+PLAN.md steps (b), (d), (e) and R-1 / R-9 / R-10, plus a user ask.
+- **一時停止 at every 踏切** (Road Traffic Act art. 33, `VehicleAIController.crossingHold`): a car stops at the hold
+  line of every level crossing ahead on its lane, open or closed (`TrainSystem.nextCrossing`: crossings of one lane
+  within `CROSSING_GROUP` 25 m are one 踏切), stands `LX_STOP_SECONDS` 1 s, and enters only when no vehicle slower
+  than 2 m/s stands between it and `LX_ROOM` 7 m past the far side (`farSideQueued`, rays along the lane on the
+  VEHICLE layer) -- a car that entered behind a queue was left on the tracks (R-1). A completed stop is remembered
+  per lane + crossing, so one 踏切 never stops a car twice. `racing` skips it; a police pursuit flag does not exist
+  yet. `crossing_stops` (`@Visible`) is the control. Waiting there counts as waiting for a signal (no stall reclaim).
+  Gate `tools/godot/probe_lx_stop.gd` (DebugWorld, `TrainSystem.crossings_forced_open` so the rule is measured alone;
+  `-- --control`).
+- **The 踏切 warning unit is a breakable pole** (user: hit away like a street pole, arcade): `furniture.json`
+  `crossing_signal.breakable` (150 kg, 4 m/s, 60 s), so it bakes into `BreakableProps` like a lamp. The AI does not
+  read the unit (cars stop from the timetable), so nothing in its logic changes; the flashing lamps of a unit that is
+  down go dark (`TrainSystem.unitDown`, through `TrafficSignals.findPole`).
+- **The far traffic tier** (`world.FarTraffic`, a child of ZoneManager; `ZoneManager.farTraffic` the control): up to
+  `budget` 60 script-free cars on the registered lanes from the simulation ring (`trafficSimRadius` + 20 m) out to
+  `farRadius` 700 m round the camera. Each is a lane, a position, a speed and a model; it follows the lane's
+  successors (`pickNextRoute`, else `LaneGraph.successorsOf` straight-biased, as the AI), holds at a red
+  (`TrafficSignals.stopDistance`) and behind the car ahead on its lane, and is drawn as one MultiMesh per model (the
+  model's `.glb` parts merged per material at first use; -Z forward, ground at y 0). Born only out of the camera's
+  view nearer than 450 m; a car entering the simulation ring or leaving the outer one is dropped. Local per peer, never
+  replicated. No headlights yet. Gate `tools/godot/probe_far_traffic.gd [-- --world=island] [-- --control]`.
+- **The Deck proxy perf gate** (`tools/perf_gate.sh`, NEEDS A DISPLAY): `probe_walk_perf.gd --deck` runs at
+  1280x800 and scores each frame `deck_ms = max(cpu_ms x cpu_factor, gpu_ms x gpu_factor)`
+  (`tools/godot/perf_budget.json`: 2.2 and 12, ESTIMATES until a real Deck calibrates them), judging each leg's p95
+  against `frame_deck_ms_p95` (33.3: 30 fps) and draws / characters against `counts_p95`; the wrapper re-runs with
+  `--no-peds` / `--no-traffic` / `--no-buildings` and judges each system's cost (shipped p50 - control p50) against
+  `systems_deck_ms_p50`. `--quick` = the shipped run only.
+- **The 踏切 layout rules are measured** (`island_layout.level_crossings`, LX_*; reported, `LX_ASSERT` after step (c)):
+  >= 30 m (arterial) / 20 m (street) from a junction mouth, >= 60 deg (never < 45), two crossings on one road < 12 m
+  apart (combined) or >= 30 m. PLAN.md "STEP (c) PREPARED" has the 7 of 18 that break one.
 
 ## Audio: every sound is a file (2026-09-29)
 

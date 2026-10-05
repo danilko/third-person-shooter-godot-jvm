@@ -1593,7 +1593,9 @@ def self_test():
     c_ = table.rules["crossing_track_clear"]
     w_ = 4.5 + table.rules["crossing_side"]
     assert sig == [((-w_, -c_), (0.0, 1.0)), ((w_, c_), (-0.0, -1.0))], sig
-    assert len(fx.collision) == 24, "each signal's post is a collider"
+    # a 踏切 unit is BREAKABLE (user, 2026-10-05: hit away like a pole): no static box, its marker carries the pole
+    assert not fx.collision and all(p_.get("breakable") for p_ in fx.placements if p_["asset"] == "crossing_signal"), \
+        "a 踏切 unit is breakable"
     # an oblique road (45 deg) takes the clearance further along itself
     fx = Furniture()
     q = math.sqrt(0.5)

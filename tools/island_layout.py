@@ -555,6 +555,81 @@ def ungapped_crossings(path):
     return out
 
 
+#: PLAN.md R-1 / R-2 / R-3, the 踏切 rules: a level crossing at least LX_JUNCTION_ART m (an arterial) or LX_JUNCTION
+#: m (a street) from the nearest junction mouth, crossed at LX_ANGLE_MIN degrees or more (never under LX_ANGLE_REFUSE),
+#: and two crossings on one road either one combined crossing (< LX_PAIR_COMBINED m apart) or at least LX_PAIR_MIN m
+#: apart (a car fits between and is trapped). REPORTED until the crossing redesign (step (c)) lands; then LX_ASSERT.
+LX_JUNCTION_ART = 30.0
+LX_JUNCTION = 20.0
+LX_ANGLE_MIN = 60.0
+LX_ANGLE_REFUSE = 45.0
+LX_PAIR_COMBINED = 12.0
+LX_PAIR_MIN = 30.0
+LX_ASSERT = False
+RAIL_RECORD = os.path.join(os.path.dirname(OUTPUT), "IslandRail.roads.json")
+
+
+def level_crossings(road_path, rail_path, arterials=()):
+    """Every at-grade road x rail crossing: [(road, rail line, (x, y), angle deg, nearest junction mouth m, findings)].
+    `findings` names each 踏切 rule it breaks (see LX_*)."""
+    net = pm.load_network(road_path)
+    rnet = pm.load_network(rail_path)
+    rails = []
+    for name, r in rnet.roads.items():
+        ch = [rnet.points[u] for u in r.points if u in rnet.points]
+        rails += [(name, a.pos, b.pos) for a, b in zip(ch, ch[1:])]
+    mouths = [p.pos for p in net.points.values()
+              if any(l.type == pm.LINK_JUNCTION for l in getattr(p, "links", ()))]
+    out = []
+    per_road = {}
+    for name, r in net.roads.items():
+        if r.road_class == "rail" or name.startswith("shuto_"):
+            continue
+        ch = [net.points[u] for u in r.points if u in net.points]
+        acc = 0.0
+        for a, b in zip(ch, ch[1:]):
+            p, q = a.pos, b.pos
+            seg = math.hypot(q[0] - p[0], q[1] - p[1])
+            for ln, ra, rb in rails:
+                d = (q[0] - p[0]) * (rb[1] - ra[1]) - (q[1] - p[1]) * (rb[0] - ra[0])
+                if abs(d) < 1e-9:
+                    continue
+                t = ((ra[0] - p[0]) * (rb[1] - ra[1]) - (ra[1] - p[1]) * (rb[0] - ra[0])) / d
+                u = ((ra[0] - p[0]) * (q[1] - p[1]) - (ra[1] - p[1]) * (q[0] - p[0])) / d
+                if not (0.0 <= t <= 1.0 and 0.0 <= u <= 1.0):
+                    continue
+                dz = (p[2] + (q[2] - p[2]) * t) - (ra[2] + (rb[2] - ra[2]) * u)
+                if abs(dz) > 1.0:
+                    continue
+                x, y = p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t
+                rx, ry = rb[0] - ra[0], rb[1] - ra[1]
+                cosang = abs((q[0] - p[0]) * rx + (q[1] - p[1]) * ry) / ((seg or 1.0) * (math.hypot(rx, ry) or 1.0))
+                ang = math.degrees(math.acos(min(1.0, cosang)))     # 90 = square
+                near = min((math.hypot(m[0] - x, m[1] - y) for m in mouths), default=1e9)
+                per_road.setdefault(name.split("__")[0], []).append((acc + seg * t, (x, y)))
+                out.append([name, ln, (round(x, 1), round(y, 1)), round(ang, 1), round(near, 1), []])
+            acc += seg
+    for row in out:
+        name, _ln, _xy, ang, near, f = row
+        need = LX_JUNCTION_ART if name.split("__")[0] in arterials else LX_JUNCTION
+        if near < need:
+            f.append("junction %.0f m < %.0f" % (near, need))
+        if ang < LX_ANGLE_REFUSE:
+            f.append("angle %.0f < %.0f (refused)" % (ang, LX_ANGLE_REFUSE))
+        elif ang < LX_ANGLE_MIN:
+            f.append("angle %.0f < %.0f" % (ang, LX_ANGLE_MIN))
+    for base, xs in per_road.items():
+        xs.sort()
+        for (s0, p0), (s1, p1) in zip(xs, xs[1:]):
+            gap = math.hypot(p1[0] - p0[0], p1[1] - p0[1])
+            if LX_PAIR_COMBINED <= gap < LX_PAIR_MIN:
+                for row in out:
+                    if row[0].split("__")[0] == base and tuple(row[2]) in ((round(p0[0], 1), round(p0[1], 1)),
+                                                                           (round(p1[0], 1), round(p1[1], 1))):
+                        row[5].append("next crossing %.0f m (trap)" % gap)
+    return out
+
+
 PHASE2_ALONG = 60.0   # m: a road may cross the held phase-2 corridor (it will pass UNDER the elevated Wangan), not run in it
 
 
@@ -769,8 +844,15 @@ def main(argv):
     TIMES["check: expressway splits + phase 2"] = time.monotonic() - t0
     print("island_layout: phase-2 Wangan ground held%s" % ("" if not p2 else "; %d INTRUSION(S): %s" % (
         len(p2), ", ".join("%s %s %s" % x for x in p2[:10]))))
+    lx = level_crossings(OUTPUT, RAIL_RECORD, names) if os.path.exists(RAIL_RECORD) else []
+    lxbad = [r for r in lx if r[5]]
+    print("island_layout: %d level crossing(s), %d break a 踏切 rule%s%s" % (len(lx), len(lxbad),
+          "" if LX_ASSERT else " (reported; asserted after step (c))", "" if not lxbad else ": " + "; ".join(
+              "%s x %s at %s: %s" % (r[0], r[1], r[2], ", ".join(r[5])) for r in lxbad)))
     print("island_layout: time " + ", ".join("%s %.0f s" % kv for kv in sorted(TIMES.items(), key=lambda kv: -kv[1])))
     print("island_layout: %d step(s) replayed from the cache%s" % (len(HITS), "" if not HITS else " (%s)" % ", ".join(HITS)))
+    if LX_ASSERT and lxbad:
+        sys.exit(1)
     if rep["errors"] or any(bad.values()) or low or steep or folds or p2 or rbad or ungapped:
         sys.exit(1)
 

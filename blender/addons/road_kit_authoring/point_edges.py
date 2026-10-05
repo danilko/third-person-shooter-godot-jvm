@@ -95,10 +95,15 @@ class Band(object):
     """One paved footprint: a closed XY polygon, plus the centreline it came from so the test can
     ask "and how high is that surface here?" without a 3D containment test."""
 
-    __slots__ = ("owner", "poly", "spine", "members", "carries_edge", "x0", "y0", "x1", "y1", "tris", "walk", "medians")
+    __slots__ = ("owner", "poly", "spine", "members", "carries_edge", "x0", "y0", "x1", "y1", "tris", "walk", "medians",
+                 "walks")
 
-    def __init__(self, owner, poly, spine, members=(), carries_edge=False, tris=(), walk=0.0, medians=()):
+    def __init__(self, owner, poly, spine, members=(), carries_edge=False, tris=(), walk=0.0, medians=(), walks=()):
         self.owner = owner
+        #: Each side's FOOTWAY level over the road surface, per spine sample: `(x, y, dir x, dir y, mid, left z,
+        #: right z)`, `mid` the lateral offset between the two kerb lines (left +), a side with no footway 0. What a
+        #: level crossing's panel stands on past the kerb (`footway_rel`).
+        self.walks = list(walks)
         #: Where this road's RAISED median is, per spine sample: `(x, y, dir x, dir y, centre offset, half width)`
         #: (0 half where there is none). A viaduct pier may stand IN it (PLAN.md item 1 R3: Shuto over a national
         #: road's median), which `in_median` answers.
@@ -145,6 +150,17 @@ class Band(object):
         lat = dx * (y - sy) - dy * (x - sx)            # left of travel is positive
         along = dx * (x - sx) + dy * (y - sy)
         return abs(lat - c) <= h - margin and abs(along) <= 6.0
+
+    def footway_rel(self, x, y):
+        """How far above the road surface the ground of this road is at plan point `(x, y)`: 0 on the paved
+        footprint, else the footway level of the side `(x, y)` is on (0 where that side has no footway). The
+        nearest spine sample decides the side."""
+        if _signed_depth(self.poly, x, y) >= 0.0 or not self.walks:
+            return 0.0
+        row = min(self.walks, key=lambda m: (m[0] - x) ** 2 + (m[1] - y) ** 2)
+        sx, sy, dx, dy, mid, zl, zr = row
+        lat = dx * (y - sy) - dy * (x - sx)
+        return zl if lat > mid else zr
 
     def bbox_hit(self, x, y, pad=0.0):
         return (self.x0 - pad <= x <= self.x1 + pad) and (self.y0 - pad <= y <= self.y1 + pad)
@@ -234,7 +250,7 @@ def band_of(solve):
     poly += [(p[0], p[1]) for p in reversed(solve.edges_right)]
     walk = max([2.0 * max(float(v.get("rka_walk_hl", 0.0)), float(v.get("rka_walk_hr", 0.0)))
                 for v in (solve.values or ())] or [0.0])
-    meds = []
+    meds, walks = [], []
     smp = solve.samples
     for i, s in enumerate(smp):
         v = solve.values[i] if solve.values and i < len(solve.values) else {}
@@ -243,7 +259,11 @@ def band_of(solve):
         raised = float(v.get("rka_med_z", 0.0)) > 0.0
         meds.append((s.pos[0], s.pos[1], (b[0] - a[0]) / L, (b[1] - a[1]) / L, float(v.get("rka_med_c", 0.0)),
                      float(v.get("rka_med_h", 0.0)) if raised else 0.0))
-    return Band(solve.road.name, poly, [tuple(s.pos) for s in solve.samples], walk=walk, medians=meds)
+        walks.append((s.pos[0], s.pos[1], (b[0] - a[0]) / L, (b[1] - a[1]) / L,
+                      0.5 * (float(v.get("rka_curb_ol", 0.0)) + float(v.get("rka_curb_or", 0.0))),
+                      float(v.get("rka_walk_zl", 0.0)) if float(v.get("rka_walk_hl", 0.0)) > 0.0 else 0.0,
+                      float(v.get("rka_walk_zr", 0.0)) if float(v.get("rka_walk_hr", 0.0)) > 0.0 else 0.0))
+    return Band(solve.road.name, poly, [tuple(s.pos) for s in solve.samples], walk=walk, medians=meds, walks=walks)
 
 
 def band_of_junction(jsolve):

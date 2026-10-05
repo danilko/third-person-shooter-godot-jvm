@@ -392,7 +392,7 @@ public class TrafficSignals extends Node3D {
     }
 
     /** The baked pole (a BreakableProps instance) standing within 0.3 m of `base`, as {props, index}, or null. */
-    private static Object[] findPole(Vector3 base) {
+    static Object[] findPole(Vector3 base) {
         for (BreakableProps bp : BreakableProps.live()) {
             if (!GD.isInstanceValid(bp) || !bp.nearBounds(base.getX(), base.getZ(), 1.0)) continue;
             for (int i = 0; i < bp.poles(); i++) {

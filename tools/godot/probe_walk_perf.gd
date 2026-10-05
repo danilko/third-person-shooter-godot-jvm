@@ -10,6 +10,9 @@ extends SceneTree
 ##
 ##   <godot> --path . --script tools/godot/probe_walk_perf.gd [-- --legs=a,b] [--budget=16.7] [--top=12]
 ##       [--no-peds] [--no-traffic] [--no-buildings] [--no-hlod] [--no-parked]      (controls: remove that derived block before the world loads)
+##       [--deck]   the Steam Deck PROXY (PLAN.md R-9): 1280x800, each frame's deck_ms = max(cpu x cpu_factor,
+##                  gpu x gpu_factor) from tools/godot/perf_budget.json, judged against its frame and count budgets;
+##                  prints a `DECK <leg> p50 p95` line per leg that tools/perf_gate.sh reads for per-system attribution
 
 const WORLD := "res://src/main/resources/com/openworld/world/World.tscn"
 var w: Node
@@ -19,6 +22,9 @@ var vp_rid: RID
 var args := {}
 var cells := {}          # postal code -> {ft:[], phys:[], proc:[], ticks:[], dc:[], tris:[], chars:[]}
 var legs_out := []
+var deck := false
+var budget_cfg := {}
+var deck_fail := []
 
 func _arg(k: String, d = null):
 	return args.get(k, d)
@@ -83,6 +89,10 @@ func _leg(label: String, path: Array, speed: float) -> void:
 	var ft := []
 	var ph := []
 	var ticks := []
+	var dk := []
+	var gp := []
+	var dcs := []
+	var chs := []
 	var seg := 0
 	var along := 0.0
 	var t_prev := Time.get_ticks_usec()
@@ -116,6 +126,11 @@ func _leg(label: String, path: Array, speed: float) -> void:
 		c.chars.append(chars)
 		c.legs[label] = true
 		ft.append(dt); ph.append(phys); ticks.append(nt)
+		var gpu := RenderingServer.viewport_get_measured_render_time_gpu(vp_rid)
+		gp.append(gpu)
+		dk.append(maxf(dt * float(budget_cfg.get("cpu_factor", 1.0)), gpu * float(budget_cfg.get("gpu_factor", 1.0))))
+		dcs.append(_info(RenderingServer.VIEWPORT_RENDER_INFO_DRAW_CALLS_IN_FRAME))
+		chs.append(chars)
 		along += speed * minf(dt, 50.0) / 1000.0
 		var a: Vector3 = path[seg]
 		var b: Vector3 = path[seg + 1]
@@ -163,6 +178,17 @@ func _leg(label: String, path: Array, speed: float) -> void:
 	print("  %-22s %5d frames | frame ms p50 %6.2f p95 %6.2f p99 %6.2f worst %7.2f | %4.1f%% under 30 fps | phys ms p50 %.2f p95 %.2f | ticks/frame p95 %d"
 			% [label, ft.size(), _pct(ft, 0.5), _pct(ft, 0.95), _pct(ft, 0.99), ft.max() if not ft.is_empty() else 0.0,
 			100.0 * slow / max(1, ft.size()), _pct(ph, 0.5), _pct(ph, 0.95), int(_pct(ticks, 0.95))])
+	if deck:
+		var fb := float(budget_cfg.get("frame_deck_ms_p95", 33.3))
+		var cb: Dictionary = budget_cfg.get("counts_p95", {})
+		print("DECK %s p50 %.2f p95 %.2f gpu_p95 %.2f draws_p95 %d chars_p95 %d" % [label, _pct(dk, 0.5), _pct(dk, 0.95),
+				_pct(gp, 0.95), int(_pct(dcs, 0.95)), int(_pct(chs, 0.95))])
+		if _pct(dk, 0.95) > fb:
+			deck_fail.append("%s deck p95 %.1f > %.1f ms" % [label, _pct(dk, 0.95), fb])
+		if cb.has("draws") and _pct(dcs, 0.95) > float(cb["draws"]):
+			deck_fail.append("%s draws p95 %d > %d" % [label, int(_pct(dcs, 0.95)), int(cb["draws"])])
+		if cb.has("characters") and _pct(chs, 0.95) > float(cb["characters"]):
+			deck_fail.append("%s characters p95 %d > %d" % [label, int(_pct(chs, 0.95)), int(cb["characters"])])
 
 func _strip_hlod(n: Node) -> void:
 	if n is MeshInstance3D and n.name == "HLOD":
@@ -176,7 +202,15 @@ func _initialize() -> void:
 		var kv := a.trim_prefix("--").split("=", true, 1)
 		args[kv[0]] = kv[1] if kv.size() > 1 else true
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
-	DisplayServer.window_set_size(Vector2i(1920, 1080))
+	deck = _arg("deck", false) != false
+	if deck:
+		budget_cfg = JSON.parse_string(FileAccess.get_file_as_string("res://tools/godot/perf_budget.json"))
+		var res: Array = budget_cfg.get("resolution", [1280, 800])
+		DisplayServer.window_set_size(Vector2i(int(res[0]), int(res[1])))
+		print("DECK PROXY: %dx%d, cpu x%.1f, gpu x%.1f, frame budget p95 %.1f ms" % [int(res[0]), int(res[1]),
+				float(budget_cfg["cpu_factor"]), float(budget_cfg["gpu_factor"]), float(budget_cfg["frame_deck_ms_p95"])])
+	else:
+		DisplayServer.window_set_size(Vector2i(1920, 1080))
 	Engine.max_fps = 0
 	var zm := root.get_node_or_null("ZoneManager")
 	if zm != null:
@@ -253,5 +287,12 @@ func _initialize() -> void:
 	print("  frames with the player UNDER the terrain: %d (must be 0, or the numbers are of the wrong world)" % under_terrain)
 	if under_terrain > 0:
 		worst_p95 = INF
+	if deck:
+		for f in deck_fail:
+			print("  DECK OVER BUDGET: " + f)
+		var ok := deck_fail.is_empty() and under_terrain == 0
+		print("RESULT %s deck proxy (%d over budget)" % ["PASS" if ok else "FAIL", deck_fail.size()])
+		quit(0 if ok else 1)
+		return
 	print("RESULT %s worst leg p95 %.2f ms (budget %.1f)" % ["PASS" if worst_p95 <= budget else "FAIL", worst_p95, budget])
 	quit(0 if worst_p95 <= budget else 1)
