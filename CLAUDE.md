@@ -7949,7 +7949,22 @@ it and the kerb or barrier, and a raised median has a side strip (側帯) with a
   `PANEL_HALF` 1.25 m each side of the track centre, top `PANEL_LIFT` 1 cm over the road, sunk 0.15 m, clipped
   to the road's edges (bisected along the track), in the rail's road collision. The rails lie flush with the panel's
   top. It used to be rails flush in the road's own asphalt.
-- Gates: `point_profile.py` (edge lines and their control), `point_mesh.py` (the panel's height, extent and collision).
+  - **The panel follows the ROAD's surface, not the rail's profile** (`point_mesh.on_road_surface` /
+    `road_surface_z`, applied to the panels and the flush rails over them). The rail is held at the road's height
+    only near its own stations, so on a road graded along its length and crossed obliquely, a panel laid on the rail
+    stood up to 0.12 m proud of the lane, and it is collision (`probe_rail_track` check 3, 4 of 59 crossings on
+    the first rebuild). Every vertex column is re-heighted to the road's interpolated spine (projected, not the
+    nearest 4 m sample) + `PANEL_LIFT`, thickness kept, grouped per crossed band so a prism moves whole.
+  - **A raised median is broken at a 踏切** (`point_mesh.median_runs`): the kerbed island stops
+    `MEDIAN_RAIL_CLEAR` (1 m) short of a rail band crossed at the road's own height, each side a capped island,
+    the carriageway asphalt (which runs under the island) left across the track. It used to run straight over the
+    rails, a 0.15 m kerb a train's wheels met, and the rail gauge sweep (from 0.5 m over the bed) cannot see it.
+- Gates: `point_profile.py` (edge lines and their control), `point_mesh.py` (the panel ON a street climbing 5 %
+  through the crossing, its thickness and collision, the flush rails on it, the median broken over the track on a
+  trunk road; controls: the panel left on the rail profile fails by 0.16 m, a road built with no rail keeps its
+  island over the track).
+- **Open: the road's lane lines are still painted across the 踏切 panels** (Japan stops the markings at the panel);
+  clip the mark polylines to the crossing as `point_furniture.clear_zones` does for a stop line.
 
 ## Ground is Terrain3D; road-generator was tried and REMOVED (2026-09-06 → 2026-09-13)
 

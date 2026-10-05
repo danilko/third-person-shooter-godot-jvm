@@ -11,7 +11,7 @@ material = ExtResource("lotmat")
 transform_format = 1
 instance_count = 1
 mesh = SubResource("LotBox")
-buffer = PackedFloat32Array(0.3401, 0.0000, -27.7979, 1278.5000, 0.0000, 0.5250, 0.0000, 5.3455, 27.7979, 0.0000, 0.3401, 780.5000)
+buffer = PackedFloat32Array(0.0000, 0.0000, -27.8000, 1278.5000, 0.0000, 0.5250, 0.0000, 5.3455, 27.8000, 0.0000, 0.0000, 780.5000)
 
 [sub_resource type="BoxShape3D" id="LotShape0"]
 size = Vector3(27.800, 0.525, 27.800)
@@ -26,7 +26,7 @@ visibility_range_begin_margin = 40.0
 visibility_range_fade_mode = 1
 
 [node name="PocketPark_000" parent="." instance=ExtResource("1")]
-transform = Transform3D(0.012234, 0, -0.999925, 0, 1, 0, 0.999925, 0, 0.012234, 1278.500, 5.623, 780.500)
+transform = Transform3D(0.000000, 0, -1.000000, 0, 1, 0, 1.000000, 0, 0.000000, 1278.500, 5.623, 780.500)
 
 [node name="Mesh" parent="./PocketPark_000" index="0"]
 visibility_parent = NodePath("../../HLOD")
@@ -38,5 +38,5 @@ multimesh = SubResource("Lots")
 collision_mask = 0
 
 [node name="Plinth0" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(0.012234, 0, -0.999925, 0, 1, 0, 0.999925, 0, 0.012234, 1278.500, 5.345, 780.500)
+transform = Transform3D(0.000000, 0, -1.000000, 0, 1, 0, 1.000000, 0, 0.000000, 1278.500, 5.345, 780.500)
 shape = SubResource("LotShape0")

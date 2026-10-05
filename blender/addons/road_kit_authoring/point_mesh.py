@@ -209,6 +209,49 @@ def raised_median(pts, values, lats=None):
     return fill, kerbs
 
 
+#: A raised median stops this far (plan) short of a rail band it would cross at its own height.
+MEDIAN_RAIL_CLEAR = 1.0
+
+
+def median_runs(pts, foreign):
+    """Index runs of a road's carrier on which its raised median stands: all of it, less every sample within
+    `MEDIAN_RAIL_CLEAR` of a foreign (rail) band crossed at the road's own height -- a level crossing. Each run is
+    swept as its own closed island, so the island ends in a capped kerb either side of the track."""
+    n = len(pts)
+    if not foreign or n < 2:
+        return [list(range(n))]
+    x0, x1 = min(p[0] for p in pts) - 30.0, max(p[0] for p in pts) + 30.0
+    y0, y1 = min(p[1] for p in pts) - 30.0, max(p[1] for p in pts) + 30.0
+    near = [b for b in foreign if b.x1 >= x0 and b.x0 <= x1 and b.y1 >= y0 and b.y0 <= y1]
+    if not near:
+        return [list(range(n))]
+
+    def hit(p):
+        for b in near:
+            if b.bbox_hit(p[0], p[1], 0.5 + MEDIAN_RAIL_CLEAR) and ped._signed_depth(b.poly, p[0], p[1]) > -MEDIAN_RAIL_CLEAR \
+                    and abs(b.lowest_surface_z(p[0], p[1]) - p[2]) < CROSSING_DZ:
+                return True
+        return False
+    bad = [hit(p) for p in pts]
+    # a span whose MIDPOINT is in the crossing takes both its ends (the carrier is ~4 m apart: a narrow track band
+    # can fall between two samples)
+    for i in range(n - 1):
+        a, b = pts[i], pts[i + 1]
+        if hit(tuple((a[k] + b[k]) / 2.0 for k in range(3))):
+            bad[i] = bad[i + 1] = True
+    runs, cur = [], []
+    for i in range(n):
+        if bad[i]:
+            if len(cur) >= 2:
+                runs.append(cur)
+            cur = []
+        else:
+            cur.append(i)
+    if len(cur) >= 2:
+        runs.append(cur)
+    return runs
+
+
 #: A `WALL` median's barrier: this wide (clamped to the island), the road's `barrier_height` tall, on the island's top.
 MEDIAN_WALL_HALF = 0.3
 
@@ -662,7 +705,27 @@ def _split_flagged(pts, flags):
     return [(f, r) for f, r in out if len(r) >= 2]
 
 
-def rails(pts, lats, offsets, holes):
+def _onto_crossed_roads(tris, near, pts, holes, lift):
+    """Each triangle re-heighted onto the road it crosses (`on_road_surface`); `lift` False = leave as swept."""
+    if lift is False or not tris:
+        return tris
+    groups, keep = {}, []
+    for t in tris:
+        cx, cy, cz = _centroid(t)
+        b = crossing_band(near, cx, cy, cz - lift)
+        if b is None:
+            # the bisected end of a run, a hair outside the band: the nearest crossed band
+            b = min((x for x in near if x.bbox_hit(cx, cy, 2.0)),
+                    key=lambda x: abs(x.lowest_surface_z(cx, cy) - cz), default=None)
+        if b is None:
+            keep.append(t)
+        else:
+            groups.setdefault(id(b), (b, []))[1].append(t)
+    # a whole band's triangles at once, so a prism's bottom face moves with its own top
+    return keep + [q for b, ts in groups.values() for q in on_road_surface(ts, b, lift)]
+
+
+def rails(pts, lats, offsets, holes, flush_only=None):
     """Two 50N-section rails per track at each of `offsets` (a foot, a web, a head, each a closed prism: the rail head
     stands `RAIL_H` over the bed); inside a crossing (`holes[i]`) as a flush strip. `[tri]`."""
     out = []
@@ -676,6 +739,8 @@ def rails(pts, lats, offsets, holes):
             for flush, run in _split_flagged(idx, holes):
                 rp = [pts[i] for i in run]
                 rl = [lats[i] for i in run]
+                if flush_only is False and flush or flush_only is True and not flush:
+                    continue
                 if flush:
                     # flush with the crossing PANEL's top (`crossing_panels`), not the road's
                     rv = [{"o": off, "hw": 0.5 * RAIL_HEAD_W}] * len(rp)
@@ -697,6 +762,40 @@ PANEL_HALF = 1.25
 PANEL_LIFT = 0.01
 PANEL_DEPTH = 0.15
 PANEL_MATERIAL = "M_Concrete"
+
+
+def road_surface_z(band, x, y, ref_z):
+    """The crossed road's OWN surface height at plan point (x, y): projected onto the band's spine segments and
+    interpolated (the nearest spine SAMPLE is a step every 4 m, 0.2 m on a 5 % road), taking, among the segments
+    within 0.5 m of the nearest, the one whose height is nearest `ref_z` (a loop covers a point twice; a wider slack
+    takes in the same leg's neighbouring segments, clamped to their ends, and their heights)."""
+    sp = band.spine
+    cands = []
+    for i in range(len(sp) - 1):
+        (ax, ay, az), (bx, by, bz) = sp[i], sp[i + 1]
+        dx, dy = bx - ax, by - ay
+        L2 = dx * dx + dy * dy
+        t = 0.0 if L2 < 1e-12 else max(0.0, min(1.0, ((x - ax) * dx + (y - ay) * dy) / L2))
+        cands.append((math.hypot(x - ax - dx * t, y - ay - dy * t), az + (bz - az) * t))
+    if not cands:
+        return band.lowest_surface_z(x, y)
+    near = min(d for d, _ in cands)
+    return min((z for d, z in cands if d <= near + 0.5), key=lambda z: abs(z - ref_z))
+
+
+def on_road_surface(tris, band, lift):
+    """Re-height a swept crossing piece (a panel prism, a flush rail strip) so its TOP lies `lift` over the crossed
+    road's own surface at every vertex, its thickness kept. The sweep lays it over the RAIL's profile, and the rail is
+    held at the road's height only near its stations: on a road graded along its length, crossed obliquely, the
+    panel then stood up to 0.12 m proud of the lane (probe_rail_track check 3, 2026-10-05). Vertices sharing a plan
+    point are one column (a prism's top and bottom) and move together."""
+    top = {}
+    for t in tris:
+        for p in t:
+            k = (round(p[0], 5), round(p[1], 5))
+            top[k] = max(top.get(k, -1e9), p[2])
+    shift = {k: road_surface_z(band, k[0], k[1], z - lift) + lift - z for k, z in top.items()}
+    return [tuple((p[0], p[1], p[2] + shift[(round(p[0], 5), round(p[1], 5))]) for p in t) for t in tris]
 
 
 def crossing_panels(pts, lats, offsets, holes, inside):
@@ -1032,9 +1131,15 @@ def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=
                     # a RAISED median is a KERBED ISLAND paved like the footway (user, 2026-09-27: "instead of the
                     # green pad, use the sidewalk kerb for the edge and fill it with sidewalk on top") -- and a solid
                     # one: the flat band it replaced had no sides at all, a sheet hanging 0.15 m over the asphalt
-                    fill, kerbs = raised_median(pts, values, lats)
-                    _add(objs, surf, style.material("footway"), fill)
-                    _add(objs, surf, style.material("kerb"), kerbs)
+                    # ...and it STOPS at a level crossing (Japanese practice: the island is broken for the track),
+                    # with the carriageway's asphalt, which runs under it, left across the track: a 0.15 m kerb
+                    # island standing over the rails was what a train's wheels met (2026-10-05, a picture of the
+                    # rinkai_dori 踏切; the gauge sweep starts 0.5 m over the bed and could not see it).
+                    for run in median_runs(pts, foreign if not rail else None):
+                        fill, kerbs = raised_median([pts[i] for i in run], [values[i] for i in run],
+                                                    [lats[i] for i in run])
+                        _add(objs, surf, style.material("footway"), fill)
+                        _add(objs, surf, style.material("kerb"), kerbs)
                     continue
                 _layer(objs, surf, style, med_slot if slot == "median" else slot, kind, oa, z, za, wa, ta,
                        pts, values, lats)
@@ -1084,11 +1189,16 @@ def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=
                 y0, y1 = min(p[1] for p in pts) - 30.0, max(p[1] for p in pts) + 30.0
                 near = [b for b in foreign if b.x1 >= x0 and b.x0 <= x1 and b.y1 >= y0 and b.y0 <= y1]
                 holes = [crossing_band(near, p[0], p[1], p[2]) is not None for p in pts]
-                _add(objs, name + "__rails", RAIL_MATERIAL, rails(pts, lats, track_offsets(s.road), holes))
                 offs = track_offsets(s.road)
+                _add(objs, name + "__rails", RAIL_MATERIAL,
+                     _onto_crossed_roads(rails(pts, lats, offs, holes, flush_only=False), near, pts, holes, False))
+                _add(objs, name + "__rails", RAIL_MATERIAL,
+                     _onto_crossed_roads(rails(pts, lats, offs, holes, flush_only=True), near, pts, holes,
+                                         PANEL_LIFT + ps.PAINT_Z_BIAS))
                 _add(objs, name + "__xpanel", PANEL_MATERIAL,
-                     crossing_panels(pts, lats, offs, holes,
-                                     lambda x, y, z: crossing_band(near, x, y, z) is not None))
+                     _onto_crossed_roads(crossing_panels(pts, lats, offs, holes,
+                                                         lambda x, y, z: crossing_band(near, x, y, z) is not None),
+                                         near, pts, holes, PANEL_LIFT))
                 slab = [slab_span(v) for v in values]
                 _add(objs, name + "__sleepers", SLEEPER_MATERIAL,
                      sleepers(pts, offs, [h or sl for h, sl in zip(holes, slab)]))
@@ -1345,7 +1455,8 @@ def self_test():
     straight(rnet, "line", [(0.0, 0.0, 0.3), (100.0, 0.0, 0.3), (200.0, 0.0, 0.3)])
     ppr.apply_preset(rnet, "line", "rail")
     fnet = pm.NetworkData()
-    straight(fnet, "street", [(100.0, -60.0, 0.3), (100.0, 0.0, 0.3), (100.0, 60.0, 0.3)])
+    # the street climbs 5 % THROUGH the crossing, so a panel laid on the (level) rail would stand proud of it
+    straight(fnet, "street", [(100.0, -60.0, -2.7), (100.0, 0.0, 0.3), (100.0, 60.0, 3.3)])
     straight(fnet, "under", [(170.0, -60.0, -8.0), (170.0, 0.0, -8.0), (170.0, 60.0, -8.0)])
     ppr.apply_preset(fnet, "street", "block")
     ppr.apply_preset(fnet, "under", "block")
@@ -1360,27 +1471,56 @@ def self_test():
             assert any(abs(v - (y - 0.5 * RAIL_HEAD_W)) < 1e-3 for v in ys), (y, ys)
     crossing_rail_top = max(p[2] for t in rl for p in t if abs(_centroid(t)[0] - 100.0) < 2.0)
     open_rail_top = max(p[2] for t in rl for p in t if abs(_centroid(t)[0] - 40.0) < 2.0)
-    assert crossing_rail_top < 0.3 + 0.05 and abs(open_rail_top - (0.3 + RAIL_H)) < 1e-6, (crossing_rail_top, open_rail_top)
+    assert abs(open_rail_top - (0.3 + RAIL_H)) < 1e-6, (crossing_rail_top, open_rail_top)   # flush: asserted below
     bed = [t for t in o["line__surface"].get(RAIL_BED_MATERIAL, [])]
     assert bed and not any(abs(_centroid(t)[0] - 100.0) < 2.0 for t in bed), "the bed runs through the crossing"
     assert [c[1] for c in rep.get("crossings", [])] == ["street"], rep.get("crossings")
     # the 踏切 panel: one per track, 1 cm over the road, only across the road (its edges bisected), in the collision
     xp = [t for ts in o["line__xpanel"].values() for t in ts]
     sbx = next(b for b in foreign if b.owner == "street")
-    road_z = sbx.lowest_surface_z(100.0, 0.0)
-    assert abs(max(p[2] for t in xp for p in t) - (road_z + PANEL_LIFT)) < 1e-3, (max(p[2] for t in xp for p in t), road_z)
+    road_z = road_surface_z(sbx, 100.0, 0.0, 0.3)
+    tops = {}
+    for t in xp:
+        for p in t:
+            k = (round(p[0], 4), round(p[1], 4))
+            tops[k] = max(tops.get(k, -1e9), p[2])
+    worst = max(abs(z - (road_surface_z(sbx, k[0], k[1], z) + PANEL_LIFT)) for k, z in tops.items())
+    assert worst < 1e-3, ("a panel top is off the road's surface + PANEL_LIFT", worst)
+    assert max(tops.values()) - min(tops.values()) > 0.2, ("the graded street did not tilt the panel", sorted(tops.items())[:3], sorted(tops.items())[-3:])
+    assert all(abs(min(p[2] for t in xp for p in t if (round(p[0], 4), round(p[1], 4)) == k) - (z - PANEL_DEPTH)) < 1e-3
+               for k, z in tops.items()), "a panel lost its thickness"
     span = (min(p[0] for t in xp for p in t), max(p[0] for t in xp for p in t))
     want = (min(q[0] for q in sbx.poly), max(q[0] for q in sbx.poly))
     assert abs(span[0] - want[0]) < 0.05 and abs(span[1] - want[1]) < 0.05, ("panel past the road", span, want)
     for c in track_offsets(rnet.roads["line"]):
         assert any(abs(p[1] - (c + PANEL_HALF)) < 1e-3 for t in xp for p in t), c
     col = [t for n, m in o.items() if n.startswith("line_road") for t in m.get(NO_MATERIAL, [])]
-    assert any(abs(_centroid(t)[2] - (road_z + PANEL_LIFT)) < 1e-3 for t in col), "the panel is not in the collision"
-    assert abs(crossing_rail_top - (road_z + PANEL_LIFT + ps.PAINT_Z_BIAS)) < 1e-3, crossing_rail_top
+    ctop = {(round(p[0], 4), round(p[1], 4), round(p[2], 4)) for t in col for p in t}
+    assert all((k[0], k[1], round(z, 4)) in ctop for k, z in tops.items()), "the panel is not in the collision"
+    flush = [p for t in rl for p in t if abs(_centroid(t)[0] - 100.0) < 2.0]
+    assert flush and max(abs(p[2] - (road_surface_z(sbx, p[0], p[1], p[2]) + PANEL_LIFT + ps.PAINT_Z_BIAS))
+                         for p in flush) < 1e-3, "a flush rail is off the panel's top"
     sl = [t for t in o["line__sleepers"][SLEEPER_MATERIAL]]
     n_sl = len(sl) // 10
     assert abs(n_sl - 2 * 200.0 / SLEEPER_SPACING) < 2 * 30.0 / SLEEPER_SPACING, n_sl     # two tracks, less the 踏切
     assert not any(abs(_centroid(t)[0] - 100.0) < 2.0 for t in sl), "a sleeper in the crossing"
+    # a RAISED median is broken at the 踏切: a trunk road built against the rail keeps no kerb island over the tracks
+    tnet = pm.NetworkData()
+    straight(tnet, "avenue", [(100.0, -60.0, 0.3), (100.0, 0.0, 0.3), (100.0, 60.0, 0.3)])
+    ppr.apply_preset(tnet, "avenue", "trunk")
+    rail_bands = ped.solve_all(rnet)[3]
+    rb = next(b for b in rail_bands if b.owner == "line")
+    for fb, want_gap in ((rail_bands, True), (None, False)):          # None: the control, built with no rail
+        ot = build(tnet, foreign=fb)
+        isl = [t for ts in ot.values() for m, tt in ts.items() if m in ("M_ConcreteTile", "M_Concrete") for t in tt]
+        isl = [t for t in isl if abs(_centroid(t)[0] - 100.0) < 1.5]          # the island, not the footways
+        assert isl, "no median island at all"
+        over = [t for t in isl if ped._signed_depth(rb.poly, _centroid(t)[0], _centroid(t)[1]) > -0.5]
+        assert (not over) == want_gap, ("median island over the track" if want_gap else "control: no island to cut",
+                                        len(over))
+        if want_gap:
+            assert any(_centroid(t)[1] > 10.0 for t in isl) and any(_centroid(t)[1] < -10.0 for t in isl), \
+                "the island is gone on one side too"
     assert abs(max(p[2] for t in sl for p in t) - (0.3 + SLEEPER_TOP)) < 1e-6
     for c in track_offsets(rnet.roads["line"]):
         assert any(abs(p[1] - (c + SLEEPER_HALF_W)) < 1e-6 for t in sl for p in t), c

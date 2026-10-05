@@ -7,9 +7,9 @@ material = ExtResource("lotmat")
 
 [sub_resource type="MultiMesh" id="Aprons"]
 transform_format = 1
-instance_count = 2
+instance_count = 1
 mesh = SubResource("ApronBox")
-buffer = PackedFloat32Array(2.0997, 0.0000, -0.0356, 1303.7760, 0.0000, 0.4000, 0.0000, 12.8590, 0.0374, 0.0000, 1.9997, -1300.5070, 2.0997, 0.0000, -0.0356, 1303.5080, 0.0000, 0.4000, 0.0000, 12.8590, 0.0374, 0.0000, 1.9997, -1285.5090)
+buffer = PackedFloat32Array(2.0997, 0.0000, -0.0356, 1303.6330, 0.0000, 0.4000, 0.0000, 12.8570, 0.0374, 0.0000, 1.9997, -1285.0070)
 
 [sub_resource type="BoxShape3D" id="ApronShape"]
 size = Vector3(2.100, 0.400, 2.000)
@@ -24,9 +24,5 @@ cast_shadow = 0
 collision_mask = 0
 
 [node name="Apron0" type="CollisionShape3D" parent="ApronCollision"]
-transform = Transform3D(0.999842, 0, -0.017801, 0, 1, 0, 0.017801, 0, 0.999842, 1303.776, 12.859, -1300.507)
-shape = SubResource("ApronShape")
-
-[node name="Apron1" type="CollisionShape3D" parent="ApronCollision"]
-transform = Transform3D(0.999842, 0, -0.017801, 0, 1, 0, 0.017801, 0, 0.999842, 1303.508, 12.859, -1285.509)
+transform = Transform3D(0.999842, 0, -0.017801, 0, 1, 0, 0.017801, 0, 0.999842, 1303.633, 12.857, -1285.007)
 shape = SubResource("ApronShape")
