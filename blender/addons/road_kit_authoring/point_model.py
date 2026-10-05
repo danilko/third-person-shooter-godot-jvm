@@ -256,6 +256,10 @@ ROAD_FIELDS = (
     #: slice as far back into the mountain as the cut is deep. Which side is uphill is DERIVED, per corridor point,
     #: from the natural ground (`roadkit_cli.py corridors`); the downhill side keeps the ordinary batter.
     ("cut_batter",    'f', 0.0),
+    #: The 側帯 (side strip) each side of a RAISED or WALL median, in metres, INSIDE `median_width`: the island is
+    #: `median_width - 2 * median_strip` wide and a solid white line runs along each strip's lane edge (道路構造令:
+    #: 0.25 m on an urban street, 0.75 m on an expressway). 0 = the island fills the median slot, no line.
+    ("median_strip",  'f', 0.0),
     #: Paint the lane markings at all. Off for a road whose surface is a placeholder, and off for
     #: every LOD-low bake -- stripes at 300 m are a triangle budget with nothing to show for it.
     ("markings", 'b', True),
@@ -415,8 +419,14 @@ def resolve_point(point, road):
 
     Returns a NEW PointData -- callers must never write through it back onto the authored point."""
     if road is None or point.profile_mode == OVERRIDE:
-        return point.copy()
+        out = point.copy()
+        if road is not None:
+            out.median_strip = float(getattr(road, "median_strip", 0.0))
+        return out
     out = road.base.copy()
+    # a ROAD fact the cross-section needs (`point_profile.build_profile`'s median lines); carried on the resolved
+    # station so every profile caller sees it without a second argument
+    out.median_strip = float(getattr(road, "median_strip", 0.0))
     out.uid = point.uid
     out.role = point.role
     out.pos = point.pos

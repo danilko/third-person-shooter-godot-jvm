@@ -2267,6 +2267,15 @@ def main(argv):
         raise SystemExit("island_expressway: %s already carries the expressway; pass --from <base record>" % base)
     ground = Ground()
     build(net, ground)
+    # a RAMP's shoulders are a ramp's (1.0 m outer, 0.5 m inner; point_record_ops.RAMP_SHOULDERS), whoever made it: a
+    # ramp built as one carriageway of the expressway preset (the T split, the terminal loop) would otherwise carry
+    # the mainline's 2.5 m breakdown shoulder, and its wider band lengthens every crossing it must clear
+    sh_out, sh_in = ro.RAMP_SHOULDERS
+    for name, r in net.roads.items():
+        if name.startswith(PREFIX) and r.road_class == "ramp" and not (r.base.lanes_fwd and r.base.lanes_bwd):
+            rev = not r.base.lanes_fwd
+            r.base.shoulder_left_width = sh_in if rev else sh_out
+            r.base.shoulder_right_width = sh_out if rev else sh_in
     for line in widen_ramps(net):
         print("island_expressway: widen " + line)
     speeds = post_speeds(net)

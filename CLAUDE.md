@@ -7925,6 +7925,32 @@ out of view.
   sent at join: the faction baseline). Bollards, bins and trees are the same mechanism, but none is flagged
   breakable yet.
 
+## Edge lines, shoulders and median strips; a 踏切 keeps its own panel (2026-10-05, user-asked)
+
+Japanese practice (道路構造令): a carriageway ends in a solid white edge line (車道外側線) with a shoulder (路肩) between
+it and the kerb or barrier, and a raised median has a side strip (側帯) with a white line each side.
+- **The shoulder was already a slot** (`shoulder_left/right_width`, `SH_L`/`SH_R`, paved inside the kerb line:
+  `paved_extents` excludes only footways); it carried no line and the presets set it to 0. Now
+  `point_profile.build_profile` paints `MARK_SOLID_W` on the lane/shoulder boundary wherever a shoulder exists (on
+  `SH_L` itself, on the outermost reverse lane for `SH_R`, on `F0` of a one-way road), and the LANES DO NOT MOVE: the
+  kerb, footway and everything beyond move out by the shoulder.
+- **`RoadData.median_strip`** (new road field, carried onto each resolved station by `resolve_point`): the 側帯 is
+  INSIDE `median_width`. The island is `median_width - 2 * strip` (`rka_med_h` in `point_solve`), and a solid white line
+  runs on each median slot edge. 0 = the old island, no line.
+- **Presets**: expressway outer shoulders 1.25 m (第2種 urban expressway, 首都高; 第1種 intercity would be 2.5 m), strip 0.2 m (median stays 1.0 m: the island is exactly the wall; a 0.75 m strip moved every lane 0.75 m out and broke 3 ramps and a crossing, measured);
+  trunk 0.5 m + strip 0.25 m (median 2.0 -> 2.5 m); arterial / block / farm 0.5 m; lane 0.75 m (路側帯);
+  coast 0.75 m (unchanged). Ramps (`point_record_ops.RAMP_SHOULDERS`): 1.0 m outer, 0.5 m inner; the OVERRIDE mouth
+  has none, so the shoulders open out of the gore. `point_presets.make_one_way` turns the median's strip into a
+  one-way carriageway's right shoulder (both halves of a split keep the strip and their bands do not overlap).
+- **Roads whose section predates this** (the island's arterials input): `tools/island_shoulders.py` applies
+  `point_presets.add_shoulders` (by road class; `CLASS_SHOULDERS`; a road that has a shoulder keeps it). It runs in
+  `island_layout.derive` on the input before the generators and again after the turnarounds. Idempotent.
+- **A level crossing keeps the track's surface** (`point_mesh.crossing_panels`): a precast concrete 踏切 panel per track,
+  `PANEL_HALF` 1.25 m each side of the track centre, top `PANEL_LIFT` 1 cm over the road, sunk 0.15 m, clipped
+  to the road's edges (bisected along the track), in the rail's road collision. The rails lie flush with the panel's
+  top. It used to be rails flush in the road's own asphalt.
+- Gates: `point_profile.py` (edge lines and their control), `point_mesh.py` (the panel's height, extent and collision).
+
 ## Ground is Terrain3D; road-generator was tried and REMOVED (2026-09-06 → 2026-09-13)
 
 `TERRAIN3D_TRANSITION.md` is the history of record. Ground moved from the Blender bake to in-engine

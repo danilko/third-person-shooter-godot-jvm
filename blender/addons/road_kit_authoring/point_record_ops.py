@@ -423,6 +423,9 @@ def make_ramp(net, uid_a, uid_b, lanes=1):
             "slot_stations": stations, "taper_span": span, "taper_want": want, "aligned": aligned}
 
 
+RAMP_SHOULDERS = (1.0, 0.5)     # (outer, inner) 路肩 of a ramp, m
+
+
 def branch_ramp(net, main_uid, name="", aux_lanes=1, carriageway="FWD", entrance=False,
                 length=80.0, spread=25.0, drop=0.0):
     """`RKA_OT_branch_ramp`: a NEW one-way ramp road leaving (or joining) `main_uid`, which may be any
@@ -436,8 +439,13 @@ def branch_ramp(net, main_uid, name="", aux_lanes=1, carriageway="FWD", entrance
     res = net.resolved(main_uid)
     rname = _unique_road_name(net, name or "%s_ramp" % main_road.name)
     fwd, bwd = (0, aux_lanes) if entrance else (aux_lanes, 0)
+    # a ramp's 路肩: 1.0 m on its outer (keep-left) side, 0.5 m on the inner; the outer side of a REVERSE-only ramp is
+    # -s (SH_R). The mouth station is OVERRIDE with no shoulder, so the shoulders open out of the gore.
+    sh_out, sh_in = RAMP_SHOULDERS
     base = pm.PointData(uid="", lanes_fwd=fwd, lanes_bwd=bwd, lane_width=res.lane_width,
-                        median_width=0.0, design_speed=max(30.0, res.design_speed - 20.0))
+                        median_width=0.0, design_speed=max(30.0, res.design_speed - 20.0),
+                        shoulder_left_width=sh_in if bwd else sh_out,
+                        shoulder_right_width=sh_out if bwd else sh_in)
     road = net.add_road(pm.RoadData(rname, base, (), road_class="ramp",
                                     ped_access=getattr(main_road, "ped_access", False)))
     mouth = net.add_station(road, net.points[main_uid].pos)

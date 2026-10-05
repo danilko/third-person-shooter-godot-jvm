@@ -66,6 +66,16 @@ def build_profile(pt, fwd_base=0, rev_base=0):
     med = float(pt.median_width) if (nf > 0 and nr > 0) else 0.0
     aux_med = (pt.aux_side == pm.MEDIAN)
     slots = []
+    # THE EDGE LINES (車道外側線). A Japanese carriageway ends in a solid white line with a shoulder (路肩) between
+    # it and the kerb or barrier -- 0.5 m on a street, 2.5 m on an expressway for a car that has broken down. The
+    # line is the boundary between the outermost lane and the shoulder, so it exists exactly where a shoulder does.
+    # `mark_left` is a slot's LOW-s edge: on the +s side that is the shoulder's own edge, on the -s side it is the
+    # outermost reverse lane's.
+    edge_r = lp.MARK_SOLID_W if float(pt.shoulder_right_width) > 0.0 else lp.MARK_NONE
+    edge_l = lp.MARK_SOLID_W if float(pt.shoulder_left_width) > 0.0 else lp.MARK_NONE
+    # the 側帯 lines along a raised / wall median (`RoadData.median_strip`, carried by `resolve_point`)
+    strip = float(getattr(pt, "median_strip", 0.0) or 0.0)
+    med_line = lp.MARK_SOLID_W if (strip > 0.0 and med > 2.0 * strip) else lp.MARK_NONE
 
     def add(sid, kind, width, dir=lp.NONE, mark=lp.MARK_NONE):
         if width > 0.0:
@@ -77,37 +87,44 @@ def build_profile(pt, fwd_base=0, rev_base=0):
     add("SH_R", lp.SHOULDER, pt.shoulder_right_width)
     if not aux_med:
         for k in range(ar - 1, -1, -1):
-            add(aux_rev_id(k), lp.AUX, lw, lp.REV, lp.MARK_NONE if k == ar - 1 else lp.MARK_DASH_W)
+            add(aux_rev_id(k), lp.AUX, lw, lp.REV, edge_r if k == ar - 1 else lp.MARK_DASH_W)
     for k in range(nr - 1, -1, -1):
         # `mark_left` is the line on a slot's LOW-s edge and this block runs outward-to-inward, so
         # the bare edge is the OUTERMOST lane -- unless an aux lane is outboard of it, in which
         # case the boundary between them is a real painted line.
         outermost = (k == nr - 1) and not (ar > 0 and not aux_med)
         add(rev_id(rev_base + k), lp.TRAVEL, lw, lp.REV,
-            lp.MARK_NONE if outermost else lp.MARK_DASH_W)
+            (edge_r if outermost else lp.MARK_DASH_W))
     if aux_med:
         for k in range(ar):
             add(aux_rev_id(k), lp.AUX, lw, lp.REV, lp.MARK_DASH_W)
 
     # ---- the divide --------------------------------------------------------------------------
-    # UNPAINTED: a median with real width IS the separator, and painting a solid yellow along its
-    # low edge draws a line through the physical island (a real user report on the scalar path).
-    add(MED_ID, lp.MEDIAN, med, lp.NONE, lp.MARK_NONE)
+    # NO yellow: a median with real width IS the separator, and painting a solid yellow along its
+    # low edge draws a line through the physical island (a real user report on the scalar path). What a
+    # Japanese median carries is a WHITE line along each 側帯 (`median_strip`), and only where the strips fit.
+    add(MED_ID, lp.MEDIAN, med, lp.NONE, med_line)
 
     # ---- forward side (+s) -------------------------------------------------------------------
     if aux_med:
         for k in range(af - 1, -1, -1):
-            add(aux_fwd_id(k), lp.AUX, lw, lp.FWD, lp.MARK_DASH_W)
+            add(aux_fwd_id(k), lp.AUX, lw, lp.FWD,
+                med_line if (k == af - 1 and med > 0.0) else lp.MARK_DASH_W)
     for k in range(nf):
         if k == 0 and not aux_med:
-            mark = lp.MARK_DOUBLE_Y if (nr > 0 and med <= 0.0) else lp.MARK_NONE
+            if nr <= 0 and ar <= 0:
+                mark = edge_r           # a ONE-WAY road: its right shoulder is beside its first lane
+            elif nr > 0 and med <= 0.0:
+                mark = lp.MARK_DOUBLE_Y
+            else:
+                mark = med_line if med > 0.0 else lp.MARK_NONE
         else:
             mark = lp.MARK_DASH_W
         add(fwd_id(fwd_base + k), lp.TRAVEL, lw, lp.FWD, mark)
     if not aux_med:
         for k in range(af):
             add(aux_fwd_id(k), lp.AUX, lw, lp.FWD, lp.MARK_DASH_W)
-    add("SH_L", lp.SHOULDER, pt.shoulder_left_width)
+    add("SH_L", lp.SHOULDER, pt.shoulder_left_width, lp.NONE, edge_l)
     add("PK_L", lp.PARKING, pt.parking_left_width)
     add("SW_L", lp.SIDEWALK, pt.left_walk_width)
     return lp.Profile(slots, lp.ANCHOR_DIVIDE)
@@ -470,6 +487,25 @@ def self_test():
     ext = lp.extents(pr)
     assert abs(ext[0] - ext[1]) < 1e-9, "a symmetric road is symmetric about the point"
     print("OK: the point IS the divide -- lanes expand either way, s = 0 on the median")
+    ok += 1
+
+    # -- the Japanese edge lines: a solid white line between the outermost lane and its shoulder, and one along each
+    #    side strip of a raised median; the lanes do not move ---------------------------------------------------
+    q = _p(lanes_fwd=2, lanes_bwd=2, median_width=2.5, shoulder_left_width=2.5, shoulder_right_width=2.5)
+    q.median_strip = 0.75
+    runs = {r["slot_id"]: (r["mark"], round(r["offsets"][0], 3))
+            for r in lp.marking_runs(lp.ProfileSet([build_profile(q)] * 2, [0.0, 1.0]), 2)}
+    lw = float(q.lane_width)
+    assert runs["SH_L"] == (lp.MARK_SOLID_W, 1.25 + 2 * lw), runs
+    assert runs["R1"] == (lp.MARK_SOLID_W, -(1.25 + 2 * lw)), runs
+    assert runs["F0"] == (lp.MARK_SOLID_W, 1.25) and runs["MED"] == (lp.MARK_SOLID_W, -1.25), runs
+    q0 = _p(lanes_fwd=2, lanes_bwd=2, median_width=2.5)
+    runs0 = {r["slot_id"]: r["mark"] for r in lp.marking_runs(lp.ProfileSet([build_profile(q0)] * 2, [0.0, 1.0]), 2)}
+    assert "SH_L" not in runs0 and "MED" not in runs0 and runs0.get("R1") is None, "no shoulder, no strip: no line"
+    one = {s.id: s.mark_left for s in build_profile(_p(lanes_fwd=1, lanes_bwd=0, shoulder_left_width=1.0,
+                                                       shoulder_right_width=0.5)).slots}
+    assert one["F0"] == lp.MARK_SOLID_W and one["SH_L"] == lp.MARK_SOLID_W, "a one-way road is lined both sides"
+    print("OK: edge lines -- solid white at every shoulder and along each 側帯 of a raised median, none without")
     ok += 1
 
     # -- one-way ---------------------------------------------------------------------------------

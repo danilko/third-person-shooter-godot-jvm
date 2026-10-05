@@ -566,7 +566,12 @@ def solve_road(net, road, uids=None, ground_fn=None):
             v["rka_med_h"] = min(med_w, MARK_WIDTH * 2.0) / 2.0 if med_w > 0.0 else 0.0
             v["rka_med_z"] = 0.0
         else:
-            v["rka_med_h"] = med_w / 2.0
+            # the island stands INSIDE its two 側帯 (`RoadData.median_strip`): the strips are paved road with a white
+            # line along their lane edge (`point_profile.build_profile`), so the kerb face sits that far off the lane
+            strip = float(getattr(road, "median_strip", 0.0) or 0.0)
+            if med_w <= 2.0 * strip:
+                strip = 0.0
+            v["rka_med_h"] = med_w / 2.0 - strip
             v["rka_med_z"] = kh_l if med_w > 0.0 else 0.0
         # where the divide's CENTRE is, across the road from the station (left positive): what a pier standing IN the
         # median of a road it runs over asks (`point_mesh.pier_on_road`, PLAN.md item 1 R3)

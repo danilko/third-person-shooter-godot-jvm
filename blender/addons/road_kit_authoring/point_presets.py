@@ -34,32 +34,43 @@ PRESETS = {
                  "median_style": pm.MED_WALL, "pillar_asset": "RKA_PIER_hammerhead",
                  # the world is compressed (CLAUDE.md "The merge taper is the metric standard x taper_factor"):
                  # half the book's taper, so an interchange fits between two city blocks
-                 "taper_factor": 0.5},
+                 "taper_factor": 0.5, "median_strip": 0.2},
+        # 道路構造令 第2種 (an URBAN expressway, 首都高): a 1.25 m outer shoulder outside the solid edge line (第1種, an
+        # intercity expressway, has 2.5 m; a breakdown on 首都高 uses 非常駐車帯 bays). The median stays 1.0 m: the
+        # 0.6 m wall plus a 0.2 m 側帯 each side, a solid line 0.2 m off the wall. MEASURED: a 0.75 m strip (median
+        # 2.5 m) moves every lane 0.75 m out, and the layout then broke the ramp rule on 3 ramps and a crossing.
         "base": {"lanes_fwd": 2, "lanes_bwd": 2, "lane_width": 4.5, "median_width": 1.0,
-                 "shoulder_left_width": 1.0, "shoulder_right_width": 1.0,
+                 "shoulder_left_width": 1.25, "shoulder_right_width": 1.25,
                  "left_walk_width": 0.0, "right_walk_width": 0.0, "design_speed": 80.0},
     },
     "trunk": {
-        "road": {"road_class": "arterial", "ped_access": True, "barrier_height": 1.0, "median_style": pm.MED_RAISED},
-        "base": {"lanes_fwd": 3, "lanes_bwd": 3, "lane_width": 4.5, "median_width": 2.0,
+        "road": {"road_class": "arterial", "ped_access": True, "barrier_height": 1.0, "median_style": pm.MED_RAISED,
+                 "median_strip": 0.25},
+        # a 0.5 m 路肩 inside each kerb and a 0.25 m 側帯 each side of the 2.0 m island (4種)
+        "base": {"lanes_fwd": 3, "lanes_bwd": 3, "lane_width": 4.5, "median_width": 2.5,
+                 "shoulder_left_width": 0.5, "shoulder_right_width": 0.5,
                  "left_walk_width": 4.0, "right_walk_width": 4.0, "left_kerb_height": 0.15,
                  "right_kerb_height": 0.15, "design_speed": 60.0},
     },
     "block": {
         "road": {"road_class": "street", "ped_access": True, "barrier_height": 1.0, "median_style": pm.MED_NONE},
         "base": {"lanes_fwd": 1, "lanes_bwd": 1, "lane_width": 4.5, "median_width": 0.0,
+                 "shoulder_left_width": 0.5, "shoulder_right_width": 0.5,
                  "left_walk_width": 2.0, "right_walk_width": 2.0, "left_kerb_height": 0.15,
                  "right_kerb_height": 0.15, "design_speed": 30.0},
     },
     "lane": {
         "road": {"road_class": "street", "ped_access": True, "barrier_height": 1.0, "median_style": pm.MED_NONE},
+        # the 路側帯: 0.75 m outside a solid white line, where a walker without a footway walks
         "base": {"lanes_fwd": 1, "lanes_bwd": 1, "lane_width": 4.5, "median_width": 0.0,
+                 "shoulder_left_width": 0.75, "shoulder_right_width": 0.75,
                  "left_walk_width": 0.0, "right_walk_width": 0.0, "left_kerb_height": 0.0,
                  "right_kerb_height": 0.0, "design_speed": 30.0},
     },
     "farm": {
         "road": {"road_class": "farm", "ped_access": True, "barrier_height": 1.0, "median_style": pm.MED_NONE},
         "base": {"lanes_fwd": 1, "lanes_bwd": 1, "lane_width": 3.5, "median_width": 0.0,
+                 "shoulder_left_width": 0.5, "shoulder_right_width": 0.5,
                  "left_walk_width": 0.0, "right_walk_width": 0.0, "left_kerb_height": 0.0,
                  "right_kerb_height": 0.0, "design_speed": 40.0},
     },
@@ -69,6 +80,7 @@ PRESETS = {
     "arterial": {
         "road": {"road_class": "arterial", "ped_access": True, "barrier_height": 1.0, "median_style": pm.MED_PAINT},
         "base": {"lanes_fwd": 2, "lanes_bwd": 2, "lane_width": 4.5, "median_width": 0.5,
+                 "shoulder_left_width": 0.5, "shoulder_right_width": 0.5,
                  "left_walk_width": 4.0, "right_walk_width": 4.0, "left_kerb_height": 0.15,
                  "right_kerb_height": 0.15, "design_speed": 50.0},
     },
@@ -93,6 +105,47 @@ PRESETS = {
 
 class PresetError(Exception):
     pass
+
+
+#: The shoulders by road CLASS, for a road whose section was written before shoulders existed (the island's arterials
+#: input, PLAN.md "edge lines"). (outer each side, median 側帯). A road already carrying a shoulder keeps it.
+CLASS_SHOULDERS = {"arterial": (0.5, 0.25), "street": (0.5, 0.0), "farm": (0.5, 0.0)}
+
+
+def add_shoulders(net, road_name):
+    """Give `road_name` its class's 路肩 and 側帯 (`CLASS_SHOULDERS`) without touching its lanes, its kerbs or its
+    footways: the shoulders are paved INSIDE the kerb, so the kerb, the footway and everything beyond move out by the
+    shoulder; the lanes stay where they are. Idempotent. Returns True if anything changed."""
+    road = net.roads[road_name]
+    rule = CLASS_SHOULDERS.get(road.road_class)
+    if rule is None:
+        return False
+    outer, strip = rule
+    changed = False
+    b = road.base
+    for f in ("shoulder_left_width", "shoulder_right_width"):
+        if float(getattr(b, f)) <= 0.0:
+            setattr(b, f, outer)
+            changed = True
+    if (strip > 0.0 and road.median_style in (pm.MED_RAISED, pm.MED_WALL) and float(road.median_strip) <= 0.0
+            and float(b.median_width) > 0.0):
+        road.median_strip = strip
+        b.median_width = float(b.median_width) + 2.0 * strip     # the island keeps its width; the strips are added
+        changed = True
+    return changed
+
+
+def make_one_way(road, lanes=None):
+    """Turn a two-way base into ONE carriageway: no reverse lanes, no median, and the median's 側帯 becomes the
+    carriageway's RIGHT shoulder (the median side), so two one-way halves leaving a divided road at a joint each keep
+    the strip they had and their paved bands do not overlap."""
+    b = road.base
+    if lanes is not None:
+        b.lanes_fwd = lanes
+    b.lanes_bwd = 0
+    b.median_width = 0.0
+    b.shoulder_right_width = float(getattr(road, "median_strip", 0.0) or 0.0)
+    road.median_strip = 0.0
 
 
 def apply_preset(net, road_name, preset):

@@ -135,7 +135,12 @@ def derive(out):
     stale = os.path.join(ROOT, "assets", "world_source", "island_dike_line.json")
     if os.path.exists(stale):
         os.remove(stale)
-    sys.stdout.write(run(os.path.join(HERE, "island_coast_road.py"), "add", tmp, "--from", INPUT))
+    # the Japanese edge line + shoulder (路肩) and median strip (側帯) on every arterial of the input, whose sections
+    # predate them, BEFORE anything is derived from their widths (island_shoulders.py)
+    shoulders = out + ".shoulders.json"
+    sys.stdout.write(run(os.path.join(HERE, "island_shoulders.py"), shoulders, "--from", INPUT))
+    sys.stdout.write(run(os.path.join(HERE, "island_coast_road.py"), "add", tmp, "--from", shoulders))
+    os.remove(shoulders)
     sys.stdout.write(run(os.path.join(HERE, "island_touges.py"), "add", tmp))
     # the ring road is the dike (user, 2026-09-26): its crest heights and the arterials' ramps BEFORE the streets,
     # which then keep off the embankment (island_dike.CORRIDOR) and never T into it
@@ -155,6 +160,8 @@ def derive(out):
     sys.stdout.write(run(os.path.join(HERE, "island_core_streets.py"), out, "--after"))
     sys.stdout.write(run(os.path.join(HERE, "island_site_access.py"), out))
     sys.stdout.write(run(os.path.join(HERE, "island_turnarounds.py"), out))
+    # ...and on any road a generator made with a hand-copied section (before the setback, which sizes pads by width)
+    sys.stdout.write(run(os.path.join(HERE, "island_shoulders.py"), out))
     sys.stdout.write(run(os.path.join(HERE, "island_dike.py"), "raise", out))     # ramps for the later roads
     # a mouth past (or inside) the road it meets -- a road that overshot the crossing -- is moved back out first: the
     # setback solve slides a mouth along its own road and cannot recover one that crossed over (check_mouth_sides)

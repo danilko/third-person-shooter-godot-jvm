@@ -677,12 +677,70 @@ def rails(pts, lats, offsets, holes):
                 rp = [pts[i] for i in run]
                 rl = [lats[i] for i in run]
                 if flush:
+                    # flush with the crossing PANEL's top (`crossing_panels`), not the road's
                     rv = [{"o": off, "hw": 0.5 * RAIL_HEAD_W}] * len(rp)
-                    out += sweep(rp, rv, "band", "o", ps.PAINT_Z_BIAS, "", "hw", "", rl)
+                    out += sweep(rp, rv, "band", "o", PANEL_LIFT + ps.PAINT_Z_BIAS, "", "hw", "", rl)
                     continue
                 for hw, z, t in parts:
                     rv = [{"o": off, "hw": hw, "z": z, "t": t}] * len(rp)
                     out += sweep(rp, rv, "deck", "o", 0.0, "z", "hw", "t", rl)
+    return out
+
+
+#: THE 踏切 PANEL (踏切舗装板). Where a track crosses a road it keeps its OWN surface: a precast concrete panel per track,
+#: PANEL_HALF either side of the track centre (a 2.5 m panel: the sleeper length plus a margin, the usual JR panel),
+#: its top PANEL_LIFT (1 cm) over the road so the road edge never laps onto the track, sunk PANEL_DEPTH into it; the
+#: rails lie flush with the panel's top. Built only across the road (the crossing's exact entry and exit along the
+#: track are bisected), in the road collision. User, 2026-10-05: "the train lane should keep its own concrete, about
+#: 1 cm above the road, rather than merge completely with the road".
+PANEL_HALF = 1.25
+PANEL_LIFT = 0.01
+PANEL_DEPTH = 0.15
+PANEL_MATERIAL = "M_Concrete"
+
+
+def crossing_panels(pts, lats, offsets, holes, inside):
+    """The 踏切 panels over each run of `holes`, clipped to where `inside(x, y, z)` (the crossed road) holds: the run's
+    two ends are bisected onto that boundary, so a panel starts and stops at the road's edge, not a carrier sample
+    (~4 m) past it. `[tri]`."""
+    out = []
+    n = len(pts)
+
+    def lerp(a, b, t):
+        return tuple(a[k] + (b[k] - a[k]) * t for k in range(len(a)))
+
+    def edge(i_out, i_in):
+        lo, hi = 0.0, 1.0           # 0 = the outside sample, 1 = the inside one
+        a, b = pts[i_out], pts[i_in]
+        for _ in range(20):
+            m = 0.5 * (lo + hi)
+            if inside(*lerp(a, b, m)):
+                hi = m
+            else:
+                lo = m
+        return lerp(a, b, hi), lerp(lats[i_out], lats[i_in], hi)
+    i = 0
+    while i < n:
+        if not holes[i]:
+            i += 1
+            continue
+        j = i
+        while j + 1 < n and holes[j + 1]:
+            j += 1
+        rp, rl = [pts[k] for k in range(i, j + 1)], [lats[k] for k in range(i, j + 1)]
+        if i > 0:
+            p, l = edge(i - 1, i)
+            rp.insert(0, p)
+            rl.insert(0, l)
+        if j + 1 < n:
+            p, l = edge(j + 1, j)
+            rp.append(p)
+            rl.append(l)
+        if len(rp) >= 2:
+            for c in offsets:
+                rv = [{"o": c, "hw": PANEL_HALF, "z": PANEL_LIFT, "t": PANEL_DEPTH}] * len(rp)
+                out += sweep(rp, rv, "deck", "o", 0.0, "z", "hw", "t", rl)
+        i = j + 1
     return out
 
 
@@ -1028,6 +1086,9 @@ def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=
                 holes = [crossing_band(near, p[0], p[1], p[2]) is not None for p in pts]
                 _add(objs, name + "__rails", RAIL_MATERIAL, rails(pts, lats, track_offsets(s.road), holes))
                 offs = track_offsets(s.road)
+                _add(objs, name + "__xpanel", PANEL_MATERIAL,
+                     crossing_panels(pts, lats, offs, holes,
+                                     lambda x, y, z: crossing_band(near, x, y, z) is not None))
                 slab = [slab_span(v) for v in values]
                 _add(objs, name + "__sleepers", SLEEPER_MATERIAL,
                      sleepers(pts, offs, [h or sl for h, sl in zip(holes, slab)]))
@@ -1050,7 +1111,7 @@ def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=
                             report.setdefault("crossings", []).append(
                                 (name, b.owner if b is not None else "", round(mid[0], 2), round(mid[1], 2),
                                  round(mid[2], 2)) + crossing_frame(pts, k, b))
-                _collision(objs, [surf], edge_names, name, bool(s.road.ped_access))
+                _collision(objs, [surf, name + "__xpanel"], edge_names, name, bool(s.road.ped_access))
                 continue
             for yellow in (False, True):
                 for r in (r for r in ps.solve_marks(s) if r.yellow is yellow):
@@ -1303,6 +1364,19 @@ def self_test():
     bed = [t for t in o["line__surface"].get(RAIL_BED_MATERIAL, [])]
     assert bed and not any(abs(_centroid(t)[0] - 100.0) < 2.0 for t in bed), "the bed runs through the crossing"
     assert [c[1] for c in rep.get("crossings", [])] == ["street"], rep.get("crossings")
+    # the 踏切 panel: one per track, 1 cm over the road, only across the road (its edges bisected), in the collision
+    xp = [t for ts in o["line__xpanel"].values() for t in ts]
+    sbx = next(b for b in foreign if b.owner == "street")
+    road_z = sbx.lowest_surface_z(100.0, 0.0)
+    assert abs(max(p[2] for t in xp for p in t) - (road_z + PANEL_LIFT)) < 1e-3, (max(p[2] for t in xp for p in t), road_z)
+    span = (min(p[0] for t in xp for p in t), max(p[0] for t in xp for p in t))
+    want = (min(q[0] for q in sbx.poly), max(q[0] for q in sbx.poly))
+    assert abs(span[0] - want[0]) < 0.05 and abs(span[1] - want[1]) < 0.05, ("panel past the road", span, want)
+    for c in track_offsets(rnet.roads["line"]):
+        assert any(abs(p[1] - (c + PANEL_HALF)) < 1e-3 for t in xp for p in t), c
+    col = [t for n, m in o.items() if n.startswith("line_road") for t in m.get(NO_MATERIAL, [])]
+    assert any(abs(_centroid(t)[2] - (road_z + PANEL_LIFT)) < 1e-3 for t in col), "the panel is not in the collision"
+    assert abs(crossing_rail_top - (road_z + PANEL_LIFT + ps.PAINT_Z_BIAS)) < 1e-3, crossing_rail_top
     sl = [t for t in o["line__sleepers"][SLEEPER_MATERIAL]]
     n_sl = len(sl) // 10
     assert abs(n_sl - 2 * 200.0 / SLEEPER_SPACING) < 2 * 30.0 / SLEEPER_SPACING, n_sl     # two tracks, less the 踏切

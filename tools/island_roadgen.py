@@ -273,8 +273,7 @@ def chain_road(net, name, pts3, preset="expressway", one_way=False):
     if preset:
         pr.apply_preset(net, name, preset)
     if one_way:
-        r.base.lanes_bwd = 0
-        r.base.median_width = 0.0
+        pr.make_one_way(r)
     prev = None
     for q in pts3:
         p = net.add_station(r, q)

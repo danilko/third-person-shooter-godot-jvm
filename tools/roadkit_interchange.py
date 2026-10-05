@@ -145,8 +145,7 @@ def build_loop():
         r = road(net, name, pts)
         pr.apply_preset(net, name, "expressway")
         r.road_class = cls
-        r.base.lanes_bwd = 0
-        r.base.median_width = 0.0
+        pr.make_one_way(r)
         for u in r.points:
             net.points[u].lanes_fwd, net.points[u].lanes_bwd = lanes, 0
         return r

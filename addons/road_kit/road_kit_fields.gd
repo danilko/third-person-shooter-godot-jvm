@@ -90,5 +90,6 @@ const ROAD_FIELDS := [
 	["barrier_asset", "s", "", []],
 	["pillar_asset", "s", "", []],
 	["cut_batter", "f", 0.0, []],
+	["median_strip", "f", 0.0, []],
 	["markings", "b", true, []],
 ]
