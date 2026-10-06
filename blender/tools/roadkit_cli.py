@@ -169,11 +169,26 @@ def _keep_out(a):
     return [(b[0], -b[1], b[2], -b[3], b[4], b[5]) for b in doc.get("boxes", ())]
 
 
+def _with_entries(net, a):
+    """`--keep-out <json>`'s `entries` (car-park driveways, `island_buildings.py write`, Godot frame `[x, z, width]`)
+    applied to the network IN MEMORY as dropped-kerb vehicle entries (`point_record_ops.apply_entries`): the record
+    stays the layout's output, and every command that builds pieces (`pieces`, `gltf`) sees the same kerb cuts."""
+    path = getattr(a, "keep_out", "") or ""
+    if not path or not os.path.exists(path):
+        return net
+    with open(path) as fh:
+        ents = json.load(fh).get("entries", ())
+    if ents:
+        import point_record_ops as pro
+        pro.apply_entries(net, [(e[0], -e[1], e[2]) for e in ents])
+    return net
+
+
 def cmd_pieces(a):
     """B6: cut ONE network into a piece per zone (`point_zones`). Writes `<out_dir>/<piece>.lanekit.json`
     per piece and reports the table the build script and the plugin's marker wiring both read -- so
     neither of them computes a piece name or a zone for itself."""
-    net = pm.load_network(a.record)
+    net = _with_entries(pm.load_network(a.record), a)
     zones = pz.load_zones(a.zones) if a.zones and os.path.exists(a.zones) else []
     gate = _findings(net)
     part = pz.partition(net, zones)
@@ -435,7 +450,7 @@ def cmd_gltf(a):
     `--only` names the pieces to write (the dirty ones); a red gate writes nothing."""
     import time
     t0 = time.time()
-    net = pm.load_network(a.record)
+    net = _with_entries(pm.load_network(a.record), a)
     zones = pz.load_zones(a.zones) if a.zones and os.path.exists(a.zones) else []
     # `--gated`: the caller ran the gate on this record already (`build_roads_piece.sh` runs `pieces` first, which
     # refuses a red one) -- it is most of this command's time, and the same answer twice.

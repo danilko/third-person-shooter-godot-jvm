@@ -431,6 +431,11 @@ def lib_piece(ref, root):
     return res + "/" + pieces["pieces"][name]["path"], pieces["pieces"][name], name
 
 
+#: The sloped edge of a paved composite (`apron_edge`); the same numbers as `blender/tools/library_procedural.py`'s.
+APRON_EDGE_W = 0.6
+APRON_EDGE_DROP = 0.065
+
+
 def rot_xz(yaw, x, z):
     """A point turned `yaw` degrees about +Y (Godot's sense: 90 takes +Z to +X)."""
     a = math.radians(yaw)
@@ -742,6 +747,35 @@ def layout_composite(c, built, root):
                 if any(r[0] - 0.01 <= x <= r[1] + 0.01 and r[2] - 0.01 <= z <= r[3] + 0.01 for r in rects):
                     continue
                 out["pieces"].append({"piece": name, "path": path, "pos": [round(x, 5), 0.0, round(z, 5)], "yaw": 0.0})
+    # `apron_edge: true` (user 2026-10-05: "--\\ slope on the side so no direct spike when cars drive on it"): the apron
+    # stands FLOOR_LIFT over the block ground, so its plain edge is a step a tyre hits. A ring of `Apron_Edge` strips
+    # (and `Apron_EdgeCorner` at the corners) falls from the apron's top to APRON_EDGE_DROP under it, APRON_EDGE_W out,
+    # and the paved collider is a convex slab whose sides slope the same way. The ring lies OUTSIDE the footprint
+    # (`apron_edge_m`, which probe_buildings allows on every side); island_buildings gives such a site no plinth.
+    edge = bool(c.get("apron") and c.get("apron_edge"))
+    if edge:
+        _p, eentry, ename = lib_piece("library:Apron_Edge", root)
+        _cp, _ce, cname = lib_piece("library:Apron_EdgeCorner", root)
+        el = eentry["size"][0]
+        for side, (yaw, length) in enumerate(((0.0, W), (90.0, D), (180.0, W), (270.0, D))):
+            n = int(round(length / el))
+            if abs(n * el - length) > 0.01:
+                raise SystemExit(f"{c['id']}: apron_edge needs sides in whole {el} m modules ({length})")
+            for i in range(n):
+                t = -length / 2 + el * (i + 0.5)
+                lx, lz = rot_xz(yaw, t, 0.0)
+                ox, oz = rot_xz(yaw, 0.0, (D if side % 2 == 0 else W) / 2)
+                out["pieces"].append({"piece": ename, "path": _p, "pos": [round(lx + ox, 5), 0.0, round(lz + oz, 5)],
+                                      "yaw": yaw})
+        for yaw, (cx, cz) in ((0.0, (W / 2, D / 2)), (90.0, (W / 2, -D / 2)), (180.0, (-W / 2, -D / 2)),
+                              (270.0, (-W / 2, D / 2))):
+            out["pieces"].append({"piece": cname, "path": _cp, "pos": [round(cx, 5), 0.0, round(cz, 5)], "yaw": yaw})
+        e, d_ = APRON_EDGE_W, APRON_EDGE_DROP
+        out.setdefault("hull_points", []).append(
+            [[x * W / 2, 0.0, z * D / 2] for x in (-1, 1) for z in (-1, 1)]
+            + [[x * (W / 2 + e), -d_, z * (D / 2 + e)] for x in (-1, 1) for z in (-1, 1)]
+            + [[x * (W / 2 + e), -d_ - 0.05, z * (D / 2 + e)] for x in (-1, 1) for z in (-1, 1)])
+        out["apron_edge_m"] = e
     gb = c.get("ground_box")
     if isinstance(gb, list):
         # `ground_box: [x0, z0, x1, z1]` -- the paved ground's collider over part of the footprint only (a pier's
@@ -749,7 +783,8 @@ def layout_composite(c, built, root):
         out["boxes"].append({"center": [round((gb[0] + gb[2]) / 2, 5), -0.05, round((gb[1] + gb[3]) / 2, 5)],
                              "size": [round(gb[2] - gb[0], 5), 0.1, round(gb[3] - gb[1], 5)]})
     elif c.get("apron") or gb:
-        # the paved ground's collider (`ground_box`: a site paved with its own tiles, an airfield's runway)
+        # the paved ground's collider (`ground_box`: a site paved with its own tiles, an airfield's runway); with an
+        # `apron_edge` it lies wholly inside the sloped slab above, and is kept for the probe's roof/floor reading
         out["boxes"].append({"center": [0, -0.05, 0], "size": [round(W, 5), 0.1, round(D, 5)]})
     px, pz = c.get("probe_xz", [0.3, 0.3])
     tops = [bx["center"][1] + bx["size"][1] / 2 for bx in out["boxes"]

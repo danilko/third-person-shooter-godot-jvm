@@ -597,6 +597,18 @@ def type_aabb(name):
     return (p[0], p[2], p[0] + s[0], p[2] + s[2], p[1] + s[1])
 
 
+_EDGES = {}
+
+
+def type_apron_edge(name):
+    """The sloped-edge width a paved composite carries outside its footprint (`apron_edge_m` in its meta), else 0."""
+    if name not in _EDGES:
+        text = open(os.path.join(BLD_DIR, name + ".tscn")).read()
+        m = re.search(r'"apron_edge_m": ([0-9.]+)', text)
+        _EDGES[name] = float(m.group(1)) if m else 0.0
+    return _EDGES[name]
+
+
 # ------------------------------------------------------------------------------------------ masks
 
 class Field(object):
@@ -2336,7 +2348,9 @@ def cell_scene(name, blds, passages=(), fields=(), aprons=()):
     run time rather than anything a build step reported."""
     types = sorted({scene_of(b) for b in blds})
     ids = {t: str(i + 1) for i, t in enumerate(types)}
-    lots = [b for b in blds if "lot" in b]
+    # a paved site with a sloped EDGE (`apron_edge`: a car park, a forecourt) has no plinth: its own slab slopes down
+    # past the ground on every side, and a plinth's 3 cm box edge under it would be the very step it removes
+    lots = [b for b in blds if "lot" in b and not type_apron_edge(b["type"])]
     ext, sub, nodes = ["[gd_scene format=3]\n\n"], [], ['[node name="%s" type="Node3D"]\n' % name]
 
     for t in types:
@@ -2399,7 +2413,8 @@ def cell_scene(name, blds, passages=(), fields=(), aprons=()):
             # the override is on the type's Mesh node, addressed by the surface index that type's own meta records
             nodes.append('\n[node name="Mesh" parent="./%s_%03d" index="0"]\n%s\n'
                          % (scene_of(b), k, "\n".join(lines)))
-    drives = [b for b in blds if "drive" in b]
+    # a driveway the road took as a dropped-kerb entry needs no gutter wedge (`drive_entries`); a refused one keeps it
+    drives = [b for b in blds if "drive" in b and id(b) not in ENTRY_TAKEN]
     if drives:
         sub.append('[sub_resource type="StandardMaterial3D" id="DriveMat"]\nalbedo_color = Color(0.16, 0.16, 0.17, 1)\n'
                    'roughness = 0.9\n\n')
@@ -2928,8 +2943,66 @@ def keep_out_boxes(buildings):
     return out
 
 
+ENTRY_FRONT_W = 6.0      # a street-front car park's 乗入れ (Japan: 4-6 m, wider by permit), centred on its front
+
+
+def drive_entries(buildings):
+    """The car-park DRIVEWAYS as dropped-kerb vehicle entries (user, 2026-10-05: "the car park looks like a random
+    plate ... do the connect"): `[(index into buildings, [x, z, width])]`, Godot frame, only those the road network
+    TAKES. A deep-pocket car park's entry is its driveway's mouth at the kerb (`drive`, DRIVEWAY_W; a refused one keeps
+    the old gutter wedge); a street-front one opens on its front, at the middle or -- a corner lot whose middle is at
+    a junction -- slid along the front to the first spot clear of it. `roadkit_cli --keep-out` applies the written
+    list to the road network at build time (`point_record_ops.apply_entries`, the same calls in the same order as
+    here, so the same answers): the road's own kerb drops there and the asphalt runs from the carriageway into the
+    lot -- the record stays the layout's output."""
+    for p in (os.path.join(ROOT, "blender", "lib"), os.path.join(ROOT, "blender", "addons", "road_kit_authoring")):
+        if p not in sys.path:
+            sys.path.insert(0, p)
+    import point_record_ops as pro
+    net = pm.load_network(RECORD)
+    out = []
+    for k, b in enumerate(buildings):
+        t = b["type"]
+        if "drive" not in b and not t.startswith("Parking"):
+            continue
+        x0, z0, x1, z1, _h = type_aabb(SIGN_OF.get(t, t))
+        a = math.radians(b["yaw"])
+        c, s_ = math.cos(a), math.sin(a)
+        if "drive" in b:
+            cands, kz, w = [0.0], b["drive"], DRIVEWAY_W
+        else:
+            w = min(ENTRY_FRONT_W, max(3.0, x1 - x0 - 1.0))
+            mid, room = (x0 + x1) / 2.0, max(0.0, (x1 - x0 - w) / 2.0)
+            cands, kz = [mid], z1
+            step = 1.0
+            while step <= room + 1e-6:
+                cands += [mid - step, mid + step]
+                step += 1.0
+        for lx in cands:
+            e = [round(b["pos"][0] + lx * c + kz * s_, 3), round(b["pos"][2] - lx * s_ + kz * c, 3), w]
+            if pro.add_entry(net, e[0], -e[1], w) is not None:
+                out.append((k, e))
+                break
+    return out
+
+
+def drive_candidates(buildings):
+    """How many car parks ask for an entry (the denominator `write` reports)."""
+    return [k for k, b in enumerate(buildings) if "drive" in b or b["type"].startswith("Parking")]
+
+
+ENTRIES, ENTRY_TAKEN = [], set()
+
+
 def write(check):
+    global ENTRIES, ENTRY_TAKEN
     doc = json.load(open(OUT))
+    ENTRIES = drive_entries(doc["buildings"])
+    taken = {k for k, _e in ENTRIES}
+    ENTRY_TAKEN = {id(doc["buildings"][k]) for k in taken}
+    asked = drive_candidates(doc["buildings"])
+    print("island_buildings: %d car park(s) -> %d dropped-kerb entries; %d driveway(s) keep the gutter wedge"
+          % (len(asked), len(taken), sum(1 for k in asked if k not in taken and "drive" in doc["buildings"][k])))
     cells = {}
     for b in doc["buildings"]:
         cells.setdefault(cell_of(b["pos"][0], b["pos"][2]), []).append(b)
@@ -3033,8 +3106,10 @@ def write(check):
     new = patch_start(new, doc)
     ko = json.dumps({"schema": 1, "source": "tools/island_buildings.py write",
                      "note": "car-park entrances road furniture keeps clear of: [cx, cz, ux, uz, half_across, "
-                             "half_deep], Godot frame, u into the lot (roadkit_cli --keep-out)",
-                     "boxes": keep_out_boxes(doc["buildings"])}, separators=(",", ":")) + "\n"
+                             "half_deep], Godot frame, u into the lot (roadkit_cli --keep-out); entries: the "
+                             "driveways' dropped kerbs [x, z, width], Godot frame",
+                     "boxes": keep_out_boxes(doc["buildings"]),
+                     "entries": [e for _k, e in ENTRIES]}, separators=(",", ":")) + "\n"
     if not os.path.exists(KEEP_OUT) or open(KEEP_OUT).read() != ko:
         changed.append(KEEP_OUT)
         if not check:

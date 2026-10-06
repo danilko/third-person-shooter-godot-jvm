@@ -10716,7 +10716,8 @@ that `probe_road_clear` or the layout gates measured.
   `corner_runaway`. On the old record it caught 6, including a 5-arm pad's three (1.1-1.8 km) and one of 4.1 km.
   That 5-arm pad was split in the arterials INPUT: `nishi_dori` passes through as a joint, and `rinkai_dori` x
   `kichi_dori` is a T.
-- **ONE LOOK, TWO MATERIALS, kerb to door** (user, 2026-09-25): PUBLIC = the footway,
+- **ONE LOOK, TWO MATERIALS, kerb to door** (user, 2026-09-25; both ASPHALT since 2026-10-05, see "Asphalt from kerb
+  to door"): PUBLIC = the footway,
   `road_kit/materials/M_ConcreteTile.tres` (`point_kit.DEFAULT_MATERIAL["footway"]`); PRIVATE (民地) = every building's
   lot slab (`island_buildings.LOT_MATERIAL`) and the block ground between them,
   `buildings/materials/M_LotConcrete.tres`. They ship with the SAME values (plain grey cast concrete, 土間コンクリート,
@@ -11805,7 +11806,44 @@ stamped ground under a road is 10 cm below the asphalt, so a cut leaves a pit). 
 - **The comparison street**: `tools/roadkit_entry_test.py` writes `EntryTest.roads.json` (one lane each way, 3 m
   footways, the three styles plus an ordinary kerb); `build_roads_piece.sh ... Roads_EntryTest`;
   `tools/godot/probe_entry_test.gd` (profiles + SPC-1 and CRT-1 driven in; `-- --shot=<dir>` pictures).
-- Not wired yet: the island's car-park driveways (`island_buildings` `drive`) still get the old gutter wedge.
+- **The island's car parks are wired to it (2026-10-05, user: "the car park looks like a random plate ... do the
+  connect").** `island_buildings.drive_entries` turns every car park into an entry -- a deep-pocket one at its
+  driveway's kerb point (`drive`, DRIVEWAY_W 5 m), a street-front one on the middle of its front (`ENTRY_FRONT_W` 6 m),
+  slid along the front 1 m at a time when the middle is at a junction -- tried on the road record with
+  `add_entry` (only what the road takes is kept) and written into `IslandRoads.keepout.json` `entries` (Godot frame
+  `[x, z, width]`). `roadkit_cli pieces|gltf --keep-out` applies them to the network IN MEMORY
+  (`roadkit_cli._with_entries` -> `point_record_ops.apply_entries`, same calls, same order, so the same answers): the
+  record stays the layout's output, and the next road build after a buildings `write` sees them (the keep-out rule).
+  A driveway the road refuses keeps the old gutter wedge. Measured: 170 car parks, 98 entries, 68 deep driveways keep
+  the wedge (they meet the street at a junction or a road end), the rest street-front lots facing a junction pad.
+  Three `add_entry` rules came with it: never on `ENTRY_SKIP` classes (expressway, ramp, rail: the first run put
+  entries on the Wangan connector); never on a stretch steeper than `ENTRY_MAX_GRADE` 2 % (a station there bends the
+  vertical curve: 0.34 m on a dike ramp); and the new station stands on the RESOLVED curve facing along it, its two
+  neighbours frozen on the tangent the curve has at them (a station on the chord pulled a bend 5.2 m toward it;
+  after, every affected road within 7 cm of where it was). A JOINT end (a zone split) is not a mouth.
+
+## Asphalt from kerb to door; a paved site's edge slopes (2026-10-05, user-asked)
+
+User: "the sidewalk, the block's ground, the parking lots and the building plates all asphalt so they blend; kerbs and
+gutters stay concrete", and "use --\ slope on the side of parking spaces so there is no spike when cars drive on".
+- **Materials, no rebuild needed for the look** (each is referenced by path), ALL the carriageway's own asphalt
+  texture, tile and TONE (user: "the same tone as the road", as a Japanese street reads): the road kit's footway
+  `M_ConcreteTile.tres` (name kept; also the raised median's fill), the private ground `M_LotConcrete.tres` (plinths,
+  edge aprons), and the block fill's Terrain3D "Urban" layer repacked from it (`make_urban_texture.py --from-lot`, tint
+  1 on the texture asset). The road's edge is marked by concrete instead: the kerb (`M_Concrete`) and the L-gutter.
+  Car-park bays (`MI_AsphaltLot`) unchanged.
+- **The L-gutter (L型側溝 / 街渠)**: `point_mesh.gutter_strips`, a `GUTTER_W` 0.4 m concrete strip (the kerb's material)
+  in front of every road kerb, on the carriageway, `GUTTER_Z` 6 mm proud (under the paint's 1 cm, so a zebra or stop
+  line over it wins), its own object `<road>__gutter_<side>` in NO collision proxy (no lip a wheel feels). Where the
+  kerb is a road kerb (0.01..0.3 m): it continues under a dropped-kerb driveway, stops where a 踏切 levels the kerb,
+  none on a rail road. Narrower than a 0.5 m shoulder, so the edge line is never on it. The drain grates
+  (`furniture.json` `drain`, inset 0.35 m) sit in it, lifted 8 mm.
+- **A paved composite's sloped edge** (`apron_edge: true` on ParkingLot4/8/14/28/56, GasStation, SupermarketSite,
+  PocketPark): a ring of library `Apron_Edge` strips + `Apron_EdgeCorner` (`library_procedural.py`) OUTSIDE the
+  footprint, falling `APRON_EDGE_DROP` 6.5 cm over `APRON_EDGE_W` 0.6 m (1:9) from the apron's top, i.e. past the
+  block ground the site stands 4.5 cm over; the paved collider is a convex slab with the same sloped sides
+  (`hull_points`). The layout records `apron_edge_m`, which probe_buildings allows on every side; `island_buildings`
+  gives such a site NO plinth (its 3 cm box edge would be the step the slope removes; `type_apron_edge`).
 
 ## The airport behind the bridge: one divided spur, the rail under it, the station against the terminal, the runway south; every hub station has its street (2026-09-29, user-asked)
 

@@ -89,9 +89,13 @@ size = Vector3(1.8, 0.12, 0.16)
 [sub_resource type="BoxShape3D" id="BoxShape3D_7c2ps"]
 size = Vector3(40.04, 0.1, 36.4)
 
-[node name="ParkingLot56" type="Node3D" unique_id=974922201]
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_pd65x"]
+points = PackedVector3Array(-20.02, 0, -18.2, -20.02, 0, 18.2, 20.02, 0, -18.2, 20.02, 0, 18.2, -20.62, -0.065, -18.8, -20.62, -0.065, 18.8, 20.62, -0.065, -18.8, 20.62, -0.065, 18.8, -20.62, -0.115, -18.8, -20.62, -0.115, 18.8, 20.62, -0.115, -18.8, 20.62, -0.115, 18.8)
+
+[node name="ParkingLot56" type="Node3D" unique_id=1965337831]
 metadata/building = {
-"aabb": [Vector3(-20.02, -0.02, -18.2), Vector3(40.04, 0.14, 36.4)],
+"aabb": [Vector3(-20.62, -0.085, -18.800001), Vector3(41.24, 0.205, 37.600002)],
+"apron_edge_m": 0.6,
 "clear_probes": [],
 "composite": true,
 "door_style": "swing",
@@ -109,7 +113,7 @@ metadata/building = {
 "note": "a large surface car park (月極 / コインパーキング) filling a deep pocket behind the street-front row (island_buildings.deep_fill, 2026-10-03): standard 2.5 x 5.0 m bays, 90-degree parking, a 6 m aisle; front (+Z) faces the street, the driveway and its kerb ramp are the placer's"
 },
 "kit": "library",
-"piece_count": 530,
+"piece_count": 618,
 "probe_xz": [0.3, 9.0],
 "props_top_m": 0.12,
 "roofline_m": 0.12,
@@ -118,127 +122,130 @@ metadata/building = {
 "wall_top_m": 0.0
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1815361161]
-visibility_range_end = 377.05624
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=485965709]
+visibility_range_end = 377.90384
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_xtnhu")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=589663980]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1594661247]
 collision_mask = 0
 
-[node name="Box0" type="CollisionShape3D" parent="Collision" unique_id=341963730]
+[node name="Box0" type="CollisionShape3D" parent="Collision" unique_id=1679803965]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17.5, 0.06, -17.5)
 shape = SubResource("BoxShape3D_yfrr5")
 
-[node name="Box1" type="CollisionShape3D" parent="Collision" unique_id=1679525614]
+[node name="Box1" type="CollisionShape3D" parent="Collision" unique_id=600245355]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0.06, -17.5)
 shape = SubResource("BoxShape3D_iebec")
 
-[node name="Box2" type="CollisionShape3D" parent="Collision" unique_id=1486097303]
+[node name="Box2" type="CollisionShape3D" parent="Collision" unique_id=1625909557]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.5, 0.06, -17.5)
 shape = SubResource("BoxShape3D_41gr1")
 
-[node name="Box3" type="CollisionShape3D" parent="Collision" unique_id=502080434]
+[node name="Box3" type="CollisionShape3D" parent="Collision" unique_id=388937938]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.06, -17.5)
 shape = SubResource("BoxShape3D_xvpj8")
 
-[node name="Box4" type="CollisionShape3D" parent="Collision" unique_id=1211064098]
+[node name="Box4" type="CollisionShape3D" parent="Collision" unique_id=1063702108]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.5, 0.06, -17.5)
 shape = SubResource("BoxShape3D_mhwjn")
 
-[node name="Box5" type="CollisionShape3D" parent="Collision" unique_id=534562863]
+[node name="Box5" type="CollisionShape3D" parent="Collision" unique_id=1244671631]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0.06, -17.5)
 shape = SubResource("BoxShape3D_ofdic")
 
-[node name="Box6" type="CollisionShape3D" parent="Collision" unique_id=410393546]
+[node name="Box6" type="CollisionShape3D" parent="Collision" unique_id=1538973331]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0.06, -17.5)
 shape = SubResource("BoxShape3D_hrtoi")
 
-[node name="Box7" type="CollisionShape3D" parent="Collision" unique_id=1885643900]
+[node name="Box7" type="CollisionShape3D" parent="Collision" unique_id=1538573756]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.06, -17.5)
 shape = SubResource("BoxShape3D_pwemu")
 
-[node name="Box8" type="CollisionShape3D" parent="Collision" unique_id=1989567830]
+[node name="Box8" type="CollisionShape3D" parent="Collision" unique_id=1624262392]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0.06, -17.5)
 shape = SubResource("BoxShape3D_f455r")
 
-[node name="Box9" type="CollisionShape3D" parent="Collision" unique_id=260991052]
+[node name="Box9" type="CollisionShape3D" parent="Collision" unique_id=1005735384]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.06, -17.5)
 shape = SubResource("BoxShape3D_llxv3")
 
-[node name="Box10" type="CollisionShape3D" parent="Collision" unique_id=1603707832]
+[node name="Box10" type="CollisionShape3D" parent="Collision" unique_id=946608279]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, 0.06, -17.5)
 shape = SubResource("BoxShape3D_hos2y")
 
-[node name="Box11" type="CollisionShape3D" parent="Collision" unique_id=67288774]
+[node name="Box11" type="CollisionShape3D" parent="Collision" unique_id=1286873458]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.06, -17.5)
 shape = SubResource("BoxShape3D_5whet")
 
-[node name="Box12" type="CollisionShape3D" parent="Collision" unique_id=2098496961]
+[node name="Box12" type="CollisionShape3D" parent="Collision" unique_id=1662789170]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.5, 0.06, -17.5)
 shape = SubResource("BoxShape3D_d5bra")
 
-[node name="Box13" type="CollisionShape3D" parent="Collision" unique_id=1643655822]
+[node name="Box13" type="CollisionShape3D" parent="Collision" unique_id=1577535650]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0.06, -17.5)
 shape = SubResource("BoxShape3D_ikgqo")
 
-[node name="Box14" type="CollisionShape3D" parent="Collision" unique_id=754249533]
+[node name="Box14" type="CollisionShape3D" parent="Collision" unique_id=2005743849]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17.5, 0.06, -17.5)
 shape = SubResource("BoxShape3D_k2dhk")
 
-[node name="Box15" type="CollisionShape3D" parent="Collision" unique_id=939083409]
+[node name="Box15" type="CollisionShape3D" parent="Collision" unique_id=216224456]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17.5, 0.06, 17.5)
 shape = SubResource("BoxShape3D_bnk4u")
 
-[node name="Box16" type="CollisionShape3D" parent="Collision" unique_id=841449398]
+[node name="Box16" type="CollisionShape3D" parent="Collision" unique_id=1319267756]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0.06, 17.5)
 shape = SubResource("BoxShape3D_mycgc")
 
-[node name="Box17" type="CollisionShape3D" parent="Collision" unique_id=782444800]
+[node name="Box17" type="CollisionShape3D" parent="Collision" unique_id=1648517814]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.5, 0.06, 17.5)
 shape = SubResource("BoxShape3D_ijuql")
 
-[node name="Box18" type="CollisionShape3D" parent="Collision" unique_id=1259629460]
+[node name="Box18" type="CollisionShape3D" parent="Collision" unique_id=101592128]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.06, 17.5)
 shape = SubResource("BoxShape3D_xafnh")
 
-[node name="Box19" type="CollisionShape3D" parent="Collision" unique_id=135319629]
+[node name="Box19" type="CollisionShape3D" parent="Collision" unique_id=818491995]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.5, 0.06, 17.5)
 shape = SubResource("BoxShape3D_mdfjr")
 
-[node name="Box20" type="CollisionShape3D" parent="Collision" unique_id=571516784]
+[node name="Box20" type="CollisionShape3D" parent="Collision" unique_id=168656329]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0.06, 17.5)
 shape = SubResource("BoxShape3D_nyafk")
 
-[node name="Box21" type="CollisionShape3D" parent="Collision" unique_id=1527487110]
+[node name="Box21" type="CollisionShape3D" parent="Collision" unique_id=1349026500]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0.06, 17.5)
 shape = SubResource("BoxShape3D_qbe3a")
 
-[node name="Box22" type="CollisionShape3D" parent="Collision" unique_id=860211422]
+[node name="Box22" type="CollisionShape3D" parent="Collision" unique_id=1540205860]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.06, 17.5)
 shape = SubResource("BoxShape3D_ph37e")
 
-[node name="Box23" type="CollisionShape3D" parent="Collision" unique_id=2141467735]
+[node name="Box23" type="CollisionShape3D" parent="Collision" unique_id=1185377414]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0.06, 17.5)
 shape = SubResource("BoxShape3D_cqs5x")
 
-[node name="Box24" type="CollisionShape3D" parent="Collision" unique_id=1295812590]
+[node name="Box24" type="CollisionShape3D" parent="Collision" unique_id=1169874625]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.06, 17.5)
 shape = SubResource("BoxShape3D_c5758")
 
-[node name="Box25" type="CollisionShape3D" parent="Collision" unique_id=887047838]
+[node name="Box25" type="CollisionShape3D" parent="Collision" unique_id=948886913]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, 0.06, 17.5)
 shape = SubResource("BoxShape3D_cl0td")
 
-[node name="Box26" type="CollisionShape3D" parent="Collision" unique_id=2126769649]
+[node name="Box26" type="CollisionShape3D" parent="Collision" unique_id=286688592]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.06, 17.5)
 shape = SubResource("BoxShape3D_jorj2")
 
-[node name="Box27" type="CollisionShape3D" parent="Collision" unique_id=1986843290]
+[node name="Box27" type="CollisionShape3D" parent="Collision" unique_id=920643444]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.5, 0.06, 17.5)
 shape = SubResource("BoxShape3D_iurv8")
 
-[node name="Box28" type="CollisionShape3D" parent="Collision" unique_id=632755652]
+[node name="Box28" type="CollisionShape3D" parent="Collision" unique_id=251445325]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
 shape = SubResource("BoxShape3D_7c2ps")
+
+[node name="Hull0" type="CollisionShape3D" parent="Collision" unique_id=2088166592]
+shape = SubResource("ConvexPolygonShape3D_pd65x")

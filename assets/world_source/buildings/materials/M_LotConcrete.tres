@@ -1,4 +1,6 @@
 [gd_resource type="StandardMaterial3D" format=3]
+; ASPHALT since 2026-10-05 (user: the block ground, the plates and the car parks blend as one asphalt; the name is
+; kept: every cell scene references this path), the road's own asphalt and tone (user: "the same tone as the road").
 ; PRIVATE pavement (民地): every building's lot slab (`island_buildings.LOT_MATERIAL`) and the block ground between
 ; the lots (Terrain3D's "Urban" layer, packed from THIS file by `tools/make_urban_texture.py --from-lot`, which also
 ; prints the tint and tile the layer must carry in `assets/terrain3d/terrain_assets.tres`). Its PUBLIC twin is the
@@ -10,14 +12,14 @@
 ; Lives here, not in road_kit/materials: that folder is the road bake's material library and is hashed into every
 ; road piece's digest, so a lot edit there would rebuild every road.
 
-[ext_resource type="Texture2D" path="res://assets/world_source/kits/quaternius_downtown_city/textures/T_Concrete_BaseColor.png" id="1_base"]
+[ext_resource type="Texture2D" path="res://assets/world_source/kits/quaternius_downtown_city/textures/T_Concrete_Asphalt_BaseColor.png" id="1_base"]
 [ext_resource type="Texture2D" path="res://assets/world_source/kits/quaternius_downtown_city/textures/T_Concrete_ORM.png" id="2_orm"]
 [ext_resource type="Texture2D" path="res://assets/world_source/kits/quaternius_downtown_city/textures/T_Concrete_Normal.png" id="3_nrm"]
 
 [resource]
 resource_name = "M_LotConcrete"
 cull_mode = 2
-albedo_color = Color(1, 0.98, 0.94, 1)
+albedo_color = Color(1, 1, 1, 1)
 albedo_texture = ExtResource("1_base")
 metallic = 1.0
 metallic_texture = ExtResource("2_orm")

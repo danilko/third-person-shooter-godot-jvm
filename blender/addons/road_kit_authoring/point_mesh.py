@@ -1472,7 +1472,7 @@ def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=
             for sfx, epts, walk, kerb, wall, sgn in ped.road_edge_runs(s, bands, _near_bands(foreign, pts)
                                                                         if foreign and not rail else None):
                 edge_names.append("%s__edges_%s" % (name, sfx))
-                _edge_run(objs, edge_names[-1], epts, walk, kerb, wall, sgn, style)
+                _edge_run(objs, edge_names[-1], epts, walk, kerb, wall, sgn, style, gutter=not rail)
             if foreign and not rail:
                 # a ROAD built against the rail (`--avoid` the rail record): where it crosses a track at its own
                 # height, its PARAPET and car wall stop -- they would stand across the track (a dike ramp's barrier
@@ -1574,7 +1574,39 @@ def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=
     return objs
 
 
-def _edge_run(objs, name, pts, walk, kerb, wall, sgn, style=None):
+#: THE L-GUTTER (L型側溝 / 街渠, user 2026-10-05): the concrete strip a Japanese kerbed street has in front of its kerb,
+#: on the carriageway side, where the drains sit. Laid on the road surface GUTTER_Z proud (like paint: no lip a
+#: wheel feels, and it is NOT in any collision proxy), in the kerb's material, wherever the kerb is a road kerb (over
+#: GUTTER_KERB_MIN -- it stops where a 踏切 levels the kerb, and continues under a dropped-kerb driveway, as the real
+#: one does -- and under GUTTER_KERB_MAX, so a platform face gets none). Narrower than a shoulder, so the white edge
+#: line on the shoulder boundary is never on it.
+GUTTER_W = 0.4
+#: under the paint's PAINT_Z_BIAS, so a zebra or stop line laid across the gutter wins the depth test
+GUTTER_Z = 0.006
+GUTTER_KERB_MIN = 0.01
+GUTTER_KERB_MAX = 0.3
+
+
+def gutter_strips(pts, kerb, sgn):
+    """`[tri]` of the L-gutter along an edge run (`pts` its kerb line, outboard on side `sgn`): GUTTER_W toward the
+    carriageway, over each stretch whose kerb is a road kerb."""
+    on = [GUTTER_KERB_MIN < float(k) <= GUTTER_KERB_MAX for k in kerb]
+    lats = [_lateral(t) for t in poly_tangents(pts)]
+    out, run = [], []
+    for i in range(len(pts) + 1):
+        if i < len(pts) and on[i]:
+            run.append(i)
+            continue
+        if len(run) >= 2:
+            inner = [(pts[j][0], pts[j][1], pts[j][2] + GUTTER_Z) for j in run]
+            outer = [(pts[j][0] - lats[j][0] * sgn * GUTTER_W, pts[j][1] - lats[j][1] * sgn * GUTTER_W,
+                      pts[j][2] + GUTTER_Z) for j in run]
+            out += _face_up(_strip(inner, outer))
+        run = []
+    return out
+
+
+def _edge_run(objs, name, pts, walk, kerb, wall, sgn, style=None, gutter=True):
     """`point_build.build_edge_run` without Blender: the same per-vertex values (`edge_run_values`, restated
     here because `point_build` imports bpy), the same three layers, each styled."""
     half_t = ps.BARRIER_THICKNESS * 0.5
@@ -1593,6 +1625,11 @@ def _edge_run(objs, name, pts, walk, kerb, wall, sgn, style=None):
                        "rka_wall_hw": half_t if wl > 0.0 else 0.0, "rka_wall_c": sgn * (2.0 * w + half_t),
                        "rka_wall_z": h + wl, "rka_wall_foot": h})
     pts = [tuple(p) for p in pts]
+    if gutter:
+        gt = gutter_strips(pts, kerb, sgn)
+        if gt:
+            _add(objs, name.replace("__edges_", "__gutter_"), style.material("kerb") if style is not None
+                 else MAT[pk.SLOT_DEFAULT["kerb"]], gt)
     asphalt = name.endswith("_asphalt")      # a DROP_ASPHALT vehicle entry (`point_edges.split_entries`)
     sloped = any(abs(v["_fw_zo"] - v["rka_walk_zl"]) > 1e-9 for v in values)    # a dropped kerb (vehicle entry)
     for layer, kind, slot, oa, z, za, wa, ta in EDGE:
@@ -1883,6 +1920,17 @@ def self_test():
     assert far and max(p[2] - road_surface_z(sbx, p[0], p[1], p[2]) for p in far) > 0.14, "the kerb never comes back"
     ramp = [p for p in eg if rb_y[1] + ped.LEVEL_MARGIN < p[1] < rb_y[1] + ped.LEVEL_MARGIN + ped.ENTRY_RAMP]
     assert hi_ < rb_y[1] + ped.LEVEL_MARGIN and ramp, ("the ramp is not outside the panel", hi_, rb_y)
+    # the L-gutter: a GUTTER_W concrete strip in front of each kerb, at the road surface + GUTTER_Z, in the kerb's
+    # material, never in a collision proxy -- and none across the 踏切, where the kerb is levelled
+    gut = [t for n, m in so.items() if n.startswith("street__gutter") for tt in m.values() for t in tt]
+    assert gut and all("__gutter" not in n for n in so if n.endswith("-colonly")), "no gutter / a gutter collider"
+    assert all(m == "M_Concrete" for n, mm in so.items() if n.startswith("street__gutter") for m in mm)
+    gx = sorted({round(p[0], 3) for t in gut for p in t})
+    kerb_line = (min(q[0] for q in sbx.poly), max(q[0] for q in sbx.poly))
+    assert any(abs(x - (kerb_line[0] + GUTTER_W)) < 0.02 for x in gx) and any(abs(x - kerb_line[0]) < 0.02 for x in gx), \
+        ("the gutter is not GUTTER_W inside the kerb line", gx[:6], kerb_line)
+    assert all(abs(p[2] - (road_surface_z(sbx, p[0], p[1], p[2]) + GUTTER_Z)) < 2e-3 for t in gut for p in t)
+    assert not any(ped._signed_depth(rbx.poly, *_centroid(t)[:2]) > 0.0 for t in gut), "a gutter across the 踏切"
     # control: the street built with no rail keeps its kerb proud over the track
     eg0 = edge_tops(build(fnet))
     assert max(p[2] - road_surface_z(sbx, p[0], p[1], p[2]) for p in eg0 if lo_ <= p[1] <= hi_) > 0.14, \

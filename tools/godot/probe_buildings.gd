@@ -104,10 +104,12 @@ func _probe(id: String, inst: Node3D, meta: Dictionary) -> void:
 	var tol := 0.01 if example else PLAN_TOL
 	# a forecourt (vending machines, bins in front of the wall) makes the mesh deeper on the street side only
 	var fc := float(meta.get("forecourt_m", 0.0))
+	# a paved site's sloped EDGE (`apron_edge`) lies outside its footprint on every side
+	var ae := 2.0 * float(meta.get("apron_edge_m", 0.0))
 	# a station's declared footprint is its RESERVE (platforms, car park), not its mesh, so the size rule does not
 	# apply to it (the 39 station "size" failures this probe carried were that, not a defect)
 	# ...nor does it to a composite whose footprint is a reserve it only dresses (the station forecourt)
-	if not meta.has("station") and not meta.has("reserve"): _check(absf(aabb.size.x - fp[0]) <= tol and absf(aabb.size.z - fp[1] - fc) <= tol
+	if not meta.has("station") and not meta.has("reserve"): _check(absf(aabb.size.x - fp[0] - ae) <= tol and absf(aabb.size.z - fp[1] - fc - ae) <= tol
 		and absf(aabb.size.y - float(meta["height_m"])) <= HEIGHT_TOL,
 		"%s size %.2f x %.2f x %.2f m (declared %.2f x %.2f, height %.2f)" % [id, aabb.size.x, aabb.size.z, aabb.size.y,
 		fp[0], fp[1], meta["height_m"]])

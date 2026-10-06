@@ -15,29 +15,20 @@ material = ExtResource("lotmat")
 
 [sub_resource type="MultiMesh" id="Lots"]
 transform_format = 1
-instance_count = 7
+instance_count = 4
 mesh = SubResource("LotBox")
-buffer = PackedFloat32Array(27.6286, 0.0000, 3.0824, 48.5000, 0.0000, 0.5880, 0.0000, 5.5940, -3.0824, 0.0000, 27.6286, -851.5000, 36.7140, 0.0000, 6.0737, 126.5000, 0.0000, 0.3100, 0.0000, 5.4550, -3.7008, 0.0000, 60.2547, -833.5000, 27.6598, 0.0000, 2.7881, 150.5000, 0.0000, 0.3100, 0.0000, 5.4550, -2.7881, 0.0000, 27.6598, -785.5000, 7.4622, 0.0000, 1.5445, 206.6930, 0.0000, 0.5600, 0.0000, 5.4800, -0.7522, 0.0000, 15.3224, -757.5800, 129.8420, 0.0000, 11.0823, 210.5000, 0.0000, 0.7780, 0.0000, 5.6890, -13.0881, 0.0000, 109.9429, -863.5000, 24.3765, 0.0000, 2.4572, 225.1097, 0.0000, 0.5100, 0.0000, 5.5050, -2.4572, 0.0000, 24.3765, -765.9650, 13.5314, 0.0000, 1.0611, 245.7380, 0.0000, 0.5600, 0.0000, 5.4800, -1.3640, 0.0000, 10.5267, -759.0940)
+buffer = PackedFloat32Array(7.4622, 0.0000, 1.5445, 206.6930, 0.0000, 0.5600, 0.0000, 5.4800, -0.7522, 0.0000, 15.3224, -757.5800, 129.8420, 0.0000, 11.0823, 210.5000, 0.0000, 0.7780, 0.0000, 5.6890, -13.0881, 0.0000, 109.9429, -863.5000, 24.3765, 0.0000, 2.4572, 225.1097, 0.0000, 0.5100, 0.0000, 5.5050, -2.4572, 0.0000, 24.3765, -765.9650, 13.5314, 0.0000, 1.0611, 245.7380, 0.0000, 0.5600, 0.0000, 5.4800, -1.3640, 0.0000, 10.5267, -759.0940)
 
 [sub_resource type="BoxShape3D" id="LotShape0"]
-size = Vector3(27.800, 0.588, 27.800)
-
-[sub_resource type="BoxShape3D" id="LotShape1"]
-size = Vector3(36.900, 0.310, 60.560)
-
-[sub_resource type="BoxShape3D" id="LotShape2"]
-size = Vector3(27.800, 0.310, 27.800)
-
-[sub_resource type="BoxShape3D" id="LotShape3"]
 size = Vector3(7.500, 0.560, 15.400)
 
-[sub_resource type="BoxShape3D" id="LotShape4"]
+[sub_resource type="BoxShape3D" id="LotShape1"]
 size = Vector3(130.500, 0.778, 110.500)
 
-[sub_resource type="BoxShape3D" id="LotShape5"]
+[sub_resource type="BoxShape3D" id="LotShape2"]
 size = Vector3(24.500, 0.510, 24.500)
 
-[sub_resource type="BoxShape3D" id="LotShape6"]
+[sub_resource type="BoxShape3D" id="LotShape3"]
 size = Vector3(13.600, 0.560, 10.580)
 
 [sub_resource type="StandardMaterial3D" id="DriveMat"]
@@ -126,29 +117,17 @@ multimesh = SubResource("Lots")
 collision_mask = 0
 
 [node name="Plinth0" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(0.993834, 0, 0.110879, 0, 1, 0, -0.110879, 0, 0.993834, 48.500, 5.594, -851.500)
+transform = Transform3D(0.994958, 0, 0.100292, 0, 1, 0, -0.100292, 0, 0.994958, 206.693, 5.480, -757.580)
 shape = SubResource("LotShape0")
 
 [node name="Plinth1" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(0.994958, 0, 0.100292, 0, 1, 0, -0.100292, 0, 0.994958, 126.500, 5.455, -833.500)
+transform = Transform3D(0.994958, 0, 0.100292, 0, 1, 0, -0.100292, 0, 0.994958, 210.500, 5.689, -863.500)
 shape = SubResource("LotShape1")
 
 [node name="Plinth2" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(0.994958, 0, 0.100292, 0, 1, 0, -0.100292, 0, 0.994958, 150.500, 5.455, -785.500)
+transform = Transform3D(0.994958, 0, 0.100292, 0, 1, 0, -0.100292, 0, 0.994958, 225.110, 5.505, -765.965)
 shape = SubResource("LotShape2")
 
 [node name="Plinth3" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(0.994958, 0, 0.100292, 0, 1, 0, -0.100292, 0, 0.994958, 206.693, 5.480, -757.580)
-shape = SubResource("LotShape3")
-
-[node name="Plinth4" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(0.994958, 0, 0.100292, 0, 1, 0, -0.100292, 0, 0.994958, 210.500, 5.689, -863.500)
-shape = SubResource("LotShape4")
-
-[node name="Plinth5" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(0.994958, 0, 0.100292, 0, 1, 0, -0.100292, 0, 0.994958, 225.110, 5.505, -765.965)
-shape = SubResource("LotShape5")
-
-[node name="Plinth6" type="CollisionShape3D" parent="PlinthCollision"]
 transform = Transform3D(0.994958, 0, 0.100292, 0, 1, 0, -0.100292, 0, 0.994958, 245.738, 5.480, -759.094)
-shape = SubResource("LotShape6")
+shape = SubResource("LotShape3")

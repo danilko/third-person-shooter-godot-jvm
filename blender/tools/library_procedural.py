@@ -604,6 +604,36 @@ def apron_tile(material):
     return "Apron_Tile", "paving", b.mesh()
 
 
+#: The sloped EDGE of a paved composite (a car park, a forecourt; user 2026-10-05: "--\\ slope on the side so no
+#: direct spike when cars drive on it"). The apron stands FLOOR_LIFT (4.5 cm) over the block ground, and a box edge is
+#: a step a tyre hits; this strip falls from the apron's top at its inner edge to APRON_EDGE_DROP under it at its
+#: outer edge, past the ground, so nothing stands vertical over the ground. Keep `tools/building_kit/
+#: layout_buildings.APRON_EDGE_W / APRON_EDGE_DROP` the same numbers (the layout places these and builds the slope's
+#: collider from them).
+APRON_EDGE_W = 0.6
+APRON_EDGE_DROP = 0.065
+
+
+def apron_edge(material):
+    """One module (1.82 m) of the slope along a side: inner edge on the origin line (top 0), falling to
+    -APRON_EDGE_DROP at the outer edge, APRON_EDGE_W out along -Y (the side that faces out); 2 cm thick at its foot."""
+    b = Builder("Apron_Edge", material)
+    w, d, h = APRON_EDGE_W, APRON_EDGE_DROP, 0.91
+    b.convex([(-h, 0.0, 0.0), (h, 0.0, 0.0), (-h, -w, -d), (h, -w, -d),
+              (-h, 0.0, -d - 0.02), (h, 0.0, -d - 0.02), (-h, -w, -d - 0.02), (h, -w, -d - 0.02)], "MI_AsphaltLot")
+    return "Apron_Edge", "paving", b.mesh()
+
+
+def apron_edge_corner(material):
+    """The slope round an outside corner: the apron's corner at the origin, the quadrant +X / -Y, two planes that
+    meet the two side strips (a hipped corner)."""
+    b = Builder("Apron_EdgeCorner", material)
+    w, d = APRON_EDGE_W, APRON_EDGE_DROP
+    b.convex([(0.0, 0.0, 0.0), (w, 0.0, -d), (0.0, -w, -d), (w, -w, -d),
+              (0.0, 0.0, -d - 0.02), (w, 0.0, -d - 0.02), (0.0, -w, -d - 0.02), (w, -w, -d - 0.02)], "MI_AsphaltLot")
+    return "Apron_EdgeCorner", "paving", b.mesh()
+
+
 def parking_line(material):
     """A parking bay line: 0.1 m wide, 5.0 m long (the Japanese standard bay is 2.5 x 5.0 m), along -Y."""
     b = Builder("Parking_Line", material)
@@ -828,6 +858,8 @@ def build_all(material):
         crossing_signal(material),
         pedestrian_signal(material),
         apron_tile(material),
+        apron_edge(material),
+        apron_edge_corner(material),
         parking_line(material),
         parking_stop(material),
         harbour_crane(material),

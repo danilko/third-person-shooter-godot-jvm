@@ -5,21 +5,6 @@
 [ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_2_9.res" id="hlod"]
 
-[sub_resource type="BoxMesh" id="LotBox"]
-material = ExtResource("lotmat")
-
-[sub_resource type="MultiMesh" id="Lots"]
-transform_format = 1
-instance_count = 2
-mesh = SubResource("LotBox")
-buffer = PackedFloat32Array(-27.6283, 0.0000, 3.0849, -1313.5000, 0.0000, 0.3100, 0.0000, 5.4550, -3.0849, 0.0000, -27.6283, 342.5000, -40.3050, 0.0000, 3.9672, -1277.5000, 0.0000, 0.3100, 0.0000, 5.4550, -4.3586, 0.0000, -36.6861, 372.5000)
-
-[sub_resource type="BoxShape3D" id="LotShape0"]
-size = Vector3(27.800, 0.310, 27.800)
-
-[sub_resource type="BoxShape3D" id="LotShape1"]
-size = Vector3(40.540, 0.310, 36.900)
-
 [sub_resource type="StandardMaterial3D" id="DriveMat"]
 albedo_color = Color(0.16, 0.16, 0.17, 1)
 roughness = 0.9
@@ -79,20 +64,6 @@ collision_mask = 0
 [node name="Drive0" type="CollisionShape3D" parent="DriveCollision"]
 transform = Transform3D(-0.107514, 0.000000, -0.994204, 0.000000, 1.000000, 0.000000, 0.994204, 0.000000, -0.107514, -1270.447, 6.603, 307.280)
 shape = SubResource("DriveShape")
-
-[node name="Plinths" type="MultiMeshInstance3D" parent="."]
-multimesh = SubResource("Lots")
-
-[node name="PlinthCollision" type="StaticBody3D" parent="."]
-collision_mask = 0
-
-[node name="Plinth0" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(-0.993824, 0, 0.110966, 0, 1, 0, -0.110966, 0, -0.993824, -1313.500, 5.455, 342.500)
-shape = SubResource("LotShape0")
-
-[node name="Plinth1" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(-0.994204, 0, 0.107514, 0, 1, 0, -0.107514, 0, -0.994204, -1277.500, 5.455, 372.500)
-shape = SubResource("LotShape1")
 
 [node name="Aprons" type="MultiMeshInstance3D" parent="."]
 multimesh = SubResource("Aprons")

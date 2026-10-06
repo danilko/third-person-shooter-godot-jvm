@@ -482,7 +482,49 @@ def branch_ramp(net, main_uid, name="", aux_lanes=1, carriageway="FWD", entrance
 ENTRY_REUSE = 1.0       # m: an existing station this close to the entry carries it, no new station
 
 
-def add_entry(net, x, y, width=5.0, max_dist=30.0, skip=("rail",)):
+def apply_entries(net, entries, max_dist=30.0):
+    """`add_entry` for each `(x, y, width)` in order, on `net` in memory; returns each result (None = refused). ONE
+    owner of the order, so a caller that only wants to know which entries take (`island_buildings.py write`, which
+    keeps the old gutter wedge for a refused one) gets the answer the road build gets."""
+    return [add_entry(net, float(x), float(y), float(w), max_dist) for x, y, w in entries]
+
+
+#: Road classes a vehicle entry is never cut into: a rail line, and the expressway system (no access to a lot).
+ENTRY_SKIP = ("rail", "expressway", "ramp")
+#: ...nor on a stretch steeper than this (a dike ramp): Japan does not put a 乗入れ on a ramp.
+ENTRY_MAX_GRADE = 0.02
+
+
+def _on_curve(net, chain, i, x, y):
+    """`(pos, tangent)` of the point of the RESOLVED centreline (the curve the kit sweeps) between chain stations i and
+    i + 1 nearest (x, y). A station put on the straight chord instead pulls a curved road toward the chord (measured:
+    5.2 m on a bend), so an entry station must stand on the curve, facing along it."""
+    run = [chain[i], chain[i + 1]]
+    k = i
+    while k > 0 and net.points[chain[k - 1]].has_link(chain[k], pm.LINK_SEGMENT):
+        run.insert(0, chain[k - 1])
+        k -= 1
+    k = i + 1
+    while k + 1 < len(chain) and net.points[chain[k]].has_link(chain[k + 1], pm.LINK_SEGMENT):
+        run.append(chain[k + 1])
+        k += 1
+    seg = run.index(chain[i])
+    rpts = [net.resolved(u) for u in run]
+    sts = pp.stations(rpts, False, end_axes=pp.run_end_axes(net, rpts))
+    best = None
+    ends = {}
+    for smp in pp.rp.resample(sts, False, step=0.5):
+        if smp.at_station in (seg, seg + 1):
+            ends[smp.at_station - seg] = tuple(smp.tangent)
+        if smp.seg != seg:
+            continue
+        d = math.hypot(smp.pos[0] - x, smp.pos[1] - y)
+        if best is None or d < best[0]:
+            best = (d, smp)
+    return (tuple(best[1].pos), tuple(best[1].tangent), ends) if best else (None, None, ends)
+
+
+def add_entry(net, x, y, width=5.0, max_dist=30.0, skip=ENTRY_SKIP):
     """A VEHICLE ENTRY (車両乗入れ部, `PointData.entry_left/right`) at plan point (x, y) -- the spot on the kerb where a
     car turns off the road into a lot or a car park. The nearest road's chain is found (never a rail line or a road
     whose class is in `skip`), a station is inserted on it opposite the point (or one within ENTRY_REUSE is reused),
@@ -506,22 +548,31 @@ def add_entry(net, x, y, width=5.0, max_dist=30.0, skip=("rail",)):
                 continue
             t = max(0.0, min(1.0, ((x - ax) * dx + (y - ay) * dy) / L2))
             d = math.hypot(ax + dx * t - x, ay + dy * t - y)
-            if d <= max_dist and (best is None or d < best[0]):
-                best = (d, road, chain, i, t)
+            # a foot CLAMPED to a segment's end ties with the next segment's, which may be another road across a
+            # joint: prefer the segment the point actually projects into
+            de = d + (0.5 if t <= 0.0 or t >= 1.0 else 0.0)
+            if d <= max_dist and (best is None or de < best[0]):
+                best = (de, road, chain, i, t)
     if best is None:
         return None
     _d, road, chain, i, t = best
     a, b = net.points[chain[i]], net.points[chain[i + 1]]
     L = math.dist(a.pos[:2], b.pos[:2])
+    if L > 1e-6 and abs(b.pos[2] - a.pos[2]) / L > ENTRY_MAX_GRADE:
+        return None                     # a driveway onto a ramp: refused (and a station there bends its vertical curve)
     at = (a.pos[0] + (b.pos[0] - a.pos[0]) * t, a.pos[1] + (b.pos[1] - a.pos[1]) * t)
     # the side: the kit's LEFT is +90 deg from the chain's direction (FWD = increasing index)
     side = "left" if ((b.pos[0] - a.pos[0]) * (y - at[1]) - (b.pos[1] - a.pos[1]) * (x - at[0])) > 0.0 else "right"
     clear = pv.MIN_MOUTH_CLEAR + width / 2.0
     ends = (chain[0], chain[-1])
+    mine = set(chain)
     for u in chain:
         p = net.points[u]
         mouth = p.role == pm.INTERSECTION or any(l.type == pm.LINK_JUNCTION for l in p.links) or u in ends
-        if mouth and math.dist(p.pos[:2], at) < clear:
+        # a JOINT (the road carries on as another road, SEGMENT-linked: a zone split, a name change) is not where the
+        # kerb stops -- the entry only has to fit on this side of it
+        joint = u in ends and any(l.type == pm.LINK_SEGMENT and l.target not in mine for l in p.links)
+        if mouth and math.dist(p.pos[:2], at) < (width / 2.0 + 1.0 if joint else clear):
             return None
     if t * L <= ENTRY_REUSE:
         st = a
@@ -535,7 +586,20 @@ def add_entry(net, x, y, width=5.0, max_dist=30.0, skip=("rail",)):
             kw = {n: getattr(a, n) for n, _k, _d in pm.POINT_FIELDS if n not in ("uid", "role", "entry_left",
                                                                             "entry_right")}
             kw["ground_z"] = a.ground_z + (b.ground_z - a.ground_z) * t
-        st = net.add_station(road, (at[0], at[1], a.pos[2] + (b.pos[2] - a.pos[2]) * t), **kw)
+        pos, tan, ends = _on_curve(net, chain, i, x, y)
+        if pos is None:
+            pos = (at[0], at[1], a.pos[2] + (b.pos[2] - a.pos[2]) * t)
+        # the two neighbours keep the tangents the curve has at them now (their AUTO chord would otherwise swing
+        # toward the new station), and the new one faces along the curve: the swept road is the one it was
+        for side_, nb in enumerate((a, b)):
+            tg = ends.get(side_)
+            if nb.tangent_mode != pm.MANUAL and tg is not None and math.hypot(tg[0], tg[1]) > 1e-9:
+                m_ = math.hypot(tg[0], tg[1])
+                nb.tangent_mode, nb.tangent = pm.MANUAL, (tg[0] / m_, tg[1] / m_, 0.0)
+        st = net.add_station(road, pos, **kw)
+        if tan is not None and math.hypot(tan[0], tan[1]) > 1e-9:
+            m = math.hypot(tan[0], tan[1])
+            st.tangent_mode, st.tangent = pm.MANUAL, (tan[0] / m, tan[1] / m, 0.0)
         road.points.remove(st.uid)
         road.points.insert(road.points.index(b.uid), st.uid)
         net.unlink(a.uid, b.uid)
