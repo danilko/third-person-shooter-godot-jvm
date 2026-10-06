@@ -176,7 +176,8 @@ public class AnimationController extends Node {
     // same frame, in the air) kept OnFloorBlend at "airborne" for good: the falling pose sat on top of the seated
     // one, and the driver sat bolt upright with the head through the roof. Measured: seated 1-5 frames after
     // spawning, pelvis 0.76 m over the seat (the rest pose); seated after landing, 0.45 m.
-    boolean onFloor = player.isOnFloor() || seatedNow;
+    // A puppet asks the owner's snapshot (Character.isAirborneNow): its own isOnFloor() is false for good.
+    boolean onFloor = (liveBody() instanceof Character fc ? !fc.isAirborneNow() : player.isOnFloor()) || seatedNow;
     if (onFloor && !wasOnFloor) {
       long fadeOut = AnimationNodeOneShot.OneShotRequest.FADE_OUT.getValue();
       animationTree.set("parameters/GroundJump/request", fadeOut);

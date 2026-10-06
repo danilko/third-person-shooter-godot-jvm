@@ -1502,6 +1502,18 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     }
 
     /** The controller currently driving this body — null only before _ready() resolves it. */
+    /** A puppet's floor state, written from the owner's snapshot (a puppet never runs move_and_slide). */
+    public boolean replicatedAirborne = false;
+
+    /**
+     * Is this body off the floor: its own floor test where this peer simulates it, the owner's word (the
+     * snapshot's airborne bit) where it is a puppet, whose own {@code isOnFloor()} is false for good.
+     */
+    public boolean isAirborneNow() {
+        if (controller != null && !controller.isAuthority()) return replicatedAirborne;
+        return !isOnFloor();
+    }
+
     public Controller getController() {
         return controller;
     }

@@ -84,4 +84,17 @@ class SnapshotFlagsTest {
         assertTrue(!NetMessageCodec.unpackHandsDown(NetMessageCodec.packSnapshotFlags(true, 5, 3, 2, 4)),
                 "the old packer must mean not holstered");
     }
+
+    /** Bit 13: the owner's body is off the floor. Its own bit, and the old packers mean on the floor. */
+    @Test
+    void airborneIsItsOwnBit() {
+        int widest = NetMessageCodec.packSnapshotFlags(true, 0b111, 0b111, 0b11, 0b111, true, true);
+        assertEquals(0b0011111111111111, widest, "unexpected bit layout: " + Integer.toBinaryString(widest));
+        int air = NetMessageCodec.packSnapshotFlags(false, 2, 1, 1, 0, false, true);
+        assertTrue(NetMessageCodec.unpackAirborne(air));
+        assertTrue(!NetMessageCodec.unpackHandsDown(air));
+        assertEquals(2, NetMessageCodec.unpackStance(air));
+        assertTrue(!NetMessageCodec.unpackAirborne(NetMessageCodec.packSnapshotFlags(true, 5, 3, 2, 4, true)),
+                "the six-argument packer must mean on the floor");
+    }
 }

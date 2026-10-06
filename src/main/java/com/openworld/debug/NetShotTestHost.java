@@ -160,6 +160,38 @@ public class NetShotTestHost extends Node3D {
         clock += delta;
         if (clock > TIMEOUT_S) finish("TIMEOUT");
         if (host) hostStep(); else if (observer) observerStep(); else clientStep();
+        if (!poseDumped && clock > 14.0 && !observer) { poseDumped = dumpTargetPose(); }
+    }
+
+    private boolean poseDumped;
+
+    /** Diagnostic (PLAN.md 0.11): the target's animation state on this peer, to compare host and puppet. */
+    private boolean dumpTargetPose() {
+        for (Node node : getTree().getNodesInGroup(new StringName("characters"))) {
+            if (!(node instanceof Character c) || c.characterInfo == null || !TARGET_ID.equals(c.characterInfo.characterId)) continue;
+            StringBuilder sb = new StringBuilder("[netshot] POSE role=" + role());
+            for (Node t : c.findChildren("*", "AnimationTree", true, false)) {
+                if (!(t instanceof godot.api.AnimationTree tree)) continue;
+                for (String k : new String[] {"CombatTransition/current_state", "RelaxedTransition/current_state",
+                        "StanceTransition/current_state", "UprightRelaxedBlend/blend_position", "WeaponBlend/blend_amount",
+                        "NeckFront/blend_amount", "UprightMovementBlend/blend_position", "OnFloorBlend/blend_amount",
+                        "AimStanceTransition/current_state"}) {
+                    sb.append(' ').append(k).append('=').append(tree.get(new StringName("parameters/" + k)));
+                }
+                sb.append(" active=").append(tree.isActive());
+            }
+            for (Node s : c.findChildren("*", "Skeleton3D", true, false)) {
+                if (!(s instanceof godot.api.Skeleton3D sk)) continue;
+                for (String b : new String[] {"hand_l", "hand_r", "upperarm_l", "lowerarm_l"}) {
+                    int i = sk.findBone(b);
+                    if (i < 0) continue;
+                    sb.append(' ').append(b).append("_rot=").append(sk.getBonePoseRotation(i));
+                }
+            }
+            GD.print(sb.toString());
+            return true;
+        }
+        return false;
     }
 
     private String role() {

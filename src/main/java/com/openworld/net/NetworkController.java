@@ -149,6 +149,7 @@ public class NetworkController extends Controller {
         if (c.currentVehicleNode == null) {
             c.applyReplicatedCombatAndStance(snapshot.combat(), snapshot.stanceOrdinal());
             c.applyReplicatedMovementType(snapshot.movementTypeOrdinal());
+            c.replicatedAirborne = snapshot.airborne();
         }
 
         if (applyHealth) {

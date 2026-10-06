@@ -2448,6 +2448,11 @@ when a counter differs from the last seen value it calls `wc.playRemoteFireCue()
 counter to other clients). No separate droppable fire/reload message exists. `SNAPSHOT_ENTRY_FIXED_BYTES`
 in `NetworkManager` must equal the per-entry byte count in `NetMessageCodec.putSnapshotEntry`
 (currently 65 = …+ fireSeq u8 + activeMagazine u16 + reloadSeq u8) or MTU chunking mis-sizes frames.
+**A puppet is never on the floor by its own test** (it never runs `move_and_slide`), so the owner's floor state rides
+the flags word as bit 13 (`SNAPSHOT_FLAG_AIRBORNE`, `Character.isAirborneNow()` / `replicatedAirborne`), and
+`AnimationController` asks that. Without it every remote body stood in the airborne blend (arms 0.2 m wider and
+0.15 m higher than on the host), and `run_net_shot_test`'s pellet agreement read 63/80; with it 78/80. The same rule
+holds for anything else a puppet would read off its own physics.
 
 **The core rule — a puppet replays cosmetics only, never re-derives damage, and derives the shot
 identically to the authority:**
