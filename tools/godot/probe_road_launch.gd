@@ -15,6 +15,7 @@ extends SceneTree
 ##       -- ... --wheel-sensor=1   drive with the sphere ground sensor (2 = tyre cylinder, 0 = the shipped rays);
 ##       the review measured all three equal in cost and sphere/cylinder 15x smoother over a kerb, so this is how
 ##       a kerb strike at speed is compared between them (PLAN.md 0.7)
+##       -- ... --car=KEC1   drive another model (its <ID>.tscn + <ID>Config.tres; SPC1 by default)
 ##       -- ... --bump-stop=0   drive with the suspension's bump stop off (the 2026-10-06 kerb-catch control)
 ##       -- ... --phys=120   run the physics at 120 Hz instead of the project's 60 (PLAN.md 0.7: is a launch the
 ##       solver running out of steps at speed? compare the same case at 60 and 120 -- half the travel per step)
@@ -142,7 +143,7 @@ func _spawn(lane_name: String, speed: float, offset: float, corner_accel: float 
 	var dir := Vector3(ahead.x - at.x, 0, ahead.z - at.z).normalized()
 	if car != null and is_instance_valid(car):
 		car.queue_free()
-	car = (load(VEHICLE) as PackedScene).instantiate()
+	car = (load(_vehicle()) as PackedScene).instantiate()
 	ctrl = load(CTRL).new()
 	ctrl.set("cruise_speed", speed)
 	# the 一時停止 at every 踏切 would stop the car short of the crossing it is here to drive over at speed
@@ -200,19 +201,26 @@ const GATE_CASES := [
 	["w_ew_e_F0", 30.0, 0.0, 7.0], ["w_ew_e_R0", 30.0, -2.0, 7.0],
 ]
 
+## --car=<ID> drives another model (KEC1, CRT1, POC1 ...); SPC1 by default.
+func _vehicle() -> String:
+	return VEHICLE if _arg("car", "") == "" else "res://src/main/resources/com/openworld/vehicle/%s.tscn" % _arg("car", "")
+
+func _vehicle_cfg() -> String:
+	return VEHICLE_CFG if _arg("car", "") == "" else "res://src/main/resources/com/openworld/vehicle/%sConfig.tres" % _arg("car", "")
+
 func _initialize() -> void:
 	if _arg("wheel-sensor", "") != "":
 		# The config is a shared .tres, loaded from the resource cache, so writing it here reaches every car
 		# built afterwards -- which is what a sensor comparison wants. It must happen BEFORE any car enters
 		# the tree (VehicleWheel._ready builds its probe there), and it cannot be done through the car node:
 		# a godot-jvm @Export resource reads as null while its node is off-tree.
-		var cfg := load(VEHICLE_CFG)
+		var cfg := load(_vehicle_cfg())
 		cfg.set("wheel_sensor", int(_arg("wheel-sensor", "0")))
 		print("probe: wheel sensor %s (0 rays, 1 sphere, 2 tyre cylinder)" % str(cfg.get("wheel_sensor")))
 	if _arg("bump-stop", "") != "":
 		# the suspension's bump stop (VehicleConfig.bumpStopRate; 0 = off, the kerb-catch control, 2026-10-06)
-		load(VEHICLE_CFG).set("bump_stop_rate", float(_arg("bump-stop", "12")))
-		print("probe: bump stop rate %s" % str(load(VEHICLE_CFG).get("bump_stop_rate")))
+		load(_vehicle_cfg()).set("bump_stop_rate", float(_arg("bump-stop", "12")))
+		print("probe: bump stop rate %s" % str(load(_vehicle_cfg()).get("bump_stop_rate")))
 	if _arg("phys", "") != "":
 		Engine.physics_ticks_per_second = int(_arg("phys", "60"))
 		HZ = float(Engine.physics_ticks_per_second)
