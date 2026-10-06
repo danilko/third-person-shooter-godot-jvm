@@ -715,7 +715,7 @@ def harbour_apron(material):
     container yard's apron, tiled by the composite like `Apron_Tile` but 400 times fewer."""
     b = Builder("Harbour_Apron", material)
     h = 36.4 / 2
-    b.box((-h, -h, -0.02), (h, h, 0.0), "MI_ConcreteSmooth")
+    b.box((-h, -h, -0.02), (h, h, 0.0), "MI_AsphaltLot")
     b.box((-h, -h, 0.0), (h, -h + 0.15, 0.004), "MI_PaintYellow")          # a yard line along one edge
     return "Harbour_Apron", "harbour", b.mesh()
 

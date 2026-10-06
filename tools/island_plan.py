@@ -313,7 +313,7 @@ STREET_REGIONS = (
 #: their models exist. Streets are not kept out (a park may have a road through it; the base has its own).
 RESERVES = (
     # the COMPACT air/naval base (user, 2026-09-28): the core at the platform's south-west corner, its gate on the east
-    # side facing the gate road (kichi_mon_michi, x -460), the runway along the platform's own south band abutting the
+    # side facing the gate road (kichi_mon_michi, x -460 -- REMOVED 2026-10-05: the gate is on the north fence), the runway along the platform's own south band abutting the
     # core's apron, the one pier (with its berth) at the core's west edge -- everything within ~300 m
     # (2026-09-29 night: the base core compressed NORTH to z 1440 and the runway pulled up onto the platform's south
     # quay line, the container terminal's south edge z 1488 -- one fence round the whole area, tools/building_kit/

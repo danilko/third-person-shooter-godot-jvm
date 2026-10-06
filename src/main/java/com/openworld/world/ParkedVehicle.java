@@ -54,6 +54,20 @@ public class ParkedVehicle extends Node3D {
      * real vehicle wherever it is. A world with no registered player (a bare probe stand) spawns at once.
      */
     static final double SPAWN_NEAR = 150.0, DESPAWN_FAR = 230.0;
+    /**
+     * A LARGE vehicle is seen from further (user, 2026-10-05: "the military base does not have its vehicles /
+     * aircraft"): the base is ~285 m across, and its jets on the apron are ~240 m from the gate, so at 150 m nobody
+     * outside the fence ever saw one. Aircraft spawn within 450 m, the big trucks within 250 m; the far edge keeps the
+     * same 80 m of hysteresis.
+     */
+    static double spawnNear(String id) {
+        if (id == null) return SPAWN_NEAR;
+        switch (id) {
+            case "FIJ1": case "LIP1": return 450.0;
+            case "COT1": case "CRT1": case "BOT1": case "LAT1": case "FIE1": return 250.0;
+            default: return SPAWN_NEAR;
+        }
+    }
     private double nearScan;
 
     @Register
@@ -75,8 +89,9 @@ public class ParkedVehicle extends Node3D {
             if (GD.isInstanceValid(p)) d = Math.min(d, p.getGlobalPosition().distanceTo(here));
         }
         Vehicle v = (Vehicle) spawnedNow();
-        if (v == null && d < SPAWN_NEAR) spawnNow();
-        else if (v != null && d > DESPAWN_FAR && untouched(v, here)) {
+        double near = spawnNear(vehicleId);
+        if (v == null && d < near) spawnNow();
+        else if (v != null && d > near + (DESPAWN_FAR - SPAWN_NEAR) && untouched(v, here)) {
             Node net = getNodeOrNull("/root/NetworkManager");
             if (net instanceof NetworkManager nm && v.getCharacterInfo() != null)
                 nm.announceDespawn(v.getCharacterInfo().characterId);

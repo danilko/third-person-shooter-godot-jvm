@@ -264,6 +264,8 @@ def _sites():
     return _SITES
 
 
+LX_MIN_CROSS = 50.0    # deg: the shallowest a generated street may cross an at-grade rail corridor
+LX_COS = math.cos(math.radians(LX_MIN_CROSS))
 RAIL_ALONG = 40.0      # m: a street may not run along a rail corridor further than this (PLAN.md B10)
 _RAIL = None
 
@@ -371,6 +373,12 @@ def _site_hit(a, b):
         x = a[0] + (b[0] - a[0]) * k / n
         y = a[1] + (b[1] - a[1]) * k / n
         if any(q[4] == "no" for q in _rail_near(x, y, R["half"] + SITE_CLEAR)):
+            return "rail"
+        # a 踏切 is never shallower than LX_MIN_CROSS (island_layout.level_crossings: never < 45, warn < 60): a grid
+        # line crossing an at-grade corridor more obliquely is a site here, so it is nudged or cut (2026-10-06: an
+        # east-west street crossed the diagonal Blue line at 38 deg with its junction ON the track)
+        if L > 0.0 and any(q[4] == "level" and abs(((b[0] - a[0]) * q[2] + (b[1] - a[1]) * q[3]) / L) > LX_COS
+                           for q in _rail_near(x, y, R["half"])):
             return "rail"
         if _dike_hit(x, y):
             return "dike"

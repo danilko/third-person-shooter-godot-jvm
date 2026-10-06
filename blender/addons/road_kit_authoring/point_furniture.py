@@ -1043,6 +1043,7 @@ def place(table, solved, lanes_doc, mine_lane, mine_run, mine_pad, mark_mat, gro
     # ONE lane index, shared: "may a solid thing stand here" is one question, and a functional pole that skips
     # it is how a signal came to stand in a turn connector and a median lamp in a neighbouring road's lane.
     index = _LaneIndex(dict(lanes, **{"~" + str(l["id"]): l for l in keep_clear or ()}))
+    fur.lane_index = index          # ...asked again by crossing_signals, which runs after `place`
     _signals(fur, table, lanes, ordered, mine_lane, ground, index)
     _ped_signals(fur, table, lanes, ordered, mine_lane, ground, index)
     for site in expressway_sign_sites(table, lanes):
@@ -1327,6 +1328,30 @@ def expressway_sign_plan(table, lanes_doc):
                                  "by roadkit_cli gltf, read by world.TrafficSignals", "signs": rows}
 
 
+def _crossing_unit_clear(index, table, r, pos, out, fwd, cross, normal, clear):
+    """A 踏切 unit's spot clear of every lane: the nearest of a small search -- outward from the road up to 4 m,
+    and along its approach up to 6 m back or 1 m on -- that still stands at least clear - 1 m from the track (a
+    junction beside the crossing swings its turn connectors over the corner where the unit stands). The original
+    spot when nothing is clear (reported by the probe, never dropped: the crossing needs its unit)."""
+    if index is None:
+        return pos
+    margin = _pole_half(table, "crossing_signal") + float(r.get("pole_lane_clear", 0.15))
+    if index.clear_of(pos, margin):
+        return pos
+    cands = []
+    for k in range(0, 17):
+        for a in (0.0, -1.0, -2.0, -3.0, -4.0, -6.0, 1.0):
+            d_out = 0.25 * k
+            c = (pos[0] + out[0] * d_out + fwd[0] * a, pos[1] + out[1] * d_out + fwd[1] * a, pos[2])
+            if abs((c[0] - cross[0]) * normal[0] + (c[1] - cross[1]) * normal[1]) < clear - 1.0:
+                continue
+            cands.append((math.hypot(d_out, a), c))
+    for _d, c in sorted(cands, key=lambda t: t[0]):
+        if index.clear_of(c, margin):
+            return c
+    return pos
+
+
 def crossing_signals(fur, table, crossings):
     """踏切 signals (PLAN.md R4): at each level crossing a `crossing_signal` (警報機 + 遮断機, boom up) on the LEFT of
     each approach -- Japan drives on the left, so the unit a driver meets stands at their own kerb -- `crossing_track_
@@ -1357,6 +1382,11 @@ def crossing_signals(fur, table, crossings):
             if abs(d) < want:
                 s_ = 1.0 if d >= 0.0 else -1.0
                 pos = (pos[0] + nx_ * s_ * (want - abs(d)), pos[1] + ny_ * s_ * (want - abs(d)), z)
+            # ...and off every lane: a junction beside the crossing swings its turn connectors over the footway (a
+            # unit stood in one, probe_road_clear 2026-10-06). The rail build sees the ROAD lanes through
+            # `--keep-clear-lanekits`. Pushed outward from the road; never dropped (the crossing needs its unit).
+            pos = _crossing_unit_clear(getattr(fur, "lane_index", None), table, r, pos, (sgn * lx, sgn * ly),
+                                       (sgn * rx, sgn * ry), (x, y), (nx_, ny_), clear)
             if fur.put(table, "crossing_signal", pos, (sgn * rx, sgn * ry), road):
                 fur.counts["crossing_units"] = fur.counts.get("crossing_units", 0) + 1
 

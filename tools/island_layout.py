@@ -159,10 +159,16 @@ def derive(out):
     # authored streets that end on the planner's streets (island_core_streets `after`)
     sys.stdout.write(run(os.path.join(HERE, "island_core_streets.py"), out, "--after"))
     sys.stdout.write(run(os.path.join(HERE, "island_site_access.py"), out))
+    # places a user marked on the map, corrected by geometry (island_local_fixes.py)
+    sys.stdout.write(run(os.path.join(HERE, "island_local_fixes.py"), out))
     sys.stdout.write(run(os.path.join(HERE, "island_turnarounds.py"), out))
     # ...and on any road a generator made with a hand-copied section (before the setback, which sizes pads by width)
     sys.stdout.write(run(os.path.join(HERE, "island_shoulders.py"), out))
     sys.stdout.write(run(os.path.join(HERE, "island_dike.py"), "raise", out))     # ramps for the later roads
+    # a road goes STRAIGHT THROUGH a junction (user, 2026-10-05: no jog at each junction): each through pair's arms
+    # onto one line, before the setback sizes the pads (island_align.py)
+    sys.stdout.write(run(os.path.join(HERE, "island_align.py"), out))
+    sys.stdout.write(run(os.path.join(HERE, "island_local_fixes.py"), out, "--late"))
     # a mouth past (or inside) the road it meets -- a road that overshot the crossing -- is moved back out first: the
     # setback solve slides a mouth along its own road and cannot recover one that crossed over (check_mouth_sides)
     # ...and again after each solve, which moves pad centres: until no mouth is wrong (at most 3 rounds)

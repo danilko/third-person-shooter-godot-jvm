@@ -80,8 +80,10 @@ ACCESS = [
     # so the planner cannot make them; these two dead ends leave the port road kichi_dori__2 (a U along the platform's
     # north strip). The MILITARY BASE's gate road enters on the base's north edge; the LOGISTICS road serves the
     # truck yards between the base and the container terminal.
-    dict(name="kichi_mon_michi", site="military_base", from_road="kichi_dori", at=(-460.0, -1229.0),
-         end=(-460.0, -1440.0), parking="ParkingLot14"),
+    # (the MILITARY BASE has NO gate road, 2026-10-05: its gate is on the north fence 20 m south of the port road's
+    # square west corner, entered straight on from kichi_dori over a dropped kerb -- island_port_road_square.py says
+    # why a gate road does not fit. The old kichi_mon_michi, a T on the port road's bend running 93 m along the east
+    # fence, was removed the same day.)
     # the AIRPORT'S SERVICE ROAD (user, 2026-09-29: the airside is fenced all round; "a vehicle service gate on the
     # landside for the hangar, off a service road -- it needs one"): a T off the forecourt loop's south leg, west of
     # the terminal, south to the locked gate in the airside fence (site_airport_fence.py GATE_GX)
@@ -237,8 +239,10 @@ def add(net, a, ground):
     ex, ey = a["end"]
     if via:
         # a street with corners (a hub station's, `station_access`): rounded, resampled like an authored street
-        plan = rg.rounded_polygon([head] + via + [a["end"]], VIA_R, closed=False)
-        pts = _resample(rg.densify(plan, 4.0), SPACING)
+        # square corners (user, 2026-10-05): a station on each corner and one 15 m either side, not a resampled fillet
+        from island_core_streets import _resample_square
+        plan = [head] + [tuple(v) for v in via] + [tuple(a["end"])]
+        pts = _resample_square(rg.densify(plan, 4.0), SPACING)
         n = len(pts) - 1
         q = pts[-2]
         L = math.hypot(ex - q[0], ey - q[1]) or 1.0

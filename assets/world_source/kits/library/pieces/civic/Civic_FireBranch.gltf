@@ -150,11 +150,25 @@
     "metallicFactor": 0,
     "roughnessFactor": 0.699999988079071
    }
+  },
+  {
+   "doubleSided": true,
+   "name": "MI_AsphaltLot",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.23894542455673218,
+     0.2290288507938385,
+     0.22325706481933594,
+     1
+    ],
+    "metallicFactor": 0,
+    "roughnessFactor": 0.699999988079071
+   }
   }
  ],
  "meshes": [
   {
-   "name": "Civic_FireBranch.001",
+   "name": "Civic_FireBranch",
    "primitives": [
     {
      "attributes": {
@@ -219,6 +233,14 @@
      },
      "indices": 11,
      "material": 7
+    },
+    {
+     "attributes": {
+      "POSITION": 23,
+      "NORMAL": 24
+     },
+     "indices": 11,
+     "material": 8
     }
    ]
   }
@@ -227,15 +249,15 @@
   {
    "bufferView": 0,
    "componentType": 5126,
-   "count": 144,
+   "count": 120,
    "max": [
     9,
     15,
-    12.5
+    11
    ],
    "min": [
     -9,
-    -0.019999999552965164,
+    0,
     -8
    ],
    "type": "VEC3"
@@ -243,13 +265,13 @@
   {
    "bufferView": 1,
    "componentType": 5126,
-   "count": 144,
+   "count": 120,
    "type": "VEC3"
   },
   {
    "bufferView": 2,
    "componentType": 5123,
-   "count": 252,
+   "count": 216,
    "type": "SCALAR"
   },
   {
@@ -441,151 +463,185 @@
    "componentType": 5126,
    "count": 24,
    "type": "VEC3"
+  },
+  {
+   "bufferView": 23,
+   "componentType": 5126,
+   "count": 24,
+   "max": [
+    9,
+    0.019999999552965164,
+    12.5
+   ],
+   "min": [
+    -9,
+    -0.019999999552965164,
+    11
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 24,
+   "componentType": 5126,
+   "count": 24,
+   "type": "VEC3"
   }
  ],
  "bufferViews": [
   {
    "buffer": 0,
-   "byteLength": 1728,
+   "byteLength": 1440,
    "byteOffset": 0,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 1728,
-   "byteOffset": 1728,
+   "byteLength": 1440,
+   "byteOffset": 1440,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 504,
-   "byteOffset": 3456,
+   "byteLength": 432,
+   "byteOffset": 2880,
    "target": 34963
   },
   {
    "buffer": 0,
    "byteLength": 1152,
-   "byteOffset": 3960,
+   "byteOffset": 3312,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 1152,
-   "byteOffset": 5112,
+   "byteOffset": 4464,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 288,
-   "byteOffset": 6264,
+   "byteOffset": 5616,
    "target": 34963
   },
   {
    "buffer": 0,
    "byteLength": 4032,
-   "byteOffset": 6552,
+   "byteOffset": 5904,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 4032,
-   "byteOffset": 10584,
+   "byteOffset": 9936,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 1008,
-   "byteOffset": 14616,
+   "byteOffset": 13968,
    "target": 34963
   },
   {
    "buffer": 0,
    "byteLength": 288,
-   "byteOffset": 15624,
+   "byteOffset": 14976,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 288,
-   "byteOffset": 15912,
+   "byteOffset": 15264,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 72,
-   "byteOffset": 16200,
+   "byteOffset": 15552,
    "target": 34963
   },
   {
    "buffer": 0,
    "byteLength": 240,
-   "byteOffset": 16272,
+   "byteOffset": 15624,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 240,
-   "byteOffset": 16512,
+   "byteOffset": 15864,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 60,
-   "byteOffset": 16752,
+   "byteOffset": 16104,
    "target": 34963
   },
   {
    "buffer": 0,
    "byteLength": 2304,
-   "byteOffset": 16812,
+   "byteOffset": 16164,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 2304,
-   "byteOffset": 19116,
+   "byteOffset": 18468,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 576,
-   "byteOffset": 21420,
+   "byteOffset": 20772,
    "target": 34963
   },
   {
    "buffer": 0,
    "byteLength": 576,
-   "byteOffset": 21996,
+   "byteOffset": 21348,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 576,
-   "byteOffset": 22572,
+   "byteOffset": 21924,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 144,
-   "byteOffset": 23148,
+   "byteOffset": 22500,
    "target": 34963
   },
   {
    "buffer": 0,
    "byteLength": 288,
-   "byteOffset": 23292,
+   "byteOffset": 22644,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 288,
-   "byteOffset": 23580,
+   "byteOffset": 22932,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 288,
+   "byteOffset": 23220,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 288,
+   "byteOffset": 23508,
    "target": 34962
   }
  ],
  "buffers": [
   {
-   "byteLength": 23868,
+   "byteLength": 23796,
    "uri": "Civic_FireBranch.bin"
   }
  ]

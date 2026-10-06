@@ -11826,7 +11826,7 @@ stamped ground under a road is 10 cm below the asphalt, so a cut leaves a pit). 
   `[x, z, width]`). `roadkit_cli pieces|gltf --keep-out` applies them to the network IN MEMORY
   (`roadkit_cli._with_entries` -> `point_record_ops.apply_entries`, same calls, same order, so the same answers): the
   record stays the layout's output, and the next road build after a buildings `write` sees them (the keep-out rule).
-  A driveway the road refuses keeps the old gutter wedge. Measured: 170 car parks, 98 entries, 68 deep driveways keep
+  A driveway the road refuses meets the kerb as it is (no wedge since 2026-10-06). Measured: 170 car parks, 98 entries, 68 deep driveways keep
   the wedge (they meet the street at a junction or a road end), the rest street-front lots facing a junction pad.
   Three `add_entry` rules came with it: never on `ENTRY_SKIP` classes (expressway, ramp, rail: the first run put
   entries on the Wangan connector); never on a stretch steeper than `ENTRY_MAX_GRADE` 2 % (a station there bends the
@@ -11850,12 +11850,15 @@ gutters stay concrete", and "use --\ slope on the side of parking spaces so ther
   kerb is a road kerb (0.01..0.3 m): it continues under a dropped-kerb driveway, stops where a 踏切 levels the kerb,
   none on a rail road. Narrower than a 0.5 m shoulder, so the edge line is never on it. The drain grates
   (`furniture.json` `drain`, inset 0.35 m) sit in it, lifted 8 mm.
-- **A paved composite's sloped edge** (`apron_edge: true` on ParkingLot4/8/14/28/56, GasStation, SupermarketSite,
-  PocketPark): a ring of library `Apron_Edge` strips + `Apron_EdgeCorner` (`library_procedural.py`) OUTSIDE the
-  footprint, falling `APRON_EDGE_DROP` 6.5 cm over `APRON_EDGE_W` 0.6 m (1:9) from the apron's top, i.e. past the
-  block ground the site stands 4.5 cm over; the paved collider is a convex slab with the same sloped sides
-  (`hull_points`). The layout records `apron_edge_m`, which probe_buildings allows on every side; `island_buildings`
-  gives such a site NO plinth (its 3 cm box edge would be the step the slope removes; `type_apron_edge`).
+- **No slope bumps, and one asphalt everywhere a car drives** (2026-10-06, user: "the slope bump causes more
+  trouble than good -- remove it everywhere"). The sloped `Apron_Edge` ring round paved sites (2026-10-05) and the
+  gutter WEDGE on the carriageway at a refused driveway are both gone (`island_buildings.DRIVE_WEDGES` False puts the
+  wedge back; `apron_edge` in a type row is ignored). Instead a PAVED site (`island_buildings.type_paved`: a composite
+  with an apron, marked `paved_site` in its meta, or any kits/interiors building) stands `SITE_LIFT` 1 cm over the block
+  ground with NO plinth; other buildings keep FLOOR_LIFT + plinth. The dropped-kerb entries (a sidewalk fix) stay.
+  `MI_AsphaltLot` (car-park bays, every compound yard) is now M_LotConcrete's values (asphalt x0.9 over the concrete
+  ORM + normal; `palette.json` `orm_path` / `normal_path`), and every kits/interiors yard (`interior_plans.apron`
+  default), the container yard, the fish market, the motor pool and the civic placeholders' grounds wear it.
 
 ## The airport behind the bridge: one divided spur, the rail under it, the station against the terminal, the runway south; every hub station has its street (2026-09-29, user-asked)
 

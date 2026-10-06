@@ -1,104 +1,36 @@
 [gd_scene format=3]
 
-[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/LogisticsTruckTerminal_mesh.res" id="1_8k76c"]
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_0tp5w"]
-size = Vector3(166, 8, 30)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_4tpyc"]
-size = Vector3(14, 14.4, 30)
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/LogisticsTruckTerminal_mesh.res" id="1_0tp5w"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/ParkedVehicle.java" id="2_4tpyc"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_dd0nx"]
-size = Vector3(2.6, 3.8, 12.02)
+size = Vector3(166, 8, 30)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_hygyh"]
-size = Vector3(2.6, 3.8, 12.02)
+size = Vector3(14, 14.4, 30)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_1g7u2"]
-size = Vector3(2.6, 3.8, 12.02)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_sr45n"]
-size = Vector3(2.6, 3.8, 12.02)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_hbr1q"]
-size = Vector3(2.6, 3.8, 12.02)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_b55by"]
-size = Vector3(2.6, 3.8, 12.02)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_nq2st"]
-size = Vector3(2.6, 3.8, 12.02)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_i72wx"]
-size = Vector3(2.6, 3.8, 12.02)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_njagt"]
-size = Vector3(2.6, 3.8, 12.02)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_kv0bo"]
-size = Vector3(2.6, 3.8, 12.02)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_14xsh"]
-size = Vector3(2.6, 3.8, 12.02)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_hv827"]
-size = Vector3(2.6, 3.8, 12.02)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_v83ds"]
-size = Vector3(2.6, 3.8, 12.02)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_p5xot"]
-size = Vector3(2.6, 3.8, 12.02)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_dd165"]
-size = Vector3(2.6, 3.8, 12.02)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_57l5s"]
-size = Vector3(2.6, 4, 16.57)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_ba7uc"]
-size = Vector3(2.6, 4, 16.57)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_5dgg3"]
-size = Vector3(2.6, 4, 16.57)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_wcgba"]
-size = Vector3(2.6, 4, 16.57)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_ln5in"]
-size = Vector3(2.6, 4, 16.57)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_6261v"]
-size = Vector3(2.6, 4, 16.57)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_p45ur"]
-size = Vector3(2.6, 4, 16.57)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_ph0if"]
-size = Vector3(2.6, 4, 16.57)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_5dygt"]
 size = Vector3(4.4, 3.1, 3.4)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_x351a"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_sr45n"]
 size = Vector3(160.08, 1.8, 0.08)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_rkne5"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_hbr1q"]
 size = Vector3(220.08, 1.8, 0.08)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_r7yuy"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_b55by"]
 size = Vector3(40.08, 1.8, 0.08)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_1ctxi"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_nq2st"]
 size = Vector3(0.08, 1.8, 150.08)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_jwgod"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_i72wx"]
 size = Vector3(0.08, 1.8, 150.08)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_4eiy5"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_njagt"]
 size = Vector3(225, 0.1, 150)
 
-[node name="LogisticsTruckTerminal" type="Node3D" unique_id=22126685]
+[node name="LogisticsTruckTerminal" type="Node3D" unique_id=1282334541]
 metadata/building = {
 "aabb": [Vector3(-112.54, -0.05, -75.04), Vector3(225.04001, 14.05, 150.08)],
 "clear_probes": [],
@@ -118,148 +50,211 @@ metadata/building = {
 "name": "トラックターミナル (placeholder)"
 },
 "kit": "library",
-"piece_count": 98,
+"marks": [{
+"name": "MARK_vehicle_BOT1_0",
+"pos": [-63.0, 0.0, 21.5],
+"props": {
+"faction": "neutral",
+"kind": "vehicle",
+"vehicle": "BOT1"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_vehicle_BOT1_1",
+"pos": [-12.0, 0.0, 21.5],
+"props": {
+"faction": "neutral",
+"kind": "vehicle",
+"vehicle": "BOT1"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_vehicle_BOT1_2",
+"pos": [39.0, 0.0, 21.5],
+"props": {
+"faction": "neutral",
+"kind": "vehicle",
+"vehicle": "BOT1"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_vehicle_BOT1_3",
+"pos": [-52.0, 0.0, -21.5],
+"props": {
+"faction": "neutral",
+"kind": "vehicle",
+"vehicle": "BOT1"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_vehicle_BOT1_4",
+"pos": [20.0, 0.0, -21.5],
+"props": {
+"faction": "neutral",
+"kind": "vehicle",
+"vehicle": "BOT1"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_vehicle_COT1_5",
+"pos": [-66.0, 0.0, -59.0],
+"props": {
+"faction": "neutral",
+"kind": "vehicle",
+"vehicle": "COT1"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_vehicle_COT1_6",
+"pos": [6.0, 0.0, -59.0],
+"props": {
+"faction": "neutral",
+"kind": "vehicle",
+"vehicle": "COT1"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_vehicle_COT1_7",
+"pos": [54.0, 0.0, -59.0],
+"props": {
+"faction": "neutral",
+"kind": "vehicle",
+"vehicle": "COT1"
+},
+"yaw": 0.0
+}],
+"piece_count": 75,
 "probe_xz": [0.0, 45.0],
 "props_top_m": 14.0,
 "roofline_m": 14.0,
 "solid_probes": [],
-"use": "the island's ONE truck terminal (user, 2026-09-28: one compact logistics hub, not repeated warehouses): a 180 x 30 m cross-dock shed with trucks backed onto both faces, a trailer park behind, the gate on the front (+Z, the logistics road). PLACEHOLDER (library_civic.py logi_*)",
+"use": "the island's ONE truck terminal (user, 2026-09-28: one compact logistics hub, not repeated warehouses): a 180 x 30 m cross-dock shed with trucks backed onto both faces, a trailer park behind, the gate on the front (+Z, the logistics road). the trucks are drivable PARKED VEHICLES (BOT1 box trucks at the docks, COT1 container trucks in the trailer park; user 2026-10-05: real vehicles from the Blender pipeline, fewer). PLACEHOLDER buildings (library_civic.py logi_*)",
 "wall_top_m": 0.0
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=945175296]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=533967566]
 visibility_range_end = 485.247
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
-mesh = ExtResource("1_8k76c")
+mesh = ExtResource("1_0tp5w")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=567869135]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=747659428]
 collision_mask = 0
 
-[node name="Box0" type="CollisionShape3D" parent="Collision" unique_id=571512251]
+[node name="Box0" type="CollisionShape3D" parent="Collision" unique_id=1194945201]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 4, 0)
-shape = SubResource("BoxShape3D_0tp5w")
-
-[node name="Box1" type="CollisionShape3D" parent="Collision" unique_id=2124881505]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 83, 7.2, 0)
-shape = SubResource("BoxShape3D_4tpyc")
-
-[node name="Box2" type="CollisionShape3D" parent="Collision" unique_id=941759430]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -80, 1.9, 21.51)
 shape = SubResource("BoxShape3D_dd0nx")
 
-[node name="Box3" type="CollisionShape3D" parent="Collision" unique_id=189136671]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -63, 1.9, 21.51)
+[node name="Box1" type="CollisionShape3D" parent="Collision" unique_id=1380941735]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 83, 7.2, 0)
 shape = SubResource("BoxShape3D_hygyh")
 
-[node name="Box4" type="CollisionShape3D" parent="Collision" unique_id=1559698459]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46, 1.9, 21.51)
+[node name="Box2" type="CollisionShape3D" parent="Collision" unique_id=905147401]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 60, 1.55, 68)
 shape = SubResource("BoxShape3D_1g7u2")
 
-[node name="Box5" type="CollisionShape3D" parent="Collision" unique_id=1155356167]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -29, 1.9, 21.51)
+[node name="Box3" type="CollisionShape3D" parent="Collision" unique_id=184345981]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -32.5, 0.9, 74.5)
 shape = SubResource("BoxShape3D_sr45n")
 
-[node name="Box6" type="CollisionShape3D" parent="Collision" unique_id=1929437908]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 1.9, 21.51)
+[node name="Box4" type="CollisionShape3D" parent="Collision" unique_id=1336611977]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0.9, -74.5)
 shape = SubResource("BoxShape3D_hbr1q")
 
-[node name="Box7" type="CollisionShape3D" parent="Collision" unique_id=488677038]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1.9, 21.51)
+[node name="Box5" type="CollisionShape3D" parent="Collision" unique_id=377396018]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 87.5, 0.9, 74.5)
 shape = SubResource("BoxShape3D_b55by")
 
-[node name="Box8" type="CollisionShape3D" parent="Collision" unique_id=1507337565]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, 1.9, 21.51)
+[node name="Box6" type="CollisionShape3D" parent="Collision" unique_id=229585807]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -112, 0.9, 0)
 shape = SubResource("BoxShape3D_nq2st")
 
-[node name="Box9" type="CollisionShape3D" parent="Collision" unique_id=1337989353]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 39, 1.9, 21.51)
+[node name="Box7" type="CollisionShape3D" parent="Collision" unique_id=1733329670]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 112, 0.9, 0)
 shape = SubResource("BoxShape3D_i72wx")
 
-[node name="Box10" type="CollisionShape3D" parent="Collision" unique_id=680142511]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 56, 1.9, 21.51)
+[node name="Box8" type="CollisionShape3D" parent="Collision" unique_id=862959350]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
 shape = SubResource("BoxShape3D_njagt")
 
-[node name="Box11" type="CollisionShape3D" parent="Collision" unique_id=937535781]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -76, 1.9, -21.51)
-shape = SubResource("BoxShape3D_kv0bo")
+[node name="Markers" type="Node3D" parent="." unique_id=712165794]
 
-[node name="Box12" type="CollisionShape3D" parent="Collision" unique_id=2023080852]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -52, 1.9, -21.51)
-shape = SubResource("BoxShape3D_14xsh")
+[node name="MARK_vehicle_BOT1_0" type="Node3D" parent="Markers" unique_id=724742708 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -63, 0, 21.5)
+script = ExtResource("2_4tpyc")
+vehicle_id = "BOT1"
+faction = "neutral"
+drop_height = 0.3
+metadata/kind = "vehicle"
+metadata/vehicle = "BOT1"
+metadata/faction = "neutral"
 
-[node name="Box13" type="CollisionShape3D" parent="Collision" unique_id=2069934210]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -28, 1.9, -21.51)
-shape = SubResource("BoxShape3D_hv827")
+[node name="MARK_vehicle_BOT1_1" type="Node3D" parent="Markers" unique_id=1919999753 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -12, 0, 21.5)
+script = ExtResource("2_4tpyc")
+vehicle_id = "BOT1"
+faction = "neutral"
+drop_height = 0.3
+metadata/kind = "vehicle"
+metadata/vehicle = "BOT1"
+metadata/faction = "neutral"
 
-[node name="Box14" type="CollisionShape3D" parent="Collision" unique_id=1803751178]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1.9, -21.51)
-shape = SubResource("BoxShape3D_v83ds")
+[node name="MARK_vehicle_BOT1_2" type="Node3D" parent="Markers" unique_id=1420603030 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 39, 0, 21.5)
+script = ExtResource("2_4tpyc")
+vehicle_id = "BOT1"
+faction = "neutral"
+drop_height = 0.3
+metadata/kind = "vehicle"
+metadata/vehicle = "BOT1"
+metadata/faction = "neutral"
 
-[node name="Box15" type="CollisionShape3D" parent="Collision" unique_id=2056274353]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 1.9, -21.51)
-shape = SubResource("BoxShape3D_p5xot")
+[node name="MARK_vehicle_BOT1_3" type="Node3D" parent="Markers" unique_id=1892880490 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -52, 0, -21.5)
+script = ExtResource("2_4tpyc")
+vehicle_id = "BOT1"
+faction = "neutral"
+drop_height = 0.3
+metadata/kind = "vehicle"
+metadata/vehicle = "BOT1"
+metadata/faction = "neutral"
 
-[node name="Box16" type="CollisionShape3D" parent="Collision" unique_id=6476164]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44, 1.9, -21.51)
-shape = SubResource("BoxShape3D_dd165")
+[node name="MARK_vehicle_BOT1_4" type="Node3D" parent="Markers" unique_id=1603611314 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 0, -21.5)
+script = ExtResource("2_4tpyc")
+vehicle_id = "BOT1"
+faction = "neutral"
+drop_height = 0.3
+metadata/kind = "vehicle"
+metadata/vehicle = "BOT1"
+metadata/faction = "neutral"
 
-[node name="Box17" type="CollisionShape3D" parent="Collision" unique_id=250507394]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -90, 2, -58.985)
-shape = SubResource("BoxShape3D_57l5s")
+[node name="MARK_vehicle_COT1_5" type="Node3D" parent="Markers" unique_id=1328991350 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -66, 0, -59)
+script = ExtResource("2_4tpyc")
+vehicle_id = "COT1"
+faction = "neutral"
+drop_height = 0.3
+metadata/kind = "vehicle"
+metadata/vehicle = "COT1"
+metadata/faction = "neutral"
 
-[node name="Box18" type="CollisionShape3D" parent="Collision" unique_id=673945912]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -66, 2, -58.985)
-shape = SubResource("BoxShape3D_ba7uc")
+[node name="MARK_vehicle_COT1_6" type="Node3D" parent="Markers" unique_id=1244792396 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, -59)
+script = ExtResource("2_4tpyc")
+vehicle_id = "COT1"
+faction = "neutral"
+drop_height = 0.3
+metadata/kind = "vehicle"
+metadata/vehicle = "COT1"
+metadata/faction = "neutral"
 
-[node name="Box19" type="CollisionShape3D" parent="Collision" unique_id=1563721897]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42, 2, -58.985)
-shape = SubResource("BoxShape3D_5dgg3")
-
-[node name="Box20" type="CollisionShape3D" parent="Collision" unique_id=778701293]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18, 2, -58.985)
-shape = SubResource("BoxShape3D_wcgba")
-
-[node name="Box21" type="CollisionShape3D" parent="Collision" unique_id=1758059942]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 2, -58.985)
-shape = SubResource("BoxShape3D_ln5in")
-
-[node name="Box22" type="CollisionShape3D" parent="Collision" unique_id=442551191]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 2, -58.985)
-shape = SubResource("BoxShape3D_6261v")
-
-[node name="Box23" type="CollisionShape3D" parent="Collision" unique_id=2083863527]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54, 2, -58.985)
-shape = SubResource("BoxShape3D_p45ur")
-
-[node name="Box24" type="CollisionShape3D" parent="Collision" unique_id=1483577285]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 78, 2, -58.985)
-shape = SubResource("BoxShape3D_ph0if")
-
-[node name="Box25" type="CollisionShape3D" parent="Collision" unique_id=755368544]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 60, 1.55, 68)
-shape = SubResource("BoxShape3D_5dygt")
-
-[node name="Box26" type="CollisionShape3D" parent="Collision" unique_id=1136353666]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -32.5, 0.9, 74.5)
-shape = SubResource("BoxShape3D_x351a")
-
-[node name="Box27" type="CollisionShape3D" parent="Collision" unique_id=1636233525]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0.9, -74.5)
-shape = SubResource("BoxShape3D_rkne5")
-
-[node name="Box28" type="CollisionShape3D" parent="Collision" unique_id=311758260]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 87.5, 0.9, 74.5)
-shape = SubResource("BoxShape3D_r7yuy")
-
-[node name="Box29" type="CollisionShape3D" parent="Collision" unique_id=1479899356]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -112, 0.9, 0)
-shape = SubResource("BoxShape3D_1ctxi")
-
-[node name="Box30" type="CollisionShape3D" parent="Collision" unique_id=908398444]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 112, 0.9, 0)
-shape = SubResource("BoxShape3D_jwgod")
-
-[node name="Box31" type="CollisionShape3D" parent="Collision" unique_id=1704512896]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
-shape = SubResource("BoxShape3D_4eiy5")
+[node name="MARK_vehicle_COT1_7" type="Node3D" parent="Markers" unique_id=803125910 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54, 0, -59)
+script = ExtResource("2_4tpyc")
+vehicle_id = "COT1"
+faction = "neutral"
+drop_height = 0.3
+metadata/kind = "vehicle"
+metadata/vehicle = "COT1"
+metadata/faction = "neutral"

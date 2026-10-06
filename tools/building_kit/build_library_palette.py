@@ -118,12 +118,20 @@ def material_tres(name, m):
         props.append("normal_enabled = true")
         props.append("normal_texture = %s" % tex(base + "_NormalGL.jpg"))
     elif "tex_path" in m and m.get("orm"):
-        props.append("metallic_texture = %s" % tex(base + "_ORM.png"))
+        # `orm_path` / `normal_path`: another texture set's maps (MI_AsphaltLot wears the asphalt colour over the
+        # concrete's relief, exactly as the block ground's M_LotConcrete does)
+        orm = m.get("orm_path", base + "_ORM.png")
+        if "metallic" in m:
+            props.append("metallic = %s" % fmt(m["metallic"]))
+        props.append("metallic_texture = %s" % tex(orm))
         props.append("metallic_texture_channel = 2")
-        props.append("roughness_texture = %s" % tex(base + "_ORM.png"))
+        props.append("roughness_texture = %s" % tex(orm))
         props.append("roughness_texture_channel = 1")
         props.append("normal_enabled = true")
-        props.append("normal_texture = %s" % tex(base + "_Normal.png"))
+        props.append("normal_texture = %s" % tex(m.get("normal_path", base + "_Normal.png")))
+        if m.get("ao"):
+            props.append("ao_enabled = true")
+            props.append("ao_texture = %s" % tex(orm))
     else:
         if "metallic" in m:
             props.append("metallic = %s" % fmt(m["metallic"]))

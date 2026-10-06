@@ -574,6 +574,9 @@ ACCEPT_GAPS = set()      # (a, b) station pairs closer than STATION_MIN_GAP that
 #      station's SOUTH forecourt with its car park, and the castle is a walk up from the north exit -- the rail never
 #      crosses the approach (a Japanese 城下町 station).
 import copy as _copy
+MAIN_EW_Y = -385.0                   # the Main line's east-west leg south of C1 (Fish Market, Suburb)
+HARBOUR_ELEV_Y = -440.0              # the Harbour line climbs onto the viaduct north of this (after rinkai_dori)
+HARBOUR_GRADE_Y = -740.0             # ...and comes back down to grade south of this (Industry is elevated)
 CENTRAL_END_X = 952.0                # the Blue and Harbour lines' buffer stops, past Central's east end
 _TS = LAYOUTS["tokyo_straight"]
 _R0 = _copy.deepcopy(_TS)
@@ -684,6 +687,26 @@ _R0["accept_gaps"] = list(_R0["accept_gaps"]) + [("Farm", "Residential North")]
 _R0["lines"]["Main line"]["corners"] = _R0["lines"]["Main line"]["corners"][:5] + [(1250.0, -1718.0)]
 _R0["lines"]["Main line"]["form"] = [f for f in _R0["lines"]["Main line"]["form"] if f[:2] != (1300.0, -1700.0)]
 _R0["stations"]["Airport"] = ("Main line", 1250.0, -1670.0) + tuple(_R0["stations"]["Airport"][3:])
+# THE CORE CROSSINGS (PLAN.md step (c), decision 2, measured 2026-10-05). South of Central both lines came down to grade
+# at (205, 140) and stayed there to the bridge, making three 踏切 6-14 m from a junction (eki_minami_dori__2,
+# nishi_hondori__s, wangan_dori__x2) and closing eki_ginza_suburb. The plan was to keep them on the viaduct from Central
+# -- impossible: both pass under C1's south side at y -108 (deck 11 m, so a rail head <= 3.5 m: CLEAR_RAIL_UNDER), and
+# Bay's platform stands under C1. So they still dip under C1 and through Bay at grade, cross rinkai_dori__5 (y -205) on
+# the level, and CLIMB straight after it: the Main line is elevated from just past its throat curve to the Rainbow
+# Bridge (Fish Market becomes elevated), the Harbour line from y -440 past Industry (elevated), down to grade between
+# Industry and Harbour (its ramp lies south of HARBOUR_GRADE_Y). Left at grade, and named in PLAN.md: the rinkai_dori__5
+# pair (two lines 20 m apart) and ring_kita__5 (the dike road meeting the Main line at 7.9 m).
+_R0["lines"]["Main line"]["form"] = [((300.0, -385.0, "elev") if f[:2] == (835.0, -400.0) else f)
+                                     for f in _R0["lines"]["Main line"]["form"]]
+_R0["lines"]["Harbour line"]["form"] = _R0["lines"]["Harbour line"]["form"] + \
+    [(185.0, HARBOUR_ELEV_Y, "elev"), (185.0, HARBOUR_GRADE_Y, "grade")]
+# ...and the Main line's east-west leg moves 15 m NORTH (y -400 -> MAIN_EW_Y): Fish Market is now an ELEVATED hub,
+# 30.7 m wide with its F1 wings, and wangan_dori (3+3, y -430) left it no room on y -400 (its paved edge ~15 m off
+# the track centre). Suburb and the throat move with the leg.
+_R0["lines"]["Main line"]["corners"] = [((x, MAIN_EW_Y) if y == -400.0 else (x, y))
+                                        for x, y in _R0["lines"]["Main line"]["corners"]]
+for _n in ("Fish Market", "Suburb"):
+    _R0["stations"][_n] = (_R0["stations"][_n][0], 445.0 if _n == "Fish Market" else _R0["stations"][_n][1], MAIN_EW_Y) + tuple(_R0["stations"][_n][3:])
 _R0["title"] = "Tokyo hub, straight Harbour (r0 route fixes)"
 LAYOUTS["tokyo_straight_pre_r0"] = _TS
 LAYOUTS["tokyo_straight"] = _R0
@@ -768,17 +791,21 @@ HUB_ACCESS = {
     # the container terminal's gate station, under the Wangan: off the ring road's low stretch west of the rail bridge
     # (6.4 m) down to the west door (3.4 m); the car park south of the street, clear of the viaduct's piers
     "Harbour": dict(from_road="ring_kita", at=(38.0, -1025.0), via=[(100.0, -1052.0)], mode="head", park="right"),
-    # the annex on the WEST side (the east is squeezed against the dike's embankment): straight off kojo_waku
-    "Industry": dict(from_road="kojo_waku", at=(103.0, -664.0), via=[(128.0, -688.5)], mode="head", side="right",
-                     park="left"),
-    # off eki_minami_dori along the north face, past the door; the car park north of it (it faced open ground)
-    "Fish Market": dict(from_road="eki_minami_dori", at=(532.0, -330.0), via=[(510.0, -367.5)], mode="face",
-                      past=14.0, park="right"),
+    # ELEVATED since 2026-10-05 (step (c)): off kojo_waku east to the station's WEST face, then NORTH along it past
+    # both west doors (the east is squeezed against the dike's embankment); the car park west of it. Its own T on
+    # kojo_waku's straight, 65 m north of the kojo_waku corner and 85 m south of the dike side road's T (user,
+    # 2026-10-06: it used to share that T -- the island's only 5-arm pad)
+    "Industry": dict(from_road="kojo_waku", at=(108.0, -735.0), via=[(156.5, -735.0)], mode="path",
+                     end=(156.5, -650.0), park="left", park_back=40.0),
+    # ELEVATED since 2026-10-05 (step (c)): a T off eki_minami_dori and west along the NORTH face, past both north
+    # doors (wangan_dori is 15 m off the south face); the car park north of it
+    "Fish Market": dict(from_road="eki_minami_dori", at=(527.0, -356.5), via=[(500.0, -356.5)], mode="path",
+                        end=(380.0, -356.5), park="right", park_back=40.0),
     # a T off wangan_dori's diagonal south-east of the station, north to the south face and west along it past both
     # south doors; the car park south of it. (A fourth arm of the wangan_dori x kogai_michi junction west of the
     # station was tried first: its two south-east arms already leave 20 deg apart, and the setback solve wanted 75 m.)
-    "Suburb": dict(from_road="wangan_dori", at=(929.0, -492.0), via=[(930.0, -428.5)], mode="path",
-                   end=(828.0, -428.5), park="left", park_back=60.0),
+    "Suburb": dict(from_road="wangan_dori", at=(929.0, -492.0), via=[(930.0, -413.5)], mode="path",
+                   end=(828.0, -413.5), park="left", park_back=60.0),
     # off nishi_hondori straight to the east door, under C1; the car park north of it (it stood west of the tracks)
     # the door already faces nishi_hondori across the station's 28 m apron (Central's is 24 m), and there is no room for
     # a T between its two junctions 67 m apart: no street, the car park moves onto nishi_hondori beside the door (it

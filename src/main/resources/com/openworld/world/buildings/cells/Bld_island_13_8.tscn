@@ -13,14 +13,11 @@ material = ExtResource("lotmat")
 
 [sub_resource type="MultiMesh" id="Lots"]
 transform_format = 1
-instance_count = 2
+instance_count = 1
 mesh = SubResource("LotBox")
-buffer = PackedFloat32Array(-2.1001, 0.0000, -48.3954, 1318.3895, 0.0000, 0.3100, 0.0000, 5.4530, 31.9310, 0.0000, -3.1830, 122.1150, -3.3671, 0.0000, -51.3757, 1320.5000, 0.0000, 0.3100, 0.0000, 5.4530, 48.3830, 0.0000, -3.5754, 168.5000)
+buffer = PackedFloat32Array(-3.3671, 0.0000, -51.3757, 1320.5000, 0.0000, 0.3100, 0.0000, 5.4530, 48.3830, 0.0000, -3.5754, 168.5000)
 
 [sub_resource type="BoxShape3D" id="LotShape0"]
-size = Vector3(32.000, 0.310, 48.500)
-
-[sub_resource type="BoxShape3D" id="LotShape1"]
 size = Vector3(48.500, 0.310, 51.500)
 
 [node name="Bld_island_13_8" type="Node3D"]
@@ -33,25 +30,25 @@ visibility_range_begin_margin = 40.0
 visibility_range_fade_mode = 1
 
 [node name="ParkingLot28_000" parent="." instance=ExtResource("3")]
-transform = Transform3D(-0.066518, 0, -0.997785, 0, 1, 0, 0.997785, 0, -0.066518, 1284.500, 5.623, 84.500)
+transform = Transform3D(-0.066518, 0, -0.997785, 0, 1, 0, 0.997785, 0, -0.066518, 1284.500, 5.588, 84.500)
 
 [node name="Mesh" parent="./ParkingLot28_000" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
 [node name="ParkingLot14_001" parent="." instance=ExtResource("2")]
-transform = Transform3D(-0.081782, 0, -0.996650, 0, 1, 0, 0.996650, 0, -0.081782, 1290.500, 5.623, 204.500)
+transform = Transform3D(-0.081782, 0, -0.996650, 0, 1, 0, 0.996650, 0, -0.081782, 1290.500, 5.588, 204.500)
 
 [node name="Mesh" parent="./ParkingLot14_001" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
 [node name="PocketPark_002" parent="." instance=ExtResource("4")]
-transform = Transform3D(-0.066518, 0, -0.997785, 0, 1, 0, 0.997785, 0, -0.066518, 1308.500, 5.623, 78.500)
+transform = Transform3D(-0.066518, 0, -0.997785, 0, 1, 0, 0.997785, 0, -0.066518, 1308.500, 5.588, 78.500)
 
 [node name="Mesh" parent="./PocketPark_002" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
 [node name="ParkingGarage_Shop_003" parent="." instance=ExtResource("1")]
-transform = Transform3D(-0.065630, 0, -0.997844, 0, 1, 0, 0.997844, 0, -0.065630, 1320.500, 5.623, 120.500)
+transform = Transform3D(-0.065630, 0, -0.997844, 0, 1, 0, 0.997844, 0, -0.065630, 1320.500, 5.588, 120.500)
 
 [node name="Mesh" parent="./ParkingGarage_Shop_003" index="0"]
 visibility_parent = NodePath("../../HLOD")
@@ -69,9 +66,5 @@ multimesh = SubResource("Lots")
 collision_mask = 0
 
 [node name="Plinth0" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(-0.065630, 0, -0.997844, 0, 1, 0, 0.997844, 0, -0.065630, 1318.389, 5.453, 122.115)
-shape = SubResource("LotShape0")
-
-[node name="Plinth1" type="CollisionShape3D" parent="PlinthCollision"]
 transform = Transform3D(-0.069426, 0, -0.997587, 0, 1, 0, 0.997587, 0, -0.069426, 1320.500, 5.453, 168.500)
-shape = SubResource("LotShape1")
+shape = SubResource("LotShape0")

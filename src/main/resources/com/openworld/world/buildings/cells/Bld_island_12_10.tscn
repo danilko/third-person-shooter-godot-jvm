@@ -23,9 +23,9 @@ material = ExtResource("lotmat")
 
 [sub_resource type="MultiMesh" id="Lots"]
 transform_format = 1
-instance_count = 8
+instance_count = 7
 mesh = SubResource("LotBox")
-buffer = PackedFloat32Array(0.0000, 0.0000, -10.5800, 1026.8400, 0.0000, 0.5600, 0.0000, 5.4800, 13.6000, 0.0000, 0.0000, 743.5030, 6.5579, 0.0000, 0.0247, 1035.9783, 0.0000, 0.5600, 0.0000, 5.4800, -0.0164, 0.0000, 9.8973, 705.1524, 15.0599, 0.0000, 0.0296, 1049.9765, 0.0000, 0.5600, 0.0000, 5.4800, -0.0549, 0.0000, 8.1224, 705.9943, -11.4200, 0.0000, -0.0147, 1067.1362, 0.0000, 0.5600, 0.0000, 5.4800, 0.0207, 0.0000, -8.1224, 731.1637, 12.5300, 0.0000, 0.0197, 1067.9810, 0.0000, 0.5600, 0.0000, 5.4800, -0.0206, 0.0000, 11.9800, 704.0110, 11.4198, 0.0000, -0.0465, 1089.0117, 0.0000, 0.5600, 0.0000, 5.4800, 0.0654, 0.0000, 8.1223, 705.9733, 27.1755, 0.0000, -15.6632, 1118.8780, 0.0000, 0.5100, 0.0000, 5.5050, 13.8472, 0.0000, 30.7395, 697.6630, 0.1185, 0.0000, -8.1222, 1129.6857, 0.0000, 0.5600, 0.0000, 5.4800, 15.0595, 0.0000, 0.0639, 743.5740)
+buffer = PackedFloat32Array(0.0000, 0.0000, -10.5800, 1026.8400, 0.0000, 0.5600, 0.0000, 5.4800, 13.6000, 0.0000, 0.0000, 743.5030, 6.5579, 0.0000, 0.0247, 1035.9783, 0.0000, 0.5600, 0.0000, 5.4800, -0.0164, 0.0000, 9.8973, 705.1524, 15.0599, 0.0000, 0.0296, 1049.9765, 0.0000, 0.5600, 0.0000, 5.4800, -0.0549, 0.0000, 8.1224, 705.9943, -11.4200, 0.0000, -0.0147, 1067.1362, 0.0000, 0.5600, 0.0000, 5.4800, 0.0207, 0.0000, -8.1224, 731.1637, 12.5300, 0.0000, 0.0197, 1067.9810, 0.0000, 0.5600, 0.0000, 5.4800, -0.0206, 0.0000, 11.9800, 704.0110, 11.4198, 0.0000, -0.0465, 1089.0117, 0.0000, 0.5600, 0.0000, 5.4800, 0.0654, 0.0000, 8.1223, 705.9733, 0.1185, 0.0000, -8.1222, 1129.6857, 0.0000, 0.5600, 0.0000, 5.4800, 15.0595, 0.0000, 0.0639, 743.5740)
 
 [sub_resource type="BoxShape3D" id="LotShape0"]
 size = Vector3(13.600, 0.560, 10.580)
@@ -46,9 +46,6 @@ size = Vector3(12.530, 0.560, 11.980)
 size = Vector3(11.420, 0.560, 8.122)
 
 [sub_resource type="BoxShape3D" id="LotShape6"]
-size = Vector3(30.500, 0.510, 34.500)
-
-[sub_resource type="BoxShape3D" id="LotShape7"]
 size = Vector3(15.060, 0.560, 8.122)
 
 [sub_resource type="BoxMesh" id="ApronBox"]
@@ -87,7 +84,7 @@ surface_material_override/1 = ExtResource("tone1_2")
 visibility_parent = NodePath("../../HLOD")
 
 [node name="PocketPark_002" parent="." instance=ExtResource("6")]
-transform = Transform3D(0.594416, 0, -0.804158, 0, 1, 0, 0.804158, 0, 0.594416, 1038.500, 5.623, 666.500)
+transform = Transform3D(0.999994, 0, 0.003508, 0, 1, 0, -0.003508, 0, 0.999994, 1044.500, 5.588, 666.500)
 
 [node name="Mesh" parent="./PocketPark_002" index="0"]
 visibility_parent = NodePath("../../HLOD")
@@ -123,7 +120,7 @@ surface_material_override/2 = ExtResource("tone7_1")
 visibility_parent = NodePath("../../HLOD")
 
 [node name="FireBranch_007" parent="." instance=ExtResource("5")]
-transform = Transform3D(0.890999, 0, -0.454006, 0, 1, 0, 0.454006, 0, 0.890999, 1120.240, 5.775, 694.990)
+transform = Transform3D(0.890999, 0, -0.454006, 0, 1, 0, 0.454006, 0, 0.890999, 1120.240, 5.740, 694.990)
 
 [node name="Mesh" parent="./FireBranch_007" index="0"]
 visibility_parent = NodePath("../../HLOD")
@@ -165,12 +162,8 @@ transform = Transform3D(0.999984, 0, -0.005725, 0, 1, 0, 0.005725, 0, 0.999984, 
 shape = SubResource("LotShape5")
 
 [node name="Plinth6" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(0.890999, 0, -0.454006, 0, 1, 0, 0.454006, 0, 0.890999, 1118.878, 5.505, 697.663)
-shape = SubResource("LotShape6")
-
-[node name="Plinth7" type="CollisionShape3D" parent="PlinthCollision"]
 transform = Transform3D(0.007871, 0, -0.999969, 0, 1, 0, 0.999969, 0, 0.007871, 1129.686, 5.480, 743.574)
-shape = SubResource("LotShape7")
+shape = SubResource("LotShape6")
 
 [node name="Aprons" type="MultiMeshInstance3D" parent="."]
 multimesh = SubResource("Aprons")

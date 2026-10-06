@@ -4,23 +4,6 @@
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ParkingLot56.tscn" id="2"]
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_13_7.res" id="hlod"]
 
-[sub_resource type="StandardMaterial3D" id="DriveMat"]
-albedo_color = Color(0.16, 0.16, 0.17, 1)
-roughness = 0.9
-
-[sub_resource type="PrismMesh" id="DriveRamp"]
-left_to_right = 1.0
-material = SubResource("DriveMat")
-
-[sub_resource type="MultiMesh" id="Drives"]
-transform_format = 1
-instance_count = 1
-mesh = SubResource("DriveRamp")
-buffer = PackedFloat32Array(0.7973, 0.0000, 0.4128, 1249.0450, 0.0000, 0.1500, 0.0000, 12.0750, -0.0661, 0.0000, 4.9829, -104.0656)
-
-[sub_resource type="ConvexPolygonShape3D" id="DriveShape"]
-points = PackedVector3Array(-0.400, -0.075, -2.500, -0.400, -0.075, 2.500, 0.400, -0.075, -2.500, 0.400, -0.075, 2.500, 0.400, 0.075, -2.500, 0.400, 0.075, 2.500)
-
 [node name="Bld_island_13_7" type="Node3D"]
 
 [node name="HLOD" type="MeshInstance3D" parent="."]
@@ -31,23 +14,13 @@ visibility_range_begin_margin = 40.0
 visibility_range_fade_mode = 1
 
 [node name="ParkingLot28_000" parent="." instance=ExtResource("1")]
-transform = Transform3D(0.082565, 0, -0.996586, 0, 1, 0, 0.996586, 0, 0.082565, 1290.500, 5.623, -107.500)
+transform = Transform3D(0.082565, 0, -0.996586, 0, 1, 0, 0.996586, 0, 0.082565, 1290.500, 5.588, -107.500)
 
 [node name="Mesh" parent="./ParkingLot28_000" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
 [node name="ParkingLot56_001" parent="." instance=ExtResource("2")]
-transform = Transform3D(-0.066518, 0, -0.997785, 0, 1, 0, 0.997785, 0, -0.066518, 1302.500, 5.623, -5.500)
+transform = Transform3D(-0.066518, 0, -0.997785, 0, 1, 0, 0.997785, 0, -0.066518, 1302.500, 5.588, -5.500)
 
 [node name="Mesh" parent="./ParkingLot56_001" index="0"]
 visibility_parent = NodePath("../../HLOD")
-
-[node name="Drives" type="MultiMeshInstance3D" parent="."]
-multimesh = SubResource("Drives")
-
-[node name="DriveCollision" type="StaticBody3D" parent="."]
-collision_mask = 0
-
-[node name="Drive0" type="CollisionShape3D" parent="DriveCollision"]
-transform = Transform3D(0.996586, 0.000000, 0.082565, 0.000000, 1.000000, 0.000000, -0.082565, 0.000000, 0.996586, 1249.045, 12.075, -104.066)
-shape = SubResource("DriveShape")

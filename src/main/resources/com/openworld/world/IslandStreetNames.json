@@ -1,5 +1,5 @@
 {
- "chars": " -0123456789ABCDEFGHIJKLMNORSTUWXYabcdeghijkmnoprstuwxyz←↑→↓のり丁上下丘中交仲作倉側先光入八出前化北南原参口台周和商園地城埠基堤場士外大天央宮富寿峠工差市幡平店庫弁所手文料新方日旭星月朝本杏東松柳栄桜梅橋正汐江河流浜海港潮灯点物状環田町目磯社神稲空紅終絡緑線若荷菊葉藤蘭街裏製西見路農辺通速連運道郊都金鈴銀錦門防陽青面頭風駅高",
+ "chars": " -0123456789ABCDEFGHIJKLMNORSTUWXYabcdeghijkmnoprstuwxyz←↑→↓のり丁上下丘中交仲側元先光入八出前化北南原参口台周和商園地城埠基堤場士外大天央宮富寿峠工差市幡平店弁所手文料新方日旭星月朝本杏東松桜業橋汐江河流浜海港潮灯点物状環田町目磯社神稲空紅終絡緑線若荷菊葉藤蘭街裏西見路農辺通速連運道郊都金鈴銀錦開防陽青面頭風駅高",
  "notes": "Written by tools/island_street_names.py from assets/world_source/pieces/IslandRoads.roads.json: each road's BASE name (no __ suffix) -> its Japanese street name. Read by world.StreetNames.",
  "roads": {
   "butsuryu_michi": {
@@ -35,6 +35,11 @@
   "cho_192": {
    "en": "Honcho-dori",
    "ja": "本町通り",
+   "kind": "street"
+  },
+  "cho_sw_345": {
+   "en": "Momiji-dori",
+   "ja": "紅葉通り",
    "kind": "street"
   },
   "cho_w_410": {
@@ -90,11 +95,6 @@
   "ekimae_industry": {
    "en": "Inari-dori",
    "ja": "稲荷通り",
-   "kind": "street"
-  },
-  "ekimae_machi_w_595": {
-   "en": "Suzuran-dori",
-   "ja": "鈴蘭通り",
    "kind": "street"
   },
   "ekimae_rotary": {
@@ -162,29 +162,34 @@
    "ja": "基地通り",
    "kind": "street"
   },
-  "kichi_mon_michi": {
-   "en": "Kichi-seimon-dori",
-   "ja": "基地正門通り",
-   "kind": "access"
-  },
   "kita_cho_641": {
    "en": "Icho-dori",
    "ja": "銀杏通り",
    "kind": "street"
   },
-  "koba_machi_w_650": {
-   "en": "Soko-dori",
-   "ja": "倉庫通り",
+  "koba_cho_719": {
+   "en": "Kogyo-dori",
+   "ja": "工業通り",
    "kind": "street"
   },
-  "koba_machi_w_850": {
-   "en": "Futo-dori",
-   "ja": "埠頭通り",
+  "koba_machi_580": {
+   "en": "Unga-dori",
+   "ja": "運河通り",
+   "kind": "street"
+  },
+  "koba_machi_650": {
+   "en": "Shinkaichi-dori",
+   "ja": "新開地通り",
+   "kind": "street"
+  },
+  "koba_machi_850": {
+   "en": "Konan-dori",
+   "ja": "港南通り",
    "kind": "street"
   },
   "koba_waku_w": {
-   "en": "Seisakusho-dori",
-   "ja": "製作所通り",
+   "en": "Futo-dori",
+   "ja": "埠頭通り",
    "kind": "street"
   },
   "kogai_loop": {
@@ -200,11 +205,6 @@
   "kojo_waku": {
    "en": "Kojo-dori",
    "ja": "工場通り",
-   "kind": "street"
-  },
-  "kojo_yoko_480": {
-   "en": "Unga-dori",
-   "ja": "運河通り",
    "kind": "street"
   },
   "kukaku_0": {
@@ -263,8 +263,8 @@
    "kind": "street"
   },
   "machi_n_360": {
-   "en": "Asahi-dori",
-   "ja": "旭通り",
+   "en": "Suzuran-dori",
+   "ja": "鈴蘭通り",
    "kind": "street"
   },
   "machi_n_830": {
@@ -292,19 +292,19 @@
    "ja": "中本通り",
    "kind": "arterial"
   },
-  "nishi_cho_355": {
-   "en": "Sakae-dori",
-   "ja": "栄通り",
-   "kind": "street"
-  },
   "nishi_cho_413": {
    "en": "Minamimachi-dori",
    "ja": "南町通り",
    "kind": "street"
   },
+  "nishi_cho_487": {
+   "en": "Shinmachi-dori",
+   "ja": "新町通り",
+   "kind": "street"
+  },
   "nishi_cho_561": {
-   "en": "Kotobuki-dori",
-   "ja": "寿通り",
+   "en": "Asahi-dori",
+   "ja": "旭通り",
    "kind": "street"
   },
   "nishi_dori": {
@@ -317,19 +317,14 @@
    "ja": "西本通り",
    "kind": "arterial"
   },
-  "nishi_machi_1050": {
-   "en": "Momiji-dori",
-   "ja": "紅葉通り",
-   "kind": "street"
-  },
   "nishi_machi_200": {
-   "en": "Hachiman-dori",
-   "ja": "八幡通り",
+   "en": "Kotobuki-dori",
+   "ja": "寿通り",
    "kind": "street"
   },
   "nishi_machi_280": {
-   "en": "Hinode-dori",
-   "ja": "日の出通り",
+   "en": "Hachiman-dori",
+   "ja": "八幡通り",
    "kind": "street"
   },
   "nishi_machi_390": {
@@ -337,14 +332,9 @@
    "ja": "市場通り",
    "kind": "street"
   },
-  "nishi_machi_940": {
-   "en": "Ume-dori",
-   "ja": "梅通り",
-   "kind": "street"
-  },
   "nishi_ura": {
-   "en": "Shinmachi-dori",
-   "ja": "新町通り",
+   "en": "Motomachi-dori",
+   "ja": "元町通り",
    "kind": "street"
   },
   "nodo_waku": {
@@ -537,11 +527,6 @@
    "ja": "堤防側道",
    "kind": "street"
   },
-  "teibo_sokudo_4": {
-   "en": "Teibo-sokudo",
-   "ja": "堤防側道",
-   "kind": "street"
-  },
   "todai_michi": {
    "en": "Todai-dori",
    "ja": "灯台通り",
@@ -578,8 +563,8 @@
    "kind": "access"
   },
   "yamasoi": {
-   "en": "Yanagi-dori",
-   "ja": "柳通り",
+   "en": "Hinode-dori",
+   "ja": "日の出通り",
    "kind": "street"
   },
   "yamate_dori": {

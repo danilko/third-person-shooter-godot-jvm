@@ -76,6 +76,10 @@ TUNING = {
     "COT1": {"name": "COT-1", "mass": 16000, "rest": 0.50, "spring": 120000, "damping": 44000, "over": 0.25,
              "max_speed": 24.0, "accel": 85000.0, "crash_hp": 2.5, "health": 2200, "paint": "car",
              "extra_seats": [[-0.50, 3.85, 1.00], [0.50, 3.85, 1.00]]},
+    # the logistics hub's box truck (user, 2026-10-05): a 4 t cab-over, governed like the crate truck
+    "BOT1": {"name": "BOT-1", "mass": 8000, "rest": 0.45, "spring": 62000, "damping": 23000, "over": 0.25,
+             "max_speed": 27.0, "accel": 46000.0, "crash_hp": 3.0, "health": 1500, "paint": "",
+             "extra_seats": [[-0.50, 3.15, 1.50], [0.50, 3.15, 1.50]]},
     "LAT1": {"name": "LAT-1", "mass": 13000, "rest": 0.48, "spring": 100000, "damping": 36000, "over": 0.25,
              "max_speed": 24.0, "accel": 70000.0, "crash_hp": 2.5, "health": 2000, "paint": "",
              "extra_seats": [[-0.50, 3.10, 1.55], [0.50, 3.10, 1.55]]},

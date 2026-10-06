@@ -92,9 +92,9 @@ def entry():
     wz1 = xw - lanes - walk_out
     park_x = (wz0 + wz1) / 2.0 - 1.0                     # 9-10 m of apron between its mouth and the footway
     # the REAL 立体駐車場 (user, 2026-09-29: "ParkingGarage, the station car park's slot"): the walkable, drivable
-    # kits/interiors ParkingGarage (31.5 x 48 m, 3 decks) as a PART, turned so its 48 m runs along x
+    # kits/interiors ParkingGarage (33 x 52 m with its apron, 3 decks; 2026-10-05) as a PART, turned so its length runs along x
     parts = [{"type": "ParkingGarage", "at": [round(park_x, 3), 2.0], "yaw": 90.0}]
-    gx0, gx1, gz0, gz1 = park_x - 24.0, park_x + 24.0, 2.0 - 15.75, 2.0 + 15.75
+    gx0, gx1, gz0, gz1 = park_x - 27.0, park_x + 26.0, 2.0 - 17.5, 2.0 + 15.5
     for b in bands:
         if gx1 > b[0] and gx0 < b[2] and gz1 > b[1] and gz0 < b[3]:
             raise SystemExit("%s: the ParkingGarage stands on the rotary" % ID)

@@ -747,35 +747,11 @@ def layout_composite(c, built, root):
                 if any(r[0] - 0.01 <= x <= r[1] + 0.01 and r[2] - 0.01 <= z <= r[3] + 0.01 for r in rects):
                     continue
                 out["pieces"].append({"piece": name, "path": path, "pos": [round(x, 5), 0.0, round(z, 5)], "yaw": 0.0})
-    # `apron_edge: true` (user 2026-10-05: "--\\ slope on the side so no direct spike when cars drive on it"): the apron
-    # stands FLOOR_LIFT over the block ground, so its plain edge is a step a tyre hits. A ring of `Apron_Edge` strips
-    # (and `Apron_EdgeCorner` at the corners) falls from the apron's top to APRON_EDGE_DROP under it, APRON_EDGE_W out,
-    # and the paved collider is a convex slab whose sides slope the same way. The ring lies OUTSIDE the footprint
-    # (`apron_edge_m`, which probe_buildings allows on every side); island_buildings gives such a site no plinth.
-    edge = bool(c.get("apron") and c.get("apron_edge"))
-    if edge:
-        _p, eentry, ename = lib_piece("library:Apron_Edge", root)
-        _cp, _ce, cname = lib_piece("library:Apron_EdgeCorner", root)
-        el = eentry["size"][0]
-        for side, (yaw, length) in enumerate(((0.0, W), (90.0, D), (180.0, W), (270.0, D))):
-            n = int(round(length / el))
-            if abs(n * el - length) > 0.01:
-                raise SystemExit(f"{c['id']}: apron_edge needs sides in whole {el} m modules ({length})")
-            for i in range(n):
-                t = -length / 2 + el * (i + 0.5)
-                lx, lz = rot_xz(yaw, t, 0.0)
-                ox, oz = rot_xz(yaw, 0.0, (D if side % 2 == 0 else W) / 2)
-                out["pieces"].append({"piece": ename, "path": _p, "pos": [round(lx + ox, 5), 0.0, round(lz + oz, 5)],
-                                      "yaw": yaw})
-        for yaw, (cx, cz) in ((0.0, (W / 2, D / 2)), (90.0, (W / 2, -D / 2)), (180.0, (-W / 2, -D / 2)),
-                              (270.0, (-W / 2, D / 2))):
-            out["pieces"].append({"piece": cname, "path": _cp, "pos": [round(cx, 5), 0.0, round(cz, 5)], "yaw": yaw})
-        e, d_ = APRON_EDGE_W, APRON_EDGE_DROP
-        out.setdefault("hull_points", []).append(
-            [[x * W / 2, 0.0, z * D / 2] for x in (-1, 1) for z in (-1, 1)]
-            + [[x * (W / 2 + e), -d_, z * (D / 2 + e)] for x in (-1, 1) for z in (-1, 1)]
-            + [[x * (W / 2 + e), -d_ - 0.05, z * (D / 2 + e)] for x in (-1, 1) for z in (-1, 1)])
-        out["apron_edge_m"] = e
+    # A PAVED site (any composite with an apron) is marked `paved_site`: island_buildings stands it 1 cm over the block
+    # ground with no plinth. Its sloped `Apron_Edge` ring (2026-10-05) is gone (user, 2026-10-06: "the slope bump causes
+    # more trouble than good"); `apron_edge` in a type row is now ignored.
+    if c.get("apron"):
+        out["paved_site"] = True
     gb = c.get("ground_box")
     if isinstance(gb, list):
         # `ground_box: [x0, z0, x1, z1]` -- the paved ground's collider over part of the footprint only (a pier's

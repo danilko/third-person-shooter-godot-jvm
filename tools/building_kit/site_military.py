@@ -8,7 +8,7 @@ The runway lies SOUTH of the base along the platform's south quay line (the cont
 1488), the base core compressed north above it (z 1250..1440, kichi_dori at z 1230 the limit) with its apron row and
 hangar opening straight onto the runway's north edge -- a jet rolls from the apron onto the runway with no open ground
 between. ONE fence closes the whole area -- base + runway + the reclaimed strip -- the runway's outer south side and
-its west end included; the only openings are the gate on the east (the gate road `kichi_mon_michi`) and the gap in the
+its west end included; the only openings are the gate on the NORTH fence (GATE_X, straight on from the port road's square west corner over a dropped kerb) and the gap in the
 base's west fence onto the pier. Both composites are DERIVED from `island_plan.RESERVES` (`military_base`,
 `military_airfield`, `military_pier`), placed by `island_sites.RESERVE_SITES` (the base at yaw 90: its local +X is
 north, +Z east; the runway at yaw 0: +X east, +Z south). `--check` exits 1 when stale or when the fence does not close.
@@ -27,7 +27,14 @@ TYPES = os.path.join(ROOT, "assets", "world_source", "buildings", "building_type
 BAY = 10.0
 FENCE = "library:Mil_Fence"
 GATE_W = 16.0                        # Mil_Gate across its posts
+#: the gate on the NORTH fence (2026-10-05): Godot x of its centre, 20 m straight south of the port road's square west
+#: corner (tools/island_port_road_square.py), entered over a dropped kerb (island_buildings.SITE_GATE_ENTRIES)
+GATE_X = -500.0
 CLOSE = 0.5
+#: the gate's collider (user, 2026-10-05: "not able to enter the military base"): the piece's bounds were its collider,
+#: a solid 16 x 6 x 6.4 m block across the whole opening. Only the guardhouse in the middle (the two lanes either side,
+#: 5.4 m each, are open; the canopy is 5 m up) and the two posts collide. Piece frame: [x, y centre, z, sx, sy, sz].
+GATE_BOXES = [[0.0, 1.5, 0.0, 4.0, 3.0, 3.0], [-7.6, 2.5, 0.0, 0.4, 5.0, 0.4], [7.6, 2.5, 0.0, 0.4, 5.0, 0.4]]
 
 
 def boxes():
@@ -69,29 +76,35 @@ def base():
              {"type": "MilArmoury", "at": [78, -110]},
              {"type": "MilControlTower", "at": [-40, -125]},
              {"type": "MilHangar", "at": [round(south + 32.0, 1), 30], "yaw": 270}]
-    props = [{"piece": "library:Mil_Gate", "at": [0, round(hd - 3.5, 1)]},
+    gz = GATE_X - cx                                     # the gate's local Z on the north fence
+    props = [{"piece": "library:Mil_Gate", "at": [round(hw - 3.5, 1), round(gz, 1)], "yaw": 90.0,
+              "collide": {"boxes": GATE_BOXES}},
              {"piece": "library:Mil_ParadeGround", "at": [30, 62], "collide": "none"},
              {"piece": "library:Mil_MotorPool", "at": [70, -30]},
              {"piece": "library:Mil_FuelDepot", "at": [78, -65], "yaw": 90},
              {"piece": "library:Mil_Helipad", "at": [20, -70], "collide": "none"}]
     props += [{"vehicle": "CRT1", "faction": "military", "at": [x, -30], "yaw": 0.0} for x in (58, 70, 82)]
     props += [{"vehicle": "FIJ1", "faction": "military", "at": [apron_x, z], "yaw": 90.0} for z in (-60, -90)]
-    props += [{"piece": "library:Airport_Apron", "at": [apron_x, z], "collide": "none"} for z in range(-120, 121, 30)]
+    # no concrete apron squares (user, 2026-10-05: "the ground of these fenced bases should be asphalt, not white"): the
+    # base's ground is the block's asphalt (island_ground.military_paint), and the jets stand on it
     # the fence: north edge, east edge (the gate's gap), west edge (the pier's gap); no south edge -- the runway is
     # inside the area, fenced round by MilitaryAirfield
     # a bay's outrigger leans 0.6 m to its local +Z (yaw 0), so every line stands 0.7 m inside the footprint
     fx, fz = hw - 0.7, hd - 0.7
     fence = []
-    run((fx, -fz), (fx, fz), 90.0, fence)                              # north (+X), outrigger north
-    run((reach, fz), (-GATE_W / 2.0, fz), 0.0, fence)                   # east (+Z), south of the gate
-    run((GATE_W / 2.0, fz), (fx, fz), 0.0, fence)                       # ...north of it
+    run((fx, -fz), (fx, gz - GATE_W / 2.0), 90.0, fence)               # north (+X), outrigger north: west of the gate
+    run((fx, gz + GATE_W / 2.0), (fx, fz), 90.0, fence)                # ...east of it
+    run((reach, fz), (fx, fz), 0.0, fence)                              # east (+Z), closed
     import island_reshape as IR                                          # the pier's DECK (not its berth's water)
     _x0, _x1, dz0, dz1 = IR.MILITARY_PIERS[0]
     g0, g1 = sorted((lx(dz0) - 1.0, lx(dz1) + 1.0))                      # the pier's root, the west edge's gap
     run((reach, -fz), (g0, -fz), 180.0, fence)
     run((g1, -fz), (fx, -fz), 180.0, fence)
     ends = dict(reach=reach, fx=fx, fz=fz, g0=g0, g1=g1)
-    return {"footprint_m": [round(2 * hw, 1), round(2 * hd, 1)], "parts": parts, "props": props + fence}, ends
+    # a RESERVE the site dresses (its ground is the block's asphalt since the concrete apron squares went): the probe's
+    # mesh-fills-the-footprint size rule does not apply (layout_buildings / probe_buildings)
+    return {"footprint_m": [round(2 * hw, 1), round(2 * hd, 1)], "parts": parts, "props": props + fence,
+            "reserve": True}, ends
 
 
 def airfield():
@@ -102,7 +115,8 @@ def airfield():
     props = []
     for x in range(-240, 241, 60):
         piece = "library:Airport_RunwayEnd" if abs(x) == 240 else "library:Airport_Runway"
-        p = {"piece": piece, "at": [x, 22.5 - hd], "collide": "none"}        # its north edge on the reserve's
+        # 3 cm over the ground: at 0 the runway's surface z-fought with the terrain's asphalt (white blotches)
+        p = {"piece": piece, "at": [x, 22.5 - hd], "y": 0.03, "collide": "none"}   # its north edge on the reserve's
         if x == 240:
             p["yaw"] = 180
         props.append(p)
@@ -133,7 +147,7 @@ def main(argv):
     open(TYPES, "a").write("\n")
     nb = sum(1 for p in new_b["props"] if p.get("piece") == FENCE)
     na = sum(1 for p in new_a["props"] if p.get("piece") == FENCE)
-    print("military: base %s m (%d fence bays, gate east, pier gap local x %.0f..%.0f), runway %s m (%d bays)"
+    print("military: base %s m (%d fence bays, gate north, pier gap local x %.0f..%.0f), runway %s m (%d bays)"
           % (new_b["footprint_m"], nb, eb["g0"], eb["g1"], new_a["footprint_m"], na))
     return 0
 

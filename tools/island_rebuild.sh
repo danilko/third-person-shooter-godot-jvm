@@ -39,7 +39,10 @@ if [ -f "$P/IslandRail.roads.json" ]; then
     # change rebuilds only the rail pieces it reaches (its crossings, its dropped piers)
     # furniture ON: a rail road carries none of the street's (point_furniture.place skips it), only the 踏切
     # signals its level crossings get (R4, point_furniture.crossing_signals)
-    [ -n "${SKIP_PIECES:-}" ] || GLTF_EXTRA="--avoid $P/IslandRoads.roads.json $AVOID_GROUND" NAV_FIT=1 DIRTY_ONLY=1 \
+    # ...and its 踏切 units keep off the ROAD lanes (a junction's turn connector beside a crossing, 2026-10-06): the
+    # road lanekits are the previous road build's here, so the rail is built again, dirty pieces only, after the roads
+    ROAD_LANES=""; ls "$P"/Roads_IslandRoads_*.lanekit.json >/dev/null 2>&1 && ROAD_LANES="--keep-clear-lanekits $P/Roads_IslandRoads_"
+    [ -n "${SKIP_PIECES:-}" ] || GLTF_EXTRA="--avoid $P/IslandRoads.roads.json $AVOID_GROUND $ROAD_LANES" NAV_FIT=1 DIRTY_ONLY=1 \
         blender/tools/build_roads_piece.sh "$P/IslandRail.roads.json" Roads_IslandRail \
         "$P/IslandRail.zones.json" "$P/IslandRail.ground.json" | grep -E "gate:|level crossing|^── 3/3|FAIL|ERROR" || true
     timeout -k 5 1800 stdbuf -oL "$G" --headless --path . --script tools/godot/stamp_roadkit_terrain.gd -- "$W" IslandRail \
@@ -65,6 +68,13 @@ RAIL_AVOID=""; [ -f "$P/IslandRail.roads.json" ] && RAIL_AVOID="--avoid $P/Islan
 GLTF_EXTRA="--keep-clear-lanekits $P/Roads_IslandRail_ $RAIL_AVOID $KEEP_OUT" NAV_FIT=1 DIRTY_ONLY=1 \
     blender/tools/build_roads_piece.sh "$P/IslandRoads.roads.json" Roads_IslandRoads \
     "$P/IslandRoads.zones.json" "$P/IslandRoads.ground.json" | grep -E "gate:|^── 3/3|FAIL|ERROR" || true
+# the rail's 踏切 units against the road lanes just built (dirty rail pieces only; see the rail step)
+if [ -f "$P/IslandRail.roads.json" ] && [ -z "${SKIP_PIECES:-}" ]; then
+    AVOID_GROUND=""; [ -f "$P/IslandRoads.ground.json" ] && AVOID_GROUND="--avoid-ground $P/IslandRoads.ground.json"
+    GLTF_EXTRA="--avoid $P/IslandRoads.roads.json $AVOID_GROUND --keep-clear-lanekits $P/Roads_IslandRoads_" NAV_FIT=1 \
+        DIRTY_ONLY=1 blender/tools/build_roads_piece.sh "$P/IslandRail.roads.json" Roads_IslandRail \
+        "$P/IslandRail.zones.json" "$P/IslandRail.ground.json" | grep -E "gate:|^── 3/3|FAIL|ERROR" || true
+fi
 # a zone the cut no longer makes leaves its piece behind, and every later step globs the lanekits: remove it
 python3 - <<'PY'
 import glob, json, os

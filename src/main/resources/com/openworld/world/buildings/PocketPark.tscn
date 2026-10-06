@@ -26,13 +26,9 @@ size = Vector3(1.2, 4.5, 1.2)
 [sub_resource type="BoxShape3D" id="BoxShape3D_b0sgf"]
 size = Vector3(27.3, 0.1, 27.3)
 
-[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_f7f7h"]
-points = PackedVector3Array(-13.65, 0, -13.65, -13.65, 0, 13.65, 13.65, 0, -13.65, 13.65, 0, 13.65, -14.25, -0.065, -14.25, -14.25, -0.065, 14.25, 14.25, -0.065, -14.25, 14.25, -0.065, 14.25, -14.25, -0.115, -14.25, -14.25, -0.115, 14.25, 14.25, -0.115, -14.25, 14.25, -0.115, 14.25)
-
-[node name="PocketPark" type="Node3D" unique_id=2070553924]
+[node name="PocketPark" type="Node3D" unique_id=182778393]
 metadata/building = {
-"aabb": [Vector3(-14.25, -0.24277201, -14.25), Vector3(28.5, 9.42519, 28.5)],
-"apron_edge_m": 0.6,
+"aabb": [Vector3(-13.65, -0.24277201, -13.65), Vector3(27.3, 9.42519, 27.3)],
 "clear_probes": [],
 "composite": true,
 "door_style": "swing",
@@ -51,7 +47,8 @@ metadata/building = {
 "note": "a small neighbourhood park filling a deep pocket behind the street-front row in a housing district (island_buildings.deep_fill, 2026-10-03): open paved ground under a ring of trees, benches, a clock; reached down a 路地. The 60 x 60 m Park is too big for most pockets."
 },
 "kit": "library",
-"piece_count": 307,
+"paved_site": true,
+"piece_count": 243,
 "probe_xz": [0.3, -2.0],
 "props_top_m": 9.1824,
 "roofline_m": 9.43,
@@ -60,46 +57,43 @@ metadata/building = {
 "wall_top_m": 0.0
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1817486711]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=845163350]
 visibility_range_end = 410.18903
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_q1621")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=902211496]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1989399672]
 collision_mask = 0
 
-[node name="Box0" type="CollisionShape3D" parent="Collision" unique_id=2064598865]
+[node name="Box0" type="CollisionShape3D" parent="Collision" unique_id=302442741]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0.425, -5)
 shape = SubResource("BoxShape3D_pqeo1")
 
-[node name="Box1" type="CollisionShape3D" parent="Collision" unique_id=90202108]
+[node name="Box1" type="CollisionShape3D" parent="Collision" unique_id=1860155956]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.425, -5)
 shape = SubResource("BoxShape3D_pp53r")
 
-[node name="Box2" type="CollisionShape3D" parent="Collision" unique_id=1168948375]
+[node name="Box2" type="CollisionShape3D" parent="Collision" unique_id=1589366788]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0.425, -5)
 shape = SubResource("BoxShape3D_1bsh7")
 
-[node name="Box3" type="CollisionShape3D" parent="Collision" unique_id=603574952]
+[node name="Box3" type="CollisionShape3D" parent="Collision" unique_id=835376817]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0.425, 5)
 shape = SubResource("BoxShape3D_mar52")
 
-[node name="Box4" type="CollisionShape3D" parent="Collision" unique_id=45027638]
+[node name="Box4" type="CollisionShape3D" parent="Collision" unique_id=1634651683]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.425, 5)
 shape = SubResource("BoxShape3D_vybjk")
 
-[node name="Box5" type="CollisionShape3D" parent="Collision" unique_id=1194151132]
+[node name="Box5" type="CollisionShape3D" parent="Collision" unique_id=506230566]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0.425, 5)
 shape = SubResource("BoxShape3D_d4r1y")
 
-[node name="Box6" type="CollisionShape3D" parent="Collision" unique_id=173174801]
+[node name="Box6" type="CollisionShape3D" parent="Collision" unique_id=1992626552]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.25, 0)
 shape = SubResource("BoxShape3D_sk6gt")
 
-[node name="Box7" type="CollisionShape3D" parent="Collision" unique_id=616065428]
+[node name="Box7" type="CollisionShape3D" parent="Collision" unique_id=203245574]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
 shape = SubResource("BoxShape3D_b0sgf")
-
-[node name="Hull0" type="CollisionShape3D" parent="Collision" unique_id=1019957278]
-shape = SubResource("ConvexPolygonShape3D_f7f7h")

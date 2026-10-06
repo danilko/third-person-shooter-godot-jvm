@@ -210,7 +210,7 @@ def fire_station(material, Builder):
     for z in range(3, 24, 3):
         b.box((x1 - 9.03, 6.8, z), (x1 - 9.0, 11.2, z + 1.2), "MI_Window")
     b.box((x1 - 9.5, 5.5, 24.0), (x1 - 2.5, 12.5, 24.8), "MI_CraneRed")
-    ground(b, x0, x1, -25.0, y0, "MI_ConcreteSmooth")                             # the apron in front of the bays
+    ground(b, x0, x1, -25.0, y0, "MI_AsphaltLot")                             # the apron in front of the bays
     return "Civic_FireStation", "civic", b.mesh()
 
 
@@ -228,7 +228,7 @@ def fire_branch(material, Builder):
     sign(b, -4.0, 4.0, y0, 5.1, 5.9, "MI_SignRed")
     b.box((x0 + 1.0, 4.0, 0.0), (x0 + 5.0, 8.0, 15.0), "MI_ConcreteSmooth")
     b.box((x0 + 0.6, 3.6, 15.0), (x0 + 5.4, 8.4, 15.6), "MI_CraneRed")
-    ground(b, x0, x1, -12.5, y0, "MI_ConcreteSmooth")
+    ground(b, x0, x1, -12.5, y0, "MI_AsphaltLot")
     return "Civic_FireBranch", "civic", b.mesh()
 
 
@@ -275,7 +275,7 @@ def ward_office(material, Builder):
     sign(b, -8.0, 8.0, -20.0, 7.2, 8.4)
     for x in (-24.0, -21.0, -18.0):
         b.box((x - 0.08, -27.0, 0.0), (x + 0.08, -26.84, 12.0), "MI_Steel")
-    ground(b, -28.0, 28.0, -30.0, -20.0, "MI_TileWhite")
+    ground(b, -28.0, 28.0, -30.0, -20.0, "MI_AsphaltLot")
     return "Civic_WardOffice", "civic", b.mesh()
 
 
@@ -540,7 +540,7 @@ def fish_market(material, Builder):
     reached by a gangway -- parallel because the Wangan's viaduct runs 15-25 m off this quay, so finger piers would
     stand under its deck. The plot's ground is the land, 5.6 m above the water: the pontoon floats at -5.0."""
     b = Builder("FishMarket", material)
-    ground(b, -82.5, 82.5, -35.0, 35.0, "MI_ConcreteSmooth")
+    ground(b, -82.5, 82.5, -35.0, 35.0, "MI_AsphaltLot")
     x0, x1, y0, y1 = -45.0, 45.0, -28.0, 8.0
     b.box((x0, y1 - 1.0, 0.0), (x1, y1, 8.0), "MI_Corrugated")                     # the land-side wall
     for x in range(int(x0), int(x1) + 1, 10):                                          # columns on the open side
@@ -673,9 +673,8 @@ def mil_gate(material, Builder):
     b.box((-8.0, -3.0, 5.0), (8.0, 3.0, 5.4), "MI_PaintedMetal")
     for x in (-7.8, 7.4):
         b.box((x, -0.2, 0.0), (x + 0.4, 0.2, 5.0), "MI_PaintedMetal")
-    for s in (-1.0, 1.0):
-        b.box((s * 2.2 - (0.0 if s > 0 else 5.6), -2.5, 0.9), (s * 2.2 + (5.6 if s > 0 else 0.0), -2.4, 1.0),
-              "MI_PaintYellow")
+    for s in (-1.0, 1.0):          # the barrier arms, RAISED (2026-10-05: the two lanes are open; a mission lowers them)
+        b.box((s * 2.25 - 0.05, -2.5, 0.9), (s * 2.25 + 0.05, -2.4, 4.8), "MI_PaintYellow")
     sign(b, -7.0, 7.0, -3.0, 5.4, 6.4, "MI_PlasticDark")
     return "Mil_Gate", "military", b.mesh()
 
@@ -1115,7 +1114,7 @@ def mil_motor_pool(material, Builder):
     """車両整備場 / motor pool: a 40 x 14 m open-fronted shed (six bays, a steel roof on posts, a back wall), the
     vehicles parked in it are Mil_Truck props. Front -Y."""
     b = Builder("Mil_MotorPool", material)
-    b.box((-20.0, -7.0, -0.05), (20.0, 7.0, 0.0), "MI_ConcreteSmooth")
+    b.box((-20.0, -7.0, -0.05), (20.0, 7.0, 0.0), "MI_AsphaltLot")
     b.box((-20.0, 6.5, 0.0), (20.0, 7.0, 5.0), "MI_Corrugated")
     for x in range(-20, 21, 8):
         b.box((x - 0.2, -7.0, 0.0), (x + 0.2, -6.6, 5.0), "MI_PaintedMetal")
@@ -1139,7 +1138,7 @@ def mil_truck(material, Builder):
 def mil_parade_ground(material, Builder):
     """グラウンド / parade ground: a 50 x 40 m paved square with white formation lines and a flag pole at +Y."""
     b = Builder("Mil_ParadeGround", material)
-    b.box((-25.0, -20.0, -0.04), (25.0, 20.0, 0.02), "MI_ConcreteSmooth")
+    b.box((-25.0, -20.0, -0.04), (25.0, 20.0, 0.02), "MI_AsphaltLot")   # asphalt (user, 2026-10-05: not white)
     for k in range(-4, 5):
         b.box((k * 5.0 - 0.06, -15.0, 0.02), (k * 5.0 + 0.06, 15.0, 0.03), "MI_PaintWhite")
     b.box((-0.1, 18.0, 0.0), (0.1, 18.2, 12.0), "MI_Steel")
@@ -1149,7 +1148,7 @@ def mil_parade_ground(material, Builder):
 def mil_helipad(material, Builder):
     """ヘリポート: a 25 m square pad, a white H in a circle's square, edge lights (dark here)."""
     b = Builder("Mil_Helipad", material)
-    b.box((-12.5, -12.5, -0.04), (12.5, 12.5, 0.03), "MI_ConcreteSmooth")
+    b.box((-12.5, -12.5, -0.04), (12.5, 12.5, 0.03), "MI_AsphaltLot")   # asphalt (user, 2026-10-05: not white)
     for x in (-3.0, 3.0):
         b.box((x - 0.6, -5.0, 0.03), (x + 0.6, 5.0, 0.04), "MI_PaintWhite")
     b.box((-2.4, -0.6, 0.03), (2.4, 0.6, 0.04), "MI_PaintWhite")
@@ -1286,9 +1285,8 @@ def logi_gate_house(material, Builder):
     b.box((-2.2, -1.7, 2.8), (2.2, 1.7, 3.1), "MI_PaintedMetal")
     b.box((-2.03, -1.0, 0.9), (-2.0, 1.0, 2.2), "MI_Window")
     b.box((2.0, -1.0, 0.9), (2.03, 1.0, 2.2), "MI_Window")
-    for s in (-1.0, 1.0):
-        b.box((s * 2.2 - (0.0 if s > 0 else 4.8), -1.9, 0.9), (s * 2.2 + (4.8 if s > 0 else 0.0), -1.8, 1.0),
-              "MI_PaintYellow")
+    for s in (-1.0, 1.0):          # the barrier arms, RAISED (2026-10-05: both lanes open)
+        b.box((s * 2.25 - 0.05, -1.9, 0.9), (s * 2.25 + 0.05, -1.8, 5.0), "MI_PaintYellow")
     return "Logi_GateHouse", "logistics", b.mesh()
 
 
@@ -1332,7 +1330,8 @@ LOGISTICS_NOTES = {
                                "corner. Composite LogisticsDistributionCentre.",
     "Logi_Truck": "Placeholder 10 t box truck, cab -Y. Static prop (collider = its bounds).",
     "Logi_Trailer": "Placeholder tractor + 40 ft box trailer, tractor -Y. Static prop.",
-    "Logi_GateHouse": "Placeholder 守衛所 with two barrier arms, road at -Y.",
+    "Logi_GateHouse": "Placeholder 守衛所 with two barrier arms (raised), road at -Y. The composite collides only "
+                      "with the guard house, so both lanes are drivable.",
     "Logi_Fence": "One 10 m bay of the logistics yards' fence, along X.",
     "Logi_YardTruckTerminal": "The truck terminal's yard slab (225 x 150 m), no collider (the site's ground box is it).",
     "Logi_YardDistribution": "The distribution centre's yard slab (225 x 240 m), no collider.",

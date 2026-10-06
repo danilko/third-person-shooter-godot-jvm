@@ -32,6 +32,8 @@ Dimensions are the real vehicle's, rounded (length x width x height, wheelbase, 
         not turn at a junction, which is why the box is the 20 ft one (user, 2026-09-29).
   POV1  postal van (郵便 軽バン, Suzuki Every / Honda N-VAN class, red) 3.395 x 1.475 x 1.90   wb 2.43
   POT1  postal truck (郵便 2 t box truck, Isuzu Elf / Toyota Dyna class) 4.69 x 1.695 x 2.95  wb 2.50  cab-over
+  BOT1  box truck (4 t ウイング/箱車, Isuzu Forward / Hino Ranger class, white) 8.50 x 2.49 x 3.40  wb 4.80  cab-over
+(BOT1: user, 2026-10-05 -- the logistics hub's trucks at the docks, replacing the library's static Logi_Truck mesh.)
 (POV1 / POT1: user, 2026-10-03 -- the post offices' vans, small and large, placed by their MARK_vehicle markers.)
 (AMB1 / FIE1 / LAT1: user, 2026-09-28 -- the hospital's and the fire stations' vehicles, placed by the mission
 buildings' MARK_vehicle markers.)
@@ -101,6 +103,9 @@ CARS = {
     "POT1": dict(L=4.69, W=1.695, H=2.95, wb=2.50, r=0.33, tw=0.20, shape="cabover", cab=1.55, doors=2, crate=True,
                  crate_mat="post_red", body="post_red", upper="amb_white",
                  seats=[(-0.42, 1.60, 1.05), (0.42, 1.60, 1.05)]),
+    "BOT1": dict(L=8.50, W=2.49, H=3.40, wb=4.80, r=0.50, tw=0.30, shape="cabover", cab=1.85, doors=2, crate=True,
+                 crate_mat="amb_white", body="amb_white", upper="amb_white",
+                 seats=[(-0.55, 2.95, 1.45), (0.55, 2.95, 1.45)]),
 }
 ISO_20 = (6.058, 2.438, 2.591)       # the container terminal's 20 ft box (blender/tools/build_zombie_yard.py ISO_20)
 CLEAR = 0.20                   # ground to the underside of the body

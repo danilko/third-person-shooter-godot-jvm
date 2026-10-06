@@ -84,7 +84,9 @@ STREETS = [
                                                         (-790.0, -125.0), (-790.0, -204.6)], last="nishi_dori"),
     # yamasoi: the strip between nishi_dori__3 and the massif's foot, 70 m inside nishi_dori, parallel to it, from a T
     # on nishi_dori__3 (clear of the clinic and fire branch plots there) to a T on nishi_dori__4 north of the touge's
-    dict(name="yamasoi", first="nishi_dori", corners=[(-300.0, -124.3), (-331.0, -61.0), (-250.0, 110.0),
+    # (2026-10-05: nishi_dori__3 was re-laid to cross the Blue line at 65 deg -- tools/island_nishi_dori_blue.py -- so its
+    # T moved onto the new line at x -288 and the first leg runs up to (-325, -40))
+    dict(name="yamasoi", first="nishi_dori", corners=[(-288.0, -84.9), (-325.0, -40.0), (-250.0, 110.0),
                                                      (-235.0, 190.0), (-149.0, 180.0)], last="nishi_dori"),
     # (kojo_minami, a U off kojo_waku into the industry south of it, went 2026-10-04: the dike's side road runs through
     # that block and gives it frontage, and the U crossed it twice with no junction)
@@ -156,6 +158,39 @@ def _resample(poly, step):
         s = cum[-1] * k / n
         j = max(i for i in range(len(cum) - 1) if cum[i] <= s) if s < cum[-1] else len(cum) - 2
         f = (s - cum[j]) / max(1e-9, cum[j + 1] - cum[j])
+        out.append((poly[j][0] + (poly[j + 1][0] - poly[j][0]) * f, poly[j][1] + (poly[j + 1][1] - poly[j][1]) * f))
+    return out
+
+
+SQUARE_LEAD = 15.0    # a corner is a station ON it and one this far either side (user, 2026-10-05: square corners)
+CORNER_TURN = 20.0    # deg: a vertex turning more than this is a corner
+
+
+def _resample_square(poly, step):
+    """Stations along a polyline whose CORNERS are kept square: a station on every corner vertex (turning more than
+    CORNER_TURN) and one SQUARE_LEAD m either side of it, the rest evenly at <= `step` m. Resampling a filleted
+    polyline evenly drops the arc and turns a 90 deg corner in one ~35 m diagonal span (measured: 13 such chamfers);
+    with a station on the corner the kit's AUTO facing turns it on a ~15 m radius, a city street corner."""
+    cum = [0.0]
+    for a, b in zip(poly, poly[1:]):
+        cum.append(cum[-1] + math.hypot(b[0] - a[0], b[1] - a[1]))
+    marks = {0.0, cum[-1]}
+    for i in range(1, len(poly) - 1):
+        h0 = math.atan2(poly[i][1] - poly[i - 1][1], poly[i][0] - poly[i - 1][0])
+        h1 = math.atan2(poly[i + 1][1] - poly[i][1], poly[i + 1][0] - poly[i][0])
+        if abs((h1 - h0 + math.pi) % (2 * math.pi) - math.pi) > math.radians(CORNER_TURN):
+            for v in (cum[i] - SQUARE_LEAD, cum[i], cum[i] + SQUARE_LEAD):
+                if 3.0 < v < cum[-1] - 3.0:
+                    marks.add(round(v, 3))
+    marks = sorted(marks)
+    full = [marks[0]]
+    for a, b in zip(marks, marks[1:]):
+        n = max(1, int(math.ceil((b - a) / step)))
+        full += [a + (b - a) * k / n for k in range(1, n + 1)]
+    out = []
+    for sv in full:
+        j = max(i for i in range(len(cum) - 1) if cum[i] <= sv) if sv < cum[-1] else len(cum) - 2
+        f = (sv - cum[j]) / max(1e-9, cum[j + 1] - cum[j])
         out.append((poly[j][0] + (poly[j + 1][0] - poly[j][0]) * f, poly[j][1] + (poly[j + 1][1] - poly[j][1]) * f))
     return out
 
@@ -256,7 +291,10 @@ def add(net, s, ground):
     t2 = _tee(net, _family(s["last"]), c[-1])
     head = _mouth_head(net, t1, c[1])
     tail = _mouth_head(net, t2, c[-2])
-    plan = rg.rounded_polygon([head] + list(c[1:-1]) + [tail], CORNER_R, closed=False)
+    if s.get("one_way"):
+        plan = rg.rounded_polygon([head] + list(c[1:-1]) + [tail], CORNER_R, closed=False)
+    else:
+        plan = [head] + list(c[1:-1]) + [tail]          # square corners (_resample_square), not a fillet
     # A CROSSING IS A JUNCTION: the street is cut at every at-grade road it crosses between its ends (each piece ends
     # MOUTH short of the crossing), and the crossed road is cut there too, the two pieces and its two halves one pad
     dense = rg.densify(plan, 4.0) if len(plan) >= 4 else plan
@@ -275,7 +313,7 @@ def add(net, s, ground):
     pieces = []
     for i in range(0, len(bounds), 2):
         part = _slice(dense, cum, bounds[i], bounds[i + 1])
-        pts = _resample(part, step)
+        pts = _resample(part, step) if s.get("one_way") else _resample_square(part, step)
         pts3 = [(x, y, max(0.0, ground.z(x, y) or 0.0)) for x, y in pts]
         pieces.append(chain_road(net, s["name"] + ("__c%d" % (i // 2) if i else ""), pts3, preset="block",
                                  one_way=s.get("one_way", False)))

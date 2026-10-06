@@ -597,16 +597,32 @@ def type_aabb(name):
     return (p[0], p[2], p[0] + s[0], p[2] + s[2], p[1] + s[1])
 
 
-_EDGES = {}
+_PAVED = {}
+_INTERIOR_TYPES = None
+#: a PAVED site (a car park, a gas station, a compound whose yard is its own slab) stands this far over the block
+#: ground, with no plinth (user, 2026-10-06: "the slope bump causes more trouble than good -- remove it everywhere";
+#: it replaced a 4.5 cm step dressed with a sloped `Apron_Edge` ring). 1 cm: no tyre feels it, no surface z-fights.
+SITE_LIFT = 0.01
+DRIVE_WEDGES = False
 
 
-def type_apron_edge(name):
-    """The sloped-edge width a paved composite carries outside its footprint (`apron_edge_m` in its meta), else 0."""
-    if name not in _EDGES:
+def type_paved(name):
+    """True for a site whose drivable ground is its own slab: a composite with an apron (`paved_site` in its meta) or
+    an enterable kits/interiors building (its `Site` yard is the plot's ground)."""
+    global _INTERIOR_TYPES
+    if _INTERIOR_TYPES is None:
+        bt = json.load(open(os.path.join(ROOT, "assets", "world_source", "buildings", "building_types.json")))
+        _INTERIOR_TYPES = {c["id"] for c in bt.get("custom", []) if c.get("kit") == "interiors"}
+    if name not in _PAVED:
+        base = re.sub(r"_(Open|Shop|BB)$", "", name)
         text = open(os.path.join(BLD_DIR, name + ".tscn")).read()
-        m = re.search(r'"apron_edge_m": ([0-9.]+)', text)
-        _EDGES[name] = float(m.group(1)) if m else 0.0
-    return _EDGES[name]
+        _PAVED[name] = bool(re.search(r'"paved_site": true', text)) or base in _INTERIOR_TYPES
+    return _PAVED[name]
+
+
+def site_lift(name):
+    """How far a building's origin stands over the block ground: SITE_LIFT for a paved site, else FLOOR_LIFT."""
+    return SITE_LIFT if type_paved(name) else FLOOR_LIFT
 
 
 # ------------------------------------------------------------------------------------------ masks
@@ -2348,9 +2364,9 @@ def cell_scene(name, blds, passages=(), fields=(), aprons=()):
     run time rather than anything a build step reported."""
     types = sorted({scene_of(b) for b in blds})
     ids = {t: str(i + 1) for i, t in enumerate(types)}
-    # a paved site with a sloped EDGE (`apron_edge`: a car park, a forecourt) has no plinth: its own slab slopes down
-    # past the ground on every side, and a plinth's 3 cm box edge under it would be the very step it removes
-    lots = [b for b in blds if "lot" in b and not type_apron_edge(b["type"])]
+    # a PAVED site (`type_paved`: a car park, a forecourt, a compound) has no plinth: its slab is the ground, 1 cm over
+    # the block's, and a plinth's 3 cm box edge round it would be a step a tyre hits
+    lots = [b for b in blds if "lot" in b and not type_paved(scene_of(b))]
     ext, sub, nodes = ["[gd_scene format=3]\n\n"], [], ['[node name="%s" type="Node3D"]\n' % name]
 
     for t in types:
@@ -2402,7 +2418,7 @@ def cell_scene(name, blds, passages=(), fields=(), aprons=()):
             sub.append('[sub_resource type="BoxShape3D" id="LotShape%d"]\nsize = Vector3(%.3f, %.3f, %.3f)\n\n'
                        % (k, sx, sy, sz))
     for k, b in enumerate(blds):
-        pos = [b["pos"][0], b["pos"][1] + LOT_RAISE + FLOOR_LIFT, b["pos"][2]]
+        pos = [b["pos"][0], b["pos"][1] + LOT_RAISE + site_lift(scene_of(b)), b["pos"][2]]
         nodes.append('\n[node name="%s_%03d" parent="." instance=ExtResource("%s")]\ntransform = %s\n'
                      % (scene_of(b), k, ids[scene_of(b)], xf(pos, b["yaw"])))
         tone = int(b.get("tone", 0))
@@ -2414,7 +2430,10 @@ def cell_scene(name, blds, passages=(), fields=(), aprons=()):
             nodes.append('\n[node name="Mesh" parent="./%s_%03d" index="0"]\n%s\n'
                          % (scene_of(b), k, "\n".join(lines)))
     # a driveway the road took as a dropped-kerb entry needs no gutter wedge (`drive_entries`); a refused one keeps it
-    drives = [b for b in blds if "drive" in b and id(b) not in ENTRY_TAKEN]
+    # the GUTTER WEDGE (a ramp on the carriageway at a driveway the road refused as a dropped-kerb entry) is gone (user,
+    # 2026-10-06: "the slope bump on the road makes cars hit it like a spike -- remove it everywhere; fix it in the
+    # sidewalk or not at all"). A refused driveway meets the kerb as it is. DRIVE_WEDGES puts it back.
+    drives = [b for b in blds if "drive" in b and id(b) not in ENTRY_TAKEN] if DRIVE_WEDGES else []
     if drives:
         sub.append('[sub_resource type="StandardMaterial3D" id="DriveMat"]\nalbedo_color = Color(0.16, 0.16, 0.17, 1)\n'
                    'roughness = 0.9\n\n')
@@ -2946,6 +2965,16 @@ def keep_out_boxes(buildings):
 ENTRY_FRONT_W = 6.0      # a street-front car park's 乗入れ (Japan: 4-6 m, wider by permit), centred on its front
 
 
+#: the GATES of the fenced compounds, as dropped-kerb vehicle entries on the road they open onto (user, 2026-10-05:
+#: "not able to enter the military base"): Godot (x, z, width). Each is the gate's own position (the composite's gate
+#: prop placed by its site's yaw); `point_record_ops.add_entry` drops the kerb on the nearest road opposite it.
+SITE_GATE_ENTRIES = [
+    (-500.0, 1250.0, 14.0),     # MilitaryBase's Mil_Gate on its north fence, 20 m south of the port road's square corner
+    (-302.0, 1297.5, 12.0),     # LogisticsTruckTerminal's Logi_GateHouse, local (60, 68) at yaw 90 -> butsuryu_michi
+    (-258.0, 1357.5, 12.0),     # LogisticsDistributionCentre's Logi_GateHouse, local (0, 113) at yaw 270
+]
+
+
 def drive_entries(buildings):
     """The car-park DRIVEWAYS as dropped-kerb vehicle entries (user, 2026-10-05: "the car park looks like a random
     plate ... do the connect"): `[(index into buildings, [x, z, width])]`, Godot frame, only those the road network
@@ -2983,6 +3012,11 @@ def drive_entries(buildings):
             if pro.add_entry(net, e[0], -e[1], w) is not None:
                 out.append((k, e))
                 break
+    for x, z, w in SITE_GATE_ENTRIES:
+        if pro.add_entry(net, x, -z, w) is not None:
+            out.append((-1, [x, z, w]))
+        else:
+            print("island_buildings: the compound gate at (%.0f, %.0f) gets no entry (no road takes it)" % (x, z))
     return out
 
 
@@ -2998,7 +3032,7 @@ def write(check):
     global ENTRIES, ENTRY_TAKEN
     doc = json.load(open(OUT))
     ENTRIES = drive_entries(doc["buildings"])
-    taken = {k for k, _e in ENTRIES}
+    taken = {k for k, _e in ENTRIES if k >= 0}
     ENTRY_TAKEN = {id(doc["buildings"][k]) for k in taken}
     asked = drive_candidates(doc["buildings"])
     print("island_buildings: %d car park(s) -> %d dropped-kerb entries; %d driveway(s) keep the gutter wedge"
@@ -3040,7 +3074,7 @@ def write(check):
             x0, z0, x1, z1, h = aabbs[t]
             tone = int(b.get("tone", 0))
             rgb = HLOD_GLASS.get(BASE_OF.get(t, t)) or (levels[tone]["srgb"] if tone < len(levels) else (150.0, 150.0, 150.0))
-            out.append([round(b["pos"][0], 3), round(b["pos"][1] + LOT_RAISE + FLOOR_LIFT, 3), round(b["pos"][2], 3),
+            out.append([round(b["pos"][0], 3), round(b["pos"][1] + LOT_RAISE + site_lift(scene_of(b)), 3), round(b["pos"][2], 3),
                         round(b["yaw"], 3), x0, z0, x1, z1, h, [round(c / 255.0, 4) for c in rgb]])
         if out:
             boxes["Bld_island_%d_%d" % (gx, gz)] = out

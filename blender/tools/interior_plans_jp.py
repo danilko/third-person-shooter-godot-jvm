@@ -894,7 +894,7 @@ def bank_small(b):
     x0, x1, y0, y1 = -7.0, 7.0, -6.0, 6.0
     H = 4.5
     xi0, xi1, yf, yb = x0 + EXT_T, x1 - EXT_T, y0 + EXT_T, y1 - EXT_T
-    apron(b, -8.5, -9.5, 8.5, 7.5, "MI_TileWhite")
+    apron(b, -8.5, -9.5, 8.5, 7.5)
     b.slab(x0, y0, x1, y1, 0.0, "MI_Terrazzo")
     ext(b, x0, y0, x1, y1, 0.0, H, "MI_TileBrown", {
         "f": ([(-4.6, -1, 1.6, "slide", "exit", 2.2), (0.5, -1, 1.8, "slide", "exit", 2.2)],
@@ -960,7 +960,7 @@ def bank_large(b):
     X0, X1, Y0, Y1 = -18.0, 18.0, -11.0, 11.0
     LV, TOP = [0.0, 5.0, 9.0], 13.0
     xi0, xi1, yf, yb = X0 + EXT_T, X1 - EXT_T, Y0 + EXT_T, Y1 - EXT_T
-    apron(b, -20.0, -16.0, 20.0, 14.0, "MI_TileWhite")
+    apron(b, -20.0, -16.0, 20.0, 14.0)
     for x in (-15.0, -9.0, 9.0, 15.0):
         b.box("Site", (x - 1.0, -15.0, 0.0), (x + 1.0, -13.8, 0.6), "MI_StoneWall")      # planters / bollards
     wy = (4.4, yb)
@@ -1109,87 +1109,107 @@ def bay_lines(b, x0, x1, y0, y1, z, along="y", pitch=2.5, mat="MI_PaintWhite"):
 # ── 立体駐車場 (自走式): a self-park multi-storey car park, ground + 3 decks (the top one open) ────────────────────
 
 def parking_garage(b):
-    """Cars drive UP the west ramps and DOWN the east ones: each ramp runs 20 m along Y for a 3.0 m storey (15 %,
-    under the 17 % 駐車場法 limit), and the ramps of every storey stack in the same strip 3 m apart. Between them the
-    decks: perpendicular bays (2.5 x 5.0) either side of a 6 m two-way aisle, cross aisles at both ends. A stair
-    tower on the south-east corner for people (二方向: a second stair at the north-west)."""
-    X0, X1, Y0, Y1 = -11.5, 11.5, -20.0, 20.0
-    RW = 3.5                                   # a one-way ramp's width (Japan: >= 3.5 m)
-    RY0, RY1 = -4.0, 16.0                      # every ramp's plan along Y
-    LV = [0.0, 3.0, 6.0, 9.0]
-    apron(b, -14.0, -26.0, 17.5, 22.0, "MI_AsphaltLot")
+    """Cars drive UP the west ramps and DOWN the east ones. REDONE 2026-10-05 (user: "the 立体駐車場 is small for a car
+    to go in, the slope very short -- it should fit a normal vehicle or at least a small truck"): 3.3 m storeys (3.0 m
+    clear under a 0.3 m deck: a 2 t box truck is 2.95 m), ramps 4.5 m wide and 36 m long -- a 5 m transition at half
+    grade at each end and 26 m at 10.6 % between (Japan: 17 % max, a transition where the grade changes, so a long
+    car's nose and tail do not ground) -- and the ramps of every storey stack in the same strip. Between them the decks:
+    perpendicular bays (2.5 x 5.0) either side of a 7 m two-way aisle, 7 m cross aisles at both ends (a car or a small
+    truck turns from a ramp into the aisle). A stair tower on the south-east corner and a lift beside it."""
+    X0, X1, Y0, Y1 = -13.0, 13.0, -25.0, 25.0
+    RW = 4.5                                   # a one-way ramp's width (Japan: >= 3.5 m; 4.5 m for a small truck)
+    RY0, RY1 = -18.0, 18.0                     # every ramp's plan along Y (its high end at RY0, low end at RY1)
+    TR = 5.0                                   # the transition at each end, at half grade
+    ST = 3.3
+    LV = [0.0, ST, 2 * ST, 3 * ST]
+    g = ST / ((RY1 - RY0) - TR)                # the main grade: rise = g/2 * TR * 2 + g * (L - 2 TR) = g (L - TR)
+    apron(b, X0 - 2.5, Y0 - 2.0, X1 + 4.5, Y1 + 1.0, "MI_AsphaltLot")   # within a 36 x 54 m plot
     strips = {"w": (X0, X0 + RW), "e": (X1 - RW, X1)}
+
+    def h(y, z0):                              # ramp top at y (low end z0 at RY1, rising toward RY0)
+        d = RY1 - y
+        if d <= TR:
+            return z0 + g / 2 * d
+        if d >= (RY1 - RY0) - TR:
+            return z0 + ST - g / 2 * ((RY1 - RY0) - d)
+        return z0 + g / 2 * TR + g * (d - TR)
+    cuts = [RY0, RY0 + TR, RY1 - TR, RY1]
     for z0, z1 in zip(LV[:-1], LV[1:]):
-        # up (west): low end at the north, rising south; down (east): the same, so both stack
         for k, (xa, xb) in strips.items():
-            ramp(b, xa, RY0, xb, RY1, z1, z0, "y", t=0.3)
-            for x in (xa, xb - 0.2):
-                _hexa(b, "Structure", [(x, RY0, z1), (x + 0.2, RY0, z1), (x + 0.2, RY1, z0), (x, RY1, z0),
-                                       (x, RY0, z1 + 0.9), (x + 0.2, RY0, z1 + 0.9), (x + 0.2, RY1, z0 + 0.9),
-                                       (x, RY1, z0 + 0.9)], "MI_ConcreteSmooth")
-            b.box("Structure", (xa + 0.3, (RY0 + RY1) / 2 - 0.1, (z0 + z1) / 2 + 0.3), (xb - 0.3, (RY0 + RY1) / 2 + 0.1,
-                  (z0 + z1) / 2 + 0.31), "MI_PaintYellow")            # a chevron mid-ramp (placeholder marking)
+            for ya, yb in zip(cuts[:-1], cuts[1:]):
+                za, zb = h(ya, z0), h(yb, z0)
+                ramp(b, xa, ya, xb, yb, za, zb, "y", t=0.3)
+                for x in (xa, xb - 0.2):
+                    _hexa(b, "Structure", [(x, ya, za), (x + 0.2, ya, za), (x + 0.2, yb, zb), (x, yb, zb),
+                                           (x, ya, za + 0.9), (x + 0.2, ya, za + 0.9), (x + 0.2, yb, zb + 0.9),
+                                           (x, yb, zb + 0.9)], "MI_ConcreteSmooth")
+            ym = 0.0
+            b.box("Structure", (xa + 0.4, ym - 0.1, h(ym, z0) + 0.001), (xb - 0.4, ym + 0.1, h(ym, z0) + 0.011),
+                  "MI_PaintYellow")            # a chevron mid-ramp (placeholder marking)
     hole = [(X0, RY0, X0 + RW, RY1), (X1 - RW, RY0, X1, RY1)]
+    BX = X0 + RW                               # the bays' outer edge (-8.5)
     for i, z in enumerate(LV):
         b.slab(X0, Y0, X1, Y1, z, "MI_ConcreteSmooth", holes=hole if i else [], t=0.3)
-        bay_lines(b, -8.0, -3.0, -14.0, 14.0, z + 0.001)
-        bay_lines(b, 3.0, 8.0, -14.0, 14.0, z + 0.001)
-        for x in (-8.0, 8.0, -3.0, 3.0):
-            b.box("Structure", (x - 0.05, -14.0, z + 0.001), (x + 0.05, 14.0, z + 0.011), "MI_PaintWhite")
-        for x in (-5.5, 5.5):
-            b.box("Structure", (x - 0.5, -12.5, z), (x + 0.5, 12.5, z + 0.12), "MI_ConcreteSmooth")  # wheel stops
-            b.box("Structure", (x - 0.1, -12.5, z + 0.12), (x + 0.1, 12.5, z + 0.13), "MI_PaintYellow")
+        bay_lines(b, BX, -3.5, -15.0, 15.0, z + 0.001)
+        bay_lines(b, 3.5, -BX, -15.0, 15.0, z + 0.001)
+        for x in (BX, -BX, -3.5, 3.5):
+            b.box("Structure", (x - 0.05, -15.0, z + 0.001), (x + 0.05, 15.0, z + 0.011), "MI_PaintWhite")
+        for x in (BX + 0.8, -BX - 0.8):        # the wheel stops, near the back of each bay row
+            b.box("Structure", (x - 0.15, -14.8, z), (x + 0.15, 14.8, z + 0.12), "MI_ConcreteSmooth")
+            b.box("Structure", (x - 0.05, -14.8, z + 0.12), (x + 0.05, 14.8, z + 0.13), "MI_PaintYellow")
         if i:
             for (xa, xb) in ((X0, X0 + RW), (X1 - RW, X1)):          # guard walls at the deck edge over the ramp well
                 b.box("Structure", (xa + (RW if xa == X0 else -0.2), RY0, z), (xa + (RW + 0.2 if xa == X0 else 0.0),
                       RY1, z + 1.1), "MI_ConcreteSmooth")
-            # the parapets round the deck (open at nothing: the stair doors cut them)
+            # the parapets round the deck (the stair and lift bridges cut the east one)
             b.box("Structure", (X0, Y0, z), (X1, Y0 + 0.2, z + 1.1), "MI_ConcreteSmooth")
             b.box("Structure", (X0, Y1 - 0.2, z), (X1, Y1, z + 1.1), "MI_ConcreteSmooth")
             b.box("Structure", (X0, Y0, z), (X0 + 0.2, Y1, z + 1.1), "MI_ConcreteSmooth")
-            b.box("Structure", (X1 - 0.2, Y0, z), (X1, -19.45, z + 1.1), "MI_ConcreteSmooth")
-            b.box("Structure", (X1 - 0.2, -18.25, z), (X1, -13.45, z + 1.1), "MI_ConcreteSmooth")
-            b.box("Structure", (X1 - 0.2, -12.35, z), (X1, Y1, z + 1.1), "MI_ConcreteSmooth")
-        # the columns (a 8 x 10 m grid) up to the next deck
+            b.box("Structure", (X1 - 0.2, Y0, z), (X1, Y0 + 0.55, z + 1.1), "MI_ConcreteSmooth")
+            b.box("Structure", (X1 - 0.2, Y0 + 1.75, z), (X1, -18.4, z + 1.1), "MI_ConcreteSmooth")
+            b.box("Structure", (X1 - 0.2, -17.4, z), (X1, Y1, z + 1.1), "MI_ConcreteSmooth")
+        # the columns, on the bay rows' outer lines (never in an aisle or a ramp), up to the next deck
         if z < LV[-1]:
-            for x in (-8.0, -3.0, 3.0, 8.0):
-                for y in (-19.4, -10.0, 0.0, 10.0, 19.4):
-                    if abs(x) == 3.0 and abs(y) < 19:
-                        continue
-                    b.box("Structure", (x - 0.35, y - 0.35, z), (x + 0.35, y + 0.35, z + 2.7), "MI_ConcreteSmooth")
-    # parked cars (markers), the entrance booth and barrier at the south
-    for i, (x, y) in enumerate(((-5.5, -8.75), (5.5, 1.25), (-5.5, 6.25), (5.5, -11.25))):
+            for x in (BX + 0.35, -BX - 0.35):
+                for y in (-15.0, -5.0, 5.0, 15.0):
+                    b.box("Structure", (x - 0.35, y - 0.35, z), (x + 0.35, y + 0.35, z + ST - 0.3), "MI_ConcreteSmooth")
+            for x in (X0 + 0.35, X1 - 0.35):
+                for y in (Y0 + 0.35, Y1 - 0.35):
+                    b.box("Structure", (x - 0.35, y - 0.35, z), (x + 0.35, y + 0.35, z + ST - 0.3), "MI_ConcreteSmooth")
+    # parked cars (markers) in the bays, the entrance booth and its RAISED arm at the south
+    for i, (x, y) in enumerate(((-6.0, -8.75), (6.0, 1.25), (-6.0, 6.25), (6.0, -11.25))):
         b.mark("vehicle", x, y, LV[i % 4], 90.0 if x < 0 else 270.0, vehicle=("KEC1", "SPC1", "TAX1", "CLC1")[i],
                note="a parked car")
-    b.box("Site", (-1.2, -22.6, 0.0), (1.2, -21.2, 2.6), "MI_PaintedMetalDark")       # the gate booth
-    b.box("Site", (-4.5, -21.9, 0.9), (-1.3, -21.8, 1.0), "MI_PaintYellow")          # the raised arm (placeholder)
-    b.box("Site", (X0, Y0 - 0.3, 6.3), (X1, Y0, 7.6), "MI_SignYellow")                # the P sign band
-    b.mark("spawn", 0.0, -22.0, 0.0, 180.0, team="staff", note="the attendant in the booth")
+    b.box("Site", (-1.2, Y0 - 1.9, 0.0), (1.2, Y0 - 0.7, 2.6), "MI_PaintedMetalDark")       # the gate booth
+    b.box("Site", (-1.6, Y0 - 1.35, 0.9), (-1.5, Y0 - 1.25, 4.2), "MI_PaintYellow")         # the arm, raised
+    b.box("Site", (X0, Y0 - 0.3, ST * 2 + 0.3), (X1, Y0, ST * 2 + 1.6), "MI_SignYellow")    # the P sign band
+    b.mark("spawn", 0.0, Y0 - 1.3, 0.0, 180.0, team="staff", note="the attendant in the booth")
     # the stair tower on the south-east corner: every deck, and the roof
-    TX0, TX1, TY0, TY1 = X1 + 0.35, X1 + 3.35, -19.8, -14.0
+    TX0, TX1, TY0, TY1 = X1 + 0.35, X1 + 3.35, Y0 + 0.2, Y0 + 6.0
     well = (TX0 + 0.25, TY0 + 0.25, TX1 - 0.25, TY1 - 0.1)
     for z0, z1 in zip(LV[:-1], LV[1:]):
         b.ustair(*well, z0, z1 - z0, near="s", cap=(z1 == LV[-1]))
     for z in LV:
-        b.box("Structure", (X1, -19.45, z - 0.3), (TX0 + 0.25, -18.25, z), "MI_ConcreteSmooth")  # the bridge to the deck
+        b.box("Structure", (X1, Y0 + 0.55, z - 0.3), (TX0 + 0.25, Y0 + 1.75, z), "MI_ConcreteSmooth")  # bridge to the deck
     for s_, axis, c, a0, a1, sgn in (("f", "x", TY0 + 0.1, TX0, TX1, -1), ("b", "x", TY1 - 0.1, TX0, TX1, 1),
                                      ("r", "y", TX1 - 0.1, TY0 + 0.2, TY1 - 0.2, 1)):
         ops = openings(b, axis, c, 0.0, [((TX0 + TX1) / 2, -1, 0.9, "swing", "exit", 2.1)]) if s_ == "f" else []
         b.wall(axis, c, a0, a1, 0.0, LV[-1] + 1.2, 0.2, "MI_Plaster", mat_out="MI_ConcreteSmooth", out_sign=sgn,
                ops=ops, group="Facade")
-    ops = [Opening(-19.4, -18.3, z, z + 2.1) for z in LV]
+    ops = [Opening(Y0 + 0.6, Y0 + 1.7, z, z + 2.1) for z in LV]
     b.wall("y", TX0 + 0.1, TY0 + 0.2, TY1 - 0.2, 0.0, LV[-1] + 1.2, 0.2, "MI_Plaster", mat_out="MI_ConcreteSmooth",
            out_sign=-1, ops=ops, group="Facade")
     b.box("Roof", (TX0, TY0, LV[-1] + 1.2), (TX1, TY1, LV[-1] + 1.4), "MI_ConcreteSmooth")
     b.box("Roof", (TX0, TY0, LV[-1] + 1.4), (TX1, TY1, LV[-1] + 3.4), "MI_ConcreteSmooth")
-    # a lift beside the stair tower (user, 2026-09-29), opening west onto every deck over a short bridge
-    b.lift(X1 + 1.3, -12.9, 1.6, 1.6, LV, faces=1, turned=False)
+    # a lift beside the stair tower, opening west onto every deck over a short bridge
+    b.lift(X1 + 1.3, -17.9, 1.6, 1.6, LV, faces=1, turned=False)
     for z in LV:
-        b.box("Structure", (X1, -13.4, z - 0.3), (X1 + 0.35, -12.4, z), "MI_ConcreteSmooth")
-    return {"note": "立体駐車場 (自走式): a self-park car park 23 x 40 m, ground + three decks (the top one open to "
-                    "the sky) -- up ramps on the west, down ramps on the east (20 m for each 3 m storey, 15 %), 2.5 x "
-                    "5.0 m bays either side of a 6 m aisle, wheel stops, a gate booth and arm at the south entrance, a "
-                    "stair tower on the south-east corner and a lift beside it to every deck."}
+        b.box("Structure", (X1, -18.4, z - 0.3), (X1 + 0.35, -17.4, z), "MI_ConcreteSmooth")
+    return {"note": "立体駐車場 (自走式): a self-park car park 26 x 50 m, ground + three decks (the top one open to "
+                    "the sky), 3.3 m storeys (3.0 m clear: a 2 t truck fits) -- up ramps on the west, down ramps on "
+                    "the east, 4.5 m wide, 36 m long (5 m half-grade transitions at each end, 10.6 % between), "
+                    "2.5 x 5.0 m bays either side of a 7 m aisle, 7 m cross aisles, wheel stops, a gate booth with "
+                    "its arm raised at the south entrance, a stair tower on the south-east corner and a lift."}
 
 
 # ── 空港管制塔: the civil airport's control tower -- an operations block and a 36 m tower with a lift ─────────────
@@ -1448,7 +1468,7 @@ def fashion_building(b):
          ["cosmetics", "fashion", "fashion", "electronics", "restaurant"], "MI_PaintedMetalDark", "MI_TileWhite",
          pairs=[(0.0, -1.5)], lift_banks=[(0.0, 1)], name_sign="MI_SignRed",
          entrances=[("f", -6.0, 2.4), ("f", 6.0, 2.4), ("l", -2.0, 1.8)])
-    apron(b, -17.0, -18.0, 17.0, 14.0, "MI_TileWhite")
+    apron(b, -17.0, -18.0, 17.0, 14.0)
     return {"note": "ファッションビル: a five-storey station-front fashion building -- F1 cosmetics and goods with "
                     "the counters, F2-F3 fashion, F4 electronics / books, F5 the restaurant floor; an escalator "
                     "atrium (up and down), two lifts, four corner stairs (one to the roof), WC blocks each floor."}
@@ -1464,7 +1484,7 @@ def department_store(b):
          "MI_StoneWall", "MI_TileBeige", pairs=[(-14.0, -2.0), (14.0, -2.0)],
          lift_banks=[(0.0, 1), (0.0, 1, 6.0)], name_sign="MI_SignGreen",
          entrances=[("f", -24.0, 3.0), ("f", 0.0, 3.6), ("f", 24.0, 3.0), ("l", 6.0, 2.4), ("r", 6.0, 2.4)])
-    apron(b, -40.0, -32.0, 40.0, 28.0, "MI_TileWhite")
+    apron(b, -40.0, -32.0, 40.0, 28.0)
     for x in (-20.0, -8.0, 8.0, 20.0):                                           # the roof garden's planters
         b.box("Roof", (x - 3.0, -12.0, TOP), (x + 3.0, -6.0, TOP + 0.6), "MI_StoneWall")
         b.box("Roof", (x - 2.8, -11.8, TOP + 0.6), (x + 2.8, -6.2, TOP + 0.62), "MI_Grass")
@@ -1486,7 +1506,7 @@ def civic_center(b):
     fr = mall(b, 48.0, 32.0, LV, TOP, ["none"] * 4, "MI_StoneWall", "MI_TileBeige", pairs=[],
               lift_banks=[(0.0, 1)], name_sign="MI_SignGreen", entrances=[("f", -10.0, 2.4), ("f", 10.0, 2.4)])
     xi0, xi1, yf, yb = fr["xi0"], fr["xi1"], fr["yf"], fr["yb"]
-    apron(b, -28.0, -26.0, 28.0, 20.0, "MI_TileWhite")
+    apron(b, -28.0, -26.0, 28.0, 20.0)
     b.box("Site", (-6.0, -23.0, 0.0), (6.0, -19.0, 0.5), "MI_StoneWall")               # the plaza's planter
     b.box("Site", (-5.8, -22.8, 0.5), (5.8, -19.2, 0.52), "MI_Grass")
     b.box("Site", (-0.15, -21.2, 0.5), (0.15, -20.8, 9.0), "MI_Steel")                 # the flag pole
@@ -1777,7 +1797,7 @@ def secure_mansion(b):
     at the back; upstairs the master's study (safe, gun locker), the PANIC ROOM, bedrooms. A three-car garage; a
     garden with a pond. Everything a raid / infiltration mission needs: two ways in, patrol routes, a vault."""
     LX0, LX1, LY0, LY1 = -32.0, 32.0, -25.0, 25.0
-    apron(b, LX0, LY0, LX1, LY1, "MI_ConcreteSmooth")
+    apron(b, LX0, LY0, LX1, LY1)
     b.box("Site", (LX0 + 0.3, LY0 + 0.3, 0.0), (-4.0, -4.0, 0.02), "MI_Grass")              # the garden
     b.box("Site", (-24.0, -18.0, 0.0), (-12.0, -10.0, 0.025), "MI_PoolWater")              # the pond
     for (x, y) in ((-25.0, -9.0), (-11.0, -19.0), (-20.0, -8.5), (-8.0, -14.0)):
@@ -1945,7 +1965,7 @@ def post_office_small(b):
     x0, x1, y0, y1 = -6.0, 6.0, -5.0, 5.0
     H = 4.0
     xi0, xi1, yf, yb = x0 + EXT_T, x1 - EXT_T, y0 + EXT_T, y1 - EXT_T
-    apron(b, -12.0, -11.0, 12.0, 13.0, "MI_ConcreteSmooth")      # a 6 m lane down each side to the 8 m van yard (2026-10-04)
+    apron(b, -12.0, -11.0, 12.0, 13.0)      # a 6 m lane down each side to the 8 m van yard (2026-10-04)
     bay_lines(b, 1.5, 7.0, -9.6, -5.4, 0.0, along="y", pitch=2.5)                      # two parking bays
     b.slab(x0, y0, x1, y1, 0.0, "MI_Terrazzo")
     ext(b, x0, y0, x1, y1, 0.0, H, "MI_TileBeige", {
@@ -1996,7 +2016,7 @@ def post_office_large(b):
     xi0, xi1, yf, yb = X0 + EXT_T, X1 - EXT_T, Y0 + EXT_T, Y1 - EXT_T
     # THE SITE (user, 2026-10-04: room for a truck round the building): an 8 m lane down each side to the van yard
     # behind, 12 m clear in front of the dock shutters before the bays along the back
-    apron(b, -26.0, -21.0, 26.0, 31.0, "MI_ConcreteSmooth")
+    apron(b, -26.0, -21.0, 26.0, 31.0)
     bay_lines(b, -25.0, 25.0, 25.0, 30.6, 0.0, along="y", pitch=3.0)                   # the red vans' bays (back yard)
     b.mark("vehicle", -23.5, 27.8, 0.0, 0.0, vehicle="POT1", note="a 郵便 2 t box truck")
     for x in (-20.5, -17.5):

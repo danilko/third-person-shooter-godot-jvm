@@ -133,7 +133,9 @@ def paint_bays(b, x0, n, pitch, y0, y1, mat="MI_PaintWhite"):
         b.box("Site", (x - 0.05, y0, 0.0), (x + 0.05, y1, 0.012), mat)
 
 
-def apron(b, x0, y0, x1, y1, mat="MI_ConcreteSmooth"):
+def apron(b, x0, y0, x1, y1, mat="MI_AsphaltLot"):
+    # the site's ground is the block's own asphalt (user, 2026-10-06: police, hospitals, banks ... a compound's drivable
+    # ground is the same tone as the block and the footway), never a light slab of its own
     b.box("Site", (x0, y0, -0.03), (x1, y1, 0.01), mat)
 
 
@@ -790,7 +792,7 @@ def office_hq(b):
     TOP = 15.6
     CF, CB = -1.5, 0.3
     xi0, xi1, yf, yb = X0 + EXT_T, X1 - EXT_T, Y0 + EXT_T, Y1 - EXT_T
-    apron(b, -14.0, -15.0, 14.0, 11.0, "MI_TileWhite")                            # the entrance plaza
+    apron(b, -14.0, -15.0, 14.0, 11.0)                            # the entrance plaza
     for x in (-10.0, -6.0, 6.0, 10.0):
         b.box("Site", (x - 0.6, -13.5, 0.0), (x + 0.6, -12.3, 0.5), "MI_ConcreteSmooth")   # planters
     wellB = (xi0, CB + 0.06, -9.06, yb)
@@ -921,7 +923,7 @@ def resort_hotel(b):
         b.put("Hotel_Lounger", -14.0 + i * 3.2, -22.6, 180.0)
     b.put("Hotel_Lounger", 8.0, -14.0, 90.0, repeat=(3, 0.0, -2.6))
     b.mark("spawn", 10.0, -20.0, 0.0, 0.0, team="guest")
-    apron(b, -6.0, Y1, 6.0, 15.0, "MI_ConcreteSmooth")
+    apron(b, -6.0, Y1, 6.0, 15.0)
     b.box("Site", (-5.0, Y1, 4.2), (5.0, 14.0, 4.5), "MI_PaintWhite")
     for x in (-4.6, 4.6):
         b.box("Site", (x - 0.15, 13.4, 0.0), (x + 0.15, 13.7, 4.2), "MI_PaintWhite")

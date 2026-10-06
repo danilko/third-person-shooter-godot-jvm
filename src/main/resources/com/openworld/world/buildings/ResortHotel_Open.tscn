@@ -644,7 +644,7 @@ size = Vector3(1, 2.1, 0.14)
 [sub_resource type="BoxShape3D" id="BoxShape3D_kp0wj"]
 size = Vector3(2.4, 2.3, 2.4)
 
-[node name="ResortHotel_Open" type="Node3D" unique_id=297915490]
+[node name="ResortHotel_Open" type="Node3D" unique_id=1081727759]
 metadata/building = {
 "aabb": [Vector3(-24, -1.2, -19.5), Vector3(48, 18.300001, 39)],
 "base_m": -1.2,
@@ -1217,21 +1217,21 @@ metadata/building = {
 "wall_top_m": 14.1
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=906997628]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=259212764]
 visibility_range_end = 505.2
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_mgugj")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=1900768817]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1735151431]
 collision_mask = 0
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=348006258]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1727825288]
 shape = ExtResource("2_a0p7b")
 
-[node name="Lifts" type="Node3D" parent="." unique_id=727985732]
+[node name="Lifts" type="Node3D" parent="." unique_id=1206508639]
 
-[node name="Lift0" type="Node3D" parent="Lifts" unique_id=637826142]
+[node name="Lift0" type="Node3D" parent="Lifts" unique_id=198303398]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -1, 0, -8.61)
 script = ExtResource("3_7xssf")
 shaft_width = 1.8
@@ -1249,9 +1249,9 @@ in_service = true
 stop_heights = "0,4.5,7.7,10.9"
 faces = 1
 
-[node name="Doors" type="Node3D" parent="." unique_id=1722493346]
+[node name="Doors" type="Node3D" parent="." unique_id=2066138827]
 
-[node name="Door0" type="StaticBody3D" parent="Doors" unique_id=560718015]
+[node name="Door0" type="StaticBody3D" parent="Doors" unique_id=269341412]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.6, 0, 3.4)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -1273,23 +1273,23 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door0" unique_id=1610924435]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door0" unique_id=1779076199]
 mesh = ExtResource("8_epvys")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door0" unique_id=604132357]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door0" unique_id=346291925]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_25mxr")
 
-[node name="Sensor0" type="Area3D" parent="Doors" unique_id=1988861873]
+[node name="Sensor0" type="Area3D" parent="Doors" unique_id=52532459]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.6, 0, 3.4)
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Sensor0" unique_id=832405596]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Sensor0" unique_id=2071227365]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.9, 1.05, 0)
 shape = SubResource("BoxShape3D_dd4w4")
 
-[node name="Door1" type="StaticBody3D" parent="Doors" unique_id=1607569908]
+[node name="Door1" type="StaticBody3D" parent="Doors" unique_id=2145467015]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.5, 0, 3.4)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -1311,23 +1311,23 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door1" unique_id=397317592]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door1" unique_id=101329769]
 mesh = ExtResource("8_epvys")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door1" unique_id=1180207053]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door1" unique_id=912415769]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_7pwcu")
 
-[node name="Sensor1" type="Area3D" parent="Doors" unique_id=1295870425]
+[node name="Sensor1" type="Area3D" parent="Doors" unique_id=279178197]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.5, 0, 3.4)
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Sensor1" unique_id=701675118]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Sensor1" unique_id=325257651]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.05, 0)
 shape = SubResource("BoxShape3D_1hkm0")
 
-[node name="Door2" type="StaticBody3D" parent="Doors" unique_id=1432303239]
+[node name="Door2" type="StaticBody3D" parent="Doors" unique_id=2117779315]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.9, 0, 3.4)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -1349,23 +1349,23 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door2" unique_id=1702375912]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door2" unique_id=277676000]
 mesh = ExtResource("8_epvys")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door2" unique_id=1100469922]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door2" unique_id=1581608868]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_4w8li")
 
-[node name="Sensor2" type="Area3D" parent="Doors" unique_id=2063185321]
+[node name="Sensor2" type="Area3D" parent="Doors" unique_id=769052862]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.9, 0, 3.4)
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Sensor2" unique_id=859899868]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Sensor2" unique_id=1295794532]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.9, 1.05, 0)
 shape = SubResource("BoxShape3D_ldv40")
 
-[node name="Door3" type="StaticBody3D" parent="Doors" unique_id=1251501198]
+[node name="Door3" type="StaticBody3D" parent="Doors" unique_id=413703089]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3.4)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -1387,23 +1387,23 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door3" unique_id=1400979339]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door3" unique_id=509341156]
 mesh = ExtResource("8_epvys")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door3" unique_id=550413009]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door3" unique_id=25591912]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_mjvko")
 
-[node name="Sensor3" type="Area3D" parent="Doors" unique_id=241504479]
+[node name="Sensor3" type="Area3D" parent="Doors" unique_id=1274800059]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3.4)
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Sensor3" unique_id=981789595]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Sensor3" unique_id=463799638]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.05, 0)
 shape = SubResource("BoxShape3D_f78lg")
 
-[node name="Door4" type="StaticBody3D" parent="Doors" unique_id=1645714693]
+[node name="Door4" type="StaticBody3D" parent="Doors" unique_id=1559216079]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.1, 0, 3.4)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -1425,23 +1425,23 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door4" unique_id=1369368288]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door4" unique_id=3642197]
 mesh = ExtResource("8_epvys")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door4" unique_id=166589691]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door4" unique_id=1279977209]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_avfua")
 
-[node name="Sensor4" type="Area3D" parent="Doors" unique_id=632414287]
+[node name="Sensor4" type="Area3D" parent="Doors" unique_id=319125264]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.1, 0, 3.4)
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Sensor4" unique_id=1875667509]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Sensor4" unique_id=1387180654]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.9, 1.05, 0)
 shape = SubResource("BoxShape3D_6k2dd")
 
-[node name="Door5" type="StaticBody3D" parent="Doors" unique_id=628251898]
+[node name="Door5" type="StaticBody3D" parent="Doors" unique_id=530736051]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0, 3.4)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -1463,23 +1463,23 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door5" unique_id=157196314]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door5" unique_id=1329577601]
 mesh = ExtResource("8_epvys")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door5" unique_id=460531718]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door5" unique_id=1470551120]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_pqf1y")
 
-[node name="Sensor5" type="Area3D" parent="Doors" unique_id=2016284875]
+[node name="Sensor5" type="Area3D" parent="Doors" unique_id=12318848]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0, 3.4)
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Sensor5" unique_id=1300247036]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Sensor5" unique_id=561238080]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.05, 0)
 shape = SubResource("BoxShape3D_6guou")
 
-[node name="Door6" type="StaticBody3D" parent="Doors" unique_id=479426587]
+[node name="Door6" type="StaticBody3D" parent="Doors" unique_id=699156813]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 1.8, 0, -12.4)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -1501,23 +1501,23 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door6" unique_id=683808760]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door6" unique_id=444448984]
 mesh = ExtResource("9_h83i5")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door6" unique_id=1415998588]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door6" unique_id=2093268407]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.6, 1.05, 0)
 shape = SubResource("BoxShape3D_wavax")
 
-[node name="Sensor6" type="Area3D" parent="Doors" unique_id=1174076294]
+[node name="Sensor6" type="Area3D" parent="Doors" unique_id=1389254456]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 1.8, 0, -12.4)
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Sensor6" unique_id=1883640805]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Sensor6" unique_id=998612415]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.2, 1.05, 0)
 shape = SubResource("BoxShape3D_xery6")
 
-[node name="Door7" type="StaticBody3D" parent="Doors" unique_id=515438525]
+[node name="Door7" type="StaticBody3D" parent="Doors" unique_id=116981098]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 3, 0, -12.4)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -1539,23 +1539,23 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door7" unique_id=501275205]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door7" unique_id=1496869358]
 mesh = ExtResource("9_h83i5")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door7" unique_id=296140219]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door7" unique_id=2134899264]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.6, 1.05, 0)
 shape = SubResource("BoxShape3D_cjvvv")
 
-[node name="Sensor7" type="Area3D" parent="Doors" unique_id=1961041357]
+[node name="Sensor7" type="Area3D" parent="Doors" unique_id=180057399]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 3, 0, -12.4)
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Sensor7" unique_id=137214464]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Sensor7" unique_id=1668858730]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.05, 0)
 shape = SubResource("BoxShape3D_j7xss")
 
-[node name="Door8" type="StaticBody3D" parent="Doors" unique_id=770149875]
+[node name="Door8" type="StaticBody3D" parent="Doors" unique_id=827207222]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21.08, 14.1, -7.46)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -1577,24 +1577,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door8" unique_id=350228652]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door8" unique_id=23025907]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_sxra7")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door8" unique_id=799100401]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door8" unique_id=515287714]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_jdmfs")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door8" unique_id=1636743337]
+[node name="Sensor" type="Area3D" parent="Doors/Door8" unique_id=789581981]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door8/Sensor" unique_id=1231431661]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door8/Sensor" unique_id=1866284865]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_sl5vn")
 
-[node name="Door9" type="StaticBody3D" parent="Doors" unique_id=1559618668]
+[node name="Door9" type="StaticBody3D" parent="Doors" unique_id=375984118]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17.66, 0, -7.5)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -1616,24 +1616,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door9" unique_id=796358963]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door9" unique_id=1794999895]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_kk5v6")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door9" unique_id=1826262817]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door9" unique_id=1073685636]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 shape = SubResource("BoxShape3D_phdna")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door9" unique_id=930466170]
+[node name="Sensor" type="Area3D" parent="Doors/Door9" unique_id=736469008]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door9/Sensor" unique_id=1596241874]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door9/Sensor" unique_id=684239515]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 shape = SubResource("BoxShape3D_quki5")
 
-[node name="Door10" type="StaticBody3D" parent="Doors" unique_id=116317744]
+[node name="Door10" type="StaticBody3D" parent="Doors" unique_id=2103883334]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.55, 0, -7.5)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -1655,24 +1655,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door10" unique_id=1058675595]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door10" unique_id=2047953364]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_gh6ab")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door10" unique_id=1413103710]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door10" unique_id=798557859]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_3xq3q")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door10" unique_id=1783713734]
+[node name="Sensor" type="Area3D" parent="Doors/Door10" unique_id=1039280197]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door10/Sensor" unique_id=1129492971]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door10/Sensor" unique_id=1099569667]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_aiky0")
 
-[node name="Door11" type="StaticBody3D" parent="Doors" unique_id=1961819074]
+[node name="Door11" type="StaticBody3D" parent="Doors" unique_id=2127339712]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 0, -7.5)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -1694,24 +1694,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door11" unique_id=764730263]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door11" unique_id=1409568765]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_2vqyg")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door11" unique_id=803338366]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door11" unique_id=1339974007]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_c80f3")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door11" unique_id=189998001]
+[node name="Sensor" type="Area3D" parent="Doors/Door11" unique_id=404959211]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door11/Sensor" unique_id=426753238]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door11/Sensor" unique_id=1080070825]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_ake8b")
 
-[node name="Door12" type="StaticBody3D" parent="Doors" unique_id=1155006221]
+[node name="Door12" type="StaticBody3D" parent="Doors" unique_id=1342758249]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.66, 0, -7.5)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -1733,24 +1733,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door12" unique_id=216655107]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door12" unique_id=1966546453]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_5hn03")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door12" unique_id=30267252]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door12" unique_id=1914924446]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 shape = SubResource("BoxShape3D_6id41")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door12" unique_id=856662734]
+[node name="Sensor" type="Area3D" parent="Doors/Door12" unique_id=424470374]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door12/Sensor" unique_id=1652449348]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door12/Sensor" unique_id=1361290523]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 shape = SubResource("BoxShape3D_a65sn")
 
-[node name="Door13" type="StaticBody3D" parent="Doors" unique_id=1702892216]
+[node name="Door13" type="StaticBody3D" parent="Doors" unique_id=718117821]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -19.85, 4.5, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -1772,24 +1772,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door13" unique_id=301992900]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door13" unique_id=937211657]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_mllps")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door13" unique_id=362774566]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door13" unique_id=600766141]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_im3x7")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door13" unique_id=121693560]
+[node name="Sensor" type="Area3D" parent="Doors/Door13" unique_id=63023426]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door13/Sensor" unique_id=944086374]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door13/Sensor" unique_id=1724611845]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_kt145")
 
-[node name="Door14" type="StaticBody3D" parent="Doors" unique_id=481918334]
+[node name="Door14" type="StaticBody3D" parent="Doors" unique_id=1282126799]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -13.849999, 4.5, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -1811,24 +1811,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door14" unique_id=93423869]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door14" unique_id=229794843]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_cdqdl")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door14" unique_id=1107772127]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door14" unique_id=900529196]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_1evee")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door14" unique_id=1452056055]
+[node name="Sensor" type="Area3D" parent="Doors/Door14" unique_id=1843325745]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door14/Sensor" unique_id=1559824507]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door14/Sensor" unique_id=1544410942]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_p26oe")
 
-[node name="Door15" type="StaticBody3D" parent="Doors" unique_id=51118591]
+[node name="Door15" type="StaticBody3D" parent="Doors" unique_id=623714531]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -7.85, 4.5, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -1850,24 +1850,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door15" unique_id=1508835306]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door15" unique_id=938606907]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_88wnn")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door15" unique_id=515269167]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door15" unique_id=1876133437]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_11mow")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door15" unique_id=786928773]
+[node name="Sensor" type="Area3D" parent="Doors/Door15" unique_id=1433746827]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door15/Sensor" unique_id=1470582789]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door15/Sensor" unique_id=997100980]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_jw2hc")
 
-[node name="Door16" type="StaticBody3D" parent="Doors" unique_id=251403123]
+[node name="Door16" type="StaticBody3D" parent="Doors" unique_id=1927937350]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -1.8499999, 4.5, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -1889,24 +1889,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door16" unique_id=1055121796]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door16" unique_id=1955520452]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_smkck")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door16" unique_id=2125557285]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door16" unique_id=758435634]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_iatvg")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door16" unique_id=361897641]
+[node name="Sensor" type="Area3D" parent="Doors/Door16" unique_id=762057182]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door16/Sensor" unique_id=827999888]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door16/Sensor" unique_id=1445774718]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_b28jw")
 
-[node name="Door17" type="StaticBody3D" parent="Doors" unique_id=432024225]
+[node name="Door17" type="StaticBody3D" parent="Doors" unique_id=851850291]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 4.15, 4.5, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -1928,24 +1928,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door17" unique_id=1325912474]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door17" unique_id=1716884387]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_rnyin")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door17" unique_id=932571931]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door17" unique_id=1174298987]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_p0665")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door17" unique_id=894495433]
+[node name="Sensor" type="Area3D" parent="Doors/Door17" unique_id=612566612]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door17/Sensor" unique_id=127179557]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door17/Sensor" unique_id=2119670861]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_a0vil")
 
-[node name="Door18" type="StaticBody3D" parent="Doors" unique_id=820936356]
+[node name="Door18" type="StaticBody3D" parent="Doors" unique_id=659398996]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 10.150001, 4.5, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -1967,24 +1967,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door18" unique_id=1233821905]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door18" unique_id=320436674]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_6dnjd")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door18" unique_id=1216867504]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door18" unique_id=1657493664]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_bblbq")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door18" unique_id=2059767663]
+[node name="Sensor" type="Area3D" parent="Doors/Door18" unique_id=1544768591]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door18/Sensor" unique_id=1203469835]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door18/Sensor" unique_id=660882231]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_en8kh")
 
-[node name="Door19" type="StaticBody3D" parent="Doors" unique_id=1719155675]
+[node name="Door19" type="StaticBody3D" parent="Doors" unique_id=706946821]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 16.15, 4.5, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2006,24 +2006,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door19" unique_id=1856479624]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door19" unique_id=647706380]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_jm4hj")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door19" unique_id=1581235080]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door19" unique_id=1443128370]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_r7psx")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door19" unique_id=252610179]
+[node name="Sensor" type="Area3D" parent="Doors/Door19" unique_id=120228922]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door19/Sensor" unique_id=25219121]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door19/Sensor" unique_id=602587816]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_5rlbk")
 
-[node name="Door20" type="StaticBody3D" parent="Doors" unique_id=194107318]
+[node name="Door20" type="StaticBody3D" parent="Doors" unique_id=239610138]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 22.15, 4.5, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2045,24 +2045,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door20" unique_id=1280214446]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door20" unique_id=79321974]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_ywqbw")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door20" unique_id=1695766508]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door20" unique_id=462290792]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_x80vh")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door20" unique_id=1798719408]
+[node name="Sensor" type="Area3D" parent="Doors/Door20" unique_id=1216167540]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door20/Sensor" unique_id=2083521196]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door20/Sensor" unique_id=337047949]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_3fr60")
 
-[node name="Door21" type="StaticBody3D" parent="Doors" unique_id=1738869292]
+[node name="Door21" type="StaticBody3D" parent="Doors" unique_id=1360616289]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -21.6, 4.5, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2084,24 +2084,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door21" unique_id=1495785337]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door21" unique_id=1435883459]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_2bdjn")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door21" unique_id=1426360288]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door21" unique_id=920529702]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_dk07j")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door21" unique_id=1888511443]
+[node name="Sensor" type="Area3D" parent="Doors/Door21" unique_id=691095735]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door21/Sensor" unique_id=1330459865]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door21/Sensor" unique_id=395859383]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_ni37t")
 
-[node name="Door22" type="StaticBody3D" parent="Doors" unique_id=33791261]
+[node name="Door22" type="StaticBody3D" parent="Doors" unique_id=66552257]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -15.6, 4.5, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2123,24 +2123,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door22" unique_id=2115225734]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door22" unique_id=510883466]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_3s0oh")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door22" unique_id=179176870]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door22" unique_id=1403725092]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_ecyu4")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door22" unique_id=1096675676]
+[node name="Sensor" type="Area3D" parent="Doors/Door22" unique_id=1802705217]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door22/Sensor" unique_id=1306503936]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door22/Sensor" unique_id=1824897001]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_pgy5a")
 
-[node name="Door23" type="StaticBody3D" parent="Doors" unique_id=862524654]
+[node name="Door23" type="StaticBody3D" parent="Doors" unique_id=1641756446]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -9.6, 4.5, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2162,24 +2162,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door23" unique_id=894568673]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door23" unique_id=597813991]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_08eve")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door23" unique_id=764969773]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door23" unique_id=1880926348]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_sw2v3")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door23" unique_id=1361964849]
+[node name="Sensor" type="Area3D" parent="Doors/Door23" unique_id=1343816458]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door23/Sensor" unique_id=939686453]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door23/Sensor" unique_id=1555132979]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_8k6e2")
 
-[node name="Door24" type="StaticBody3D" parent="Doors" unique_id=292496035]
+[node name="Door24" type="StaticBody3D" parent="Doors" unique_id=558235689]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -3.6, 4.5, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2201,24 +2201,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door24" unique_id=362385638]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door24" unique_id=1190609920]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_4bcld")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door24" unique_id=189573136]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door24" unique_id=367324360]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_aeirb")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door24" unique_id=1665075230]
+[node name="Sensor" type="Area3D" parent="Doors/Door24" unique_id=1092690262]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door24/Sensor" unique_id=1475165563]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door24/Sensor" unique_id=782703852]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_uljxg")
 
-[node name="Door25" type="StaticBody3D" parent="Doors" unique_id=1352109168]
+[node name="Door25" type="StaticBody3D" parent="Doors" unique_id=533332366]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 2.4, 4.5, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2240,24 +2240,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door25" unique_id=2005836256]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door25" unique_id=1965227608]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_o0drc")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door25" unique_id=1708488156]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door25" unique_id=248552456]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_eubub")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door25" unique_id=930181778]
+[node name="Sensor" type="Area3D" parent="Doors/Door25" unique_id=316934933]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door25/Sensor" unique_id=63670075]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door25/Sensor" unique_id=959384788]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_f8jc1")
 
-[node name="Door26" type="StaticBody3D" parent="Doors" unique_id=1142838436]
+[node name="Door26" type="StaticBody3D" parent="Doors" unique_id=746329184]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 8.4, 4.5, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2279,24 +2279,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door26" unique_id=1127154963]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door26" unique_id=573241876]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_bx0y8")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door26" unique_id=102648515]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door26" unique_id=1296958670]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_xtwyb")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door26" unique_id=535987656]
+[node name="Sensor" type="Area3D" parent="Doors/Door26" unique_id=1090878762]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door26/Sensor" unique_id=1753416800]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door26/Sensor" unique_id=1722756352]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_y61dl")
 
-[node name="Door27" type="StaticBody3D" parent="Doors" unique_id=2007117825]
+[node name="Door27" type="StaticBody3D" parent="Doors" unique_id=833023648]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 14.4, 4.5, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2318,24 +2318,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door27" unique_id=13070296]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door27" unique_id=2052107354]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_8wp63")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door27" unique_id=1174783160]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door27" unique_id=998608961]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_dugqk")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door27" unique_id=233687849]
+[node name="Sensor" type="Area3D" parent="Doors/Door27" unique_id=2320887]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door27/Sensor" unique_id=385098240]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door27/Sensor" unique_id=1683506688]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_74ktt")
 
-[node name="Door28" type="StaticBody3D" parent="Doors" unique_id=354399790]
+[node name="Door28" type="StaticBody3D" parent="Doors" unique_id=1277723727]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 20.4, 4.5, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2357,24 +2357,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door28" unique_id=1350029794]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door28" unique_id=1234397039]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_v5plp")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door28" unique_id=567737760]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door28" unique_id=85046243]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_amagg")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door28" unique_id=962362863]
+[node name="Sensor" type="Area3D" parent="Doors/Door28" unique_id=518888036]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door28/Sensor" unique_id=1467228036]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door28/Sensor" unique_id=1722646645]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_pq3if")
 
-[node name="Door29" type="StaticBody3D" parent="Doors" unique_id=1246605179]
+[node name="Door29" type="StaticBody3D" parent="Doors" unique_id=1248798569]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17.66, 4.5, -7.5)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2396,24 +2396,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door29" unique_id=246475338]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door29" unique_id=1753935113]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_app4w")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door29" unique_id=853429077]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door29" unique_id=263361919]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 shape = SubResource("BoxShape3D_0q8uh")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door29" unique_id=378239902]
+[node name="Sensor" type="Area3D" parent="Doors/Door29" unique_id=162197301]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door29/Sensor" unique_id=18010275]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door29/Sensor" unique_id=1299920019]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 shape = SubResource("BoxShape3D_dudht")
 
-[node name="Door30" type="StaticBody3D" parent="Doors" unique_id=560227805]
+[node name="Door30" type="StaticBody3D" parent="Doors" unique_id=1504004505]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.55, 4.5, -7.5)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2435,24 +2435,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door30" unique_id=799141506]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door30" unique_id=474988524]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_nehrj")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door30" unique_id=204440052]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door30" unique_id=592281249]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_l2kit")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door30" unique_id=1752935413]
+[node name="Sensor" type="Area3D" parent="Doors/Door30" unique_id=1053795011]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door30/Sensor" unique_id=1185716215]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door30/Sensor" unique_id=726354034]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_aydp7")
 
-[node name="Door31" type="StaticBody3D" parent="Doors" unique_id=2023161980]
+[node name="Door31" type="StaticBody3D" parent="Doors" unique_id=1886377411]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 4.5, -7.5)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2474,24 +2474,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door31" unique_id=1792699254]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door31" unique_id=1806542078]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_h4i2f")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door31" unique_id=1812706804]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door31" unique_id=1797533574]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_50530")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door31" unique_id=465962279]
+[node name="Sensor" type="Area3D" parent="Doors/Door31" unique_id=541696494]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door31/Sensor" unique_id=1933589137]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door31/Sensor" unique_id=1121193489]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_o4hpx")
 
-[node name="Door32" type="StaticBody3D" parent="Doors" unique_id=890893217]
+[node name="Door32" type="StaticBody3D" parent="Doors" unique_id=1552372798]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.66, 4.5, -7.5)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2513,24 +2513,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door32" unique_id=1681848035]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door32" unique_id=21336513]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_5dbpv")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door32" unique_id=1029205709]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door32" unique_id=236971494]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 shape = SubResource("BoxShape3D_pprhr")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door32" unique_id=222436895]
+[node name="Sensor" type="Area3D" parent="Doors/Door32" unique_id=1274855388]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door32/Sensor" unique_id=640795168]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door32/Sensor" unique_id=579113397]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 shape = SubResource("BoxShape3D_mero8")
 
-[node name="Door33" type="StaticBody3D" parent="Doors" unique_id=666242924]
+[node name="Door33" type="StaticBody3D" parent="Doors" unique_id=1293454430]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -19.85, 7.7, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2552,24 +2552,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door33" unique_id=1920686377]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door33" unique_id=2120234953]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_24pay")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door33" unique_id=576451118]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door33" unique_id=306765696]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_y56pv")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door33" unique_id=1546499520]
+[node name="Sensor" type="Area3D" parent="Doors/Door33" unique_id=2024651452]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door33/Sensor" unique_id=405286679]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door33/Sensor" unique_id=1772820954]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_ynavt")
 
-[node name="Door34" type="StaticBody3D" parent="Doors" unique_id=555675135]
+[node name="Door34" type="StaticBody3D" parent="Doors" unique_id=743297347]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -13.849999, 7.7, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2591,24 +2591,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door34" unique_id=939950157]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door34" unique_id=1314055014]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_wqb8l")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door34" unique_id=873885568]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door34" unique_id=778002829]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_umhat")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door34" unique_id=978699526]
+[node name="Sensor" type="Area3D" parent="Doors/Door34" unique_id=1845846543]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door34/Sensor" unique_id=1599462359]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door34/Sensor" unique_id=57622182]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_bv0yb")
 
-[node name="Door35" type="StaticBody3D" parent="Doors" unique_id=1173106979]
+[node name="Door35" type="StaticBody3D" parent="Doors" unique_id=2124357065]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -7.85, 7.7, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2630,24 +2630,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door35" unique_id=865554768]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door35" unique_id=1885971576]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_vldxg")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door35" unique_id=1606036618]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door35" unique_id=1799268435]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_72grp")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door35" unique_id=559152549]
+[node name="Sensor" type="Area3D" parent="Doors/Door35" unique_id=284167934]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door35/Sensor" unique_id=1891680836]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door35/Sensor" unique_id=1297173788]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_deupy")
 
-[node name="Door36" type="StaticBody3D" parent="Doors" unique_id=740351859]
+[node name="Door36" type="StaticBody3D" parent="Doors" unique_id=38786861]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -1.8499999, 7.7, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2669,24 +2669,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door36" unique_id=535414818]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door36" unique_id=1112653033]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_4w4ae")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door36" unique_id=936855946]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door36" unique_id=1092773330]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_85twu")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door36" unique_id=272588298]
+[node name="Sensor" type="Area3D" parent="Doors/Door36" unique_id=1839591730]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door36/Sensor" unique_id=738060425]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door36/Sensor" unique_id=1172298575]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_h18ul")
 
-[node name="Door37" type="StaticBody3D" parent="Doors" unique_id=1650046811]
+[node name="Door37" type="StaticBody3D" parent="Doors" unique_id=640412424]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 4.15, 7.7, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2708,24 +2708,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door37" unique_id=1849881468]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door37" unique_id=914480857]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_5jtpy")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door37" unique_id=893794028]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door37" unique_id=194432719]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_rjp12")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door37" unique_id=1500977951]
+[node name="Sensor" type="Area3D" parent="Doors/Door37" unique_id=1739878201]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door37/Sensor" unique_id=67718396]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door37/Sensor" unique_id=715984828]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_3sbrx")
 
-[node name="Door38" type="StaticBody3D" parent="Doors" unique_id=327442301]
+[node name="Door38" type="StaticBody3D" parent="Doors" unique_id=1392341883]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 10.150001, 7.7, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2747,24 +2747,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door38" unique_id=1141466139]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door38" unique_id=1761087034]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_rjdwr")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door38" unique_id=1418984282]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door38" unique_id=1630361152]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_s5ad0")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door38" unique_id=1806442750]
+[node name="Sensor" type="Area3D" parent="Doors/Door38" unique_id=1628958950]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door38/Sensor" unique_id=910761724]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door38/Sensor" unique_id=763658822]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_7aycf")
 
-[node name="Door39" type="StaticBody3D" parent="Doors" unique_id=583494858]
+[node name="Door39" type="StaticBody3D" parent="Doors" unique_id=1604698374]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 16.15, 7.7, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2786,24 +2786,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door39" unique_id=1302754977]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door39" unique_id=606114749]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_bajwp")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door39" unique_id=1386881946]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door39" unique_id=1874385876]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_duafw")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door39" unique_id=363931288]
+[node name="Sensor" type="Area3D" parent="Doors/Door39" unique_id=83453391]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door39/Sensor" unique_id=2028929591]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door39/Sensor" unique_id=1178309993]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_5dw1l")
 
-[node name="Door40" type="StaticBody3D" parent="Doors" unique_id=1277715267]
+[node name="Door40" type="StaticBody3D" parent="Doors" unique_id=826197406]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 22.15, 7.7, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2825,24 +2825,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door40" unique_id=1989123980]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door40" unique_id=445088477]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_vllaf")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door40" unique_id=893889007]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door40" unique_id=482015874]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_35bgu")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door40" unique_id=371936729]
+[node name="Sensor" type="Area3D" parent="Doors/Door40" unique_id=1396820729]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door40/Sensor" unique_id=1886532069]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door40/Sensor" unique_id=50883738]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_8hjr4")
 
-[node name="Door41" type="StaticBody3D" parent="Doors" unique_id=636485773]
+[node name="Door41" type="StaticBody3D" parent="Doors" unique_id=492485329]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -21.6, 7.7, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2864,24 +2864,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door41" unique_id=1767630609]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door41" unique_id=1936577418]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_qqh1k")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door41" unique_id=1966372653]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door41" unique_id=1090758816]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_q8t2l")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door41" unique_id=791635513]
+[node name="Sensor" type="Area3D" parent="Doors/Door41" unique_id=54959684]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door41/Sensor" unique_id=1923089120]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door41/Sensor" unique_id=158525773]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_in88l")
 
-[node name="Door42" type="StaticBody3D" parent="Doors" unique_id=157256920]
+[node name="Door42" type="StaticBody3D" parent="Doors" unique_id=2137720442]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -15.6, 7.7, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2903,24 +2903,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door42" unique_id=132171939]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door42" unique_id=681478814]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_ntcea")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door42" unique_id=400138100]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door42" unique_id=1788398523]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_a7132")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door42" unique_id=426164900]
+[node name="Sensor" type="Area3D" parent="Doors/Door42" unique_id=854816435]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door42/Sensor" unique_id=1234192381]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door42/Sensor" unique_id=1766866927]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_puabk")
 
-[node name="Door43" type="StaticBody3D" parent="Doors" unique_id=1178350603]
+[node name="Door43" type="StaticBody3D" parent="Doors" unique_id=943845795]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -9.6, 7.7, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2942,24 +2942,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door43" unique_id=2100713704]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door43" unique_id=1430942364]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_dnbly")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door43" unique_id=288167504]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door43" unique_id=2066110]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_u8dxf")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door43" unique_id=1049874213]
+[node name="Sensor" type="Area3D" parent="Doors/Door43" unique_id=882946556]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door43/Sensor" unique_id=1834452304]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door43/Sensor" unique_id=847172255]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_72dal")
 
-[node name="Door44" type="StaticBody3D" parent="Doors" unique_id=85830270]
+[node name="Door44" type="StaticBody3D" parent="Doors" unique_id=1749427716]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -3.6, 7.7, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -2981,24 +2981,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door44" unique_id=2088084734]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door44" unique_id=1944362105]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_4ly88")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door44" unique_id=807889776]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door44" unique_id=1677538460]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_i3d3a")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door44" unique_id=92326716]
+[node name="Sensor" type="Area3D" parent="Doors/Door44" unique_id=1881473751]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door44/Sensor" unique_id=1588425057]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door44/Sensor" unique_id=2045352477]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_vya02")
 
-[node name="Door45" type="StaticBody3D" parent="Doors" unique_id=687920945]
+[node name="Door45" type="StaticBody3D" parent="Doors" unique_id=501039300]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 2.4, 7.7, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3020,24 +3020,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door45" unique_id=1997899765]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door45" unique_id=1786102401]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_xrqql")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door45" unique_id=1980825386]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door45" unique_id=1155251444]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_shrko")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door45" unique_id=855593847]
+[node name="Sensor" type="Area3D" parent="Doors/Door45" unique_id=319020187]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door45/Sensor" unique_id=1916102319]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door45/Sensor" unique_id=690944841]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_l8wfo")
 
-[node name="Door46" type="StaticBody3D" parent="Doors" unique_id=1567352471]
+[node name="Door46" type="StaticBody3D" parent="Doors" unique_id=880858539]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 8.4, 7.7, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3059,24 +3059,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door46" unique_id=341313003]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door46" unique_id=154562766]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_ufwpx")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door46" unique_id=1900808243]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door46" unique_id=731497948]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_f256n")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door46" unique_id=1491353564]
+[node name="Sensor" type="Area3D" parent="Doors/Door46" unique_id=101621768]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door46/Sensor" unique_id=407772681]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door46/Sensor" unique_id=642072555]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_vnqiu")
 
-[node name="Door47" type="StaticBody3D" parent="Doors" unique_id=1602552005]
+[node name="Door47" type="StaticBody3D" parent="Doors" unique_id=1955505423]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 14.4, 7.7, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3098,24 +3098,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door47" unique_id=1120890887]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door47" unique_id=1453211041]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_y50ql")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door47" unique_id=2051317385]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door47" unique_id=1026460139]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_yqvqe")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door47" unique_id=95046258]
+[node name="Sensor" type="Area3D" parent="Doors/Door47" unique_id=991528187]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door47/Sensor" unique_id=1011149331]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door47/Sensor" unique_id=609328248]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_wgf8d")
 
-[node name="Door48" type="StaticBody3D" parent="Doors" unique_id=323147470]
+[node name="Door48" type="StaticBody3D" parent="Doors" unique_id=1357343255]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 20.4, 7.7, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3137,24 +3137,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door48" unique_id=1038067761]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door48" unique_id=984081109]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_cl87j")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door48" unique_id=886795996]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door48" unique_id=1424783255]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_jyly8")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door48" unique_id=2018201332]
+[node name="Sensor" type="Area3D" parent="Doors/Door48" unique_id=2035151809]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door48/Sensor" unique_id=1172402356]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door48/Sensor" unique_id=270690409]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_5kygu")
 
-[node name="Door49" type="StaticBody3D" parent="Doors" unique_id=1901805970]
+[node name="Door49" type="StaticBody3D" parent="Doors" unique_id=634417202]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17.66, 7.7, -7.5)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3176,24 +3176,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door49" unique_id=1578403973]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door49" unique_id=848481946]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_t1mkj")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door49" unique_id=2096940635]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door49" unique_id=36604244]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 shape = SubResource("BoxShape3D_gnmsk")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door49" unique_id=393734277]
+[node name="Sensor" type="Area3D" parent="Doors/Door49" unique_id=1184613152]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door49/Sensor" unique_id=995100793]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door49/Sensor" unique_id=1947550557]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 shape = SubResource("BoxShape3D_2q4vq")
 
-[node name="Door50" type="StaticBody3D" parent="Doors" unique_id=862426434]
+[node name="Door50" type="StaticBody3D" parent="Doors" unique_id=197035811]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.55, 7.7, -7.5)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3215,24 +3215,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door50" unique_id=581496769]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door50" unique_id=418594739]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_v7q5j")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door50" unique_id=125996625]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door50" unique_id=513629302]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_su0hk")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door50" unique_id=74445115]
+[node name="Sensor" type="Area3D" parent="Doors/Door50" unique_id=1968381032]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door50/Sensor" unique_id=50326076]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door50/Sensor" unique_id=664131765]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_6vqb0")
 
-[node name="Door51" type="StaticBody3D" parent="Doors" unique_id=14417836]
+[node name="Door51" type="StaticBody3D" parent="Doors" unique_id=165610327]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 7.7, -7.5)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3254,24 +3254,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door51" unique_id=51901425]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door51" unique_id=428837181]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_xthmn")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door51" unique_id=852570928]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door51" unique_id=685146532]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_ymnch")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door51" unique_id=1290670457]
+[node name="Sensor" type="Area3D" parent="Doors/Door51" unique_id=13224186]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door51/Sensor" unique_id=2042505095]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door51/Sensor" unique_id=2073964469]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_gmeyh")
 
-[node name="Door52" type="StaticBody3D" parent="Doors" unique_id=503801037]
+[node name="Door52" type="StaticBody3D" parent="Doors" unique_id=1222974984]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.66, 7.7, -7.5)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3293,24 +3293,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door52" unique_id=295182195]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door52" unique_id=155479760]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_3lmot")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door52" unique_id=1654579472]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door52" unique_id=1606840646]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 shape = SubResource("BoxShape3D_ao41v")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door52" unique_id=1181562354]
+[node name="Sensor" type="Area3D" parent="Doors/Door52" unique_id=1403076745]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door52/Sensor" unique_id=537397357]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door52/Sensor" unique_id=1540052955]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 shape = SubResource("BoxShape3D_ssljj")
 
-[node name="Door53" type="StaticBody3D" parent="Doors" unique_id=216591358]
+[node name="Door53" type="StaticBody3D" parent="Doors" unique_id=829149044]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -19.85, 10.9, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3332,24 +3332,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door53" unique_id=520089427]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door53" unique_id=1177047224]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_2bmro")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door53" unique_id=2070865641]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door53" unique_id=1138072154]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_vo775")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door53" unique_id=1579567824]
+[node name="Sensor" type="Area3D" parent="Doors/Door53" unique_id=779745368]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door53/Sensor" unique_id=394651952]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door53/Sensor" unique_id=1125586748]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_c8b1u")
 
-[node name="Door54" type="StaticBody3D" parent="Doors" unique_id=1956023704]
+[node name="Door54" type="StaticBody3D" parent="Doors" unique_id=966612760]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -13.849999, 10.9, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3371,24 +3371,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door54" unique_id=646777626]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door54" unique_id=861781460]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_w533j")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door54" unique_id=1800539012]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door54" unique_id=1506909301]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_w0g54")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door54" unique_id=822704349]
+[node name="Sensor" type="Area3D" parent="Doors/Door54" unique_id=1684436816]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door54/Sensor" unique_id=78435234]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door54/Sensor" unique_id=320475232]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_wiqj3")
 
-[node name="Door55" type="StaticBody3D" parent="Doors" unique_id=54003141]
+[node name="Door55" type="StaticBody3D" parent="Doors" unique_id=1162683498]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -7.85, 10.9, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3410,24 +3410,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door55" unique_id=842002321]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door55" unique_id=1448951130]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_m8nmq")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door55" unique_id=2105479619]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door55" unique_id=1260401645]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_hsva2")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door55" unique_id=577173022]
+[node name="Sensor" type="Area3D" parent="Doors/Door55" unique_id=499101970]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door55/Sensor" unique_id=1373149325]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door55/Sensor" unique_id=133205129]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_t5cxu")
 
-[node name="Door56" type="StaticBody3D" parent="Doors" unique_id=1837896488]
+[node name="Door56" type="StaticBody3D" parent="Doors" unique_id=78910615]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -1.8499999, 10.9, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3449,24 +3449,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door56" unique_id=1780405101]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door56" unique_id=67087776]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_in5wd")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door56" unique_id=1384773737]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door56" unique_id=268248605]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_haxka")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door56" unique_id=1806733139]
+[node name="Sensor" type="Area3D" parent="Doors/Door56" unique_id=1493164203]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door56/Sensor" unique_id=1875266044]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door56/Sensor" unique_id=1709697412]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_rwjmi")
 
-[node name="Door57" type="StaticBody3D" parent="Doors" unique_id=1486922213]
+[node name="Door57" type="StaticBody3D" parent="Doors" unique_id=1758647927]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 4.15, 10.9, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3488,24 +3488,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door57" unique_id=2069454607]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door57" unique_id=1596282200]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_fxo3q")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door57" unique_id=1369366690]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door57" unique_id=1106073902]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_rimoi")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door57" unique_id=102251695]
+[node name="Sensor" type="Area3D" parent="Doors/Door57" unique_id=272064819]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door57/Sensor" unique_id=1841896565]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door57/Sensor" unique_id=774744953]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_wvb5f")
 
-[node name="Door58" type="StaticBody3D" parent="Doors" unique_id=911095386]
+[node name="Door58" type="StaticBody3D" parent="Doors" unique_id=1730461995]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 10.150001, 10.9, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3527,24 +3527,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door58" unique_id=2037893532]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door58" unique_id=758081123]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_lno7l")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door58" unique_id=1088446333]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door58" unique_id=1046174711]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_33kmo")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door58" unique_id=240948513]
+[node name="Sensor" type="Area3D" parent="Doors/Door58" unique_id=1182828557]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door58/Sensor" unique_id=1032197014]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door58/Sensor" unique_id=857407031]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_v6d04")
 
-[node name="Door59" type="StaticBody3D" parent="Doors" unique_id=388349902]
+[node name="Door59" type="StaticBody3D" parent="Doors" unique_id=1501677561]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 16.15, 10.9, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3566,24 +3566,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door59" unique_id=607796393]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door59" unique_id=1959928248]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_svlca")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door59" unique_id=2067541633]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door59" unique_id=924238205]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_jkcfa")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door59" unique_id=239576160]
+[node name="Sensor" type="Area3D" parent="Doors/Door59" unique_id=1877827294]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door59/Sensor" unique_id=2010171569]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door59/Sensor" unique_id=172707030]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_avqjp")
 
-[node name="Door60" type="StaticBody3D" parent="Doors" unique_id=608811271]
+[node name="Door60" type="StaticBody3D" parent="Doors" unique_id=578602265]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 22.15, 10.9, -5.7)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3605,24 +3605,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door60" unique_id=1245291707]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door60" unique_id=1494612219]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_44fbe")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door60" unique_id=2029732200]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door60" unique_id=1636638401]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_g5hyy")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door60" unique_id=1160212007]
+[node name="Sensor" type="Area3D" parent="Doors/Door60" unique_id=51257459]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door60/Sensor" unique_id=1658787352]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door60/Sensor" unique_id=296878040]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_n87ib")
 
-[node name="Door61" type="StaticBody3D" parent="Doors" unique_id=310762975]
+[node name="Door61" type="StaticBody3D" parent="Doors" unique_id=1708926335]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -21.6, 10.9, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3644,24 +3644,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door61" unique_id=1776627317]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door61" unique_id=360870151]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_11w8h")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door61" unique_id=650826777]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door61" unique_id=1682753280]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_0b3kf")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door61" unique_id=1259642634]
+[node name="Sensor" type="Area3D" parent="Doors/Door61" unique_id=279132208]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door61/Sensor" unique_id=1047196252]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door61/Sensor" unique_id=1641131486]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_2385d")
 
-[node name="Door62" type="StaticBody3D" parent="Doors" unique_id=1911035430]
+[node name="Door62" type="StaticBody3D" parent="Doors" unique_id=637874849]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -15.6, 10.9, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3683,24 +3683,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door62" unique_id=879085234]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door62" unique_id=209685490]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_dlqqf")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door62" unique_id=1675254272]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door62" unique_id=1930961917]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_a4eb5")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door62" unique_id=548729763]
+[node name="Sensor" type="Area3D" parent="Doors/Door62" unique_id=636484432]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door62/Sensor" unique_id=971842592]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door62/Sensor" unique_id=1252412560]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_yc1tl")
 
-[node name="Door63" type="StaticBody3D" parent="Doors" unique_id=106430166]
+[node name="Door63" type="StaticBody3D" parent="Doors" unique_id=1609450097]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -9.6, 10.9, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3722,24 +3722,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door63" unique_id=824249392]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door63" unique_id=1205093444]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_tax8b")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door63" unique_id=482153182]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door63" unique_id=1002981516]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_7b7xx")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door63" unique_id=316210632]
+[node name="Sensor" type="Area3D" parent="Doors/Door63" unique_id=349171248]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door63/Sensor" unique_id=974104769]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door63/Sensor" unique_id=1595199937]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_x3ymj")
 
-[node name="Door64" type="StaticBody3D" parent="Doors" unique_id=191793159]
+[node name="Door64" type="StaticBody3D" parent="Doors" unique_id=1292844726]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -3.6, 10.9, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3761,24 +3761,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door64" unique_id=280680288]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door64" unique_id=2017270286]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_yiluq")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door64" unique_id=1094310996]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door64" unique_id=1085755439]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_0xg6l")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door64" unique_id=1654110038]
+[node name="Sensor" type="Area3D" parent="Doors/Door64" unique_id=377381035]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door64/Sensor" unique_id=90989335]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door64/Sensor" unique_id=1778334412]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_coq6d")
 
-[node name="Door65" type="StaticBody3D" parent="Doors" unique_id=1562045330]
+[node name="Door65" type="StaticBody3D" parent="Doors" unique_id=1406435915]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 2.4, 10.9, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3800,24 +3800,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door65" unique_id=1236240124]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door65" unique_id=2127486990]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_ydxcr")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door65" unique_id=1151851450]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door65" unique_id=1303879713]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_nuuub")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door65" unique_id=663741925]
+[node name="Sensor" type="Area3D" parent="Doors/Door65" unique_id=1884749389]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door65/Sensor" unique_id=1571306629]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door65/Sensor" unique_id=474241809]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_8j4kr")
 
-[node name="Door66" type="StaticBody3D" parent="Doors" unique_id=1326071835]
+[node name="Door66" type="StaticBody3D" parent="Doors" unique_id=343154822]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 8.4, 10.9, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3839,24 +3839,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door66" unique_id=2146513131]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door66" unique_id=407427152]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_g6u2i")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door66" unique_id=2139372625]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door66" unique_id=29814284]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_gt561")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door66" unique_id=578142066]
+[node name="Sensor" type="Area3D" parent="Doors/Door66" unique_id=1792177613]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door66/Sensor" unique_id=1283220500]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door66/Sensor" unique_id=1896702818]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_s1pee")
 
-[node name="Door67" type="StaticBody3D" parent="Doors" unique_id=1398488159]
+[node name="Door67" type="StaticBody3D" parent="Doors" unique_id=620131981]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 14.4, 10.9, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3878,24 +3878,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door67" unique_id=1631936204]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door67" unique_id=1127770744]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_4lk64")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door67" unique_id=1580471459]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door67" unique_id=1580916841]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_dhqvu")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door67" unique_id=1198225925]
+[node name="Sensor" type="Area3D" parent="Doors/Door67" unique_id=1926799562]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door67/Sensor" unique_id=1536569742]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door67/Sensor" unique_id=1199387851]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_83sv4")
 
-[node name="Door68" type="StaticBody3D" parent="Doors" unique_id=1602919484]
+[node name="Door68" type="StaticBody3D" parent="Doors" unique_id=1977213122]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 20.4, 10.9, -4.85)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3917,24 +3917,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door68" unique_id=127895205]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door68" unique_id=640772372]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_s0oon")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door68" unique_id=1848741168]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door68" unique_id=2077424827]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_56u7g")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door68" unique_id=1516545777]
+[node name="Sensor" type="Area3D" parent="Doors/Door68" unique_id=394766908]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door68/Sensor" unique_id=1679468595]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door68/Sensor" unique_id=695034178]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.05, 0)
 shape = SubResource("BoxShape3D_mywhn")
 
-[node name="Door69" type="StaticBody3D" parent="Doors" unique_id=1255298098]
+[node name="Door69" type="StaticBody3D" parent="Doors" unique_id=1850942310]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17.66, 10.9, -7.5)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3956,24 +3956,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door69" unique_id=1378222090]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door69" unique_id=1056820057]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_bbyh7")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door69" unique_id=230140400]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door69" unique_id=456204082]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 shape = SubResource("BoxShape3D_xiauj")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door69" unique_id=1023299335]
+[node name="Sensor" type="Area3D" parent="Doors/Door69" unique_id=413556959]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door69/Sensor" unique_id=563312702]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door69/Sensor" unique_id=1715805865]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 shape = SubResource("BoxShape3D_yxdkx")
 
-[node name="Door70" type="StaticBody3D" parent="Doors" unique_id=1295238469]
+[node name="Door70" type="StaticBody3D" parent="Doors" unique_id=1004691718]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.55, 10.9, -7.5)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -3995,24 +3995,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door70" unique_id=1829687034]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door70" unique_id=1297902295]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_xn3kg")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door70" unique_id=845405014]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door70" unique_id=1047480793]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_gr60x")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door70" unique_id=842503074]
+[node name="Sensor" type="Area3D" parent="Doors/Door70" unique_id=1762730248]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door70/Sensor" unique_id=574537984]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door70/Sensor" unique_id=1615869489]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_lukmx")
 
-[node name="Door71" type="StaticBody3D" parent="Doors" unique_id=714020039]
+[node name="Door71" type="StaticBody3D" parent="Doors" unique_id=1479317796]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.15, 10.9, -7.5)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -4034,24 +4034,24 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door71" unique_id=1962315132]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door71" unique_id=1351935272]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_jjnpf")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door71" unique_id=1741198611]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door71" unique_id=180764409]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_yluvj")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door71" unique_id=1693478215]
+[node name="Sensor" type="Area3D" parent="Doors/Door71" unique_id=1063188638]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door71/Sensor" unique_id=694705833]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door71/Sensor" unique_id=636547668]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
 shape = SubResource("BoxShape3D_hpv3b")
 
-[node name="Door72" type="StaticBody3D" parent="Doors" unique_id=559634406]
+[node name="Door72" type="StaticBody3D" parent="Doors" unique_id=1664270053]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.66, 10.9, -7.5)
 collision_mask = 0
 script = ExtResource("7_265i6")
@@ -4073,63 +4073,63 @@ spawn_debris = true
 break_min_damage = 0.0
 surface_type = "DEFAULT"
 
-[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door72" unique_id=1708422999]
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door72" unique_id=2058274095]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 material_override = ExtResource("10_5t0fk")
 mesh = SubResource("BoxMesh_gvbop")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door72" unique_id=704634602]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door72" unique_id=398770946]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 shape = SubResource("BoxShape3D_qrkiy")
 
-[node name="Sensor" type="Area3D" parent="Doors/Door72" unique_id=1446882850]
+[node name="Sensor" type="Area3D" parent="Doors/Door72" unique_id=927585290]
 collision_layer = 0
 collision_mask = 2
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door72/Sensor" unique_id=2008864356]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door72/Sensor" unique_id=1814036899]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
 shape = SubResource("BoxShape3D_kp0wj")
 
-[node name="Door_exit_0" type="Marker3D" parent="." unique_id=798155741]
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=550180200]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -14.5, 0, 3.4)
 
-[node name="Door_exit_1" type="Marker3D" parent="." unique_id=867800290]
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=861836994]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 3.4)
 
-[node name="Door_exit_2" type="Marker3D" parent="." unique_id=1636382761]
+[node name="Door_exit_2" type="Marker3D" parent="." unique_id=2026183687]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -10, 0, 3.4)
 
-[node name="Door_exit_3" type="Marker3D" parent="." unique_id=1140060127]
+[node name="Door_exit_3" type="Marker3D" parent="." unique_id=1056397927]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, -12.4)
 
-[node name="Markers" type="Node3D" parent="." unique_id=728712944]
+[node name="Markers" type="Node3D" parent="." unique_id=1665597526]
 
-[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=94850625 groups=["mission_marker"]]
+[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=894424373 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 10.9, -0.1)
 metadata/note = "the top-floor room (a target / a witness)"
 metadata/kind = "objective"
 
-[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=429419352 groups=["mission_marker"]]
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1795165467 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0, 15.5)
 metadata/team = "guest"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=891016298 groups=["mission_marker"]]
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=1325996784 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -2.5, 0, 1.4)
 metadata/team = "staff"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=443287680 groups=["mission_marker"]]
+[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=386532668 groups=["mission_marker"]]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -6, 4.5, -6.6)
 metadata/team = "guest"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_04" type="Marker3D" parent="Markers" unique_id=1860918055 groups=["mission_marker"]]
+[node name="MARK_spawn_04" type="Marker3D" parent="Markers" unique_id=1179250920 groups=["mission_marker"]]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -6, 7.7, -6.6)
 metadata/team = "guest"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_05" type="Marker3D" parent="Markers" unique_id=250317743 groups=["mission_marker"]]
+[node name="MARK_spawn_05" type="Marker3D" parent="Markers" unique_id=1166445980 groups=["mission_marker"]]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -6, 10.9, -6.6)
 metadata/team = "guest"
 metadata/kind = "spawn"

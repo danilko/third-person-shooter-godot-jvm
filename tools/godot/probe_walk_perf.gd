@@ -86,6 +86,7 @@ func _leg(label: String, path: Array, speed: float) -> void:
 		return
 	_place(path[0], path[1] - path[0])
 	await _settle(12.0)             # streaming + the crowd around the start
+	var under0 := under_terrain
 	var ft := []
 	var ph := []
 	var ticks := []
@@ -170,6 +171,8 @@ func _leg(label: String, path: Array, speed: float) -> void:
 			doors += 1
 			ticking += 1 if dn.call("ticking_now") else 0
 	print("    census at leg end: %s, light peds %d, doors %d (%d ticking)" % [str(census), light, doors, ticking])
+	if under_terrain > under0:
+		print("    UNDER the terrain on %d frames of this leg" % (under_terrain - under0))
 	var slow := 0
 	for v in ft:
 		if v > 33.3:
@@ -248,13 +251,14 @@ func _initialize() -> void:
 	var g := 0.75 + 0.9     # standing on a footway / lot (world y of the plain is 0.6 + kerb)
 	# walk the downtown grid (the E-W street through the station quarter), walking pace
 	await _leg("walk_downtown", [Vector3(80, g, -100), Vector3(1150, g, -100)], 6.0)
-	# the busy station: up to Tokyo Station's front, into the concourse, along it and out
-	await _leg("walk_station", [Vector3(592, g, -60), Vector3(592, g, -135), Vector3(592, g, -155),
-			Vector3(470, g, -155), Vector3(470, g, -110)], 3.0)
-	# into a downtown konbini (a shop with an interior and a door)
-	await _leg("enter_konbini", [Vector3(600, g, -361.2), Vector3(559.7, g, -361.2), Vector3(553.9, g, -361.2),
-			Vector3(550.0, g, -358.0)], 2.0)
-	# round Tokyo Tower's park
+	# the busy station: along Central's forecourt (the bus terminal), into the elevated hub's F1 hall and along it
+	# (Central Station is at (782, -215); the forecourt reserve's centre at (787.5, -149.5))
+	await _leg("walk_station", [Vector3(700, g, -125), Vector3(870, g, -125), Vector3(787, g, -150),
+			Vector3(787, g, -205), Vector3(720, g, -205)], 3.0)
+	# into a downtown konbini (KonbiniS at (569.1, -322.0), its door facing +X at (579.0, -322.0))
+	await _leg("enter_konbini", [Vector3(605, g, -322.0), Vector3(579.5, g, -322.0), Vector3(575.0, g, -322.0),
+			Vector3(570.0, g, -320.0)], 2.0)
+	# round the Broadcast Centre (the site at (680, -365) that replaced Tokyo Tower)
 	await _leg("walk_tower", [Vector3(620, g, -300), Vector3(740, g, -300), Vector3(740, g, -430),
 			Vector3(620, g, -430)], 5.0)
 	# a drive through downtown on the trunk grid, then on C1 (elevated)
