@@ -10996,6 +10996,17 @@ PLAN.md steps (b), (d), (e) and R-1 / R-9 / R-10, plus a user ask.
   VEHICLE layer) -- a car that entered behind a queue was left on the tracks (R-1). A completed stop is remembered
   per lane + crossing, so one 踏切 never stops a car twice. `racing` skips it; a police pursuit flag does not exist
   yet. `crossing_stops` (`@Visible`) is the control. Waiting there counts as waiting for a signal (no stall reclaim).
+  **One hold line per 踏切** (PLAN.md 0.16, 2026-10-06): `TrainSystem.stopDistance` holds a car before the FIRST track
+  of a crossing group for a closure on ANY of its tracks (`groupStart`). With a line per track, a car crept up to the
+  far track's line, 4 m past the real one, which put it more than `COMMITTED` past the near track's line: it then
+  ignored the near track and drove onto it in front of the second train once the far one had passed (1 island traffic
+  run in 10 lost a car). And a car past the hold line is held while it can still stop short of the train
+  (`LX_DANGER` 2.5 m from the first track at `LX_BRAKE` 6 m/s^2), not released at 3 m past the line: logged, cars crept
+  3-4 m on a closed crossing and were let go 6 m short of the rails. `group_hold` (`@Visible`) is the control for both;
+  `probe_lx_stop.gd` cases 3 (only the far track force-closed, `TrainSystem.force_crossing_closed_now`) and 4 (a car
+  standing 4 m past a closed line) fail with it off. Why cars creep on a held line is not known. A vehicle a train hits is logged with the car's
+  crossing state (`VehicleAIController.describeBlock`'s `lx[...]`). `probe_lx_lead.gd [-- --world=island]` reports how
+  long each crossing has been closed when a train reaches it.
   Gate `tools/godot/probe_lx_stop.gd` (DebugWorld, `TrainSystem.crossings_forced_open` so the rule is measured alone;
   `-- --control`).
 - **The 踏切 warning unit is a breakable pole** (user: hit away like a street pole, arcade): `furniture.json`

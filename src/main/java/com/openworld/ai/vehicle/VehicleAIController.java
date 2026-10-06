@@ -325,7 +325,12 @@ public class VehicleAIController extends Controller {
         double d = ts == null ? -1.0 : ts.stopDistance(lane, routeProgress, route.total(), currentSpeed());
         // a LEVEL CROSSING (踏切) closed for a train is a red light at its hold line (world.TrainSystem)
         com.openworld.world.TrainSystem trains = com.openworld.world.TrainSystem.get();
-        double dx = trains == null ? -1.0 : trains.stopDistance(lane, routeProgress);
+        double dx = trains == null ? -1.0 : trains.stopDistance(lane, routeProgress, currentSpeed());
+        if (trains != null && (dx >= 0.0) != lxHeldByTrain) {
+            lxHeldByTrain = dx >= 0.0;
+            lxNote(String.format("%s@%.1f v%.1f %s", lxHeldByTrain ? "HOLD" : "GO", routeProgress, currentSpeed(),
+                    trains.crossingStateFor(lane)));
+        }
         if (dx >= 0.0 && (d < 0.0 || dx < d)) d = dx;
         // ...and an OPEN one is still a stop: 一時停止 (Road Traffic Act art. 33) -- stop at the hold line, wait
         // LX_STOP_SECONDS, and enter only once the far side has room for this car (PLAN.md R-1 / decision 1)
@@ -353,6 +358,11 @@ public class VehicleAIController extends Controller {
     private long lxStoppedSinceMs = -1;
     private int lxStops;
 
+    /** The last few 踏切 decisions, for the train-hit report (PLAN.md 0.16). */
+    private boolean lxHeldByTrain;
+    private final java.util.ArrayDeque<String> lxLog = new java.util.ArrayDeque<>();
+    private void lxNote(String s) { if (lxLog.size() >= 10) lxLog.removeFirst(); lxLog.addLast(s); }
+
     /** Probe readout: how many 踏切 stops this car has completed. */
     @Register
     public int crossingStopsNow() { return lxStops; }
@@ -377,6 +387,8 @@ public class VehicleAIController extends Controller {
         }
         boolean waited = lxStoppedSinceMs >= 0 && now - lxStoppedSinceMs >= LX_STOP_SECONDS * 1000.0;
         if (waited && !farSideQueued(nx[1])) {
+            lxNote(String.format("t%.1f done %s@%.1f far %.1f closed=%s", now / 1000.0, lane, routeProgress, nx[1],
+                    trains.stopDistance(lane, routeProgress) >= 0.0));
             lxDoneLane = lane;
             lxDoneS = nx[1] - com.openworld.world.TrainSystem.HOLD_BACK;
             lxStoppedSinceMs = -1;
@@ -545,6 +557,14 @@ public class VehicleAIController extends Controller {
             break;
         }
         b.append(" pos=").append(vehicleBody == null ? "?" : vehicleBody.getGlobalPosition().toString());
+        com.openworld.world.TrainSystem trains = com.openworld.world.TrainSystem.get();
+        if (trains != null && route instanceof Node rn2) {
+            String ln = rn2.getName().toString();
+            double[] nx = trains.nextCrossing(ln, routeProgress, Double.NEGATIVE_INFINITY);
+            b.append(String.format(" lx[next=%s stopDist=%.1f stoppedSince=%d done=%s@%.1f log=%s]",
+                    nx == null ? "none" : String.format("%.1f/%.1f", nx[0], nx[1]),
+                    trains.stopDistance(ln, routeProgress), lxStoppedSinceMs, lxDoneLane, lxDoneS, lxLog));
+        }
         return b.toString();
     }
 

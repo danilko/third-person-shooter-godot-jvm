@@ -5,16 +5,20 @@ extends SceneTree
 ##   1. an open crossing: the car stands at the hold line for >= 1 s, then drives over it;
 ##   2. a car standing just past the crossing: the car holds at the line and never enters (it would be left on the
 ##      tracks behind it);
-##   ...and `-- --control` (`crossing_stops` off) fails both: it rolls over without stopping, and it drives onto the
+##   3. only the FAR track of a double-track 踏切 closed: the car holds at the 踏切's FIRST hold line, not 4 m past it
+##      at the far track's own (PLAN.md 0.16: from there it counted as committed to the near track and drove onto it);
+##   4. a car that has crept 4 m past the hold line of a CLOSED 踏切 stays there (it can still stop short of the train;
+##      "3 m past the line is committed" released it onto the rails, PLAN.md 0.16);
+##   ...and `-- --control` (`crossing_stops` off, and TrainSystem `group_hold` off) fails all four: it rolls over without stopping, and it drives onto the
 ##   crossing behind the standing car.
 ##
 ##   stdbuf -oL godot --headless --fixed-fps 60 --path . --script tools/godot/probe_lx_stop.gd [-- --control]
 
 const WORLD := "res://src/main/resources/com/openworld/world/DebugWorld.tscn"
-const VEHICLE := "res://src/main/resources/com/openworld/vehicle/SPC1.tscn"
+var VEHICLE := "res://src/main/resources/com/openworld/vehicle/SPC1.tscn"
 const CTRL := "res://src/main/java/com/openworld/debug/LaneDriveProbeController.java"
 const HOLD_BACK := 9.0       # world.TrainSystem.HOLD_BACK
-const SPEED := 12.0
+var SPEED := 12.0
 
 var world: Node
 var trains: Node
@@ -60,7 +64,7 @@ func _car(path: Path3D, s: float, lane_name: String, brain_on: bool) -> RigidBod
 
 ## Drive from `s0` for `secs`; returns {stop_s (longest stand within 3 m of the hold line), max_s, min_v_near}.
 func _drive(path: Path3D, car: RigidBody3D, hold: float, secs: float) -> Dictionary:
-	var r := {"stand": 0.0, "max_s": -1.0, "min_v_near": 99.0}
+	var r := {"stand": 0.0, "max_s": -1.0, "min_v_near": 99.0, "stop_nose": -1.0}
 	var stand := 0.0
 	for i in int(secs * 60):
 		await physics_frame
@@ -74,6 +78,8 @@ func _drive(path: Path3D, car: RigidBody3D, hold: float, secs: float) -> Diction
 		if s < hold:
 			r["min_v_near"] = minf(r["min_v_near"], v) if s > hold - 15.0 else r["min_v_near"]
 			stand = stand + 1.0 / 60.0 if v < 0.5 else 0.0
+			if v < 0.5 and r["stop_nose"] < 0.0 and s > hold - 15.0:
+				r["stop_nose"] = s + 2.3
 			r["stand"] = maxf(r["stand"], stand)
 		var brn = car.get_node_or_null("Brain")
 		r["stops"] = int(brn.call("crossing_stops_now")) if brn else 0
@@ -82,6 +88,9 @@ func _drive(path: Path3D, car: RigidBody3D, hold: float, secs: float) -> Diction
 func _initialize() -> void:
 	control = "--control" in OS.get_cmdline_user_args()
 	verbose = "--verbose" in OS.get_cmdline_user_args()
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--car="): VEHICLE = "res://src/main/resources/com/openworld/vehicle/%s.tscn" % a.substr(6)
+		elif a.begins_with("--speed="): SPEED = float(a.substr(8))
 	world = (load(WORLD) as PackedScene).instantiate()
 	root.add_child(world)
 	current_scene = world
@@ -90,6 +99,8 @@ func _initialize() -> void:
 	if trains == null:
 		print("RESULT: FAIL (no TrainSystem)"); quit(2); return
 	trains.set("crossings_forced_open", true)
+	if control:
+		trains.set("group_hold", false)
 	var pick := []
 	for i in 60 * 30:
 		await physics_frame
@@ -105,16 +116,23 @@ func _initialize() -> void:
 			break
 	if pick.is_empty():
 		print("RESULT: FAIL (no streamed lane with a crossing 80 m in)"); quit(2); return
+	for row in str(trains.call("crossing_lanes_now")).split(";", false):
+		if row.begins_with(pick[1] + "|"): print("probe: crossing row ", row)
 	var path: Path3D = pick[0].get_node("Path3D")
 	var xs: float = pick[2]
+	# the 踏切's FIRST track on this lane (a double track lists both; its hold line is the group's)
+	for row in str(trains.call("crossing_lanes_now")).split(";", false):
+		var kv := row.split("|")
+		if kv[0] == pick[1] and float(kv[1]) < xs and float(kv[1]) >= xs - 25.0:
+			xs = float(kv[1])
 	var hold: float = xs - HOLD_BACK
 	print("probe: lane %s, crossing at %.1f m, hold line %.1f m%s" % [pick[1], xs, hold, "  (CONTROL)" if control else ""])
 
 	# --- 1. an open crossing: stop, wait, cross
 	var car := _car(path, hold - 55.0, pick[1], true)
 	var a := await _drive(path, car, hold, 16.0)
-	print("probe: open crossing -> stood %.2f s at the line, min speed there %.2f, reached %.1f m (crossing %.1f)"
-			% [a["stand"], a["min_v_near"], a["max_s"], xs])
+	print("probe: open crossing -> stood %.2f s at the line, min speed there %.2f, reached %.1f m (crossing %.1f), nose stopped %+.2f m past the hold line"
+			% [a["stand"], a["min_v_near"], a["max_s"], xs, a["stop_nose"] - hold])
 	_check(a["stand"] >= 0.9 and a["stand"] < 3.0 and a["stops"] == 1,
 			"the car stands at the hold line for 1 s (一時停止): %.2f s, %d stop(s)" % [a["stand"], a["stops"]])
 	_check(a["max_s"] > xs + 12.0, "... and then drives over the crossing")
@@ -131,6 +149,35 @@ func _initialize() -> void:
 	_check(b["max_s"] + 2.3 < hold + 1.0, "with a car standing past it, the car does not enter the crossing")
 	car.queue_free()
 	blocker.queue_free()
+
+	# --- 3. a double track, only the FAR track closed: hold at the 踏切's first line
+	var far := -1.0
+	for row in str(trains.call("crossing_lanes_now")).split(";", false):
+		var kv := row.split("|")
+		if kv[0] == pick[1] and float(kv[1]) > xs + 0.5 and float(kv[1]) <= xs + 25.0:
+			far = maxf(far, float(kv[1]))
+	if far < 0.0:
+		_check(false, "the picked lane crosses a second track within 25 m (needed for case 3)")
+	else:
+		trains.call("force_crossing_closed_now", pick[1], far, true)
+		car = _car(path, hold - 55.0, pick[1], true)
+		var c := await _drive(path, car, hold, 10.0)
+		print("probe: far track closed (%.1f m) -> nose reached %.1f m (first hold line %.1f, near track %.1f)"
+				% [far, c["max_s"] + 2.3, hold, xs])
+		_check(c["max_s"] + 2.3 < hold + 1.0, "with only the far track closed, the car holds at the first hold line")
+		trains.call("force_crossing_closed_now", pick[1], far, false)
+		car.queue_free()
+
+	# --- 4. standing 4 m past the hold line of a closed crossing: stay
+	trains.call("force_crossing_closed_now", pick[1], xs, true)
+	car = _car(path, hold + 4.0 - 2.3, pick[1], true)
+	car.linear_velocity = Vector3.ZERO
+	var e := await _drive(path, car, hold + 50.0, 6.0)
+	print("probe: closed, standing 4 m past the line -> nose reached %.1f m (line %.1f, first track %.1f)"
+			% [e["max_s"] + 2.3, hold, xs])
+	_check(e["max_s"] + 2.3 < xs - 2.5, "a car 4 m past the line of a closed crossing stops short of the train")
+	trains.call("force_crossing_closed_now", pick[1], xs, false)
+	car.queue_free()
 
 	print("RESULT: %s (%d of %d checks failed)" % ["PASS" if fails == 0 else "FAIL", fails, checks])
 	quit(1 if fails else 0)

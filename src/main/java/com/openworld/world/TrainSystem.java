@@ -635,7 +635,24 @@ public class TrainSystem extends Node3D {
     /** Share of the disagreement taken out per second (0.2: a 0.1 s error is gone in ~10 s, at 2% of a step). */
     static final double CLOCK_EASE = 0.2;
 
+    /** One hold line per 踏切, and a car past it held while it can still stop short of the train (off: a line per
+     *  track and "3 m past the line is committed", the control for PLAN.md 0.16). */
+    @Visible public boolean groupHold = true;
+    private final java.util.Set<Crossing> forcedClosed = new java.util.HashSet<>();
+
+    /** Probe: hold the crossing of road lane {@code lane} nearest lane position {@code laneS} closed (or release it). */
+    @Register
+    public boolean forceCrossingClosedNow(String lane, double laneS, boolean on) {
+        Crossing best = null;
+        for (Crossing c : byLane.getOrDefault(lane, List.of()))
+            if (best == null || Math.abs(c.laneS - laneS) < Math.abs(best.laneS - laneS)) best = c;
+        if (best == null) return false;
+        if (on) forcedClosed.add(best); else forcedClosed.remove(best);
+        return true;
+    }
+
     private boolean closed(Crossing c, double t) {
+        if (enabled && forcedClosed.contains(c)) return true;
         if (!enabled || crossingsForcedOpen) return false;
         for (TrainSet set : sets) {
             int ti = set.trackIndex(c.track);
@@ -649,17 +666,58 @@ public class TrainSystem extends Node3D {
      * How far (m) a car on road lane {@code laneId}, {@code progress} m along it, must stop within (its NOSE at the
      * crossing's hold line), or -1 when it may go: no crossing ahead on this lane, or the crossing is open.
      */
-    public double stopDistance(String laneId, double progress) {
+    public double stopDistance(String laneId, double progress) { return stopDistance(laneId, progress, 0.0); }
+
+    /**
+     * As above for a car moving at {@code speed} m/s. A car past the hold line still stops (distance 0) while it can stop
+     * before the train's envelope, {@link #LX_DANGER} from the 踏切's first track at {@link #LX_BRAKE}: only a car that
+     * can no longer is let through. "3 m past the line" was the old test, and a car that crept 3 m on a closed crossing
+     * was released 6 m short of the rails into the next train (PLAN.md 0.16).
+     */
+    public double stopDistance(String laneId, double progress, double speed) {
         if (!enabled) return -1.0;
         List<Crossing> cs = byLane.get(laneId);
         if (cs == null) return -1.0;
-        double t = now(), best = -1.0;
+        double t = now(), best = -1.0, nose = progress + NOSE;
         for (Crossing c : cs) {
-            double d = c.laneS - HOLD_BACK - progress - NOSE;
-            if (d < -COMMITTED || !closed(c, t)) continue;
-            if (best < 0 || d < best) best = Math.max(0.0, d);
+            // ONE hold line per 踏切: a closed track holds the car before the FIRST track of its group. A line per
+            // track let a car creep up to the far track's line, 4 m past the real one (PLAN.md 0.16).
+            double first = groupHold ? groupStart(cs, c.laneS) : c.laneS;
+            if (first + CROSSING_GROUP < nose || !closed(c, t)) continue;   // well past it: not this car's business
+            double room = first - LX_DANGER - nose;
+            boolean committed = groupHold ? speed * speed / (2.0 * LX_BRAKE) > room
+                    : first - HOLD_BACK - nose < -COMMITTED;
+            if (committed) continue;
+            double d = Math.max(0.0, first - HOLD_BACK - nose);
+            if (best < 0 || d < best) best = d;
         }
         return best;
+    }
+
+    /** m from a 踏切's first track inside which a car is in the train's way (the EMU1's 1.49 m half width and 1 m),
+     *  and the m/s^2 a car can stop at, which together decide whether a car past the hold line can still stop. */
+    public static final double LX_DANGER = 2.5, LX_BRAKE = 6.0;
+
+    /** The lane position of the first crossing of the 踏切 {@code laneS} belongs to (crossings chained within
+     *  {@link #CROSSING_GROUP} of each other are one). */
+    private static double groupStart(List<Crossing> cs, double laneS) {
+        double first = laneS;
+        for (boolean moved = true; moved; ) {
+            moved = false;
+            for (Crossing o : cs) {
+                if (o.laneS < first && o.laneS >= first - CROSSING_GROUP) { first = o.laneS; moved = true; }
+            }
+        }
+        return first;
+    }
+
+    /** Diagnostics (PLAN.md 0.16): the train clock and each crossing of {@code laneId} as "laneS:closed". */
+    public String crossingStateFor(String laneId) {
+        StringBuilder b = new StringBuilder(String.format("clock %.2f", now()));
+        double t = now();
+        for (Crossing c : byLane.getOrDefault(laneId, List.of()))
+            b.append(String.format(" %.1f:%s", c.laneS, closed(c, t) ? "closed" : "open"));
+        return b.toString();
     }
 
     /** Crossings of one lane closer than this along it are ONE 踏切 (a double track is two `Crossing`s 4 m apart). */
@@ -1622,6 +1680,40 @@ public class TrainSystem extends Node3D {
             if (idx >= 0) { si = k; ti = idx; }
         }
         for (double v : new double[]{si, c.s, c.pos.getX(), c.pos.getY(), c.pos.getZ(), ti}) out.append(v);
+        return out;
+    }
+
+    /**
+     * Probe (PLAN.md 0.16): over {@code [t0, t1)} in steps of {@code dt}, the SHORTEST time crossing {@code i} had been
+     * closed when a train's front reached the road ({@code [lead s, at time t]}; lead 0 = arrived at an open crossing,
+     * NaN = no train reached it in the window). A 踏切 must warn long before a car can no longer clear it.
+     */
+    @Register
+    public godot.core.PackedFloat64Array crossingLeadNow(int i, double t0, double t1, double dt) {
+        godot.core.PackedFloat64Array out = new godot.core.PackedFloat64Array();
+        if (i < 0 || i >= crossings.size() || dt <= 0) return out;
+        Crossing c = crossings.get(i);
+        double closedSince = Double.NaN, best = Double.NaN, bestAt = Double.NaN;
+        boolean wasIn = false;
+        for (double t = t0; t < t1; t += dt) {
+            boolean cl = closed(c, t);
+            if (!cl) closedSince = Double.NaN;
+            else if (Double.isNaN(closedSince)) closedSince = t;
+            boolean in = false;
+            for (TrainSet set : sets) {
+                int ti = set.trackIndex(c.track);
+                if (ti < 0 || set.outOfService(t)) continue;
+                TrainTimetable.State st = set.tt.at(t + set.phase);
+                if (st.track() == ti && Math.abs(c.s - st.s()) <= SET_L / 2.0) in = true;
+            }
+            if (in && !wasIn) {
+                double lead = cl ? t - closedSince : 0.0;
+                if (Double.isNaN(best) || lead < best) { best = lead; bestAt = t; }
+            }
+            wasIn = in;
+        }
+        out.append(best);
+        out.append(bestAt);
         return out;
     }
 
