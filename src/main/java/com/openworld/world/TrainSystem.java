@@ -1317,6 +1317,12 @@ public class TrainSystem extends Node3D {
         if (speed >= HIT_SPEED && authority() && rb.getNodeOrNull("Health") instanceof com.openworld.character.Health h
                 && !h.isDead()) {
             h.takeDamage(rb, (float) (speed * 30.0), "Train", null, "Train", "", rb.getGlobalPosition());
+            // A train hitting a car is never meant to happen to traffic (the cars hold at a closed crossing), so when it
+            // does, say what the car was doing (PLAN.md 0.13: one ambient car in five runs was destroyed on a 踏切).
+            String why = rb instanceof com.openworld.carrier.vehicle.Vehicle v
+                    && v.getController() instanceof com.openworld.ai.vehicle.VehicleAIController ai ? ai.describeBlock() : "";
+            GD.print(String.format("TrainSystem: train at %.1f m/s hit %s at %s v=%.1f m/s %s", speed, rb.getName(),
+                    rb.getGlobalPosition(), rb.getLinearVelocity().length(), why));
         }
     }
 

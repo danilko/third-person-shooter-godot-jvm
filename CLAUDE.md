@@ -958,7 +958,9 @@ prefix-collects plain lanes (never turn connectors) whose entry is within `unloa
 only those a car can drive at least `unloadRadius` from (`util.LaneReach`, over the same
 `LaneGraph.successorsOf` the AI follows — name order put cars on lanes with no successor).
 `spawnTrafficCar` is the ONE placement owner (zone load and top-up alike): a per-zone rotating
-cursor over those lanes, a slot with nothing within `TRAFFIC_SPAWN_CLEARANCE` (10 m, the obstacle
+cursor over those lanes, the car set down ON ITS WHEELS and pitched along the lane (`Vehicle.groundClearanceAtRest`;
+with its origin on the road surface the hull started buried and was ejected -- backwards on the touge's 10 % grade,
+a 35 m roll to a `stalled` reclaim in 3 of 5 island runs), a slot with nothing within `TRAFFIC_SPAWN_CLEARANCE` (10 m, the obstacle
 ray's reach), the car **faced along its lane**, and no spawn at all while a named route matches no
 lane yet. See "Ambient spawn placement" under Terrain3D below.
 **All lane lookups are registry reads, never scene-tree walks:** `VehicleRoute._ready/_exitTree`
@@ -6983,6 +6985,10 @@ rule (3-letter type code + series). DebugWorld parks all three behind `VehicleRo
   - The parking lock froze an unoccupied car MID-SETTLE (velocity zeroed below 0.5 m/s while the overdamped
     suspension was still easing down): set down 0.3 m high it hovered 0.32 m. `Vehicle.suspensionSettled()` (no
     spring faster than 0.01 m/s) now gates both the lock and parking into sleep.
+- **A hard landing does not bottom the car** (`tools/godot/probe_hard_landing.gd [-- --car=<ID>] [--control]`, PLAN.md
+  0.14): level drops up to 3 m (7.7 m/s) stop ABOVE rest height on the overdamped suspension, bump stop or not;
+  nose-down at speed the bumper scrapes (a cab-over truck from 10 deg), with 0 damage and a bounce under 3 m/s on
+  SPC1 KEC1 CRT1 KET1 TAX1. A parked car re-sleeps below its park threshold, so the probe drops it at 1 m/s.
 - **The wheel-sensor review** (`tools/godot/bench_wheel_sensor.gd` behaviour, `.sh` cost: one mode per fresh process,
   median of 5 — in one process the step time climbed round over round, 2.7 → 11 ms, so single-process numbers are
   noise). `VehicleConfig.wheelSensor`: 0 rays (shipped), 1 sphere, 2 tyre cylinder. Measured on SPC1:
