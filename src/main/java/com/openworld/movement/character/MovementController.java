@@ -172,6 +172,17 @@ public class MovementController extends Node {
     return bodyCharacter;
   }
 
+  /**
+   * Forget the body's motion: the vertical speed lives here, not on the body, so a teleport that only zeroes
+   * the body's velocity still lands it at the old fall speed -- and takes fall damage for it. Call this after
+   * moving a body by hand (a rescue, a respawn, a probe's snap).
+   */
+  @Register
+  public void clearMotion() {
+    velocity = new Vector3();
+    if (player != null) player.setVelocity(new Vector3());
+  }
+
   private double jumpGravity = fallGravity;
   private Vector3 direction = new Vector3();
   private Vector3 velocity = new Vector3();

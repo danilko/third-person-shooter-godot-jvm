@@ -362,7 +362,13 @@ public class WorldBounds extends Node3D {
 
     private static void cancelAll(Node3D body) {
         Vector3 zero = Vector3.Companion.getZERO();
-        if (body instanceof CharacterBody3D cb) cb.setVelocity(zero);
+        if (body instanceof CharacterBody3D cb) {
+            cb.setVelocity(zero);
+            // A Character's fall speed is MovementController's own field: zeroing the body alone landed a
+            // rescued body at the speed it fell at, with fall damage.
+            if (cb.getNodeOrNull("MovementController")
+                    instanceof com.openworld.movement.character.MovementController mc) mc.clearMotion();
+        }
         else if (body instanceof RigidBody3D rb) { rb.setLinearVelocity(zero); rb.setAngularVelocity(zero); }
     }
 

@@ -158,7 +158,7 @@ public class NetMeleeTestHost extends Node3D {
             if (wc.getWeaponItem(i) instanceof KnifeItem k) { knife = k; knifeSlot = i; }
         }
         if (knife == null) {
-            if (me.getGlobalPosition().distanceTo(PICKUP_AT) > 0.6) me.setGlobalPosition(PICKUP_AT);
+            if (me.getGlobalPosition().distanceTo(PICKUP_AT) > 0.6) { me.setGlobalPosition(PICKUP_AT); snapped(me); }
             return;
         }
         if (wc.getCurrentWeaponItem() != knife) {
@@ -168,7 +168,7 @@ public class NetMeleeTestHost extends Node3D {
         // Stand in reach and look at the target's chest (world yaw, positive pitch up). Each stab knocks the
         // target back (measured 1.10 -> 1.93 m over three hits), so follow it the way a player closes in.
         Vector3 stand = target.getGlobalPosition().plus(new Vector3(0, 0, STAND_GAP_M));
-        if (me.getGlobalPosition().distanceTo(stand) > 0.15) me.setGlobalPosition(stand);
+        if (me.getGlobalPosition().distanceTo(stand) > 0.15) { me.setGlobalPosition(stand); snapped(me); }
         Vector3 eye = me.getGlobalPosition().plus(new Vector3(0, 1.5, 0));
         Vector3 to = target.getGlobalPosition().plus(new Vector3(0, 1.2, 0)).minus(eye);
         me.controlRotation.yaw = Math.toDegrees(Math.atan2(-to.getX(), -to.getZ()));
@@ -186,6 +186,13 @@ public class NetMeleeTestHost extends Node3D {
         }
         if (tapsDone >= TAPS && doneAt < 0 && clock >= nextTapAt) doneAt = clock;
         if (doneAt >= 0) forgeStep(me, target, wc, knifeSlot);
+    }
+
+    /** A snap carries no fall speed: kept, it built up over the pickup wait into a 12 m/s landing and an extra
+     *  self-damage request the summary counts (PLAN.md 0.15). */
+    private static void snapped(Player me) {
+        if (me.getNodeOrNull(new NodePath("MovementController"))
+                instanceof com.openworld.movement.character.MovementController mc) mc.clearMotion();
     }
 
     /** What a forged client sends, one per 0.5 s, each refused for its own reason. */

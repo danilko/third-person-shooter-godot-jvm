@@ -11191,6 +11191,10 @@ checks its "Wired in code" table against the enum. Licence rule as for art: CC0 
   so the JSON changes whenever the geometry does. The same risk applies to any other glTF writer (the Blender
   exports of kit pieces and bodies); to check one, compare `.godot/imported/<name>*.scn`'s mtime against its
   `.bin`.
+- **A character's FALL SPEED is `MovementController`'s own field, not the body's velocity.** Moving a body by hand
+  and zeroing `CharacterBody3D.velocity` still lands it at the speed it was falling, with fall damage. Call
+  `MovementController.clearMotion()` after any hand teleport (WorldBounds' rescues do; `run_net_melee_test.sh`'s 1-in-3
+  flake was its harness snapping the client back to the pickup every 0.6 m of fall until it landed at 12 m/s).
 - **godot-jvm rc1: `Transform3D.times(Transform3D)` MUTATES its receiver** (`val t = this`, then writes into it) and
   returns it. `a.times(b)` in a loop accumulates every product into `a` (every car part's box sat ~1 m above the
   last). Always call it on a fresh getter result (`getGlobalTransform().affineInverse().times(x)`); `times(Vector3)`

@@ -1293,6 +1293,8 @@ public class NetworkManager extends Node {
         Health health = findHealth(victimNode);
         if (health == null) return;
         com.openworld.net.NetStats.increment("damage_request_accepted");
+        GD.print("NetworkManager: accepted MSG_DAMAGE_REQUEST from peer " + senderPeerId + " (" + kind
+                + ", victim " + req.victimCharacterId() + ", " + req.finalDamage() + " by '" + req.weaponName() + "')");
         Vector3 source = kind == DamageRequestPolicy.Kind.AREA && attacker instanceof godot.api.Node3D a ? a.getGlobalPosition() : null;
         health.applyNetworkDamage(req.finalDamage(), req.headshot(), req.weaponName(),
                 req.attackerName(), req.attackerFaction(), source);
