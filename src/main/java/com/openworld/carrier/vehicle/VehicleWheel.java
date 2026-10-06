@@ -344,7 +344,7 @@ public class VehicleWheel extends RayCast3D {
         Vector3 forcePos = contact.minus(vehicle.getGlobalPosition());
 
         // Spring suspension force
-        double springForceMag = cfg.springStrength * compression;
+        double springForceMag = cfg.springStrength * compression + bumpStopForce(compression);
         Vector3 tireVelocity  = getPointVelocity(contact);
         double  dampForceMag  = cfg.springDamping * getGlobalBasis().getY().dot(tireVelocity);
         if (leadZoneHit && dampForceMag > 0.0) dampForceMag = 0.0;   // never pull toward ground
@@ -470,6 +470,17 @@ public class VehicleWheel extends RayCast3D {
         }
     }
 
+    /**
+     * The bump stop's force (N) at this compression: 0 within the spring's normal travel, then {@code bumpStopRate} x the
+     * spring rate per metre past {@code bumpStopTravel} beyond the static sag (VehicleConfig, the kerb-catch fix).
+     */
+    private double bumpStopForce(double compression) {
+        if (cfg.bumpStopRate <= 0f || cfg.springStrength <= 0f || vehicle == null) return 0.0;
+        double sag = vehicle.getMass() * 9.8 / (vehicle.wheelCount() * cfg.springStrength);
+        double over = compression - (sag + cfg.bumpStopTravel);
+        return over > 0.0 ? cfg.bumpStopRate * cfg.springStrength * over : 0.0;
+    }
+
     public void applyWheelSuspension(float delta) {
         if (vehicle == null || !isColliding()) return;
 
@@ -486,7 +497,7 @@ public class VehicleWheel extends RayCast3D {
         wheelMeshPos.setY(-springLen);
         wheelMesh.setPosition(wheelMeshPos);
 
-        double springForceMag = cfg.springStrength * compression;
+        double springForceMag = cfg.springStrength * compression + bumpStopForce(compression);
         Vector3 worldVelocity = getPointVelocity(contact);
         double  relVelocity   = springUpDir.dot(worldVelocity);
         double  dampForceMag  = cfg.springDamping * relVelocity;

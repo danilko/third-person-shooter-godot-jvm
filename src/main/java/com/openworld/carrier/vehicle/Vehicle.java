@@ -1404,6 +1404,8 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
      * car sometimes" report was traced to street-tree planters standing flush with the kerb.
      */
     static final boolean CRASH_TRACE = System.getenv("OW_CRASH_TRACE") != null;
+    /** {@code OW_CRASH_TRACE=all}: every car, not only a player's (probes drive cars with no player in them). */
+    static final boolean CRASH_TRACE_ALL = "all".equals(System.getenv("OW_CRASH_TRACE"));
     /** The collider of the hardest contact in the crash being summed (CRASH_TRACE only). */
     String crashCollider = "";
 
@@ -1426,7 +1428,9 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             if (CRASH_TRACE && d > bestD) {
                 bestD = d;
                 Object o = state.getContactColliderObject(i);
-                crashCollider = o instanceof Node n ? String.valueOf(n.getPath().getPath()) : String.valueOf(o);
+                crashCollider = (o instanceof Node n ? String.valueOf(n.getPath().getPath()) : String.valueOf(o))
+                        + " n " + state.getContactLocalNormal(i) + " at " + state.getContactLocalPosition(i)
+                        + " carUp " + up + " carPos " + state.getTransform().getOrigin();
             }
             at = at.plus(state.getContactLocalPosition(i).times(d));
             dv += d;
@@ -2288,6 +2292,8 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     public Controller getController() { return controller; }
 
     public Character getOccupant()   { return occupant; }
+    /** How many wheels carry the car (the static sag each spring takes is mass x g / this). */
+    public int wheelCount() { return Math.max(1, wheels.size()); }
 
     // ── Carjacking (PLAN.md I3c) ──────────────────────────────────────────────
 

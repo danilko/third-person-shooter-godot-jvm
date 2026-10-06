@@ -15,6 +15,7 @@ extends SceneTree
 ##       -- ... --wheel-sensor=1   drive with the sphere ground sensor (2 = tyre cylinder, 0 = the shipped rays);
 ##       the review measured all three equal in cost and sphere/cylinder 15x smoother over a kerb, so this is how
 ##       a kerb strike at speed is compared between them (PLAN.md 0.7)
+##       -- ... --bump-stop=0   drive with the suspension's bump stop off (the 2026-10-06 kerb-catch control)
 ##       -- ... --phys=120   run the physics at 120 Hz instead of the project's 60 (PLAN.md 0.7: is a launch the
 ##       solver running out of steps at speed? compare the same case at 60 and 120 -- half the travel per step)
 ##       A FALL (the car metres below the lane it is on: through or over a wall, off a deck edge) counts like a launch;
@@ -189,7 +190,10 @@ const GATE_CASES := [
 	["link_F1", 35.0, -3.0, 3.2], ["link_R1", 35.0, -3.0, 3.2],
 	["link_F1", 35.0, 0.0, 3.2], ["link_R1", 35.0, 3.0, 3.2],
 	["w_ns__x1_F0", 30.0, 0.0, 5.5], ["w_ns__x1_R0", 30.0, -2.0, 5.5],
-	["w_ring__x2_R1", 35.0, 3.0, 4.3], ["w_ring__x2__x1_F1", 35.0, -3.0, 4.3],
+	["w_ring__x2_R1", 35.0, 3.0, 4.3],
+	# -2.0, not -3.0 (2026-10-06): since DebugRoads has 4 m footways, -3 m put the outer wheels ON the pavement and the body
+	# into a street-tree planter -- a crash into a tree, not a road launch. -2 m is the outer wheels on the kerb line.
+	["w_ring__x2__x1_F1", 35.0, -2.0, 4.3],
 	# R-18: both 踏切 (one level plane: panel, flush rails, the footway brought down to the road), on the lane
 	# centre and with the outer wheels on the kerb line where the kerb ramps down to the crossing and back up
 	["w_ns_F0", 30.0, 0.0, 7.0], ["w_ns_R0", 30.0, -2.0, 7.0],
@@ -205,6 +209,10 @@ func _initialize() -> void:
 		var cfg := load(VEHICLE_CFG)
 		cfg.set("wheel_sensor", int(_arg("wheel-sensor", "0")))
 		print("probe: wheel sensor %s (0 rays, 1 sphere, 2 tyre cylinder)" % str(cfg.get("wheel_sensor")))
+	if _arg("bump-stop", "") != "":
+		# the suspension's bump stop (VehicleConfig.bumpStopRate; 0 = off, the kerb-catch control, 2026-10-06)
+		load(VEHICLE_CFG).set("bump_stop_rate", float(_arg("bump-stop", "12")))
+		print("probe: bump stop rate %s" % str(load(VEHICLE_CFG).get("bump_stop_rate")))
 	if _arg("phys", "") != "":
 		Engine.physics_ticks_per_second = int(_arg("phys", "60"))
 		HZ = float(Engine.physics_ticks_per_second)
@@ -252,6 +260,7 @@ func _case(lane_name: String, speed: float, offset: float, seconds: float, corne
 	var breaks0 := _breaks_total()
 	var prev_breaks := breaks0
 	var launches := 0
+	var furniture_crashes := 0
 	var off_road_launches := 0
 	var worst_lat := 0.0
 	var by_cause := {}
@@ -344,14 +353,22 @@ func _case(lane_name: String, speed: float, offset: float, seconds: float, corne
 					why[k] = true
 			if why.is_empty():
 				why["<wheel forces only>"] = true
-			if on_road:
+			# a bounce off street furniture (a planter, a tree: `FURN_props-prop`) is the car CRASHING into something on
+			# the footway, not the road throwing it -- reported, not counted (2026-10-06: the -3 m cases run on the
+			# pavement since DebugRoads has footways)
+			var furniture := not why.is_empty()
+			for k in why:
+				if not str(k).contains("FURN_props"): furniture = false
+			if furniture:
+				furniture_crashes += 1
+			elif on_road:
 				launches += 1
 				for k in why:
 					by_cause[k] = int(by_cause.get(k, 0)) + 1
 			else:
 				off_road_launches += 1
 			print("  %s t=%.2f  vy rose %.2f m/s in %.2f s  speed %.1f  lane %s  %.2f m right of it  at (%.0f, %.0f, %.0f)  from: %s"
-					% ["LAUNCH" if on_road else "off-road bounce", f / HZ, rise, WINDOW / 60.0,
+					% ["FURNITURE CRASH" if furniture else ("LAUNCH" if on_road else "off-road bounce"), f / HZ, rise, WINDOW / 60.0,
 					car.linear_velocity.length(), ln, lat, p.x, p.y, p.z, ", ".join(why.keys())])
 		# A FALL: the car is metres below the lane it is on (through or over a wall, off a deck edge). On an elevated
 		# road that is the defect the wall test (--offset beside a barrier) exists to find.
@@ -379,6 +396,8 @@ func _case(lane_name: String, speed: float, offset: float, seconds: float, corne
 			last_lane = ""
 			last_pos = car.global_position
 	print("    health lost %.1f" % hp_lost)
+	if furniture_crashes > 0:
+		print("    %d bounce(s) off street furniture (a crash on the footway, not counted as a launch)" % furniture_crashes)
 	if is_instance_valid(car):
 		car.queue_free()
 		car = null

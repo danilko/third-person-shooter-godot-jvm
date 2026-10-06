@@ -341,7 +341,7 @@ public class VehicleDamageModel extends Node {
         if (syntheticCrash) syntheticCrash = false;
         else crashDv = crashDeltaV(crashDv, crashStartVel.getX(), crashStartVel.getY(), crashStartVel.getZ(),
                 v.getX(), v.getY(), v.getZ());
-        if (Vehicle.CRASH_TRACE && vehicle.getOccupant() instanceof com.openworld.character.Player) {
+        if (Vehicle.CRASH_TRACE && (Vehicle.CRASH_TRACE_ALL || vehicle.getOccupant() instanceof com.openworld.character.Player)) {
             GD.print(String.format(java.util.Locale.ROOT, "[crash] %s hit %s: dv %.2f m/s (%s -> %s), %.1f damage points",
                     vehicle.getName(), vehicle.crashCollider, crashDv, crashStartVel, v, impactPoints(crashDv)));
         }

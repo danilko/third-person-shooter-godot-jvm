@@ -45,6 +45,18 @@ public class VehicleConfig extends Resource {
     /** Natural rest position: distance from wheel centre to contact point when unloaded. */
     @Export public float restDistance     = 0.5f;
 
+    /**
+     * Bump stop (2026-10-06, user-reported: "near the kerb the car occasionally takes huge damage, at any speed").
+     * The spring had no end of travel: at rest it already uses ~0.23 m of its {@link #restDistance}, so ~2 g of load (a
+     * hard turn, a dip at speed) compressed it past its full length and the body sank to ~9 cm off the road -- under a
+     * 15 cm kerb, whose vertical edge then stopped the car dead (measured: 55 -> 1.7 m/s, 311 hp, on a raised median's
+     * cap at a junction mouth). Past {@code bumpStopTravel} metres of compression BEYOND the static sag the wheel adds
+     * {@code bumpStopRate} x its spring rate, so the hull floor (HULL_FLOOR 0.32 m at rest) stays above kerb height.
+     * 0 rate = off (the control).
+     */
+    @Export public float bumpStopTravel = 0.06f;
+    @Export public float bumpStopRate   = 12f;
+
     /** How far the wheel can extend below rest position before the ray stops. */
     @Export public float overExtend       = 0.3f;
 

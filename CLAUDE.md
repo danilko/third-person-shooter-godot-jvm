@@ -9024,6 +9024,20 @@ indistinguishable and the mip bleeding is not visible.
   and `island_buildings.furniture_strip` reads it (the walk line moves on 3 m footways). DebugWorld, kerb line at 12 and
   22 m/s: 17.6 / 72.4 hp -> 0. Driving fully onto the pavement into a tree is still a crash, on purpose. A raised median
   measured 0 damage with the wheels on it (naka_hondori, 244 m).
+- **The rest of the "kerb damage" was the SUSPENSION: a bump stop was missing** (user, same day: "near a kerb or a
+  median, at any speed, occasionally huge damage"; their trace: `[crash] ... hit nishi_dori__5_road-road-noped: dv
+  53.28 m/s`). Reproduced on the island (`probe_road_launch.gd` on `nishi_dori__4__x1_F0` at 55 m/s: 311, 141+249 and
+  295 hp): the contact is the vertical 0.15 m face of a RAISED MEDIAN's cap at a junction mouth, struck by the HULL
+  (normal `(-0.09, 0.09, 0.99)`, at kerb-top height, all four wheels on the pad). SPC1's springs (14 000 N/m a wheel)
+  already sag ~0.23 m of their 0.35 m at rest and had no end of travel, so ~2 g of load (a hard turn, a dip) pushed the
+  hull floor from 0.32 m to ~0.09 m -- under kerb height -- and its vertical edge stopped the car dead. Which speed and
+  which kerb is a matter of the load on that corner at that instant, so it never repeated on demand.
+  `VehicleConfig.bumpStopTravel` (0.06 m past the static sag) / `bumpStopRate` (12 x the spring rate) add a
+  progressive bump stop in `VehicleWheel.bumpStopForce`, both suspension paths. After: the same three cases 0 damage;
+  `--bump-stop=0` (new probe flag) is the control and crashes again (205 hp). `probe_component_car` (SPC1, CRT1, KEC1),
+  `probe_vehicle_views`, `probe_car_push`, `probe_dead_driver`, `probe_driveby_aim`, the launch gate PASS. The gate's
+  `w_ring__x2__x1_F1` case moved -3 -> -2 m and the probe now reports a bounce off street furniture
+  (`FURN_props-prop`) as a FURNITURE CRASH, not a launch: since DebugRoads has footways, -3 m is ON the pavement.
 - **`OW_CRASH_TRACE=1`** in the environment prints `[crash] <car> hit <collider path>: dv ...` for every scored crash of
   a PLAYER-driven car (`Vehicle.CRASH_TRACE`, `VehicleDamageModel.flushCrash`). Ask for that line before guessing.
 - **Shooting the light crowd** (user: "even a shotgun or a powerful handgun after 3-4 shots cannot knock one down").
