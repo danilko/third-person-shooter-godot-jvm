@@ -42,6 +42,38 @@ func _panels() -> Dictionary:
 			out[k] = c.get_global_rect()
 	return out
 
+## The VISIBLE box of every corner widget (its drawn background, not its content): what the eye lines up.
+func _boxes() -> Dictionary:
+	var out := {}
+	var nodes := {
+		"health": hud.get_node_or_null("FootHUD/Health/Background"), "minimap": hud.get_node_or_null("Minimap"),
+		"weapon": hud.get_node_or_null("WeaponHUD/Background"), "slots": hud.get_node_or_null("WeaponSlotsUI"),
+		"speed": hud.get_node_or_null("VehicleHUD/Speed/Background"),
+	}
+	for k in nodes:
+		var c: Control = nodes[k]
+		if c != null and c.is_visible_in_tree() and c.get_global_rect().size.y > 1.0:
+			out[k] = c.get_global_rect()
+	return out
+
+## Every visible box's outer edges on ONE margin from the screen edge (user, 2026-10-05: the panels looked unaligned
+## -- each widget drew its background a different 6-8 px outside its content). Returns the offenders.
+func _off_margin(b: Dictionary, vp: Vector2) -> Array:
+	var m: float = (b["minimap"] as Rect2).position.x if b.has("minimap") else 20.0
+	var bad := []
+	for k in b:
+		var r: Rect2 = b[k]
+		var left := r.get_center().x < vp.x / 2
+		var edge := r.position.x if left else vp.x - r.end.x
+		if absf(edge - m) > 1.0:
+			bad.append("%s side %.1f" % [k, edge])
+		# the minimap and the inventory column stand ABOVE other boxes, and so does the weapon line in a car (it
+		# stacks over the speed cluster): only a box that is the lowest in its corner owes the bottom margin
+		var stacked: bool = k == "minimap" or k == "slots" or (k == "weapon" and b.has("speed"))
+		if not stacked and absf(vp.y - r.end.y - m) > 1.0:
+			bad.append("%s bottom %.1f" % [k, vp.y - r.end.y])
+	return bad
+
 func _overlaps(p: Dictionary) -> Array:
 	var bad := []
 	var keys := p.keys()
@@ -87,6 +119,14 @@ func _initialize() -> void:
 	var slots: Node = hud.get_node("WeaponSlotsUI")
 	var shown := float(slots.call("shown_now"))
 	var foot := _panels()
+	var vp0 := (hud.get_node("FootHUD") as Control).get_viewport_rect().size
+	var offm := _off_margin(_boxes(), vp0)
+	_check("the visible edges share one margin (on foot)", offm.is_empty(), str(offm))
+	var bx := _boxes()
+	var widths := [] if not (bx.has("health") and bx.has("minimap") and bx.has("weapon") and bx.has("slots")) else [
+		absf((bx["health"] as Rect2).size.x - (bx["minimap"] as Rect2).size.x),
+		absf((bx["weapon"] as Rect2).size.x - (bx["slots"] as Rect2).size.x)]
+	_check("each corner's stacked boxes are one width", widths.size() == 2 and widths.max() <= 1.0, str(widths))
 	_check("the inventory column comes up to full on a switch", shown > 0.9, "alpha %.2f" % shown)
 	_check("nothing overlaps (with the column up)", _overlaps(foot).is_empty(), "%s / %s" % [_overlaps(foot), foot.keys()])
 	var heights := {}
@@ -163,6 +203,8 @@ func _initialize() -> void:
 	_check("the car's health is shown as a percentage", hp_text == "100%", hp_text)
 	_check("your own car carries no nameplate", not (car.get_node("Nameplate") as Node3D).visible)
 	_check("nothing overlaps in the car", _overlaps(drive).is_empty(), str(_overlaps(drive)))
+	var offc := _off_margin(_boxes(), vp0)
+	_check("the visible edges share one margin (in the car)", offc.is_empty(), str(offc))
 	Input.action_press("aim")
 	await _wait(0.2)
 	var aimed := _panels()

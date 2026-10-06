@@ -601,6 +601,7 @@ public class HUDManager extends CanvasLayer {
 	for (Node child : getChildren()) {
 	  if (child instanceof CharacterHUD hud) {
 		hud.setPlayerCharacterId(info.characterId);
+		hud.setPlayer(c);
 		if (c.getNodeOrNull("Health") instanceof Health h) {
 		  hud.setMaxHealth(h.maxHealth);
 		  hud.onHealthChanged(h.getCurrentHealth());

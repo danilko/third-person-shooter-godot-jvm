@@ -186,6 +186,29 @@ func _counter_cycle(counter: Area3D, p: CharacterBody3D, spawn: Node3D, weapon: 
 	await _press("ui_cancel")
 	await _tick(2)
 	_check("ui_cancel closes the menu and gives the input back", _menu(root) == null and not bool(p.call("input_blocked_now")))
+	# E closes what E opened (user, 2026-10-05), and does not reopen it on the same press
+	await _press("interact")
+	await _tick(2)
+	var reopened := _menu(root) != null
+	await _press("interact")
+	await _tick(4)
+	_check("interact opens it again and interact closes it", reopened and _menu(root) == null
+			and not bool(p.call("input_blocked_now")))
+	# Esc as a real input EVENT (the pause menu listens to events): it closes the store and does NOT pause the game
+	await _press("interact")
+	await _tick(2)
+	var ev := InputEventAction.new()
+	ev.action = "ui_cancel"
+	ev.pressed = true
+	Input.parse_input_event(ev)
+	await process_frame
+	var up := InputEventAction.new()
+	up.action = "ui_cancel"
+	Input.parse_input_event(up)
+	await _tick(4)
+	_check("Esc closes the store and does not open the pause menu", _menu(root) == null and not paused,
+			"paused %s" % paused)
+	paused = false
 	var h: Node = p.get_node("Health")
 	var mh := float(h.get("max_health"))
 	h.call("apply_replicated_health", mh - 40.0)

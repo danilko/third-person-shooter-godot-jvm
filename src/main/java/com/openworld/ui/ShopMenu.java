@@ -27,22 +27,26 @@ import java.util.List;
 
 /**
  * The shop counter's menu (PLAN.md W3; GTA SA's Ammu-Nation list): one row per item -- icon, name, and FREE (money
- * does not exist yet) or REFILL for a weapon already carried. Up/down or the mouse choose, {@code interact} /
- * {@code ui_accept} / a click buys, {@code ui_cancel} closes, and so does walking away from the counter. While it
- * is open the player's input is blocked and the mouse is free (the debug console's rule).
+ * does not exist yet) or REFILL for a weapon already carried. Up/down or the mouse choose, {@code ui_accept} (Enter)
+ * or a click takes the row; {@code interact} (E, the key that opened it) or {@code ui_cancel} (Esc) closes it, and so
+ * does walking away from the counter (user, 2026-10-05: E must close what E opened, and Esc must not go on to open the
+ * pause menu -- {@link MenuManager} hands Esc here first). While it is open the player's input is blocked and the
+ * mouse is free (the debug console's rule).
  *
  * <p>One menu at a time, built in code on the scene's root and freed on close.
  */
 @Script(className = "ShopMenu")
 public class ShopMenu extends Control {
 
-    static final String PANEL = "res://src/main/resources/com/openworld/ui/hud_panel.tres";
+    static final String PANEL = "res://src/main/resources/com/openworld/ui/menu_panel.tres";
     static final String FONT = "res://assets/ui/Aldrich-Regular.ttf";
     static final String ICONS = "res://assets/ui/weapons/";
-    public static final float W = 460f, ROW = 54f, HEAD = 56f;
+    public static final float W = 460f, ROW = 54f, HEAD = 56f, FOOT = 44f;
 
     private static ShopMenu open;
     private static CanvasLayer layer;
+    /** The frame the menu opened / closed on: the E that opens it must not close it, nor the E that closes it reopen it. */
+    private static long openedFrame = -1, closedFrame = -1;
 
     private ShopCounter counter;
     private Player buyer;
@@ -68,7 +72,11 @@ public class ShopMenu extends Control {
         layer.addChild(m);
         counter.getTree().getRoot().addChild(layer);
         open = m;
+        openedFrame = godot.api.Engine.INSTANCE.getProcessFrames();
     }
+
+    /** Did a menu close on this frame (so the key that closed it is not read again as "open")? */
+    public static boolean closedThisFrame() { return closedFrame == godot.api.Engine.INSTANCE.getProcessFrames(); }
 
     public static void closeFor(ShopCounter counter) {
         if (isOpen() && open.counter == counter) open.close();
@@ -109,7 +117,7 @@ public class ShopMenu extends Control {
             names.add(name);
             icons.add(GD.load(ICONS + id + ".png") instanceof Texture2D t ? t : null);
         }
-        float h = HEAD + ROW * ids.size() + 16f;
+        float h = HEAD + ROW * ids.size() + FOOT;
         setAnchor(godot.core.Side.LEFT, 0f, false, true);
         setAnchor(godot.core.Side.TOP, 0.5f, false, true);
         setAnchor(godot.core.Side.BOTTOM, 0.5f, false, true);
@@ -126,6 +134,7 @@ public class ShopMenu extends Control {
     }
 
     public void close() {
+        closedFrame = godot.api.Engine.INSTANCE.getProcessFrames();
         block(false);
         if (open == this) open = null;
         if (layer != null && GD.isInstanceValid(layer)) layer.queueFree();
@@ -138,9 +147,11 @@ public class ShopMenu extends Control {
         if (ids.isEmpty()) { close(); return; }
         Input in = Input.INSTANCE;
         if (in.isActionJustPressed("ui_cancel", false)) { close(); return; }
+        if (in.isActionJustPressed("interact", false)
+                && godot.api.Engine.INSTANCE.getProcessFrames() != openedFrame) { close(); return; }
         if (in.isActionJustPressed("ui_down", false) || in.isActionJustPressed("back", false)) move(1);
         if (in.isActionJustPressed("ui_up", false) || in.isActionJustPressed("forward", false)) move(-1);
-        if (in.isActionJustPressed("ui_accept", false) || in.isActionJustPressed("interact", false)) buySelected();
+        if (in.isActionJustPressed("ui_accept", false)) buySelected();
     }
 
     private void move(int d) {
@@ -173,7 +184,7 @@ public class ShopMenu extends Control {
     @Register
     @Override
     public void _draw() {
-        float h = HEAD + ROW * ids.size() + 16f;
+        float h = HEAD + ROW * ids.size() + FOOT;
         if (panel != null) drawStyleBox(panel, new Rect2(0.0, 0.0, W, h));
         if (font == null) return;
         var clerk = counter.clerk();
@@ -215,6 +226,13 @@ public class ShopMenu extends Control {
             drawString(font, new Vector2(W - 140f, y + 34f), tag, HorizontalAlignment.RIGHT, 120f,
                     18, has ? new Color(0.55f, 0.85f, 1f, 1f) : new Color(0.55f, 1f, 0.55f, 1f));
         }
+        footer(h);
+    }
+
+    private void footer(float h) {
+        if (font == null) return;
+        drawString(font, new Vector2(20f, h - 16f), "ENTER / CLICK  take     E / ESC  close     H  eat / heal",
+                HorizontalAlignment.LEFT, W - 40f, 14, new Color(1f, 1f, 1f, 0.7f));
     }
 
     /** A supply has no weapon icon: a coloured badge by kind (food, medical cross, strange). */

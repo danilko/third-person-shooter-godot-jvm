@@ -58,6 +58,12 @@ public class MenuManager extends CanvasLayer {
     @Override
     public void _input(InputEvent event) {
         if (event.isActionPressed("ui_cancel", false)) {
+            // an open store menu takes Esc first: it closes the menu, and the game does not pause (user, 2026-10-05)
+            if (ShopMenu.isOpen()) {
+                ShopMenu.current().close();
+                getViewport().setInputAsHandled();
+                return;
+            }
             // Esc is only a pause toggle when the game-over screen is not up
             if (gameOverMenu == null || !gameOverMenu.isVisible()) {
                 togglePause();

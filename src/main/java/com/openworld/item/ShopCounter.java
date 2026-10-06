@@ -98,7 +98,8 @@ public class ShopCounter extends Area3D {
             setProcess(false);
             return;
         }
-        if (!ShopMenu.isOpen() && Input.INSTANCE.isActionJustPressed("interact", false)) ShopMenu.open(this, inside);
+        if (!ShopMenu.isOpen() && !ShopMenu.closedThisFrame() && Input.INSTANCE.isActionJustPressed("interact", false))
+            ShopMenu.open(this, inside);
     }
 
     private void showPrompt(boolean on) {

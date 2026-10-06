@@ -2627,7 +2627,19 @@ pictures `tools/godot/shot_hud.gd`, needs a display):
 | centre | crosshair, `WeaponProgress` ring, hit marker, damage direction, interact prompt just under the crosshair | same |
 
 - **One background**: `ui/hud_panel.tres`, the minimap's translucent black, behind every panel (a `Background`
-  Panel in each scene, `WeaponSlotsUI`'s panel style, and `FeedEntry._draw` for feed rows).
+  Panel in each scene, `WeaponSlotsUI`'s panel style, and `FeedEntry._draw` for feed rows), SQUARE (no corner radius
+  anywhere in the HUD; the minimap is a square, `RoadOverlay.CORNER` 0). Text-only (alpha 0) was tried on 2026-10-05
+  and measured on a bright ground: the white weapon silhouettes and the inventory list vanished, so the boxes stay.
+  What made the HUD look "not aligned" was each widget drawing its background 6-8 px OUTSIDE its content, so the
+  visible edges sat 12-20 px from the screen. Now every VISIBLE edge sits on one 20 px margin (content inset by its
+  background's padding) and the boxes stacked in a corner are one width (health = minimap, weapon = inventory
+  column); `probe_hud_layout` asserts both ("the visible edges share one margin", "each corner's stacked boxes are
+  one width"; the old offsets fail them). A MENU has its own backing (`ui/menu_panel.tres`, the store list).
+- **The store menu** (`ShopMenu`): Enter / click takes a row; `E` (the key that opened it) or `Esc` closes it, and
+  `MenuManager` hands Esc to an open store first, so it does not go on to open the pause menu. A footer lists the keys.
+- **Supplies on the HUD** (`CharacterHUD.setPlayer`): beside the health bar, `H  FOOD 3  MED 1` (what is carried, by
+  kind); pressing `H` says what it did (`+15 Onigiri`, `health is full`, `nothing to eat or use`). Host / single
+  player only: a co-op client's counts are not replicated yet.
 - **One palette**: `ui.HudPalette`. Colour means state, never selection: white → amber (health under 50%, a
   quarter magazine) → red (health under 25%, empty); red is reserved for danger. Selection is carried by SHAPE and
   brightness: a white ▶ in the inventory panel's left gutter before the active row, which is full white while the

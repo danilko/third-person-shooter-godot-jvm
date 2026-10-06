@@ -578,14 +578,19 @@ final class RoadOverlay {
      * shape (the pictures, the postal grid, the lines, the blips), so nothing can be drawn outside the frame.
      */
     static boolean squareClip = true;
-    /** The square's corner radius, as a share of its half size. */
-    static final double CORNER = 0.12;
+    /** The square's corner radius, as a share of its half size: 0, a SQUARE (user 2026-10-05: a flat, square HUD). */
+    static final double CORNER = 0.0;
 
     /** The clip shape as a convex polygon, wound like {@link #discPolygon} (angle increasing). */
     static List<Vector2> clipPolygon(double cx, double cy, double r) {
         if (!squareClip) return discPolygon(cx, cy, r);
         double rc = r * CORNER, k = r - rc;
         double[][] corners = {{k, k}, {-k, k}, {-k, -k}, {k, -k}};
+        if (rc < 1e-6) {
+            List<Vector2> sq = new ArrayList<>(4);
+            for (double[] c : corners) sq.add(new Vector2((float) (cx + c[0]), (float) (cy + c[1])));
+            return sq;
+        }
         List<Vector2> pts = new ArrayList<>(28);
         for (int q = 0; q < 4; q++) {
             for (int i = 0; i <= 6; i++) {
