@@ -12,6 +12,7 @@ import godot.core.Callable;
 import godot.core.MethodCallable;
 import godot.core.NodePath;
 import godot.core.StringNames;
+import godot.global.GD;
 
 /**
  * Generic floating nameplate rendered above any {@link NameplateTarget} — a character, a carrier,
@@ -120,7 +121,7 @@ public class Nameplate extends Node3D {
         relevanceTimer -= delta;
         if (relevanceTimer > 0.0 || target == null) return;
         relevanceTimer = RELEVANCE_INTERVAL;
-        boolean own = getParent() instanceof com.openworld.character.Character c && c.isLocallyOwnedPlayer();
+        boolean own = carriesLocalPlayer(getParent());
         boolean show = !own && target.isNameplateRelevant();
         if ((show ? 1 : 0) == shown) return;
         shown = show ? 1 : 0;
@@ -130,6 +131,22 @@ public class Nameplate extends Node3D {
             vp.setUpdateMode(show ? godot.api.SubViewport.UpdateMode.WHEN_VISIBLE
                                               : godot.api.SubViewport.UpdateMode.DISABLED);
         }
+    }
+
+    /**
+     * The plate is the local player's own: their body, or a car they sit in (driver or passenger). One owner of
+     * that rule -- HUDManager used to hide the car's plate once on entry, and the relevance check here put it back
+     * 0.25 s later, because the driver (a Player) is relevant.
+     */
+    private static boolean carriesLocalPlayer(Node parent) {
+        if (parent instanceof com.openworld.character.Character c) return c.isLocallyOwnedPlayer();
+        if (parent instanceof com.openworld.carrier.vehicle.Vehicle v) {
+            for (int i = 0; i < v.getSeatCount(); i++) {
+                com.openworld.character.Character o = v.getSeatOccupant(i);
+                if (o != null && GD.isInstanceValid(o) && o.isLocallyOwnedPlayer()) return true;
+            }
+        }
+        return false;
     }
 
     /** Is the plate up right now (a probe readout)? */

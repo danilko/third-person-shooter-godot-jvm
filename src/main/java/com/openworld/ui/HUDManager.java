@@ -628,7 +628,6 @@ public class HUDManager extends CanvasLayer {
   public void onVehicleEntered(Node vehicle, CharacterInfo occupantInfo) {
 	if (occupantInfo == null || !playerCharacterId.equals(occupantInfo.characterId)) return;
 	currentVehicle = vehicle instanceof Vehicle v ? v : null;
-	setVehicleNameplateVisible(currentVehicle, false);   // your own car carries no floating label
 	Node vhudNode = getNodeOrNull("VehicleHUD");
 	if (vhudNode instanceof VehicleHUD hud && vehicle instanceof Node3D v) {
 	  hud.setVehicle(v);
@@ -641,17 +640,8 @@ public class HUDManager extends CanvasLayer {
 	if (occupantInfo == null || !playerCharacterId.equals(occupantInfo.characterId)) return;
 	Node vhudNode = getNodeOrNull("VehicleHUD");
 	if (vhudNode instanceof VehicleHUD hud) hud.setVehicle(null);
-	setVehicleNameplateVisible(currentVehicle, true);
 	currentVehicle = null;
 	applyContext(Situation.ON_FOOT);
-  }
-
-  /**
-   * Hide the nameplate of the vehicle the local player is in, and give it back on the way out — the same rule
-   * {@code Character.applyNameplateVisibility} applies to the local player's own body. Local view only.
-   */
-  private static void setVehicleNameplateVisible(Vehicle v, boolean visible) {
-	if (v != null && GD.isInstanceValid(v) && v.getNodeOrNull("Nameplate") instanceof Node3D np) np.setVisible(visible);
   }
 
   // ── Signal relays — player → EventBus ─────────────────────────────────────

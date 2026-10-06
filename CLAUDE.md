@@ -2662,8 +2662,9 @@ pictures `tools/godot/shot_hud.gd`, needs a display):
   scaling with the screen height (the weapon list's text is ~10 px on a Steam Deck, just over Valve's ~9 px floor).
   One number for a future "UI scale" setting (`Window.content_scale_factor`).
 - Numbers are Aldrich (`assets/ui/Aldrich-Regular.ttf`); the DSEG7 seven-segment font is gone.
-- The local player's own vehicle nameplate is hidden while they are in it (`HUDManager.setVehicleNameplateVisible`,
-  the vehicle twin of `Character.applyNameplateVisibility`).
+- The local player's own vehicle nameplate is hidden while they are in it, by the plate's own relevance rule
+  (`Nameplate.carriesLocalPlayer`: the local player's body, or a car any seat of which holds them). HUDManager used to
+  hide it once on entry and the 0.25 s relevance check put it back, since the driver is a Player.
 
 The visibility machinery is unchanged: a `Situation` enum (`ON_FOOT`, `VEHICLE_DRIVE`, `VEHICLE_PASSENGER_WEAPON`,
 `VEHICLE_MOUNTED_WEAPON`, derived from `Vehicle.getWeaponMode()` in `situationForVehicle`) and a code table
