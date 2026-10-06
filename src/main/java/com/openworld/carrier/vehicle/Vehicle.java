@@ -2369,6 +2369,25 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     public boolean isSlipping()      { return slipping; }
     public void setSlipping(boolean s) { this.slipping = s; }
     public ArrayList<VehicleWheel> getWheels() { return wheels; }
+
+    /**
+     * How far above the ground this car's ORIGIN stands with every wheel just touching at full spring travel: its
+     * lowest wheel mount + the rest length + the tyre radius. A spawn sets the car down this high (and lets it sink
+     * onto its springs); set down with its origin ON the road, the hull starts buried and the solver ejects it --
+     * on an uphill grade backwards, which is how a traffic car on the touge rolled 35 m downhill and was reclaimed as
+     * stalled (PLAN.md 0.13). Needs the car in the tree (the wheels are found in _ready); 0.8 m before that.
+     */
+    public double groundClearanceAtRest() {
+        VehicleConfig cfg = getConfig();
+        if (wheels.isEmpty() || cfg == null) return 0.8;
+        double h = 0.0;
+        for (VehicleWheel w : wheels) {
+            if (!GD.isInstanceValid(w)) continue;
+            double mountY = toLocal(w.getGlobalPosition()).getY();
+            h = Math.max(h, -mountY + cfg.restDistance + cfg.wheelRadius);
+        }
+        return h > 0.0 ? h : 0.8;
+    }
     public boolean isBraking()       { return braking; }
     public boolean isHandbraking()   { return handBraking; }
 

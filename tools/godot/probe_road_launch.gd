@@ -16,6 +16,7 @@ extends SceneTree
 ##       the review measured all three equal in cost and sphere/cylinder 15x smoother over a kerb, so this is how
 ##       a kerb strike at speed is compared between them (PLAN.md 0.7)
 ##       -- ... --car=KEC1   drive another model (its <ID>.tscn + <ID>Config.tres; SPC1 by default)
+##       -- ... --start-speed=0   start at rest (default: at --speed) -- pulling away from standing on a grade
 ##       -- ... --bump-stop=0   drive with the suspension's bump stop off (the 2026-10-06 kerb-catch control)
 ##       -- ... --phys=120   run the physics at 120 Hz instead of the project's 60 (PLAN.md 0.7: is a launch the
 ##       solver running out of steps at speed? compare the same case at 60 and 120 -- half the travel per step)
@@ -176,8 +177,9 @@ func _spawn(lane_name: String, speed: float, offset: float, corner_accel: float 
 	world.add_child(car)
 	car.global_position = at + Vector3(0, 0.8, 0) + dir.cross(Vector3.UP) * offset
 	car.look_at(car.global_position + dir, Vector3.UP)
-	# Start at the target speed: a launch run-up would spend half the lane accelerating.
-	car.linear_velocity = dir * speed
+	# Start at the target speed: a launch run-up would spend half the lane accelerating. `--start-speed=0` starts
+	# at rest instead (PLAN.md 0.13: can each model pull away up the touge's 10 % grade from standing?).
+	car.linear_velocity = dir * float(_arg("start-speed", str(speed)))
 	return bool(ctrl.call("drive_lane", lane_name))
 
 ## The gate (PLAN.md 0.1): each case drives one lane at speed, some deliberately on the edge line where a

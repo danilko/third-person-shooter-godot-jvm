@@ -1886,11 +1886,16 @@ public class ZoneManager extends Node {
 		v.characterInfo.faction = vc.faction;
 
 		container.addChild(v);
-		v.setGlobalPosition(at.position());
+		// Set down ON ITS WHEELS, pitched along the lane (PLAN.md 0.13): the lane point is the road surface, and
+		// a car whose origin was put there started with its hull buried and was ejected -- backwards on an uphill
+		// grade, rolling 35 m down the touge to a `stalled` reclaim. 5 cm over full travel, so it settles a touch.
+		Vector3 up = new Vector3(0, 1, 0);
+		Vector3 pos = at.position().plus(up.times(v.groundClearanceAtRest() + 0.05));
+		v.setGlobalPosition(pos);
 		// Face along the lane. A car used to spawn at its default heading (-Z) whatever way its lane
 		// ran: one set down across a west-running lane crept 6 m north on full steer and cut throttle
 		// and stopped for good (measured, probe_traffic_spawn.gd) — the "car at ~0 m/s" shape.
-		if (at.facing() != null) v.lookAt(at.position().plus(at.facing()), new Vector3(0, 1, 0));
+		if (at.facing() != null) v.lookAt(pos.plus(at.facing()), up);
 
 		VehicleAIController ctrl = new VehicleAIController();
 		ctrl.cruiseThrottle = vc.cruiseThrottle;
@@ -1996,7 +2001,7 @@ public class ZoneManager extends Node {
 	}
 
 	/** Where and which way an ambient car is set down: a lane (null = free-roaming, no route asked
-	 *  for), a point on it and the lane's XZ travel direction there. */
+	 *  for), a point on it and the lane's travel direction there (with its grade). */
 	private record Placement(Lane lane, Vector3 position, Vector3 facing) {}
 
 	/**
@@ -2085,15 +2090,18 @@ public class ZoneManager extends Node {
 		return null;
 	}
 
-	/** Unit XZ direction of travel at arc length {@code s}, or null where the lane gives none. */
+	/** Unit direction of travel at arc length {@code s} (with the lane's grade), or null where the lane gives none. */
 	private static Vector3 travelDirection(Lane lane, double s, double total) {
 		double a = s, b = s + 2.0;
 		if (!lane.isLoop() && b > total) { a = Math.max(0.0, total - 2.0); b = total; }
 		Vector3 pa = lane.pointAtLength(a), pb = lane.pointAtLength(b);
 		if (pa == null || pb == null) return null;
-		double dx = pb.getX() - pa.getX(), dz = pb.getZ() - pa.getZ();
-		double len = Math.sqrt(dx * dx + dz * dz);
-		return len < 1e-4 ? null : new Vector3(dx / len, 0, dz / len);
+		// With its grade (dy), so the car is set down pitched along the road, not level into an uphill one.
+		double dx = pb.getX() - pa.getX(), dy = pb.getY() - pa.getY(), dz = pb.getZ() - pa.getZ();
+		double flat = Math.sqrt(dx * dx + dz * dz);
+		if (flat < 1e-4) return null;
+		double len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+		return new Vector3(dx / len, dy / len, dz / len);
 	}
 
 	/** True when no registered body (car, character, player) stands within

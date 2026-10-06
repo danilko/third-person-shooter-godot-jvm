@@ -38,7 +38,9 @@ const WORLDS := {
 const STREAMED := "streamed_vehicle"
 const SECONDS := 240
 const MIN_DRIVE_M := 160.0
-const CLEARANCE_M := 9.9          # ZoneManager.TRAFFIC_SPAWN_CLEARANCE, minus float slack
+const CLEARANCE_M := 9.5          # ZoneManager.TRAFFIC_SPAWN_CLEARANCE (10 m, tested on the frame of the spawn), less
+                                  # what a car already driving can close before this probe first sees the new one
+                                  # (0.25-0.33 m a tick at 15-20 m/s: a 9.87 m reading on 2026-10-06 was that)
 const FACING_TOL_DEG := 30.0
 const MAX_IDLE_S := 15.0          # past ZoneManager.vehicleStallTimeout (12 s)
 
