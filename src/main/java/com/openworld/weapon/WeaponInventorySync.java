@@ -161,6 +161,7 @@ final class WeaponInventorySync {
           + "' (scene '" + entry.scenePath() + "') for slot " + slot + " on '" + wc.getOwner().getName() + "'");
       return;
     }
+    if (item instanceof SupplyItem s && s.supplyId.isEmpty()) s.configure(entry.weaponId());
     if (!entry.pickupId().isEmpty()) item.pickupId = entry.pickupId();
     item.setMagazine(entry.magazine());
     item.setReserve(entry.reserve());

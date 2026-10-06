@@ -7,7 +7,8 @@ extends SceneTree
 ##   2. the armoury konbini has ONE shop counter (PLAN.md W3) whose stock is catalog weapons and healing supplies;
 ##   3. standing at it and pressing `interact` opens the menu; buying a weapon puts it in the inventory, once;
 ##   4. buying it again REFILLS it, no second copy;
-##   5. buying food carries it; hurt, `use_supply` heals with it;
+##   5. buying food puts a SUPPLY stack in the consumable slot (weapon.SupplyItem); hurt, drawing it (key 6) and
+##      firing eats one and heals;
 ##   6. `ui_cancel` closes the menu and gives the player their input back.
 
 const WORLD := "res://src/main/resources/com/openworld/world/World.tscn"
@@ -182,7 +183,8 @@ func _counter_cycle(counter: Area3D, p: CharacterBody3D, spawn: Node3D, weapon: 
 	menu.call("select_now", stock.find(food))
 	menu.call("buy_now")
 	await _tick(2)
-	_check("buying %s carries one" % food, int(p.call("supply_count_now", food)) == 1)
+	_check("buying %s carries a stack" % food, int(p.call("supply_count_now", food)) >= 1,
+			"%d" % int(p.call("supply_count_now", food)))
 	await _press("ui_cancel")
 	await _tick(2)
 	_check("ui_cancel closes the menu and gives the input back", _menu(root) == null and not bool(p.call("input_blocked_now")))
@@ -212,10 +214,15 @@ func _counter_cycle(counter: Area3D, p: CharacterBody3D, spawn: Node3D, weapon: 
 	var h: Node = p.get_node("Health")
 	var mh := float(h.get("max_health"))
 	h.call("apply_replicated_health", mh - 40.0)
-	await _press("use_supply")
-	await _tick(4)
+	var before := int(p.call("supply_count_now", food))
+	await _press("weapon_slot_6")
+	await _tick(60)
+	await _press("fire")
+	await _tick(6)
 	var healed := float(h.call("health_now")) - (mh - 40.0)
-	_check("use_supply eats it and heals", healed > 1.0 and int(p.call("supply_count_now", food)) == 0, "+%.0f HP" % healed)
+	_check("drawing the stack and firing eats one and heals", healed > 1.0
+			and int(p.call("supply_count_now", food)) == before - 1, "+%.0f HP, %d -> %d" % [healed, before,
+			int(p.call("supply_count_now", food))])
 
 
 ## DebugWorld: the konbini's own counter (a MARK_shop_counter in its model), the same cycle as the island's.

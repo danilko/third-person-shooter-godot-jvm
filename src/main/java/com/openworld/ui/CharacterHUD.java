@@ -133,93 +133,11 @@ public class CharacterHUD extends Control {
     }
   }
 
-  // ── carried supplies (user, 2026-10-05: "food has no way to be consumed") ────────────────────────────────
-  // The H key (item.Supplies, use_supply) already eats / heals with the best-fitting supply, but nothing on screen
-  // said what is carried or that H uses it, and at full health it silently did nothing. A line beside the health
-  // bar lists what is carried with the key, and pressing H says what happened. The counts live on the authoritative
-  // peer (Character.supplies), so a co-op client's line stays empty until supplies replicate.
+  // The healing supplies are a weapon stack now (weapon.SupplyItem, the CONSUMABLE slot): the weapon panel and the
+  // inventory column show what is carried, so this HUD keeps no supplies line of its own (user, 2026-10-06).
   private com.openworld.character.Character player;
-  private Label suppliesLabel;
-  private double supplyPoll;
-  private double flashLeft;
-  private String flashText = "";
-  private java.util.Map<String, Integer> beforeUse;
-  private double checkUseIn = -1.0;
 
-  public void setPlayer(com.openworld.character.Character c) {
-    player = c;
-    if (suppliesLabel == null && getNodeOrNull("Health") instanceof Control health) {
-      suppliesLabel = new Label();
-      suppliesLabel.setName("Supplies");
-      if (getNodeOrNull(healthLabelPath) instanceof Label hl && hl.getLabelSettings() != null) {
-        LabelSettings ls = (LabelSettings) hl.getLabelSettings().duplicate();
-        ls.setFontSize(12);
-        suppliesLabel.setLabelSettings(ls);
-      }
-      suppliesLabel.setMouseFilter(Control.MouseFilter.IGNORE);
-      suppliesLabel.setVerticalAlignment(godot.core.VerticalAlignment.CENTER);
-      health.addChild(suppliesLabel);
-      // beside the bar, on the health row, so the bottom-left stays one row
-      suppliesLabel.setPosition(new godot.core.Vector2(health.getSize().getX() + 16f, 0f));
-      suppliesLabel.setSize(new godot.core.Vector2(320f, health.getSize().getY()));
-    }
-  }
-
-  @Register
-  @Override
-  public void _process(double delta) {
-    if (suppliesLabel == null || player == null || !GD.isInstanceValid(player)) return;
-    if (com.openworld.item.Supplies.useKeyJustPressed() && !player.inputBlocked) {
-      beforeUse = new java.util.HashMap<>(player.supplies);
-      checkUseIn = 0.15;
-    }
-    if (checkUseIn >= 0.0 && (checkUseIn -= delta) < 0.0) flash(useResult());
-    if (flashLeft > 0.0) flashLeft -= delta;
-    if ((supplyPoll -= delta) > 0.0 && flashLeft <= 0.0) return;
-    supplyPoll = 0.25;
-    suppliesLabel.setText(flashLeft > 0.0 ? flashText : carriedLine());
-  }
-
-  private void flash(String text) {
-    if (text.isEmpty()) return;
-    flashText = text;
-    flashLeft = 1.8;
-    suppliesLabel.setText(text);
-  }
-
-  /** What the H press did: the supply taken, else why nothing was. */
-  private String useResult() {
-    for (var e : beforeUse.entrySet()) {
-      if (player.supplies.getOrDefault(e.getKey(), 0) < e.getValue()) {
-        var s = com.openworld.item.SupplyCatalog.find(e.getKey());
-        return s != null ? "+" + (int) s.heal() + "  " + s.name() : "";
-      }
-    }
-    if (beforeUse.values().stream().mapToInt(Integer::intValue).sum() == 0) return "H  nothing to eat or use";
-    var h = player.healthNode;
-    if (h != null && h.maxHealth - h.getCurrentHealth() <= 0.5f) return "H  health is full";
-    return "";
-  }
-
-  /** "H  FOOD 3  MED 1" -- by kind, the key first; empty when nothing is carried. */
-  private String carriedLine() {
-    int food = 0, med = 0, odd = 0;
-    for (var e : player.supplies.entrySet()) {
-      var s = com.openworld.item.SupplyCatalog.find(e.getKey());
-      if (s == null || e.getValue() <= 0) continue;
-      switch (s.kind()) {
-        case "medical" -> med += e.getValue();
-        case "strange" -> odd += e.getValue();
-        default -> food += e.getValue();
-      }
-    }
-    if (food + med + odd == 0) return "";
-    StringBuilder b = new StringBuilder("H ");
-    if (food > 0) b.append("  FOOD ").append(food);
-    if (med > 0) b.append("  MED ").append(med);
-    if (odd > 0) b.append("  ??? ").append(odd);
-    return b.toString();
-  }
+  public void setPlayer(com.openworld.character.Character c) { player = c; }
 
   /** Called by HUDManager.wirePlayer() to bind this HUD to a specific character. */
   public void setPlayerCharacterId(String id) {

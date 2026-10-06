@@ -291,6 +291,9 @@ public class WeaponController extends Node {
    */
   private boolean scopeRequested = false;
 
+  /** The aim button held this tick (a supply aims at whom it is given to). */
+  public boolean scopeRequestedNow() { return scopeRequested; }
+
   /** @see #scopeRequested */
   public void setScopeRequested(boolean requested) {
     if (!requested) holdSuppressed = false;   // the button is up: the next press is a fresh hold

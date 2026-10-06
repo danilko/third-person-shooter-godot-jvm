@@ -67,8 +67,6 @@ public class UserCommand {
     public boolean reload;
     /** One-tick edge: the remote-charge detonator (REC1), set off whatever is held (GTA's sticky bomb). */
     public boolean detonate;
-    /** One-tick edge: use a carried healing supply (food / medical; PLAN.md W3). */
-    public boolean useSupply;
     public boolean drop;
 
     // ── Body actions ──────────────────────────────────────────────────────────
@@ -80,7 +78,7 @@ public class UserCommand {
     // ── State requests ────────────────────────────────────────────────────────
     public StanceName desiredStance;
     public int        desiredWeapon;
-    public boolean    wantUnequip;
+    public boolean    wantHolster;
 
     // ── Aim ───────────────────────────────────────────────────────────────────
     /**
@@ -128,7 +126,7 @@ public class UserCommand {
         swimVertical      = 0.0;
         desiredStance     = null;
         desiredWeapon     = -1;
-        wantUnequip       = false;
+        wantHolster       = false;
         aimTargetPosition = null;
         tick              = 0;
         motor = 0f;
@@ -160,7 +158,7 @@ public class UserCommand {
         c.swimVertical    = swimVertical;
         c.desiredStance   = desiredStance;
         c.desiredWeapon   = desiredWeapon;
-        c.wantUnequip     = wantUnequip;
+        c.wantHolster     = wantHolster;
         c.aimTargetPosition = aimTargetPosition != null
                 ? new Vector3(aimTargetPosition.getX(),
                               aimTargetPosition.getY(),

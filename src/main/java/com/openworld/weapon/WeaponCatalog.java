@@ -72,7 +72,8 @@ public final class WeaponCatalog {
     /** A fresh, un-parented instance of weapon {@code id}; null if it has no loadable scene. */
     public static WeaponItem instantiate(String id) {
         Row r = rows().get(id);
-        if (r == null) return null;
+        // A healing supply is a weapon stack too (one shared scene, configured by its supplies.json row).
+        if (r == null) return SupplyItem.instantiate(id, 0);
         if (!(GD.INSTANCE.load(r.scene()) instanceof PackedScene ps) || !(ps.instantiate() instanceof WeaponItem item)) {
             GD.INSTANCE.printErr("WeaponCatalog: " + r.scene() + " is not a WeaponItem scene");
             return null;

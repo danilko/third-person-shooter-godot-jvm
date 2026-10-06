@@ -104,7 +104,8 @@ public class ShopMenu extends Control {
             if (ShopCounter.isSupply(id)) {
                 ids.add(id);
                 names.add(com.openworld.item.SupplyCatalog.find(id).name());
-                icons.add(null);
+                icons.add(GD.load(ICONS + "supply_" + com.openworld.item.SupplyCatalog.find(id).kind() + ".png")
+                        instanceof Texture2D st ? st : null);
                 continue;
             }
             WeaponItem w = WeaponCatalog.instantiate(id);
@@ -215,7 +216,7 @@ public class ShopMenu extends Control {
                 has = fee == 0 || buyer.cash < fee;
                 tag = fee == 0 ? "NOTHING OWED" : (buyer.cash < fee ? "SHORT " : "") + "¥" + fee;
             } else if (ShopCounter.isSupply(ids.get(i))) {
-                int n = com.openworld.item.Supplies.count(buyer, ids.get(i));
+                int n = buyer.supplyCountNow(ids.get(i));
                 int max = com.openworld.item.SupplyCatalog.find(ids.get(i)).max();
                 has = n >= max;
                 tag = has ? "FULL" : "FREE  " + n + "/" + max;
@@ -231,7 +232,7 @@ public class ShopMenu extends Control {
 
     private void footer(float h) {
         if (font == null) return;
-        drawString(font, new Vector2(20f, h - 16f), "ENTER / CLICK  take     E / ESC  close     H  eat / heal",
+        drawString(font, new Vector2(20f, h - 16f), "ENTER / CLICK  take     E / ESC  close",
                 HorizontalAlignment.LEFT, W - 40f, 14, new Color(1f, 1f, 1f, 0.7f));
     }
 

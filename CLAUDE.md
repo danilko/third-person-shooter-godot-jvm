@@ -2637,9 +2637,8 @@ pictures `tools/godot/shot_hud.gd`, needs a display):
   one width"; the old offsets fail them). A MENU has its own backing (`ui/menu_panel.tres`, the store list).
 - **The store menu** (`ShopMenu`): Enter / click takes a row; `E` (the key that opened it) or `Esc` closes it, and
   `MenuManager` hands Esc to an open store first, so it does not go on to open the pause menu. A footer lists the keys.
-- **Supplies on the HUD** (`CharacterHUD.setPlayer`): beside the health bar, `H  FOOD 3  MED 1` (what is carried, by
-  kind); pressing `H` says what it did (`+15 Onigiri`, `health is full`, `nothing to eat or use`). Host / single
-  player only: a co-op client's counts are not replicated yet.
+- **Supplies** are a weapon stack in slot 6 (CLAUDE.md "Wanted level ..." -> "Healing supplies are a WEAPON stack"): the
+  weapon panel and the inventory column show them; there is no separate supplies line.
 - **One palette**: `ui.HudPalette`. Colour means state, never selection: white → amber (health under 50%, a
   quarter magazine) → red (health under 25%, empty); red is reserved for danger. Selection is carried by SHAPE and
   brightness: a white ▶ in the inventory panel's left gutter before the active row, which is full white while the
@@ -9101,9 +9100,11 @@ Fumiriya, weighted 3 in `character_gaits.json` `crowd_weights`). Each went `impo
 
 **A HOLSTER, not a raised state** (user decision). Hands EMPTY (`WeaponController.isHolstered`, the fist slot's second
 state; a body starts holstered): the walk's own arms (WeaponBlend eased to 0 over 0.15 s), no shoulder aim / stock
-mount / torso layer / aim branch, and fire does nothing -- the same in FPS and TPS. The 0 key (`weapon_slot_0`)
-toggles it (with a real weapon out it puts the weapon away); any weapon slot draws. An AI holsters its fists when not
-fighting. The CHEST look-at and `NeckFront` still follow combat (the FPS camera rides the neck: keyed on the hands,
+mount / torso layer / aim branch, and fire does nothing -- the same in FPS and TPS. **Controls (2026-10-06):** H
+(`holster`) toggles it -- a weapon in hand is put away and remembered, empty hands bring that weapon back (the fists if
+none); any slot key draws that slot at once (0 = the fists). Holstered, `PlayerController` keeps combat and the scope
+OFF whatever aim / fire are doing, so nothing aims and nothing alarms a bystander; the weapon panel shows NO weapon
+(not the fist) and no inventory row is lit. An AI holsters its fists when not fighting. The CHEST look-at and `NeckFront` still follow combat (the FPS camera rides the neck: keyed on the hands,
 the view lagged a crouch 0.161 m against `probe_fps_camera`'s 0.12). Replicated as bit 12 of the snapshot flags word.
 Drawing posts `StimulusManager.Type.WEAPON_DRAWN` (10 m fists, 30 m a weapon): the crowd and the promoted walkers
 (`SidewalkWalkerController` now runs from gunshots, blasts and drawn weapons) react. Both listen by IDENTITY, not by
@@ -10954,11 +10955,19 @@ Written while an island rebuild ran, so compiled and unit-tested only; the gates
   ids and supply ids; `interact` opens `ui.ShopMenu` (GTA SA's Ammu-Nation list). Every grant goes through
   `item.WeaponGrant` (a carried weapon is refilled), which `WeaponPad` uses too until the pads are removed. A client
   sends `MSG_SHOP_REQUEST` (31); the host checks the owner and that the buyer stands at a counter that sells it.
-- **Healing supplies** (user: food from a konbini / restaurant / market, medical from a hospital, "strange" medical
-  from an adult shop): `item/supplies.json`, `item.SupplyCatalog` (`SupplyCatalogTest`), carried in
-  `Character.supplies` on the authoritative peer (at most `max` each), used with `use_supply` (H; the action is added
-  to the InputMap at run time so project.godot is untouched): the smallest supply that heals all the missing health,
-  else the biggest. A client sends `MSG_SUPPLY_USE` (32).
+- **Healing supplies are a WEAPON stack** (user, 2026-10-06; food from a konbini / restaurant / market, medical from a
+  hospital, "strange" from an adult shop): `item/supplies.json` rows, one shared scene `weapon/Supply.tscn`
+  (`weapon.SupplyItem`, configured by its row; `WeaponCatalog.instantiate` and the inventory manifest route a supply id
+  there, so there is no per-kind scene). It sits in the CONSUMABLE slot (key 6), one kind at a time like a grenade
+  stack: magazine = count, same kind tops up, another kind displaces it, the last use clears the slot. FIRE uses one on
+  yourself (not at full health); holding AIM on another living character within `giveReach` 2.5 m and `giveConeDeg`
+  25 deg uses it on THEM, and that character wears an L4D-style rim while targeted (`assets/vfx/outline/
+  target_outline.tres`, an inverted-hull `material_overlay`, local only); the drop key gives the stack away. Health is
+  applied on the authority; a client sends `MSG_SUPPLY_USE` (32: user, target, supply), the host re-checks the stack,
+  the reach and that the target lives. Icons `assets/ui/weapons/supply_<kind>.png` (placeholders). The old H key,
+  `Character.supplies` and the HUD supplies line are gone. Gate **`tools/godot/probe_holster_supply.gd`** 10/10
+  (`--control`, give reach 0, fails the 2 give checks); `probe_weapon_counter.gd` buys a stack and eats one. Not gated:
+  a client giving to someone across two processes.
 - **Under the map** (`WorldBounds.underground`, PLAN.md W1): a body more than 1 m under the Terrain3D surface for
   0.5 s is put on the topmost collider within 8 m over the terrain there; swimming over the seabed is never touched.
   Gate `tools/godot/probe_underground.gd` (3 cases, `--control`).

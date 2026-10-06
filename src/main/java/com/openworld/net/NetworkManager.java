@@ -1766,24 +1766,44 @@ public class NetworkManager extends Node {
         com.openworld.weapon.RemoteCharges.detonateAll(id);
     }
 
-    /** Client → host: the owner used a healing supply (PLAN.md W3). */
-    public void sendSupplyUse(String characterId) {
-        if (!isNetworked() || isServer() || characterId == null || characterId.isEmpty()) return;
+    /** Client → host: the owner used the healing supply in its hands on {@code targetId} (weapon.SupplyItem). */
+    public void sendSupplyUse(String userId, String targetId, String supplyId) {
+        if (!isNetworked() || isServer() || userId == null || userId.isEmpty()) return;
         com.openworld.net.NetStats.increment("supply_use_sent");
-        sendMessage(SERVER_PEER_ID, NetMessageCodec.encodeSupplyUse(MSG_SUPPLY_USE, characterId));
+        sendMessage(SERVER_PEER_ID, NetMessageCodec.encodeSupplyUse(MSG_SUPPLY_USE, userId,
+                targetId == null ? "" : targetId, supplyId == null ? "" : supplyId));
     }
 
     private void handleSupplyUseMessage(int senderPeerId, StreamPeerBuffer buf) {
-        String id = NetMessageCodec.decodeSupplyUse(buf);
-        if (!isValidIdentifier(id)) { dropInvalid("supply", "MSG_SUPPLY_USE", senderPeerId); return; }
+        NetMessageCodec.SupplyUse m = NetMessageCodec.decodeSupplyUse(buf);
+        if (!isValidIdentifier(m.userId()) || (!m.targetId().isEmpty() && !isValidIdentifier(m.targetId()))) {
+            dropInvalid("supply", "MSG_SUPPLY_USE", senderPeerId);
+            return;
+        }
         if (!isServer()) return;
-        Character c = findCharacterById(id);
-        if (c == null || c.characterInfo == null || c.characterInfo.ownerPeerId != senderPeerId) {
+        Character user = findCharacterById(m.userId());
+        if (user == null || user.characterInfo == null || user.characterInfo.ownerPeerId != senderPeerId) {
             com.openworld.net.NetStats.increment("supply_use_rejected_not_owner");
             return;
         }
-        com.openworld.net.NetStats.increment(com.openworld.item.Supplies.useHere(c).isEmpty()
-                ? "supply_use_nothing" : "supply_use_accepted");
+        // The host's copy of the stack: the same kind, in the CONSUMABLE slot, not empty.
+        com.openworld.weapon.SupplyItem stack = null;
+        if (user.weaponController != null) {
+            for (int i = 0; i < user.weaponController.getSlotCount(); i++) {
+                if (user.weaponController.getWeaponItem(i) instanceof com.openworld.weapon.SupplyItem si
+                        && si.supplyId.equals(m.supplyId()) && si.getMagazine() > 0) stack = si;
+            }
+        }
+        if (stack == null) { com.openworld.net.NetStats.increment("supply_use_rejected_no_stack"); return; }
+        Character target = m.targetId().isEmpty() ? user : findCharacterById(m.targetId());
+        if (target == null || target.healthNode == null || !target.isAlive()
+                || target.getGlobalPosition().distanceTo(user.getGlobalPosition()) > stack.giveReach + 1.5f) {
+            com.openworld.net.NetStats.increment("supply_use_rejected_target");
+            return;
+        }
+        stack.setMagazine(stack.getMagazine() - 1);
+        target.healthNode.heal(stack.healAmount());
+        com.openworld.net.NetStats.increment("supply_use_accepted");
     }
 
     /** Client → host: the owner bought an item at a shop counter (PLAN.md W3). */

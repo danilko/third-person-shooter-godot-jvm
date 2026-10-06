@@ -55,6 +55,8 @@ public class PlayerController extends Controller {
     // ── Cached body references (re-resolved when body type changes) ───────────
     private Player     cachedPlayer;
     private Timer      cachedAimStayTimer;
+    /** Aim or fire held on the previous tick: the aim-stay beat starts on this controller's own edge. */
+    private boolean    wasAimOrFire;
     /** Last tick's toggled-scope state, so the aim-stay beat starts on the tick the toggle ends. */
     private boolean wasScopeLatched = false;
     private Vehicle     cachedVehicle;
@@ -180,12 +182,18 @@ public class PlayerController extends Controller {
             Timer aimStayTimer = cachedAimStayTimer;
             if (aimOrFire) {
                 aimStayTimer.stop();
-            } else if (body.isCombat() && (inp.isActionJustReleased("aim", false)
+            } else if (body.isCombat() && (wasAimOrFire
+                                        || inp.isActionJustReleased("aim", false)
                                         || inp.isActionJustReleased("fire", false)
                                         || wasScopeLatched)) {
+                // The beat starts on THIS controller's own edge (aim/fire held last tick, not now), not only on
+                // Input's just-released flag: that flag is per physics frame and is missed when the release lands
+                // after this tick ran (measured: a release injected from another node's physics step dropped
+                // combat at once, the gun never came on the aim and W21's held press expired -- run_net_shot_test).
                 aimStayTimer.start();
             }
             wasScopeLatched = scopeLatched;
+            wasAimOrFire = aimOrFire;
             cmd.wantCombat = aimOrFire || (body.isCombat() && !aimStayTimer.isStopped());
         }
 
@@ -194,6 +202,12 @@ public class PlayerController extends Controller {
         // scoped; and the aim-stay timer would hold the scope up for a beat after release. Whether
         // this intent means anything is decided by the held weapon (WeaponController.isScoped).
         cmd.wantScope = inp.isActionPressed("aim", false);
+        // HOLSTERED (hands empty): aim and fire mean nothing -- no combat state, no raised aim, no scope, so nothing
+        // a bystander could read as a threat (user, 2026-10-06). Draw first: H, or a weapon key.
+        if (body.weaponController != null && body.weaponController.isHolstered()) {
+            cmd.wantCombat = false;
+            cmd.wantScope = false;
+        }
         // Hold breath shares Shift with the stealth-walk modifier by default (CoD's binding): a
         // shooter steadying a scope is not running anyway. A separate action so it can be rebound.
         cmd.holdBreath = inp.isActionPressed("hold_breath", false);
@@ -237,8 +251,8 @@ public class PlayerController extends Controller {
         cmd.fire    = inp.isActionPressed("fire", false);
         cmd.reload  = inp.isActionJustPressed("reload", false);
         cmd.detonate = inp.isActionJustPressed("detonate", false);
-        cmd.useSupply = com.openworld.item.Supplies.useKeyJustPressed();
         cmd.drop    = inp.isActionJustPressed("drop", false);
+        cmd.wantHolster = inp.isActionJustPressed("holster", false);
         cmd.jump    = inp.isActionJustPressed("jump", false);
 
         // ── Stance (hold or toggle, configurable via stanceToggleMode) ────────

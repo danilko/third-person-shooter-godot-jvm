@@ -1,0 +1,40 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/SupplyItem.java" id="1_sup"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_area"]
+size = Vector3(0.5, 0.5, 0.5)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_body"]
+size = Vector3(0.1, 0.08, 0.08)
+
+[sub_resource type="BoxMesh" id="BoxMesh_pack"]
+size = Vector3(0.1, 0.08, 0.06)
+
+[sub_resource type="StandardMaterial3D" id="Mat_pack"]
+albedo_color = Color(0.92, 0.92, 0.88, 1)
+
+[node name="Supply" type="Node3D"]
+script = ExtResource("1_sup")
+weapon_archetype = "throwable"
+slot_type = 4
+hold_socket = "SocketThrowable"
+magazine = 1
+reserve = 0
+
+[node name="PickupArea" type="Area3D" parent="."]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PickupArea"]
+shape = SubResource("BoxShape3D_area")
+
+[node name="Model" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_pack")
+surface_material_override/0 = SubResource("Mat_pack")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("BoxShape3D_body")
+
+[connection signal="body_entered" from="PickupArea" to="." method="on_body_entered"]
+[connection signal="body_exited" from="PickupArea" to="." method="on_body_exited"]

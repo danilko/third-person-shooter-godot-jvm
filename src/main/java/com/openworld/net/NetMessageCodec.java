@@ -421,15 +421,23 @@ public final class NetMessageCodec {
         return new DecodedShopRequest(who, buf.getUtf8String());
     }
 
-    // ── MSG_SUPPLY_USE (client → host, reliable channel 1): [tag u8][characterId utf8] ──
-    // The owner pressed use_supply; the host uses that character's best-fitting carried supply.
+    // ── MSG_SUPPLY_USE (client → host, reliable channel 1): [tag u8][user utf8][target utf8][supply utf8] ──
+    // The owner used the healing supply in its hands (weapon.SupplyItem) on `target` (itself, or someone it aimed
+    // at). The host re-checks the stack, the reach and that the target is alive, then heals.
 
-    public static PackedByteArray encodeSupplyUse(int msgType, String characterId) {
-        return encodeDetonateRequest(msgType, characterId);
+    public record SupplyUse(String userId, String targetId, String supplyId) {}
+
+    public static PackedByteArray encodeSupplyUse(int msgType, String userId, String targetId, String supplyId) {
+        StreamPeerBuffer buf = new StreamPeerBuffer();
+        buf.put8(msgType);
+        buf.putUtf8String(userId);
+        buf.putUtf8String(targetId);
+        buf.putUtf8String(supplyId);
+        return buf.getDataArray();
     }
 
-    public static String decodeSupplyUse(StreamPeerBuffer buf) {
-        return buf.getUtf8String();
+    public static SupplyUse decodeSupplyUse(StreamPeerBuffer buf) {
+        return new SupplyUse(buf.getUtf8String(), buf.getUtf8String(), buf.getUtf8String());
     }
 
     // ── MSG_DAMAGE_BROADCAST ──────────────────────────────────────────────────

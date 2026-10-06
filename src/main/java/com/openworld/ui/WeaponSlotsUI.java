@@ -64,6 +64,7 @@ public class WeaponSlotsUI extends PanelContainer {
     private Character        character;
     private WeaponController weaponController;
     private int              activeSlot = 0;
+    private boolean          shownHolstered;
 
     private final List<WeaponSlotItem> slotItems = new ArrayList<>();
     private final String[]             keyTexts  = new String[SLOT_COUNT];
@@ -99,6 +100,9 @@ public class WeaponSlotsUI extends PanelContainer {
     @Register
     @Override
     public void _process(double delta) {
+        // The holster emits no signal: poll it (one boolean) so the in-hand row follows H at once.
+        boolean h = weaponController != null && GD.isInstanceValid(weaponController) && weaponController.isHolstered();
+        if (h != shownHolstered) { shownHolstered = h; refreshAllSlots(); }
         if (showTimer <= 0.0) return;
         showTimer = Math.max(0.0, showTimer - delta);
         double up = fadeSeconds > 0f ? Math.min(1.0, showTimer / fadeSeconds) : (showTimer > 0 ? 1.0 : 0.0);
@@ -194,7 +198,8 @@ public class WeaponSlotsUI extends PanelContainer {
 
     private void refreshAllSlots() {
         if (weaponController == null) return;
-        int active = weaponController.getWeapon();
+        // holstered: no slot is in hand (the fist row is not lit -- the hands are empty)
+        int active = weaponController.isHolstered() ? -1 : weaponController.getWeapon();
         activeSlot = active;
 
         boolean changed = false;

@@ -214,6 +214,8 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     private boolean headVisibleApplied = true;
 
     public Health healthNode;
+    /** The weapon slot the HOLSTER key put away last; the next press draws it again. */
+    private int lastDrawnSlot = 0;
     protected Marker3D aimTarget;
     public RayCast3D aimRay;
 
@@ -278,12 +280,12 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     public boolean inputBlocked = false;
     /** For probes: is an overlay (shop menu, radial menu, console) holding this body's input. */
     @Register public boolean inputBlockedNow() { return inputBlocked; }
+    /** In combat (aiming / fighting) this tick -- a probe readout. */
+    @Register public boolean combatNow() { return combat; }
 
     /** Yen carried (a robbed till, PLAN.md W3). Kept on the authoritative peer; nothing spends it yet. */
     public int cash = 0;
 
-    /** Healing supplies carried: id -> count (PLAN.md W3). Kept on the authoritative peer. */
-    public final java.util.Map<String, Integer> supplies = new java.util.LinkedHashMap<>();
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
     @Register
@@ -771,7 +773,7 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         // Pressing fire with a melee weapon automatically enters combat stance so
         // the character raises fists without requiring a separate aim button press.
         boolean effectiveCombat = input.wantCombat;
-        if (input.fire && weaponController != null) {
+        if (input.fire && weaponController != null && !weaponController.isHolstered()) {   // empty hands do not fight
             WeaponItem w = weaponController.getCurrentWeaponItem();
             if (w != null && w.getWeaponType() == WeaponType.MELEE) effectiveCombat = true;
         }
@@ -808,9 +810,6 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
 
         // ── Remote-charge detonator (REC1) ────────────────────────────────
         if (input.detonate) pressDetonator();
-
-        // ── Healing supply (PLAN.md W3) ───────────────────────────────────
-        if (input.useSupply) com.openworld.item.Supplies.use(this);
 
         // ── Jump (single ground jump only) ─────────────────────────────────
         // First stand up if crouched/crawling, otherwise launch a ground jump.
@@ -886,19 +885,25 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         // this tick cannot — it is off in a driver's seat, and a car's camera is not this body's.
         if (debugSwim) updateSwimDebug(sw, waterDepth, swimming);
 
-        // ── Weapon switch / unequip ────────────────────────────────────────
-        // HOLSTER (user, 2026-09-27): a body walks with its hands empty until it chooses to fight. The
-        // slot-0 key (0; also `wantUnequip`) toggles it -- a real weapon goes away and the hands drop; with the hands empty it
-        // raises the fists; with the fists up it drops them. Choosing any weapon draws it. Holstered, a body
-        // cannot fight (WeaponController.onWeaponFire). The same in first and third person. An AI has no key:
-        // an unarmed AI holsters its fists whenever it is not fighting and draws them when it engages.
+        // ── Weapon switch / holster ────────────────────────────────────────
+        // HOLSTER (user, 2026-09-27; controls 2026-10-06): a body walks with its hands empty until it chooses to
+        // fight. The HOLSTER key (H, `wantHolster`) toggles it: a weapon in hand is put away (remembered), and with
+        // the hands empty the weapon put away last comes back out (the fists if there is none). Choosing any slot
+        // draws that weapon at once, slot 0 the fists. Holstered, a body cannot fight (WeaponController.onWeaponFire)
+        // and does not aim (PlayerController keeps combat off), the same in first and third person. An AI has no
+        // key: an unarmed AI holsters its fists whenever it is not fighting and draws them when it engages.
         if (weaponController != null) {
-            if (input.wantUnequip || input.desiredWeapon == 0) {
-                if (weaponController.getWeapon() > 0) {
-                    setWeapon(0);
+            if (input.wantHolster) {
+                if (!weaponController.isHolstered()) {
+                    int cur = weaponController.getWeapon();
+                    if (cur > 0) lastDrawnSlot = cur;
+                    if (cur > 0) setWeapon(0);
                     weaponController.setHolstered(true);
+                } else if (lastDrawnSlot > 0 && weaponController.getWeaponItem(lastDrawnSlot) != null) {
+                    weaponController.setHolstered(false);
+                    setWeapon(lastDrawnSlot);
                 } else {
-                    weaponController.setHolstered(!weaponController.isHolstered());
+                    weaponController.setHolstered(false);
                 }
             } else if (input.desiredWeapon >= 0) {
                 weaponController.setHolstered(false);
@@ -1633,10 +1638,15 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     @Register
     public void giveCashNow(int yen) { cash = Math.max(0, cash + yen); }
 
-    /** How many of a healing supply this character carries (probe readout, PLAN.md W3). */
+    /** How many of a healing supply this character carries -- its CONSUMABLE stack (weapon.SupplyItem; probe readout). */
     @Register
     public int supplyCountNow(String id) {
-        return supplies.getOrDefault(id, 0);
+        if (weaponController == null) return 0;
+        for (int i = 0; i < weaponController.getSlotCount(); i++) {
+            if (weaponController.getWeaponItem(i) instanceof com.openworld.weapon.SupplyItem s && s.supplyId.equals(id))
+                return s.getMagazine();
+        }
+        return 0;
     }
 
     /** How many remote charges this character has armed on this peer (probe readout). */

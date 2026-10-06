@@ -51,7 +51,10 @@ public class WeaponHUD extends Control {
     @Override
     public void _process(double delta) {
         if (wc == null || !godot.global.GD.isInstanceValid(wc)) return;
-        WeaponItem w = wc.getCurrentWeaponItem();
+        // Holstered, the hands are EMPTY: the panel shows no weapon at all, not the fist (user, 2026-10-06).
+        boolean holstered = wc.isHolstered();
+        WeaponItem w = holstered ? null : wc.getCurrentWeaponItem();
+        setModulate(new godot.core.Color(1f, 1f, 1f, holstered ? 0f : 1f));
         if (w != shownItem) {
             shownItem = w;
             shownMag = shownReserve = Integer.MIN_VALUE;
@@ -63,7 +66,7 @@ public class WeaponHUD extends Control {
         }
         boolean ammo = showsAmmo(w);
         if (magazine != null) magazine.setVisible(ammo);
-        if (reserve != null) reserve.setVisible(ammo);
+        if (reserve != null) reserve.setVisible(ammo && !(w instanceof com.openworld.weapon.SupplyItem));   // a stack has no reserve
         if (!ammo) return;
         if (w.magazine != shownMag) {
             shownMag = w.magazine;

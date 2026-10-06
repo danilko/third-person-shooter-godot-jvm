@@ -42,19 +42,4 @@ public final class SupplyCatalog {
     }
 
     public static Supply find(String id) { return load().get(id); }
-
-    /**
-     * Which carried supply to use for {@code missing} health: the smallest one that heals it all, else the
-     * biggest (so a scratch does not waste a medical kit). Null when nothing is carried.
-     */
-    public static String best(Map<String, Integer> carried, Map<String, Supply> table, float missing) {
-        String fit = null, big = null;
-        for (Map.Entry<String, Integer> e : carried.entrySet()) {
-            Supply s = table.get(e.getKey());
-            if (s == null || e.getValue() <= 0) continue;
-            if (s.heal() >= missing && (fit == null || s.heal() < table.get(fit).heal())) fit = s.id();
-            if (big == null || s.heal() > table.get(big).heal()) big = s.id();
-        }
-        return fit != null ? fit : big;
-    }
 }

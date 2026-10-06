@@ -27,24 +27,15 @@ class SupplyCatalogTest {
     }
 
     @Test
-    void theSmallestThatHealsItAllIsUsedElseTheBiggest() throws Exception {
-        var t = table();
-        Map<String, Integer> carried = new LinkedHashMap<>();
-        carried.put("med_kit", 1);
-        carried.put("onigiri", 2);
-        carried.put("bandage", 1);
-        assertEquals("onigiri", SupplyCatalog.best(carried, t, 12f));
-        assertEquals("bandage", SupplyCatalog.best(carried, t, 20f));
-        assertEquals("med_kit", SupplyCatalog.best(carried, t, 90f));
-        assertEquals("med_kit", SupplyCatalog.best(carried, t, 500f));
-        carried.put("med_kit", 0);
-        assertEquals("bandage", SupplyCatalog.best(carried, t, 500f));
-        assertNull(SupplyCatalog.best(new LinkedHashMap<>(), t, 10f));
-    }
-
-    @Test
     void stockIdsNeverCollideWithWeaponIds() throws Exception {
         String catalog = Files.readString(Path.of("src/main/resources/com/openworld/weapon/weapon_catalog.json"));
         for (String id : table().keySet()) assertFalse(catalog.contains("\"" + id + "\""), id);
+    }
+
+    @Test
+    void everyKindHasAnIconAndTheSharedSceneExists() throws Exception {
+        assertTrue(Files.exists(Path.of("src/main/resources/com/openworld/weapon/Supply.tscn")), "weapon/Supply.tscn");
+        for (var s : table().values())
+            assertTrue(Files.exists(Path.of("assets/ui/weapons/supply_" + s.kind() + ".png")), s.id() + ": supply_" + s.kind() + ".png");
     }
 }

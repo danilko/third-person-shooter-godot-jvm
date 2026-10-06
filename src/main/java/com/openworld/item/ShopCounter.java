@@ -164,7 +164,7 @@ public class ShopCounter extends Area3D {
         grantTo(who, id);
     }
 
-    /** The authority's grant: a supply is carried, a weapon goes through {@link WeaponGrant}. */
+    /** The authority's grant: weapons and supplies alike go through {@link WeaponGrant} (a supply is a weapon stack). */
     @Register
     public void grantToNow(Node who, String id) {
         if (who instanceof com.openworld.character.Character c) grantTo(c, id);
@@ -174,8 +174,7 @@ public class ShopCounter extends Area3D {
         if (!sells(id)) return;
         if (TILL.equals(id)) { clerk().robTill(who); return; }
         if (DONATION.equals(id)) { com.openworld.game.GangSystem.get().donate(who, clerk().gang()); return; }
-        if (isSupply(id)) Supplies.give(who, id);
-        else WeaponGrant.grant(who, id, this);
+        WeaponGrant.grant(who, id, this);
     }
 
     public static boolean isSupply(String id) { return SupplyCatalog.find(id) != null; }
