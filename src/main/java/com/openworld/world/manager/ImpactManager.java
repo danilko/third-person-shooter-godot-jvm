@@ -8,6 +8,7 @@ import godot.annotation.Script;
 import godot.api.Node;
 import godot.api.Texture2D;
 import godot.core.NodePath;
+import godot.global.GD;
 import com.openworld.character.CharacterVisuals;
 import com.openworld.weapon.WeaponController;
 import com.openworld.world.Breakable;
@@ -83,6 +84,7 @@ public class ImpactManager extends Node {
         DecalManager dm = getDecalManager();
         if (dm != null && info.hitNormal != null) dm.spawn(info.hitPoint, info.hitNormal);
 
+        if (SHOT_TRACE && attackerId != null && !attackerId.isEmpty()) traceHit(info, ctx, damage);
         if (ctx.healthOwner != null) {
             float bodyDamage = damage;
             // Tire hit (the TireHit collider under a VehicleWheel): the wheel takes the
@@ -108,6 +110,28 @@ public class ImpactManager extends Node {
         // Destructible world geometry (breakable glass/wall — PLAN.md I2). Host-authoritative:
         // Breakable.applyDamage ignores the hit on a non-server peer and replicates the break itself.
         if (ctx.breakable != null) ctx.breakable.applyDamage(damage, attackerPos);
+    }
+
+    /**
+     * Run the game with {@code OW_SHOT_TRACE=1} to print one line per bullet a player lands: what it hit, which body's
+     * Health that resolves to, and that Health's state BEFORE the damage (dead, invulnerable, no owner at all). Added
+     * for the 2026-10-06 report "the HUD aim is on a pedestrian and the shot does no damage", which a headless stand
+     * could not reproduce -- this is the line to ask for.
+     */
+    public static final boolean SHOT_TRACE = System.getenv("OW_SHOT_TRACE") != null;
+
+    private static void traceHit(HitInfo info, HitContext ctx, float damage) {
+        String what = info.hitNode == null ? "nothing" : String.valueOf(info.hitNode.getPath().getPath()) + " at " + info.hitPoint;
+        if (ctx.healthOwner == null) {
+            GD.print("[shot] " + what + " -> no Health owner (no damage)");
+            return;
+        }
+        Node hn = ctx.healthOwner.getNodeOrNull(new NodePath("Health"));
+        String state = hn instanceof Health h
+                ? String.format(java.util.Locale.ROOT, "hp %.0f%s", h.getCurrentHealth(), h.invulnerable ? " INVULNERABLE" : "")
+                : "no Health node";
+        GD.print(String.format(java.util.Locale.ROOT, "[shot] %s -> %s (%s), %.0f damage before multipliers",
+                what, ctx.healthOwner.getName(), state, damage));
     }
 
     /**

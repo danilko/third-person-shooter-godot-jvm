@@ -447,7 +447,15 @@ public class WeaponItem extends Pickup implements WeaponAction {
     double len = toFar.length();
     if (len > 1e-3) {
       TraceHit near = nearerSmallShape(ray, origin, toFar.div(len), (float) end.minus(origin).length(), null);
-      if (near != null && near.point.minus(origin).length() > SIGHT_MIN_DISTANCE) return near.point;
+      if (near != null && near.point.minus(origin).length() > SIGHT_MIN_DISTANCE) {
+        end = near.point;
+      }
+      // A light crowd ped has no collider (world.PedCrowd), so the camera ray passes through the person under the
+      // crosshair and the sight point lands on the wall BEHIND them; the muzzle leg then converges there and, from a
+      // gun beside and below the camera, passes up to ~0.3 m wide of the ped (user, 2026-10-06: "shooting the crowd
+      // does not work, it works on an AI" -- an AI's hitbox stops the camera ray). Stop the sight at the ped.
+      var crowd = com.openworld.world.PedCrowd.shoot(origin, toFar.div(len), end.minus(origin).length());
+      if (crowd != null && crowd.distance() > SIGHT_MIN_DISTANCE) end = crowd.point();
     }
     return end;
   }

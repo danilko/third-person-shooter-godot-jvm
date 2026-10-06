@@ -509,6 +509,14 @@ PED_RADIUS = 0.35      # the character capsule (MeshConfig `body_radius`, measur
 PED_EDGE = 0.10        # ... and the margin it keeps from the strip and from the footway's outer edge
 
 
+def _pfu():
+    d = os.path.join(ROOT, "blender", "addons", "road_kit_authoring")
+    if d not in sys.path:
+        sys.path.insert(0, d)
+    import point_furniture
+    return point_furniture
+
+
 def furniture_strip(walk):
     """How far outboard of the KERB the road furniture reaches on a footway `walk` m wide (m).
 
@@ -524,8 +532,7 @@ def furniture_strip(walk):
         for d in (os.path.join(ROOT, "blender", "addons", "road_kit_authoring"),):
             if d not in sys.path:
                 sys.path.insert(0, d)
-        import point_furniture as pfu
-        table = _STRIP_CACHE = pfu.load()
+        table = _STRIP_CACHE = _pfu().load()
     r, a = table.rules, table.assets
 
     def across(name):
@@ -541,7 +548,7 @@ def furniture_strip(walk):
              r["bollard_inset"] + across("bollard")]
     if walk >= r["tree_min_footway"]:
         # the planter is the TREE's socket (3.18m), so it stands where the tree does and reaches its own half
-        reach.append(r["tree_kerb_gap"] + max(across(r["tree_assets"][0]),
+        reach.append(_pfu().tree_kerb_offset(table) + max(across(r["tree_assets"][0]),
                                               across("planter") if r.get("tree_planter", True) else 0.0))
     if r.get("planter_spacing", 0.0) > 0.0 and walk >= r["planter_min_footway"]:
         # a standalone planter run, if one is ever turned back on: its CENTRE is at kerb_gap + half

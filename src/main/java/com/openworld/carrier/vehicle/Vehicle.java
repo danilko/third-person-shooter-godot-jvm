@@ -1399,6 +1399,15 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     }
 
     /**
+     * Run the game with {@code OW_CRASH_TRACE=1} to print one line per scored crash of a PLAYER-driven car: what it hit,
+     * how hard, and the health it cost (VehicleDamageModel.flushCrash). This is how the 2026-10-06 "the kerb damages my
+     * car sometimes" report was traced to street-tree planters standing flush with the kerb.
+     */
+    static final boolean CRASH_TRACE = System.getenv("OW_CRASH_TRACE") != null;
+    /** The collider of the hardest contact in the crash being summed (CRASH_TRACE only). */
+    String crashCollider = "";
+
+    /**
      * Hands this step's hard contacts to the damage model as ONE impact: the change of velocity they caused
      * (|impulse| / mass, summed) at their impulse-weighted point. A contact pushing UP from below is the car resting
      * or landing on the ground, not a crash, and is skipped - the wheels are rays, so the hull only touches the
@@ -1407,12 +1416,18 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     private void feedCrash(PhysicsDirectBodyState3D state, int count) {
         double mass = Math.max(1.0, getMass());
         double dv = 0.0;
+        double bestD = 0.0;
         Vector3 at = Vector3.Companion.getZERO();
         Vector3 up = state.getTransform().getBasis().getColumn(1);
         for (int i = 0; i < count; i++) {
             Vector3 impulse = state.getContactImpulse(i);
             double d = impulse.length() / mass;
             if (d < 0.05 || state.getContactLocalNormal(i).dot(up) > 0.7) continue;
+            if (CRASH_TRACE && d > bestD) {
+                bestD = d;
+                Object o = state.getContactColliderObject(i);
+                crashCollider = o instanceof Node n ? String.valueOf(n.getPath().getPath()) : String.valueOf(o);
+            }
             at = at.plus(state.getContactLocalPosition(i).times(d));
             dv += d;
         }

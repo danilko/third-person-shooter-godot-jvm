@@ -956,7 +956,7 @@ def _street_trees(fur, table, solves, bands, mine_run, ground, lanes):
                 if 2.0 * w < r["tree_min_footway"] or k <= 0.0 or not _grounded(ground, p, r["max_above_ground"]):
                     continue
                 lat = _left(d)
-                off = sgn * r["tree_kerb_gap"]
+                off = sgn * tree_kerb_offset(table)
                 pos = (p[0] + lat[0] * off, p[1] + lat[1] * off, p[2] + k)
                 if fur.clear_of(pos, r["tree_clearance"]) and index.clear_of(pos, r["tree_lane_clear"]):
                     if fur.put(table, asset, pos, d, s.road.name):
@@ -971,6 +971,24 @@ def _street_trees(fur, table, solves, bands, mine_run, ground, lanes):
                             fur.put(table, "planter", pos, d, s.road.name)
                         else:
                             _tree_pit(fur, r, pos, d, pit_mat)
+
+
+def tree_kerb_offset(table):
+    """Where a street tree's CENTRE stands, metres in from the kerb line: `tree_kerb_gap`, pushed out so that the
+    planter it stands in (`tree_planter`) keeps `planter_kerb_gap` of footway between its kerb-side face and the kerb.
+
+    User-reported 2026-10-06: "the vehicle driving along the kerb is damaged sometimes, not other times". Measured
+    (`probe_road_launch.gd` with OW_CRASH_TRACE): every damaging contact was this planter, never the kerb -- the tree
+    stood 0.90 m in and the planter is 0.898 m across-half, so its face was FLUSH with the kerb line (2 mm) and a car
+    with its tyre on the kerb scraped a 0.6 m concrete box every 18 m. One owner, read by `island_buildings
+    .furniture_strip` too, so the crowd's walk line moves with it."""
+    r = table.rules
+    off = float(r["tree_kerb_gap"])
+    if r.get("tree_planter", True) and "planter" in table.assets:
+        a = table.assets["planter"]
+        half = 0.5 * (a["hi"][0] - a["lo"][0]) * a["scale"][0]
+        off = max(off, float(r.get("planter_kerb_gap", 0.3)) + half)
+    return off
 
 
 def _tree_pit(fur, r, pos, fwd, material):

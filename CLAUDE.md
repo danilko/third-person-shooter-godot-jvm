@@ -9014,6 +9014,40 @@ read as flat ovals, no brows or mouth). At **80 m**, the nearest a light ped is 
 indistinguishable and the mip bleeding is not visible.
 
 
+## Kerb damage was street-tree planters; crowd shots land like AI shots (2026-10-06, user-reported)
+
+- **"The kerb damages my car sometimes, not other times."** Measured (`probe_road_launch.gd` with `OW_CRASH_TRACE=1`):
+  the kerb never scored a crash; every damaging contact was `FURN_props-prop`, the PLANTER every street tree stands in
+  (3.18m). The tree stood `tree_kerb_gap` 0.90 m in and the planter is 0.898 m across-half, so its face was 2 mm from
+  the kerb line: a car with its tyre on the kerb scraped a 0.6 m concrete box every 18 m. `point_furniture
+  .tree_kerb_offset` is the one owner now (planter face `planter_kerb_gap` 0.3 m behind the kerb, tree centre 1.20 m),
+  and `island_buildings.furniture_strip` reads it (the walk line moves on 3 m footways). DebugWorld, kerb line at 12 and
+  22 m/s: 17.6 / 72.4 hp -> 0. Driving fully onto the pavement into a tree is still a crash, on purpose. A raised median
+  measured 0 damage with the wheels on it (naka_hondori, 244 m).
+- **`OW_CRASH_TRACE=1`** in the environment prints `[crash] <car> hit <collider path>: dv ...` for every scored crash of
+  a PLAYER-driven car (`Vehicle.CRASH_TRACE`, `VehicleDamageModel.flushCrash`). Ask for that line before guessing.
+- **Shooting the light crowd** (user: "even a shotgun or a powerful handgun after 3-4 shots cannot knock one down").
+  Three defects, each measured:
+  * **The sight leg passed through the ped.** In third person the shot is aimed at what the CAMERA ray hits and
+    traced from the muzzle; a light ped has no collider, so the camera ray ended on the wall behind it and the muzzle
+    leg converged there, passing up to ~0.3 m beside the person under the crosshair. `WeaponItem.resolveSightPoint`
+    now stops the sight at a crowd ped (`PedCrowd.shoot`).
+  * **The promoting shot landed at x1 on the capsule** (no headshot ever killed a crowd ped outright). It now lands on
+    the hitbox at the height it struck (`PedCrowd.hitPart` / `hitHeightFraction`): REV1 to the head kills in one.
+  * **A shotgun counted one pellet**: the first pellet promoted the ped and the other seven found nobody.
+    `FirearmItem.resolvePellets` traces every pellet first, promotes each ped once, then lands every pellet that
+    reached it. One SHG1 pull at 5.6 m: 8 pellets on the body, a kill.
+  * The hit cylinder is each body's own height (`<body>.body.json` crown + 4 cm, `PedCrowd.Variant.height`), not one
+    1.62 m for bodies 1.41-1.91 m tall. `ped_heights_now` is its readout.
+  * **Confirmed in play by the user** (same day): every crowd member near them now takes damage. A crowded street
+    can still put a passer-by between the gun and the crosshair (the muzzle sits beside the camera), which is the
+    ordinary third-person rule. **`OW_SHOT_TRACE=1`** prints `[shot] <collider path> at <point> -> <body> (hp N)` for
+    every bullet a player lands (`ImpactManager.SHOT_TRACE`); `tools/godot/probe_crowd_scene.gd` is the diagnosis stand
+    (the island crowd, shooting the promoted walkers near the player).
+  Gate **`tools/godot/probe_crowd_hits.gd`** (World.tscn, light peds frozen in place, a real Player firing through
+  Input): head kill, chest hit alive, SHG1 multi-pellet -- PASS. Unchanged: `probe_hit_marker`, `probe_self_hit`,
+  `probe_sniper_hits`, `probe_ped_crowd`, `probe_auto_reload`, `./gradlew test`.
+
 ## The crowd: a GPU-animated far tier, promotion on need, six bodies, a holster, a female walk (2026-09-27, user-asked)
 
 Supersedes the section above on how the far tier is DRAWN (its LOD-body rules still apply: the bake reads that body).

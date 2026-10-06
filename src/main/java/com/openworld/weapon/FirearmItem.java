@@ -435,21 +435,41 @@ public class FirearmItem extends WeaponItem {
 	java.util.List<com.openworld.net.NetMessageCodec.PelletResult> results = new java.util.ArrayList<>(pellets);
 	var im = getImpactManager();
 	double digest = 0;
+	// Every pellet is traced BEFORE any crowd ped is promoted, so all of a pull's pellets see the same peds: a
+	// shotgun pull into a light ped used to promote it on its first pellet, after which the ped was gone and the
+	// other seven found nothing (only 15 of a possible 120 damage landed -- user, 2026-10-06: "even a shotgun
+	// after 3-4 shots cannot knock one down").
+	Vector3[] dirs = new Vector3[pellets];
+	TraceHit[] traced = new TraceHit[pellets];
+	com.openworld.world.PedCrowd.CrowdHit[] crowd = new com.openworld.world.PedCrowd.CrowdHit[pellets];
 	for (int i = 0; i < pellets; i++) {
 	  double[] d = SpreadPattern.direction(aim.getX(), aim.getY(), aim.getZ(), spreadDeg * 0.5, seed, i);
 	  digest += (i + 1) * (d[0] + 3 * d[1] + 7 * d[2]);
-	  Vector3 dir = new Vector3(d[0], d[1], d[2]);
-	  TraceHit hit = throughGlass(ray, origin, dir, trace(ray, origin, dir, range), applyDamage, damage);
+	  dirs[i] = new Vector3(d[0], d[1], d[2]);
+	  traced[i] = throughGlass(ray, origin, dirs[i], trace(ray, origin, dirs[i], range), applyDamage, damage);
 	  if (applyDamage) {
-		// A light crowd ped has no collider (world.PedCrowd): ask the crowds, and promote the one this pellet
-		// reaches before anything solid, so the damage lands on a real body in this same frame.
-		double reached = hit != null ? hit.point.minus(origin).length() : range;
-		var crowdHit = com.openworld.world.PedCrowd.shoot(origin, dir, reached);
-		if (crowdHit != null) {
-		  var body = crowdHit.crowd().promoteHit(crowdHit);
-		  if (body != null) hit = new TraceHit(body, crowdHit.point(), dir.times(-1.0));
-		}
+		// A light crowd ped has no collider (world.PedCrowd): ask the crowds which ped this pellet reaches
+		// before anything solid.
+		double reached = traced[i] != null ? traced[i].point.minus(origin).length() : range;
+		crowd[i] = com.openworld.world.PedCrowd.shoot(origin, dirs[i], reached);
 	  }
+	}
+	// Promote each ped the pull reached ONCE, and land every pellet that reached it on the body, on the hitbox at
+	// the height it struck (a head shot is a head shot).
+	java.util.Map<java.lang.Object, Node> bodies = new java.util.HashMap<>();
+	for (int i = 0; i < pellets; i++) {
+	  var ch = crowd[i];
+	  if (ch == null) continue;
+	  if (!bodies.containsKey(ch.ped())) bodies.put(ch.ped(), ch.crowd().promoteHit(ch));
+	  Node body = bodies.get(ch.ped());
+	  if (body != null) {
+		traced[i] = new TraceHit(com.openworld.world.PedCrowd.hitPart(body, ch.crowd().hitHeightFraction(ch)),
+			ch.point(), dirs[i].times(-1.0));
+	  }
+	}
+	for (int i = 0; i < pellets; i++) {
+	  Vector3 dir = dirs[i];
+	  TraceHit hit = traced[i];
 	  hits.add(hit != null && hit.node != null ? hit.node.getName().toString() : "-");
 	  if (hit != null) {
 		SurfaceType s = im != null ? im.surfaceOf(hit.node) : SurfaceType.DEFAULT;

@@ -104,6 +104,8 @@ public class PedCrowd extends Node3D {
 	static final class Variant {
 		String body;
 		double weight = 1.0;
+		/** The body's standing height to the crown (its `<body>.body.json`), for a shot's hit cylinder. */
+		double height = BODY_HEIGHT;
 		Mesh mesh;
 		ShaderMaterial material;
 		Clip idle, walk, run, cower, phone, talk;
@@ -132,6 +134,11 @@ public class PedCrowd extends Node3D {
 			if (!(MiniJson.parse(FileAccess.getFileAsString(metaPath)) instanceof Map<?, ?> m)) continue;
 			Variant v = new Variant();
 			v.body = body;
+			String bodyJson = "res://assets/characters/" + body + "/" + body + ".body.json";
+			if (FileAccess.fileExists(bodyJson) && MiniJson.parse(FileAccess.getFileAsString(bodyJson)) instanceof Map<?, ?> bj
+					&& bj.get("crown_m") instanceof Number cm && cm.doubleValue() > 0.5) {
+				v.height = cm.doubleValue() + 0.04;          // the hair over the crown
+			}
 			if (weights.get(body) instanceof Number n) v.weight = Math.max(0.0, n.doubleValue());
 			v.mesh = ResourceLoader.INSTANCE.load(String.valueOf(m.get("mesh")), "", ResourceLoader.CacheMode.REUSE) instanceof Mesh me ? me : null;
 			Texture2D pos = ResourceLoader.INSTANCE.load(String.valueOf(m.get("positions")), "", ResourceLoader.CacheMode.REUSE) instanceof Texture2D t ? t : null;
@@ -314,6 +321,14 @@ public class PedCrowd extends Node3D {
 		return out;
 	}
 
+	/** Every ped's hit-cylinder height (m), in {@link #pedPositionsNow}'s order -- a probe aims at a head with it. */
+	@Register
+	public PackedFloat32Array pedHeightsNow() {
+		PackedFloat32Array out = new PackedFloat32Array();
+		for (Ped p : peds) out.append((float) bodyHeight(p));
+		return out;
+	}
+
 	/** The baked bodies this crowd draws, by name (a probe readout). */
 	@Register
 	public String bodiesNow() {
@@ -458,8 +473,12 @@ public class PedCrowd extends Node3D {
 	/** A light ped a shot hit: where, and how far along the ray. */
 	public record CrowdHit(PedCrowd crowd, Object ped, double distance, Vector3 point) { }
 
-	/** A ped's body for a shot: an upright capsule this wide and this tall (x its own scale). */
+	/** A ped's body for a shot: an upright cylinder this wide (x its own scale). Its height is the body's own
+	 *  ({@link Variant#height}); BODY_HEIGHT is only the fallback. One 1.62 m cylinder for bodies 1.41-1.91 m tall put
+	 *  every head shot on a taller body over the top of it (user, 2026-10-06). */
 	private static final double BODY_RADIUS = 0.28, BODY_HEIGHT = 1.62;
+
+	private double bodyHeight(Ped p) { return variants().get(p.variant).height * p.scale; }
 
 	/**
 	 * The nearest light ped a ray from {@code origin} along unit {@code dir} passes through within
@@ -473,7 +492,7 @@ public class PedCrowd extends Node3D {
 			for (Ped p : c.peds) {
 				if (p.hidden) continue;
 				Vector3 f = c.pointAt(p, p.along);
-				double t = rayCapsule(origin, dir, f, BODY_HEIGHT * p.scale, BODY_RADIUS * p.scale);
+				double t = rayCapsule(origin, dir, f, c.bodyHeight(p), BODY_RADIUS * p.scale);
 				if (t >= 0.0 && t <= maxDist && (best == null || t < best.distance())) {
 					best = new CrowdHit(c, p, t, origin.plus(dir.times(t)));
 				}
@@ -498,6 +517,34 @@ public class PedCrowd extends Node3D {
 		return ai;
 	}
 
+	/** How far up the ped's body a hit landed, 0 = feet, 1 = the top of the head. */
+	public double hitHeightFraction(CrowdHit hit) {
+		if (!(hit.ped() instanceof Ped p)) return 0.6;
+		Vector3 foot = pointAt(p, p.along);
+		return Math.max(0.0, Math.min(1.0, (hit.point().getY() - foot.getY()) / bodyHeight(p)));
+	}
+
+	/**
+	 * The hitbox of a just-promoted body a crowd hit counts as, from how far up the light ped's capsule it landed.
+	 * A promoted body's own bones are still in their rest pose for a frame, so the bullet cannot be traced against
+	 * them; without this every promoting shot landed on the body's capsule at x1.0 -- no headshot ever killed a crowd
+	 * ped outright, where the same shot kills an ordinary AI (user, 2026-10-06). Splits are the standing body's
+	 * proportions (the contract skeleton: neck at ~0.84 of the height, chest to ~0.66, hips ~0.5, knees ~0.27).
+	 */
+	public static Node hitPart(Node body, double frac) {
+		String[] names = frac > 0.84 ? new String[] { "head_2", "head" }
+				: frac > 0.66 ? new String[] { "spine_03" }
+				: frac > 0.58 ? new String[] { "spine_02" }
+				: frac > 0.48 ? new String[] { "pelvis" }
+				: frac > 0.27 ? new String[] { "thigh_l" }
+				: frac > 0.05 ? new String[] { "calf_l" } : new String[] { "foot_l" };
+		for (String n : names) {
+			Node b = body.findChild("Physical Bone " + n, true, false);
+			if (b != null) return b;
+		}
+		return body;
+	}
+
 	/** Seconds of running this ped still has (0 = calm): a promotion must not change who runs. */
 	private double panicLeft(Ped p) {
 		return p.state == FLEE ? Math.max(0.0, p.timer) : 0.0;   // a body has no cower yet: it walks
@@ -517,7 +564,7 @@ public class PedCrowd extends Node3D {
 				if (p.hidden) continue;
 				Vector3 f = c.pointAt(p, p.along);
 				double d = CrowdShot.segmentToBody(a.getX(), a.getY(), a.getZ(), b.getX(), b.getY(), b.getZ(),
-						f.getX(), f.getY(), f.getZ(), BODY_HEIGHT * p.scale);
+						f.getX(), f.getY(), f.getZ(), c.bodyHeight(p));
 				if (d <= radius + BODY_RADIUS * p.scale) found.add(new Object[] { c, p, d });
 			}
 		}
