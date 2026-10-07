@@ -42,7 +42,7 @@
   }
  },
  "hunters": {
-  "note": "A gang hunting a player at chase_at stars or more (game.EnforcementDispatch). Index = the player's stars with that gang. Same spawn rules as the police dispatch; gang members always shoot. From ram_at stars their cars drive AT the player; from breach_at they follow into buildings (PLAN.md W6).",
+  "note": "A gang hunting a player at chase_at stars or more (game.EnforcementDispatch). Index = the player's stars with that gang. Same spawn rules as the police dispatch; gang members always shoot. From ram_at stars their cars drive AT the player; units always follow the player into a building through its door (PLAN.md W6).",
   "foot_by_stars": [
    0,
    0,
@@ -93,8 +93,7 @@
    1,
    1
   ],
-  "ram_at": 4,
-  "breach_at": 3
+  "ram_at": 4
  },
  "abduction": {
   "note": "拉致 ABDUCTED (game.RespawnSystem / GangSystem, user 2026-10-06): a player who goes down with ANY standing against a gang wakes at one of that gang's places (the places record's `gang`), held by `guards` armed members. Two ways out: pay the ransom (ransom_per_star x that gang's stars; it also clears the standing), or ESCAPE -- step past escape_start metres from where they were held and the guards open fire (+ the `escape` crime's heat); past escape_free metres the player is free.",

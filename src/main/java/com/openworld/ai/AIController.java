@@ -103,6 +103,7 @@ public class AIController extends Controller {
         pursuit = null;
         pursuitAway = false;
         pursuitStand = false;
+        pursuitVia.clear();
         transitionTo(initialState());
     }
 
@@ -169,6 +170,9 @@ public class AIController extends Controller {
     public boolean pursuitAway;
     /** Stand and cover the pursuit, weapon on them (a gang guard over a captive). */
     public boolean pursuitStand;
+    /** BREACH waypoints (PLAN.md W6): walk straight to each in turn before closing on the pursuit -- outside a
+     *  building's door, then through it. Popped as reached; empty = straight at the pursuit as before. */
+    public final java.util.ArrayList<godot.core.Vector3> pursuitVia = new java.util.ArrayList<>();
 
     public boolean hasScriptedArrived()            { return scriptedArrived; }
     public void    setScriptedArrived(boolean v)   { scriptedArrived = v; }

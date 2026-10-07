@@ -32,8 +32,6 @@ public final class DispatchRules {
     public int[] snipersByStars = {0}, helisByStars = {0};
     /** From this many stars a car on a call RAMS the player instead of stopping to unload (0 = never). */
     public int ramAt = 0;
-    /** From this many stars units ENTER a building the player is in (through its doors) instead of waiting outside. */
-    public int breachAt = 0;
     /** Armoured vehicles that fire a main gun (catalog model ids) and how: seconds between shells, range (m). */
     public List<String> gunVehicles = new ArrayList<>();
     public double gunInterval = 4.0, gunRange = 220.0, gunDamage = 320.0, gunRadius = 7.0;
@@ -66,7 +64,6 @@ public final class DispatchRules {
         if (m.get("snipers_by_stars") != null) r.snipersByStars = ints(m.get("snipers_by_stars"));
         if (m.get("helis_by_stars") != null) r.helisByStars = ints(m.get("helis_by_stars"));
         r.ramAt = (int) num(m, "ram_at", 0);
-        r.breachAt = (int) num(m, "breach_at", 0);
         if (m.get("gun") instanceof Map<?, ?> g0) {
             Map<String, Object> g = (Map<String, Object>) g0;
             if (g.get("vehicles") instanceof List<?> l) for (Object o : l) r.gunVehicles.add(String.valueOf(o));
@@ -107,8 +104,6 @@ public final class DispatchRules {
     /** Do cars on a call ram at this many stars? */
     public boolean rams(int stars) { return ramAt > 0 && stars >= ramAt; }
 
-    /** Do units enter buildings at this many stars? */
-    public boolean breaches(int stars) { return breachAt > 0 && stars >= breachAt; }
 
     /** Does this vehicle model fire a main gun? */
     public boolean hasGun(String model) { return gunVehicles.contains(model); }

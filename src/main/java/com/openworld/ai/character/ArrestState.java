@@ -69,6 +69,18 @@ public class ArrestState implements AIState {
             cmd.movementType = MovementType.IDLE;
             return this;
         }
+        // BREACH (PLAN.md W6): through a building's door first -- straight to each waypoint, popped within a metre
+        while (!ctrl.pursuitVia.isEmpty()) {
+            Vector3 w = ctrl.pursuitVia.get(0);
+            Vector3 dw = w.minus(body.getGlobalPosition());
+            dw.setY(0f);
+            if (dw.length() < 1.0) { ctrl.pursuitVia.remove(0); continue; }
+            cmd.movementType = MovementType.SPRINT;
+            Vector3 n = dw.normalized();
+            cmd.movementDirection.setX(n.getX());
+            cmd.movementDirection.setZ(n.getZ());
+            return this;
+        }
         cmd.movementType = dist > WALK_INSIDE ? MovementType.SPRINT : MovementType.WALK;
         Vector3 dir = ctrl.pursuitDirect ? (d.length() > 0.001 ? d.normalized() : null)
                 : ScriptedMoveState.steerDirection(body, at);

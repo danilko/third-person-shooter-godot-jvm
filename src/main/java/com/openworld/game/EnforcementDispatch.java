@@ -80,6 +80,8 @@ public class EnforcementDispatch extends Node {
 
     /** Off = no units (the control: stars still count, nobody comes). */
     @Export public boolean enabled = true;
+    /** Units follow a player INTO a building through its door (always; off = the control: they stop outside). */
+    @Export public boolean breaching = true;
     /** Foot units spawned per side per spawn tick, at most. */
     @Export public int spawnPerTick = 2;
 
@@ -93,6 +95,8 @@ public class EnforcementDispatch extends Node {
         double closest = Double.MAX_VALUE, sinceCloser;
         /** A sniper (PLAN.md W6): placed at range on a clear line, holds there and shoots; never closes in. */
         boolean sniper;
+        /** The building it is breaching (its player is inside), or null. */
+        Node breachOf;
     }
 
     /** An officer running a player down that has not closed in by {@link #STUCK_GAIN} for this long is given up:
@@ -228,6 +232,9 @@ public class EnforcementDispatch extends Node {
 
     private void tickUnits(Map<String, Player> players, Map<String, Map<String, Integer>> demand, WantedSystem ws,
                            DispatchRules police) {
+        Map<String, Node3DRef> indoors = new HashMap<>();
+        for (Map.Entry<String, Player> e : players.entrySet())
+            indoors.put(e.getKey(), new Node3DRef(buildingAround(e.getValue().getGlobalPosition())));
         Iterator<Unit> it = units.iterator();
         while (it.hasNext()) {
             Unit u = it.next();
@@ -264,6 +271,30 @@ public class EnforcementDispatch extends Node {
                 continue;
             }
             brain.pursuitStand = false;
+            // BREACH (PLAN.md W6): the player is inside a building -- follow them in, at ANY star level (user: always
+            // get in, so the behaviour is consistent): through the building's door nearest this unit, straight (no
+            // navmesh indoors), forcing a locked one
+            Node3DRef in = indoors.get(u.playerId);
+            if (!u.sniper && breaching && in != null && in.node != null) {
+                if (buildingAround(u.body.getGlobalPosition()) != in.node) {
+                    if (u.breachOf != in.node || brain.pursuitVia.isEmpty()) {
+                        brain.pursuitVia.clear();
+                        brain.pursuitVia.addAll(breachRoute(in.node, u.body.getGlobalPosition()));
+                        u.breachOf = in.node;
+                        breachRoutes++;
+                    }
+                    brain.setPursuit(p);
+                    brain.pursuitAway = false;
+                    brain.pursuitDirect = true;
+                    if (brain.getCurrentState() != ArrestState.INSTANCE) brain.forceState(ArrestState.INSTANCE);
+                    u.sinceCloser = 0;          // not stuck: on its way round to the door
+                    continue;
+                }
+                if (u.breachOf == in.node && brain.pursuitVia.isEmpty()) { u.breachOf = null; breachedIn++; }
+            } else if (u.breachOf != null) {
+                u.breachOf = null;
+                brain.pursuitVia.clear();
+            }
             if (u.sniper) {
                 // a sniper holds its spot and shoots: the squad's radio says where the player is
                 brain.setPursuit(null);
@@ -621,6 +652,59 @@ public class EnforcementDispatch extends Node {
 
     private int shellsFired;
 
+    // ── breaching a building (PLAN.md W6) ─────────────────────────────────────
+
+    private record Node3DRef(Node node) {}
+    private int breachRoutes, breachedIn;
+
+    /** The building whose roof is over this point (a ray up hits it within 25 m, its owner carries the `building`
+     *  meta), or null outdoors. Cheap: one ray per player and per breaching unit, every tick. */
+    private Node buildingAround(Vector3 at) {
+        if (getViewport() == null || getViewport().getWorld3d() == null) return null;
+        var sp = getViewport().getWorld3d().getDirectSpaceState();
+        var q = godot.api.PhysicsRayQueryParameters3D.create(at.plus(new Vector3(0, 1.7, 0)), at.plus(new Vector3(0, 25.0, 0)),
+                CollisionLayers.WORLD, new godot.core.VariantArray<>(godot.core.RID.class));
+        godot.core.Dictionary<Object, Object> hit = sp.intersectRay(q);
+        if (hit == null || hit.isEmpty() || !(hit.get("collider") instanceof Node n)) return null;
+        StringName key = new StringName("building");
+        for (Node x = n; x != null; x = x.getParent()) if (x.hasMeta(key)) return x;
+        return null;
+    }
+
+    /** Outside the building's door nearest {@code from}, then 2.5 m inside it (its Door_* markers: -Z points out).
+     *  A locked door there is forced: unlocked and made automatic (a breach does not knock). */
+    private List<Vector3> breachRoute(Node building, Vector3 from) {
+        List<Vector3> out = new ArrayList<>();
+        godot.api.Node3D best = null;
+        double bd = Double.MAX_VALUE;
+        for (Node c : building.getChildren()) {
+            if (!(c instanceof godot.api.Node3D m) || !c.getName().toString().startsWith("Door_")) continue;
+            double d = m.getGlobalPosition().distanceTo(from);
+            if (d < bd) { bd = d; best = m; }
+        }
+        if (best == null) return out;
+        Vector3 o = best.getGlobalTransform().getBasis().getColumn(2).times(-1.0);
+        o.setY(0);
+        o = o.length() > 1e-3 ? o.normalized() : new Vector3(0, 0, 1);
+        Vector3 c = best.getGlobalPosition();
+        out.add(c.plus(o.times(2.5)));
+        out.add(c.minus(o.times(2.5)));
+        forceDoorsNear(building, c);
+        return out;
+    }
+
+    private void forceDoorsNear(Node n, Vector3 at) {
+        for (Node c : n.getChildren()) {
+            if (c instanceof com.openworld.world.Door d && d.getGlobalPosition().distanceTo(at) < 3.0) {
+                if (d.isLocked()) { d.setLocked(false); doorsForced++; }
+                d.autoOpen = true;
+            }
+            if (c.getChildCount() > 0 && !(c instanceof com.openworld.character.Character)) forceDoorsNear(c, at);
+        }
+    }
+
+    private int doorsForced;
+
     // ── helicopters (PLAN.md W6) ──────────────────────────────────────────────
 
     /** In the air, out of view, 220-280 m from the player and 60 m up, a pilot and a gunner aboard, orbiting. */
@@ -925,7 +1009,8 @@ public class EnforcementDispatch extends Node {
         for (Unit u : units) if (u.sniper && GD.isInstanceValid(u.body) && !u.body.isDead()) snipers++;
         int hl = 0;
         for (Heli h : helis) if (GD.isInstanceValid(h.h) && h.retiredFor == 0) hl++;
-        return m.toString().trim() + ";" + rammers + ";" + shellsFired + ";" + snipers + ";" + hl + ";" + heliShots + ";" + heliHits;
+        return m.toString().trim() + ";" + rammers + ";" + shellsFired + ";" + snipers + ";" + hl + ";" + heliShots + ";" + heliHits
+                + ";" + breachRoutes + ";" + breachedIn + ";" + doorsForced;
     }
 
     /** Live dispatched bodies on foot of {@code side} (police or a gang id). */
