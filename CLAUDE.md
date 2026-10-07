@@ -7070,6 +7070,21 @@ the zone behaviour". **`tools/debug_world_rebuild.sh`** rebuilds all of it (~5 m
 - **Open, not layout:** `probe_ai_stops`' "person at the edge of the car's width" case -- the flank ray first catches
   them at ~27 m where the car needs ~25 m, and it touches at ~4 m/s (same on the inner and the kerb lane).
 
+## The rear-view mirror while driving (user, 2026-10-07)
+
+`ui.RearViewMirror` (built in code by HUDManager, self-managed): a strip at the top centre while the LOCAL player
+drives with the carrier's own camera on screen (`Vehicle.isDrivenViewOf`), the racing-game convention (Forza, GT, NFS),
+drawn mirror-flipped. The chase view looks back from `roofLift` over the roof; the first-person views from the
+driver's eye HEIGHT but just past the back of the hull (from the eye itself the headrests filled it). `rear_view` (C)
+toggles it. Cost control: its own SubViewport at the strip's size, refreshed every `updateEvery` (2) frames, `farPlane`
+150 m, mesh LOD threshold 2, FXAA only, no positional shadows, a copy of the world Environment with SSAO / SSIL / SSR /
+glow / SDFGI / volumetric fog off, and nothing rendered while hidden. **A blurred mirror is resolution, not meshes**:
+at `renderScale` 0.6 (an upscaled target, which also samples blurrier mips) it was visibly soft; 1.0 costs nothing
+measurable, because draws, not pixels, are the cost here. Measured in the city (island safe house, parked, chase
+view, ON/OFF alternated): +1.5 ms p50, +2.4 ms p95, +1 500 draws (~16%); DebugWorld +0.45 ms. Gate
+**`tools/godot/probe_rear_view.gd [-- --world=island] [--shot=<dir>]`** (display): hidden on foot, shown driving,
+looks back (dot -0.998) in chase and first person, renders every other frame, C hides it and it renders nothing.
+
 ## Godot-JVM Specifics
 
 - **Annotations (godot-jvm `1.0.0-rc1` API — the older `@Register*` family is gone).** The plugin runs in the

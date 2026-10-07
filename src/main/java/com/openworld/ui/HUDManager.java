@@ -162,6 +162,11 @@ public class HUDManager extends CanvasLayer {
 	Node feedNode = getNodeOrNull("Feed");
 	if (feedNode instanceof Feed f) feed = f;
 	// the game clock in the top-right corner (user, 2026-10-02), and the kill feed moved down under it
+	if (getNodeOrNull("RearViewMirror") == null) {
+	  RearViewMirror mirror = new RearViewMirror();
+	  mirror.setName(new godot.core.StringName("RearViewMirror"));
+	  addChild(mirror);
+	}
 	if (getNodeOrNull("GameClock") == null) {
 	  GameClock clock = new GameClock();
 	  clock.setName(new godot.core.StringName("GameClock"));
@@ -263,7 +268,7 @@ public class HUDManager extends CanvasLayer {
 		  || name.equals("ScopeOverlay") || name.equals("AreaWarning") || name.equals("HitMarker")
 		  || name.equals("Minimap") || name.equals("WorldMap") || name.equals("GpsArrow")
 		  || name.equals("RaceHUD") || name.equals("GameClock")
-		  || name.equals("WantedStars")) continue;
+		  || name.equals("WantedStars") || name.equals("RearViewMirror")) continue;
 	  widgets.put(name, c);
 	  if (c instanceof WeaponSlotsUI ws) weaponSlotsUI = ws;
 	  if (c instanceof WeaponHUD wh) weaponHud = wh;

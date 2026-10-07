@@ -1942,6 +1942,16 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         return camController.getCameraMode() == com.openworld.camera.CameraMode.FPS;
     }
 
+    /** True while {@code c} drives this carrier and its own camera is the one on screen (ui.RearViewMirror). */
+    public boolean isDrivenViewOf(Character c) {
+        return c != null && occupant == c && vehicleCamera != null && GD.isInstanceValid(vehicleCamera) && vehicleCamera.isCurrent();
+    }
+
+    /** True while the carrier's camera is in one of its first-person views (cockpit or bonnet). */
+    public boolean isFirstPersonViewNow() {
+        return camController != null && camController.getCameraMode() == com.openworld.camera.CameraMode.FPS;
+    }
+
     /** True while the local player drives this carrier in its BUMPER view (first person, not the cockpit). */
     public boolean isBumperViewNow() {
         return camController != null && vehicleCamera != null && vehicleCamera.isCurrent()
