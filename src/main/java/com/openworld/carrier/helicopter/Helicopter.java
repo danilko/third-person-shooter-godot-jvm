@@ -15,9 +15,12 @@ import godot.global.GD;
  * hospital roof and at a police station). Arcade, GTA-style, a placeholder to tune:
  *
  * <ul>
- *   <li><b>Flown by a player</b>: with a pilot the rotor runs and the lift holds the weight; the jump key
- *   ({@code handbrake}) CLIMBS, brake DESCENDS, forward/back ({@code motor}) tilts the nose and drives it along its
- *   heading, steering YAWS. The body is kept upright (a strong level torque): it never rolls over.</li>
+ *   <li><b>Flown by a player</b>: with a pilot the rotor runs and the lift holds the weight -- let go and it HOLDS
+ *   its height. Space ({@code handbrake}) CLIMBS, Ctrl ({@code descend}, the crouch key) DESCENDS, Shift boosts,
+ *   forward/back ({@code motor}) tilts the nose and drives it along its heading, steering YAWS. The body is kept
+ *   upright (a strong level torque): it never rolls over. Near the ground the descent is capped by the height
+ *   left ({@link #landingRate}), so holding descend settles it on its skids (user 2026-10-07: no graceful
+ *   landing before).</li>
  *   <li><b>Flown by the AI</b> ({@link #aiTarget} set, no player at the controls): it holds an ORBIT round the
  *   target at {@link #orbitHeight} over it and {@link #orbitRadius} out, nose on the target -- the platform a door
  *   gunner and a sniper fire from (game.EnforcementDispatch).</li>
@@ -34,6 +37,12 @@ public class Helicopter extends Vehicle {
     public double orbitHeight = 38.0, orbitRadius = 55.0, orbitSpeed = 0.12;
     /** Climb / descend rate (m/s) a pilot gets at full input, and the top horizontal speed (m/s). */
     public double climbRate = 7.0, cruise = 32.0;
+    /** Descent near the ground: at most {@code landingGain} x the height over the ground per second, never under
+     *  {@code landingRate} (m/s) -- so a held descend arrives at about landingRate. */
+    public double landingRate = 1.2, landingGain = 0.5;
+    /** Height over the ground under the skids at the last tick (m), for probes; NaN with nothing within 60 m. */
+    private double groundClear = Double.NaN;
+    private double skidDrop = Double.NaN;
     private double orbitAngle, rotorSpin;
 
     @Override
@@ -78,9 +87,13 @@ public class Helicopter extends Vehicle {
             Vector3 face = tp.minus(getGlobalPosition());
             yawWant = Math.atan2(-face.getX(), -face.getZ());
         } else {
-            double climb = (cmd.handbrake ? 1.0 : 0.0) - (cmd.brake ? 1.0 : 0.0);
+            double climb = (cmd.handbrake ? 1.0 : 0.0) - (cmd.descend ? 1.0 : 0.0);
+            double vy = climb * climbRate;
+            groundClear = clearanceBelow();
+            if (vy < 0 && !Double.isNaN(groundClear))
+                vy = -Math.min(climbRate, Math.max(landingRate, groundClear * landingGain));
             Vector3 h = fwd.times(cmd.motor * cruise * (cmd.boost ? 1.4 : 1.0));
-            want = new Vector3(h.getX(), climb * climbRate, h.getZ());
+            want = new Vector3(h.getX(), vy, h.getZ());
             yawWant = Double.NaN;
         }
         // hold the wanted velocity: a force proportional to the error, plus the weight
@@ -106,6 +119,37 @@ public class Helicopter extends Vehicle {
         applyTorque(axis.times(mass * 40.0f).minus(new Vector3(av.getX(), 0, av.getZ()).times(mass * 8.0f)));
         return false;
     }
+
+    /** The skids' height over whatever is under them (a ray down from the body, its own drop to the skids measured
+     *  from the collision shapes' lowest point), NaN beyond 60 m. */
+    private double clearanceBelow() {
+        if (Double.isNaN(skidDrop)) skidDrop = bottomDrop();
+        var sp = getWorld3d() != null ? getWorld3d().getDirectSpaceState() : null;
+        if (sp == null) return Double.NaN;
+        Vector3 o = getGlobalPosition();
+        godot.core.VariantArray<godot.core.RID> ex = new godot.core.VariantArray<>(godot.core.RID.class);
+        ex.add(getRid());
+        var q = godot.api.PhysicsRayQueryParameters3D.create(o, o.plus(new Vector3(0, -60, 0)),
+                com.openworld.util.CollisionLayers.WORLD | com.openworld.util.CollisionLayers.VEHICLE, ex);
+        godot.core.Dictionary<Object, Object> hit = sp.intersectRay(q);
+        if (hit == null || hit.isEmpty() || !(hit.get("position") instanceof Vector3 p)) return Double.NaN;
+        return Math.max(0.0, o.getY() - p.getY() - skidDrop);
+    }
+
+    /** How far the lowest collision shape reaches below the body's origin (m). */
+    private double bottomDrop() {
+        double lo = 0.0;
+        for (Node c : getChildren()) {
+            if (!(c instanceof godot.api.CollisionShape3D cs) || cs.getShape() == null) continue;
+            var aabb = cs.getShape().getDebugMesh().getAabb();
+            Vector3 low = cs.getTransform().times(aabb.getPosition());
+            lo = Math.min(lo, low.getY());
+        }
+        return -lo;
+    }
+
+    /** Probe readout: the skids' height over the ground (m), NaN when unknown. */
+    @Register public double groundClearNow() { return groundClear; }
 
     private void spinRotor(boolean run, double delta) {
         rotorSpin = run ? Math.min(1.0, rotorSpin + delta * 0.5) : Math.max(0.0, rotorSpin - delta * 0.2);

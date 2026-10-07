@@ -349,6 +349,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         cmd.handbrake = false;
         cmd.brake     = false;
         cmd.boost     = false;
+        cmd.descend   = false;
         cmd.fire      = false;
         cmd.reload    = false;
         cmd.desiredWeapon = -1;
@@ -370,6 +371,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             cmd.handbrake = currentCmd.handbrake;
             cmd.brake     = currentCmd.brake;
             cmd.boost     = currentCmd.boost;
+            cmd.descend   = currentCmd.descend;
             cmd.fire      = currentCmd.fire;
             cmd.reload    = currentCmd.reload;
             // Relay the passenger-weapon slot switch (PASSENGER_WEAPON mode): without this the

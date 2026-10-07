@@ -8,6 +8,8 @@ extends SceneTree
 ##   1. parked with nobody aboard, it rests on the floor (no drift, rotor still);
 ##   2. a seated player holding the climb key (space = handbrake) climbs it (> 10 m in 4 s) and it HOVERS when let go (holds height within 2 m);
 ##   3. holding FORWARD moves it along its heading (> 15 m in 3 s), holding steer turns it (> 30 deg in 3 s);
+##   3b. holding BOOST (shift = sprint) with nothing else does not lose height (user 2026-10-07: shift was boost AND
+##      descend), and holding DESCEND (ctrl = crouch) brings it down to a landing on its skids under 2 m/s.
 ##   4. empty again with an AI target set, it climbs to its orbit and holds it: 25-55 m over the target, within
 ##      90 m of it, after 25 s.
 
@@ -67,10 +69,21 @@ func _initialize() -> void:
 	await _tick(30)
 	var helper: Node = load(HELPER).new()
 	world.add_child(helper)
-	p.collision_layer = 0          # seating moves the body into the hull; the real entry path clears it first
-	p.collision_mask = 0
-	helper.call("seat_character", h, p)
+	# the REAL way in (user 2026-10-07: "no altitude control" -- was the pilot ever seated?): walk into the entrance
+	# area and press use_carrier
+	p.global_position = Vector3(2.8, 1.0, 3.2)
+	await _tick(20)
+	Input.action_press("use_carrier")
+	await _tick(2)
+	Input.action_release("use_carrier")
 	await _tick(30)
+	var seated: bool = helper.call("occupant_of", h) == p
+	_check(seated, "use_carrier beside it seats the player as its pilot")
+	if not seated:
+		p.collision_layer = 0
+		p.collision_mask = 0
+		helper.call("seat_character", h, p)
+		await _tick(30)
 	var y0 := h.global_position.y
 	await _press("handbrake", 240)
 	var y1 := h.global_position.y
@@ -87,6 +100,24 @@ func _initialize() -> void:
 	await _press("left", 180)
 	var turned := rad_to_deg(absf(wrapf(h.global_rotation.y - yaw0, -PI, PI)))
 	_check(turned > 30.0, "holding steer turns it (%.0f deg in 3 s)" % turned)
+	var yb := h.global_position.y
+	await _press("sprint", 120)
+	_check(h.global_position.y > yb - 1.0, "holding boost alone keeps its height (%.2f m)" % (h.global_position.y - yb))
+	var touch_vy := 99.0
+	var t := 0
+	Input.action_press("crouch")
+	while t < 60 * 40:
+		await physics_frame
+		t += 1
+		var gc := float(h.call("ground_clear_now"))
+		if not is_nan(gc) and gc < 0.15:
+			touch_vy = -h.linear_velocity.y
+			break
+	Input.action_release("crouch")
+	await _tick(120)
+	print("  landing: touchdown at %.2f m/s after %.1f s, resting at y %.2f" % [touch_vy, t / 60.0, h.global_position.y])
+	_check(touch_vy < 2.0, "holding descend lands it on its skids under 2 m/s (%.2f m/s)" % touch_vy)
+	_check(h.global_position.y < 3.0, "it rests on the floor after the landing (y %.2f)" % h.global_position.y)
 	# the AI's orbit: the player gets out (fly on alone with a target)
 	helper.call("exit_driver", h)
 	await _tick(30)

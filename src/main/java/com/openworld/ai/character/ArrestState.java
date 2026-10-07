@@ -9,10 +9,12 @@ import com.openworld.movement.character.MovementType;
 import godot.core.Vector3;
 
 /**
- * A police officer running a wanted player down to ARREST them (game.EnforcementDispatch; PLAN.md W5). The low-star
- * half of the GTA rule: below the dispatch's {@code shoot_at} stars, and while the player is not lethal-wanted, police
- * close in with a weapon drawn and aimed, and do not fire. The dispatcher decides the arrest itself (an officer within
- * reach of the player for long enough) and moves the officer to the shooting FSM when the stars climb.
+ * The APPROACH a dispatched unit runs toward a player (game.EnforcementDispatch; PLAN.md W5/W6): sprint in, weapon
+ * drawn and aimed inside 25 m, straight when the dispatcher says the line is clear, through a building's door first
+ * when the player is indoors ({@link AIController#pursuitVia}). The dispatcher hands a hostile unit to the combat FSM
+ * once it is close. Its other uses: walking away when stood down ({@code pursuitAway}) and an abduction's guards
+ * standing over a captive ({@code pursuitStand}). It was named for the walk-up arrest, which is gone (user
+ * 2026-10-07: police hunt the player down; a wanted player who goes down is arrested by RecoveryRules).
  *
  * <p>The target lives on the {@link AIController} ({@link AIController#getPursuit()}), the stateless-singleton rule.
  * No pursuit, or a dead one -> back to Patrol. Steering is {@link ScriptedMoveState}'s (the NavAgent only while it

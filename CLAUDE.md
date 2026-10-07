@@ -11049,7 +11049,9 @@ User: the chase stopped at buildings and every unit carried small arms. All of i
   replicated yet, and an ambulance / fire engine on a call does not use it yet.
 - **Snipers**: placed at range on a clear line with SNR1, they hold and shoot.
 - **The helicopter** (`carrier/helicopter/Helicopter`, HLC1, VehicleModels 26; the Airplane scene with this script via
-  `build_craft_scenes` `script`): an arcade hover -- lift holds the weight, space climbs, shift descends, forward flies,
+  `build_craft_scenes` `script`): an arcade hover -- lift holds the weight (let go = hold height), Space climbs, Ctrl (crouch, `UserCommand.descend`)
+  descends -- capped near the ground at max(1.2 m/s, 0.5 x the skids' clearance), so holding it lands at ~1.3 m/s --
+  Shift boosts (it used to descend on Shift too, user 2026-10-07), forward flies,
   steer yaws, kept level, `setCanSleep(false)` while the rotor runs (Jolt sleeps a body whose forces balance). With
   `aiTarget` set and nobody aboard it orbits 38 m up / 55 m out, nose on the target. The dispatcher spawns it in the air
   out of view with a pilot and a sniper; door-gun bursts and aimed shots are hitscan from the door (tracers,

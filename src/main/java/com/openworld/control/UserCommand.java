@@ -110,6 +110,9 @@ public class UserCommand {
     public boolean resetVehicle;
     /** NOS/booster held (vehicle only) — sprint action while driving. */
     public boolean boost;
+    /** Descend held (an aircraft's collective down -- the crouch key, Ctrl): Shift is the booster, so a helicopter
+     *  that descended on {@code brake} (also Shift) could never boost without dropping (user 2026-10-07). */
+    public boolean descend;
 
     // ── Construction ──────────────────────────────────────────────────────────
     public UserCommand() {
@@ -173,6 +176,7 @@ public class UserCommand {
         c.enterExit       = enterExit;
         c.resetVehicle    = resetVehicle;
         c.boost           = boost;
+        c.descend         = descend;
         return c;
     }
 }
