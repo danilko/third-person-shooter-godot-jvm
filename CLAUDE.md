@@ -11398,10 +11398,11 @@ checks its "Wired in code" table against the enum. Licence rule as for art: CC0 
 
 ## Armour, a helicopter that can be shot down, rotors on their hubs (2026-10-07, user-reported)
 
-- **Armour is per model** (`tools/build_vehicle_scenes.py` / `build_craft_scenes.py` rows `hit_mult` / `blast_mult`
-  on the Health): HLC-1 900 HP, 0.6 / 3.0 (1 ATL1 rocket, 75 ASR1 rounds); ARV-1 1600, 0.15 / 2.5 (2 rockets); LTK-1
-  2400, 0.03 / 2.5 (3); TNK-1 3200, 0.02 / 2.5 (4; a rifle magazine is under 2%). They were 1200-16000 HP on the
-  defaults, i.e. 20 rockets for a tank.
+- **Armour is per model, ONE damage rule** (early-GTA, user 2026-10-07: a rifle hurts a tank too, just slowly;
+  `tools/build_vehicle_scenes.py` / `build_craft_scenes.py` rows `hit_mult` / `blast_mult` on the Health):
+  HLC-1 1200 HP, 0.6 / 2.0 (2 ATL1 rockets, 100 ASR1 rounds -- harder to escape); ARV-1 1600, 0.4 / 2.5 (2 / 200);
+  LTK-1 2400, 0.3 / 2.5 (3 / 400); TNK-1 3200, 0.25 / 2.5 (4 / 640). They were 1200-16000 HP on the defaults, i.e. 20
+  rockets for a tank.
 - **A helicopter at 0 HP in the air is SHOT DOWN** (`Helicopter.onVehicleDestruction` override): no lift, the rotor
   winds down, a yaw spin, and the ordinary destruction when it reaches the ground, touches something or after 8 s.
   Every vehicle's static wreck is now set on the ground under it (`Vehicle.spawnWreckScene`); a helicopter's used

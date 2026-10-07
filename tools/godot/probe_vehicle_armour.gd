@@ -4,8 +4,8 @@ extends SceneTree
 ##   stdbuf -oL godot --headless --path . --script tools/godot/probe_vehicle_armour.gd
 ##
 ## 1. Rockets (ATL1's own numbers, a blast on the hull's side) and ASR1 rounds (ImpactManager.processHit) to destroy
-##    each enforcement vehicle: HLC-1 1 rocket / <= 80 rounds; ARV-1 2 rockets; LTK-1 3; TNK-1 4; a tank shrugs off
-##    a full rifle magazine (under 2% of its health).
+##    each enforcement vehicle: HLC-1 2 rockets / ~100 rounds; ARV-1 2 rockets; LTK-1 3; TNK-1 4; a rifle still hurts a tank
+##    (one damage rule, early-GTA style), it just takes hundreds of rounds.
 ## 2. An HLC-1 hovering 40 m over the floor and killed by a rocket FALLS (it is "downed", it loses height), then is
 ##    destroyed on impact; its wreck lies on the floor, not in the air.
 
@@ -61,7 +61,7 @@ func _initialize() -> void:
 	await physics_frame
 
 	print("== 1. rockets and rifle rounds to destroy each vehicle")
-	var want := {"HLC1": 1, "ARV1": 2, "LTK1": 3, "TNK1": 4}
+	var want := {"HLC1": 2, "ARV1": 2, "LTK1": 3, "TNK1": 4}
 	for id in ["HLC1", "ARV1", "LTK1", "TNK1"]:
 		var c := await _spawn(id, Vector3(0, 20, 0), true)
 		var hp0 := _hp(c)
@@ -79,9 +79,9 @@ func _initialize() -> void:
 		_check("%s: %d rocket(s) to destroy (want %d)" % [id, n, want[id]], n == want[id],
 			"%.0f HP, %.1f per ASR1 round = %d rounds" % [hp0, per_round, rounds])
 		if id == "HLC1":
-			_check("HLC1: a rifle brings it down within 80 rounds", rounds <= 80, "%d rounds" % rounds)
+			_check("HLC1: a rifle brings it down in about 100 rounds", rounds >= 80 and rounds <= 120, "%d rounds" % rounds)
 		if id == "TNK1":
-			_check("TNK1: a full ASR1 magazine (30) is under 2%% of it", per_round * 30.0 < hp0 * 0.02, "%.1f of %.0f" % [per_round * 30.0, hp0])
+			_check("TNK1: a rifle hurts it, but it takes hundreds of rounds", per_round > 0.0 and rounds >= 400 and rounds <= 900, "%d rounds" % rounds)
 		if is_instance_valid(c):
 			c.queue_free()
 		for i in 5:

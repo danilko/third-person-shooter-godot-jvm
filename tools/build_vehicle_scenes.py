@@ -84,14 +84,14 @@ TUNING = {
     # loses. Masses are the real vehicles' (riot vehicle ~12 t, Type 16 ~26 t, Type 10 ~44 t) and the springs scale
     "ARV1": {"name": "ARV-1", "mass": 12000, "rest": 0.50, "spring": 95000, "damping": 34000, "over": 0.25,
              "max_speed": 28.0, "accel": 80000.0, "crash_hp": 1.5, "health": 1600, "paint": "",
-             "hit_mult": 0.15, "blast_mult": 2.5},
+             "hit_mult": 0.4, "blast_mult": 2.5},
     "LTK1": {"name": "LTK-1", "mass": 26000, "rest": 0.55, "spring": 210000, "damping": 72000, "over": 0.25,
              "max_speed": 27.0, "accel": 170000.0, "crash_hp": 0.6, "health": 2400, "paint": "",
-             "hit_mult": 0.03, "blast_mult": 2.5,
+             "hit_mult": 0.3, "blast_mult": 2.5,
              "extra_seats": [[-0.60, 0.60, 1.20], [0.60, 0.60, 1.20]]},
     "TNK1": {"name": "TNK-1", "mass": 44000, "rest": 0.45, "spring": 360000, "damping": 125000, "over": 0.25,
              "max_speed": 19.0, "accel": 260000.0, "crash_hp": 0.3, "health": 3200, "paint": "",
-             "hit_mult": 0.02, "blast_mult": 2.5,
+             "hit_mult": 0.25, "blast_mult": 2.5,
              "extra_seats": [[-0.60, 0.70, 0.95], [0.60, 0.70, 0.95]]},
     "LAT1": {"name": "LAT-1", "mass": 13000, "rest": 0.48, "spring": 100000, "damping": 36000, "over": 0.25,
              "max_speed": 24.0, "accel": 70000.0, "crash_hp": 2.5, "health": 2000, "paint": "",
@@ -103,7 +103,8 @@ SEAT_ORDER = ["seat_front_l", "seat_front_r", "seat_rear_l", "seat_rear_r"]   # 
 
 # ARMOUR (user 2026-10-07: "these vehicles cannot be shot down"): a row may set the damage kinds on its Health --
 # `hit_mult` (bullets, pellets, melee) and `blast_mult` (explosions); unset keeps Vehicle.tscn's 0.4 / 2.5. GTA's
-# shape: small arms barely mark armour, rockets decide (ARV-1 2 rockets, LTK-1 3, TNK-1 4 at ATL1's 320).
+# early-GTA shape (user 2026-10-07): ONE damage rule, so a rifle hurts a tank too, it just takes many rounds
+# (ARV-1 2 rockets / 200 ASR1 rounds, LTK-1 3 / 400, TNK-1 4 / 640, at ATL1's 320 and ASR1's 20).
 def health_mults(t):
     out = ""
     if "hit_mult" in t:

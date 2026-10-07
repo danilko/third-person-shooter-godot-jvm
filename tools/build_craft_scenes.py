@@ -43,9 +43,9 @@ TUNING = {
                           grounded_angular_damp=2.5)),
     # the police helicopter (user, 2026-10-06, PLAN.md W6): the Airplane scene with the Helicopter script; a 6.4 t
     # AW139, arcade hover (Helicopter.java: lift = weight x (1 + climb), pitch to move, yaw, auto-level)
-    "HLC1": dict(base="Airplane", name="HLC-1 police helicopter", mass=6400.0, health=900.0,
+    "HLC1": dict(base="Airplane", name="HLC-1 police helicopter", mass=6400.0, health=1200.0,
                  box=(2.3, 3.7, 9.0),
-                 hit_mult=0.6, blast_mult=3.0,     # one rocket brings it down, ~75 rifle rounds (GTA's police Maverick)
+                 hit_mult=0.6, blast_mult=2.0,     # two rockets bring it down, ~100 rifle rounds (user 2026-10-07)
                  entrance=(6.0, 4.0, 9.0), spring=18.0,
                  script="res://src/main/java/com/openworld/carrier/helicopter/Helicopter.java",
                  cfg=dict(max_speed=70.0, acceleration=52000.0, lift_coefficient=0.0, pitch_torque=60000.0,
