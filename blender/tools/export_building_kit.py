@@ -86,6 +86,7 @@ def godot(v):
 def markers(col):
     """The piece's COL_, GATE_ and LIFT_ Empties, in the piece's own frame (the grid offset removed), Godot axes."""
     boxes, gates, lifts, hulls, doors, props = [], [], [], [], [], []
+    stair_ramps = []
     exits, marks = [], []
     for o in sorted(col.all_objects, key=lambda o: o.name):
         if o.type != "EMPTY":
@@ -115,6 +116,11 @@ def markers(col):
             yaw = math.degrees(o.matrix_world.to_euler().z)
             props.append({"piece": str(o["piece"]), "pos": godot(loc), "yaw": round(yaw % 360.0, 4),
                           "collide": str(o.get("collide", "none"))})
+        elif o.name.startswith("HULL_stair_"):
+            # a STAIR RAMP (user 2026-10-07): a convex slope along a flight's nosings that only CHARACTER bodies walk
+            # on (collision layer stair_ramp); bullets, projectiles and blasts keep meeting the steps
+            pts = list(o["pts"])
+            stair_ramps.append([godot(loc + mathutils.Vector(pts[i:i + 3])) for i in range(0, len(pts), 3)])
         elif o.name.startswith("HULL_"):
             # a CONVEX collider (a ramp's smooth slope): its points, relative to the Empty, in its custom property
             pts = list(o["pts"])
@@ -136,7 +142,7 @@ def markers(col):
                      if k not in ("edit_note",) and not k.startswith("_")}
             marks.append({"name": o.name, "pos": godot(loc),
                           "yaw": round(math.degrees(o.matrix_world.to_euler().z) % 360.0, 4), "props": extra})
-    return boxes, gates, lifts, hulls, doors, props, exits, marks
+    return boxes, gates, lifts, hulls, doors, props, exits, marks, stair_ramps
 view_layer = bpy.context.view_layer
 for col in pieces:
     cat = col["bk_category"]
@@ -173,7 +179,7 @@ for col in pieces:
         fh.write(json.dumps(gltf, indent=1) + "\n")
     lo, hi = nk.measure(gltf, blob)
     manifest["pieces"][name] = nk.manifest_entry(name, cat, gltf, lo, hi)
-    boxes, gates, lifts, hulls, doors, props, exits, marks = markers(col)
+    boxes, gates, lifts, hulls, doors, props, exits, marks, stair_ramps = markers(col)
     if exits:
         manifest["pieces"][name]["exits"] = exits
     if marks:
@@ -184,6 +190,8 @@ for col in pieces:
         manifest["pieces"][name]["doors"] = doors
     if hulls:
         manifest["pieces"][name]["collide_hulls"] = hulls
+    if stair_ramps:
+        manifest["pieces"][name]["stair_ramps"] = stair_ramps
     if lifts:
         manifest["pieces"][name]["lifts"] = lifts
     if boxes:

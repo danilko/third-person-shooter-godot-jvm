@@ -31,7 +31,55 @@ size = Vector3(1.24, 2.1, 0.14)
 [sub_resource type="BoxShape3D" id="BoxShape3D_8i6rg"]
 size = Vector3(1.24, 2.1, 0.14)
 
-[node name="ResortHotel" type="Node3D" unique_id=1299791609]
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_hhgdi"]
+points = PackedVector3Array(-18.59, 0, -7.56, -18.59, -0.3, -7.56, -21.83, 2.25, -7.56, -21.83, 1.95, -7.56, -18.59, 0, -8.9, -18.59, -0.3, -8.9, -21.83, 2.25, -8.9, -21.83, 1.95, -8.9)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_yjj23"]
+points = PackedVector3Array(-22.37, 2.25, -9.02, -22.37, 1.95, -9.02, -19.13, 4.5, -9.02, -19.13, 4.2, -9.02, -22.37, 2.25, -10.36, -22.37, 1.95, -10.36, -19.13, 4.5, -10.36, -19.13, 4.2, -10.36)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_v2nq3"]
+points = PackedVector3Array(18.59, 0, -10.36, 18.59, -0.3, -10.36, 21.83, 2.25, -10.36, 21.83, 1.95, -10.36, 18.59, 0, -9.02, 18.59, -0.3, -9.02, 21.83, 2.25, -9.02, 21.83, 1.95, -9.02)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_qxdhg"]
+points = PackedVector3Array(22.37, 2.25, -8.9, 22.37, 1.95, -8.9, 19.13, 4.5, -8.9, 19.13, 4.2, -8.9, 22.37, 2.25, -7.56, 22.37, 1.95, -7.56, 19.13, 4.5, -7.56, 19.13, 4.2, -7.56)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_rc35s"]
+points = PackedVector3Array(-18.59, 4.5, -7.56, -18.59, 4.2, -7.56, -21.02, 6.1, -7.56, -21.02, 5.8, -7.56, -18.59, 4.5, -8.9, -18.59, 4.2, -8.9, -21.02, 6.1, -8.9, -21.02, 5.8, -8.9)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_xa1fw"]
+points = PackedVector3Array(-21.56, 6.1, -9.02, -21.56, 5.8, -9.02, -19.13, 7.7, -9.02, -19.13, 7.4, -9.02, -21.56, 6.1, -10.36, -21.56, 5.8, -10.36, -19.13, 7.7, -10.36, -19.13, 7.4, -10.36)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_lujh7"]
+points = PackedVector3Array(18.59, 4.5, -10.36, 18.59, 4.2, -10.36, 21.02, 6.1, -10.36, 21.02, 5.8, -10.36, 18.59, 4.5, -9.02, 18.59, 4.2, -9.02, 21.02, 6.1, -9.02, 21.02, 5.8, -9.02)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_hsjre"]
+points = PackedVector3Array(21.56, 6.1, -8.9, 21.56, 5.8, -8.9, 19.13, 7.7, -8.9, 19.13, 7.4, -8.9, 21.56, 6.1, -7.56, 21.56, 5.8, -7.56, 19.13, 7.7, -7.56, 19.13, 7.4, -7.56)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_c3a4u"]
+points = PackedVector3Array(-18.59, 7.7, -7.56, -18.59, 7.4, -7.56, -21.02, 9.3, -7.56, -21.02, 9, -7.56, -18.59, 7.7, -8.9, -18.59, 7.4, -8.9, -21.02, 9.3, -8.9, -21.02, 9, -8.9)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_2bovv"]
+points = PackedVector3Array(-21.56, 9.3, -9.02, -21.56, 9, -9.02, -19.13, 10.9, -9.02, -19.13, 10.6, -9.02, -21.56, 9.3, -10.36, -21.56, 9, -10.36, -19.13, 10.9, -10.36, -19.13, 10.6, -10.36)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_2bqnh"]
+points = PackedVector3Array(18.59, 7.7, -10.36, 18.59, 7.4, -10.36, 21.02, 9.3, -10.36, 21.02, 9, -10.36, 18.59, 7.7, -9.02, 18.59, 7.4, -9.02, 21.02, 9.3, -9.02, 21.02, 9, -9.02)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_4lmwj"]
+points = PackedVector3Array(21.56, 9.3, -8.9, 21.56, 9, -8.9, 19.13, 10.9, -8.9, 19.13, 10.6, -8.9, 21.56, 9.3, -7.56, 21.56, 9, -7.56, 19.13, 10.9, -7.56, 19.13, 10.6, -7.56)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_53cf7"]
+points = PackedVector3Array(-18.59, 10.9, -7.56, -18.59, 10.6, -7.56, -21.02, 12.5, -7.56, -21.02, 12.2, -7.56, -18.59, 10.9, -8.9, -18.59, 10.6, -8.9, -21.02, 12.5, -8.9, -21.02, 12.2, -8.9)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_6onfd"]
+points = PackedVector3Array(-21.56, 12.5, -9.02, -21.56, 12.2, -9.02, -19.13, 14.1, -9.02, -19.13, 13.8, -9.02, -21.56, 12.5, -10.36, -21.56, 12.2, -10.36, -19.13, 14.1, -10.36, -19.13, 13.8, -10.36)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_dt40l"]
+points = PackedVector3Array(18.59, 10.9, -10.36, 18.59, 10.6, -10.36, 21.02, 12.5, -10.36, 21.02, 12.2, -10.36, 18.59, 10.9, -9.02, 18.59, 10.6, -9.02, 21.02, 12.5, -9.02, 21.02, 12.2, -9.02)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_2u1ix"]
+points = PackedVector3Array(21.56, 12.5, -8.9, 21.56, 12.2, -8.9, 19.13, 14.1, -8.9, 19.13, 13.8, -8.9, 21.56, 12.5, -7.56, 21.56, 12.2, -7.56, 19.13, 14.1, -7.56, 19.13, 13.8, -7.56)
+
+[node name="ResortHotel" type="Node3D" unique_id=1591676358]
 metadata/building = {
 "aabb": [Vector3(-24, -1.2, -19.5), Vector3(48, 18.300001, 39)],
 "base_m": -1.2,
@@ -604,53 +652,105 @@ metadata/building = {
 "wall_top_m": 14.1
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1140878983]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=27792074]
 visibility_range_end = 505.2
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_oys02")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=2131956028]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1626954814]
 collision_mask = 0
 
-[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=87977565]
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=476890616]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.05, 1.05, 3.4)
 shape = SubResource("BoxShape3D_udj8t")
 
-[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=1299606846]
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=601883396]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.95, 1.05, 3.4)
 shape = SubResource("BoxShape3D_pgk3g")
 
-[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=1487825718]
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=593049644]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45, 1.05, 3.4)
 shape = SubResource("BoxShape3D_605it")
 
-[node name="DoorLeaf3" type="CollisionShape3D" parent="Collision" unique_id=816068260]
+[node name="DoorLeaf3" type="CollisionShape3D" parent="Collision" unique_id=394385394]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 3.4)
 shape = SubResource("BoxShape3D_a3yyb")
 
-[node name="DoorLeaf4" type="CollisionShape3D" parent="Collision" unique_id=26013607]
+[node name="DoorLeaf4" type="CollisionShape3D" parent="Collision" unique_id=1953813501]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.55, 1.05, 3.4)
 shape = SubResource("BoxShape3D_krmai")
 
-[node name="DoorLeaf5" type="CollisionShape3D" parent="Collision" unique_id=980624416]
+[node name="DoorLeaf5" type="CollisionShape3D" parent="Collision" unique_id=2130420176]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.45, 1.05, 3.4)
 shape = SubResource("BoxShape3D_gw5gb")
 
-[node name="DoorLeaf6" type="CollisionShape3D" parent="Collision" unique_id=1483909559]
+[node name="DoorLeaf6" type="CollisionShape3D" parent="Collision" unique_id=1920807946]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 2.4, 1.05, -12.4)
 shape = SubResource("BoxShape3D_6dm7n")
 
-[node name="DoorLeaf7" type="CollisionShape3D" parent="Collision" unique_id=459749905]
+[node name="DoorLeaf7" type="CollisionShape3D" parent="Collision" unique_id=1970062138]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 3.6, 1.05, -12.4)
 shape = SubResource("BoxShape3D_8i6rg")
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=756442997]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=554356999]
 shape = ExtResource("2_ko3in")
 
-[node name="Lifts" type="Node3D" parent="." unique_id=437041910]
+[node name="StairRamps" type="StaticBody3D" parent="." unique_id=1823449926]
+collision_layer = 64
+collision_mask = 0
 
-[node name="Lift0" type="Node3D" parent="Lifts" unique_id=597225480]
+[node name="Ramp0" type="CollisionShape3D" parent="StairRamps" unique_id=394569472]
+shape = SubResource("ConvexPolygonShape3D_hhgdi")
+
+[node name="Ramp1" type="CollisionShape3D" parent="StairRamps" unique_id=1218809929]
+shape = SubResource("ConvexPolygonShape3D_yjj23")
+
+[node name="Ramp2" type="CollisionShape3D" parent="StairRamps" unique_id=524548287]
+shape = SubResource("ConvexPolygonShape3D_v2nq3")
+
+[node name="Ramp3" type="CollisionShape3D" parent="StairRamps" unique_id=736062205]
+shape = SubResource("ConvexPolygonShape3D_qxdhg")
+
+[node name="Ramp4" type="CollisionShape3D" parent="StairRamps" unique_id=727366408]
+shape = SubResource("ConvexPolygonShape3D_rc35s")
+
+[node name="Ramp5" type="CollisionShape3D" parent="StairRamps" unique_id=202896147]
+shape = SubResource("ConvexPolygonShape3D_xa1fw")
+
+[node name="Ramp6" type="CollisionShape3D" parent="StairRamps" unique_id=1735400425]
+shape = SubResource("ConvexPolygonShape3D_lujh7")
+
+[node name="Ramp7" type="CollisionShape3D" parent="StairRamps" unique_id=1802002792]
+shape = SubResource("ConvexPolygonShape3D_hsjre")
+
+[node name="Ramp8" type="CollisionShape3D" parent="StairRamps" unique_id=248624937]
+shape = SubResource("ConvexPolygonShape3D_c3a4u")
+
+[node name="Ramp9" type="CollisionShape3D" parent="StairRamps" unique_id=1507748410]
+shape = SubResource("ConvexPolygonShape3D_2bovv")
+
+[node name="Ramp10" type="CollisionShape3D" parent="StairRamps" unique_id=399284623]
+shape = SubResource("ConvexPolygonShape3D_2bqnh")
+
+[node name="Ramp11" type="CollisionShape3D" parent="StairRamps" unique_id=1339829671]
+shape = SubResource("ConvexPolygonShape3D_4lmwj")
+
+[node name="Ramp12" type="CollisionShape3D" parent="StairRamps" unique_id=975044929]
+shape = SubResource("ConvexPolygonShape3D_53cf7")
+
+[node name="Ramp13" type="CollisionShape3D" parent="StairRamps" unique_id=1935896906]
+shape = SubResource("ConvexPolygonShape3D_6onfd")
+
+[node name="Ramp14" type="CollisionShape3D" parent="StairRamps" unique_id=952167681]
+shape = SubResource("ConvexPolygonShape3D_dt40l")
+
+[node name="Ramp15" type="CollisionShape3D" parent="StairRamps" unique_id=1278518048]
+shape = SubResource("ConvexPolygonShape3D_2u1ix")
+
+[node name="Lifts" type="Node3D" parent="." unique_id=216459907]
+
+[node name="Lift0" type="Node3D" parent="Lifts" unique_id=172852518]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -1, 0, -8.61)
 script = ExtResource("3_hhgik")
 shaft_width = 1.8
@@ -668,46 +768,46 @@ in_service = true
 stop_heights = "0,4.5,7.7,10.9"
 faces = 1
 
-[node name="Door_exit_0" type="Marker3D" parent="." unique_id=1812354743]
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=108830758]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -14.5, 0, 3.4)
 
-[node name="Door_exit_1" type="Marker3D" parent="." unique_id=169048711]
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=1359195282]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 3.4)
 
-[node name="Door_exit_2" type="Marker3D" parent="." unique_id=1699584137]
+[node name="Door_exit_2" type="Marker3D" parent="." unique_id=2106954015]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -10, 0, 3.4)
 
-[node name="Door_exit_3" type="Marker3D" parent="." unique_id=1302022971]
+[node name="Door_exit_3" type="Marker3D" parent="." unique_id=236658211]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, -12.4)
 
-[node name="Markers" type="Node3D" parent="." unique_id=264735943]
+[node name="Markers" type="Node3D" parent="." unique_id=1808095920]
 
-[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=509599064 groups=["mission_marker"]]
+[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=11511013 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 10.9, -0.1)
 metadata/note = "the top-floor room (a target / a witness)"
 metadata/kind = "objective"
 
-[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1666739614 groups=["mission_marker"]]
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=589857715 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0, 15.5)
 metadata/team = "guest"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=602272320 groups=["mission_marker"]]
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=1582331768 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -2.5, 0, 1.4)
 metadata/team = "staff"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=1904810442 groups=["mission_marker"]]
+[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=1806759947 groups=["mission_marker"]]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -6, 4.5, -6.6)
 metadata/team = "guest"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_04" type="Marker3D" parent="Markers" unique_id=1003977166 groups=["mission_marker"]]
+[node name="MARK_spawn_04" type="Marker3D" parent="Markers" unique_id=1466105526 groups=["mission_marker"]]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -6, 7.7, -6.6)
 metadata/team = "guest"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_05" type="Marker3D" parent="Markers" unique_id=91488675 groups=["mission_marker"]]
+[node name="MARK_spawn_05" type="Marker3D" parent="Markers" unique_id=367549602 groups=["mission_marker"]]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -6, 10.9, -6.6)
 metadata/team = "guest"
 metadata/kind = "spawn"

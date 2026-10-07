@@ -20,6 +20,10 @@ Then `build_weapon.py <ID>` verifies (length and grip->rear are unchanged by a v
 by 0.03 m. 5 cm was measured first and rejected: the grips reach only 5.3-6.4 cm below the old fist centre, so a
 5 cm move leaves the lower half of the fist (pinky, ring finger) closing on air below the grip.
 Then (user: align the fist with the trigger) PIS1, PIS2, DUP1 by -0.015 m: pistols net +0.015, REV1 and SMG1 +0.03.
+2026-10-07 (user: "all pistols' grip too low, the gun blocks the crosshair"): PIS1, PIS2, DUP1 by -0.015 and REV1 by
+-0.03 -- every pistol back on its CONFORMED grip (net 0: the origin is the fist's centre, the weapon standard). Judged
+with tools/godot/shot_pistol_sight.gd: REV1's front sight sat on the crosshair in first person before, clear below it
+after. SupportPoints put back by hand as above.
 """
 import os
 import re

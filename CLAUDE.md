@@ -6729,6 +6729,10 @@ the pipeline and numbers. The three rules that make ARP safe in the CLIP-SOURCE 
   crawl clips). It is a gentle cup (35-57 deg at the middle joints), so a handguard grip still reads nearly flat.
 - **Open: SHG1 in crouch** misses the left grip by 5.4 cm (tolerance 5): crouch still plays the rifle's crouch
   aim, never fitted to the shotgun's adopted socket (the mount drags the hand 0.27 m there).
+- **2026-10-07: the pistols (PIS1, PIS2, DUP1, REV1) are back on their CONFORMED grip** (user: "the grip is too low,
+  the gun blocks the crosshair"): models -1.5 cm (REV1 -3 cm), so the fist sits high under the slide / frame and REV1's
+  front sight, which sat ON the crosshair in first person, is clear below it. SMG1 keeps its +3 cm. Pictures:
+  `tools/godot/shot_pistol_sight.gd` (display). The note below is the history.
 - **The revolver and SMG1 sit 3 cm higher in the hand, the pistols (PIS1, PIS2, DUP1) 1.5 cm** (user asked ~5 cm, then
   pulled the pistols back 1.5 cm so the fist lines up near the trigger; `blender/tools/shift_weapon_grip.py`
   moves the model up in its .blend and every Marker3D/CollisionShape3D with it). 5 cm was measured and rejected: the
@@ -7084,6 +7088,25 @@ measurable, because draws, not pixels, are the cost here. Measured in the city (
 view, ON/OFF alternated): +1.5 ms p50, +2.4 ms p95, +1 500 draws (~16%); DebugWorld +0.45 ms. Gate
 **`tools/godot/probe_rear_view.gd [-- --world=island] [--shot=<dir>]`** (display): hidden on foot, shown driving,
 looks back (dot -0.998) in chase and first person, renders every other frame, C hides it and it renders nothing.
+
+## Stairs are walked on an invisible ramp; bullets still meet the steps (user, 2026-10-07)
+
+"Characters get stuck on stairs." Every stair flight the kits generate carries a RAMP collider along its NOSINGS: a
+0.3 m convex slab from one tread in front of the first riser (at the floor) to the front of the top tread (at the top),
+so every step sits under it and keeps its own collision. It is on collision layer 7 (`CollisionLayers.STAIR_RAMP`, 64,
+named `stair_ramp`), which only CHARACTER bodies collide with (`Character.tscn` mask 19 -> 83; `testMove`, the
+step-up, inherits it): bullets, projectiles, blasts and vehicles meet the real steps (user: "other weapons / collision
+deal with stairs like stairs"). A navmesh bake parses every layer, so a path walks the slope too.
+- Made by the generators: `interior_kit.Bld.stair_ramp` (both flights of `ustair`; `interior_plans_jp.sstair`) and
+  `build_station_blends.stair` (`p.stair_hulls`), written as `HULL_stair_<n>` Empties (a kept, hand-edited interior
+  piece gets missing ones added, like its shop MARKs). `export_building_kit.py` puts them in a piece's `stair_ramps`;
+  `layout_buildings.py` carries them for props, custom (interiors) types and composite parts; `build_building_scenes.gd`
+  builds a `StairRamps` StaticBody3D (layer 64, mask 0) of `Ramp<n>` ConvexPolygonShape3Ds.
+- Gate **`tools/godot/probe_stairs.gd [-- --scenes=...] [--control]`**: a real Player holds `forward` up every ramp
+  of each scene. Steps only (`--control`): stuck on 14 of 24 flights; with the ramps 2 of 24, and both are BUILDING
+  defects that fail with steps only too: the police station's roof-level flight has 1.64 m of headroom at its foot
+  (the roof slab is not cut over it), and the large city safe house's top flight has a slab edge at head height.
+- Not covered: stairs inside `library.blend` pieces (landmarks, civic placeholders, apartment external stairs).
 
 ## Godot-JVM Specifics
 

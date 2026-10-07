@@ -166,6 +166,20 @@ class Bld:
         self.empties.append((self._n("MARK_%s_" % kind), "mark", (x, y, z), rot, props))
 
     # ── stairs ──────────────────────────────────────────────────────────────────────────────────────────────────
+    def stair_ramp(self, a_lo, a_hi, b_lo, b_hi, thick=0.3):
+        """An invisible RAMP collider over a flight (user 2026-10-07: characters stuck on stairs): a convex slab whose
+        top runs along the step NOSINGS from a_lo/b_lo (the two bottom corners: one tread in front of the first riser,
+        at the floor) to a_hi/b_hi (the two top corners: the front of the top tread, at the top floor), `thick` deep.
+        Every step sits under it, so the steps keep their own collision and the capsule walks a smooth slope -- the
+        standard shooter answer to stairs (Source, Unreal, GTA). Exported as a HULL_ Empty (convex points)."""
+        pts = []
+        for q in (a_lo, a_hi, b_lo, b_hi):
+            pts.append(q)
+            pts.append((q[0], q[1], q[2] - thick))
+        loc = pts[0]
+        rel = [c - loc[k % 3] for q in pts for k, c in enumerate(q)]
+        self.empties.append((self._n("HULL_stair_"), "hull", loc, 0.0, {"pts": rel}))
+
     def ustair(self, x0, y0, x1, y1, z0, rise, near="s", mat="MI_ConcreteSmooth", nosing="MI_PaintedMetalDark",
                cap=False):
         """A U-return stair (折り返し階段) filling the well x0..x1 / y0..y1 from floor z0 up `rise`: a landing at the
@@ -210,6 +224,21 @@ class Bld:
             v1 = STAIR_NEAR + k * TREAD - j * TREAD
             put_box(half + 0.06, v1 - TREAD, W, v1, top - r - 0.25, top, mat)
             put_box(half + 0.06, v1 - 0.04, W, v1, top - 0.02, top + 0.005, nosing)
+        def pt(u, v, z):
+            if near == "s":
+                return (x0 + u, y0 + v, z)
+            if near == "n":
+                return (x1 - u, y1 - v, z)
+            if near == "w":
+                return (x0 + v, y1 - u, z)
+            return (x1 - v, y0 + u, z)
+
+        # the ramps over the two flights, along the nosings (flight A up from the near landing, B up from the half one)
+        va_lo, va_hi = STAIR_NEAR - TREAD, STAIR_NEAR + (k - 1) * TREAD
+        self.stair_ramp(pt(0.0, va_lo, z0), pt(0.0, va_hi, zm), pt(half - 0.06, va_lo, z0), pt(half - 0.06, va_hi, zm))
+        vb_lo, vb_hi = STAIR_NEAR + (k + 1) * TREAD, STAIR_NEAR + TREAD
+        self.stair_ramp(pt(half + 0.06, vb_lo, zm), pt(half + 0.06, vb_hi, z0 + rise),
+                        pt(W, vb_lo, zm), pt(W, vb_hi, z0 + rise))
         put_box(half - 0.06, STAIR_NEAR, half + 0.06, STAIR_NEAR + k * TREAD, z0, z0 + rise + 1.0, "MI_Plaster")
         if cap:           # the top floor, no flight above: a 1.1 m guard over flight A's drop at the landing's edge
             put_box(0.0, STAIR_NEAR - 0.06, half + 0.06, STAIR_NEAR + 0.06, z0 + rise, z0 + rise + 1.1, "MI_Plaster")
@@ -313,6 +342,9 @@ class Bld:
                 e.empty_display_size = 0.8
                 d = rot
                 e.rotation_euler = (0.0, math.radians(90.0), math.atan2(d[1], d[0]))
+            elif kind == "hull":
+                e.empty_display_type = "SPHERE"
+                e.empty_display_size = 0.2
             elif kind == "lift":
                 e.empty_display_type = "PLAIN_AXES"
                 e.empty_display_size = 1.0

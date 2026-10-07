@@ -19,7 +19,7 @@ import com.openworld.item.Pickup;
  *   setCollisionLayerValue(LAYER_HITBOX, false)    — 1-based layer number API
  *
  * Common combined masks:
- *   CHARACTER body mask:      WORLD | CHARACTER | VEHICLE  = 19
+ *   CHARACTER body mask:      WORLD | CHARACTER | VEHICLE | STAIR_RAMP = 83
  *   AimRay (character):       WORLD | PICKUP | HITBOX | VEHICLE = 29  (Character.tscn — PICKUP is
  *                             what lets a bullet detonate a dropped grenade)
  *   AimRay (vehicle):         WORLD | HITBOX | VEHICLE          = 25
@@ -43,6 +43,11 @@ public final class CollisionLayers {
      *  so a hull pressed into a 1.15 m parapet at speed has no top edge to climb (the Road Kit's `-carwall` proxies,
      *  set by `WorldBaker.applyCarWalls`). Nothing else sees it: not bullets, characters, wheel rays or the navmesh. */
     public static final int CAR_WALL  = 32;  // layer 6
+    /** Layer 7: a STAIR RAMP -- a smooth slope along a flight's nosings that only CHARACTER bodies walk on (their mask
+     *  includes it, Character.tscn 83), so a capsule never catches on a step edge (user 2026-10-07). Bullets,
+     *  projectiles, blasts and vehicles do not see it and meet the real steps. Built by build_building_scenes.gd from a
+     *  piece's HULL_stair_ Empties (the StairRamps body). */
+    public static final int STAIR_RAMP = 64; // layer 7
 
     // ── Layer numbers, 1-based (use with setCollisionLayerValue / setCollisionMaskValue) ──
     public static final int LAYER_WORLD     = 1;
@@ -51,4 +56,5 @@ public final class CollisionLayers {
     public static final int LAYER_HITBOX    = 4;
     public static final int LAYER_VEHICLE   = 5;
     public static final int LAYER_CAR_WALL  = 6;
+    public static final int LAYER_STAIR_RAMP = 7;
 }

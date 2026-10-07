@@ -74,7 +74,8 @@ def build(bid):
         b = IK.Bld(bid, Builder, material)
         PLANS[bid](b)
         have = {o.name.split(".")[0] for o in col.objects}
-        want = [e for e in b.empties if e[0].startswith(SHOP_MARKS) and e[0] not in have]
+        # ...and so are the stair RAMP colliders (HULL_stair_, user 2026-10-07): invisible, they change no look
+        want = [e for e in b.empties if e[0].startswith(SHOP_MARKS + ("HULL_stair_",)) and e[0] not in have]
         if want:
             b.groups, b.objs, b.empties = {}, [], want
             b.install(col, {})
@@ -82,7 +83,7 @@ def build(bid):
                 if o.name.split(".")[0] in {e[0] for e in want}:
                     o["edit_note"] = col.get("edit_note", "")
             bpy.ops.wm.save_as_mainfile(filepath=path, compress=True)
-            print("[build_interior_blends]   ... added %d missing shop MARK_ Empties to it" % len(want))
+            print("[build_interior_blends]   ... added %d missing MARK_ / HULL_stair_ Empties to it" % len(want))
         return True
     b = IK.Bld(bid, Builder, material)
     spec = PLANS[bid](b)

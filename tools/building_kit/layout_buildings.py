@@ -543,6 +543,13 @@ def place_props(props, out, root, footprint=None):
                     "center": [round(pos[0] + dx_, 5), round(pos[1] + dd["pos"][1], 5), round(pos[2] + dz_, 5)],
                     "outward": [round(ox_, 6), 0, round(oz_, 6)], "width": float(dd["w"]), "height": float(dd["h"]),
                     "style": str(dd.get("style", "swing")), "slide_dir": float(dd.get("slide_dir", 1.0))})
+            for h in entry.get("stair_ramps", ()):
+                # a stair flight's RAMP (characters only, layer stair_ramp), in the piece's own frame
+                pts = []
+                for q in h:
+                    rx, rz = rot_xz(yaw, q[0], q[2])
+                    pts.append([round(pos[0] + rx, 5), round(pos[1] + q[1], 5), round(pos[2] + rz, 5)])
+                out.setdefault("stair_ramps", []).append(pts)
             kind = p.get("collide", "box")
             if kind == "piece":
                 # the piece's OWN colliders (COL_ / HULL_ Empties in its .blend): what an artist moved there
@@ -699,6 +706,8 @@ def layout_composite(c, built, root):
             out["boxes"].append({"center": mv(bx["center"]), "size": [round(sx, 5), sz[1], round(sz_, 5)]})
         for h in b.get("hulls", []):
             out["hulls"].append({**h, "pos": mv(h["pos"]), "yaw": (h["yaw"] + yaw) % 360.0})
+        for h in b.get("stair_ramps", []):
+            out.setdefault("stair_ramps", []).append([mv(q) for q in h])
         for mk in b.get("marks", []):
             out.setdefault("marks", []).append({**mk, "pos": mv(mk["pos"]), "yaw": (mk.get("yaw", 0.0) + yaw) % 360.0})
         for d in b["doors"]:
@@ -807,6 +816,9 @@ def layout_example(e, root):
            "door_style": e.get("door_style", "swing"),
            "boxes": [], "hulls": [], "doors": [], "solid_probes": [], "collision": "trimesh",
            "trimesh_pieces": 1}
+    for h in p.get("stair_ramps", ()):
+        out.setdefault("stair_ramps", []).append([[round(q[0] + pos[0], 5), round(q[1] + pos[1], 5),
+                                                   round(q[2] + pos[2], 5)] for q in h])
     if "probe_xz" in e:
         out["probe_xz"] = e["probe_xz"]
     # how far the mesh reaches BELOW the scene origin (a ship's hull under its waterline origin): a composite that

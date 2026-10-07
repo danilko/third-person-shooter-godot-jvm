@@ -657,6 +657,29 @@ func _build(b: Dictionary, variant: String) -> bool:
 		hcs.shape = hsh
 		body.add_child(hcs)
 		hcs.owner = root
+	if b.get("stair_ramps", []).size() > 0:
+		# STAIR RAMPS (user 2026-10-07): a smooth slope along each flight's nosings that only CHARACTER bodies collide
+		# with (layer 7, stair_ramp: Character.tscn's mask includes it). Bullets, projectiles, blasts and vehicles meet
+		# the real steps; a navmesh bake parses every layer, so a path walks the slope too.
+		var rb := StaticBody3D.new()
+		rb.name = "StairRamps"
+		rb.collision_layer = 64
+		rb.collision_mask = 0
+		root.add_child(rb)
+		rb.owner = root
+		var ri := 0
+		for sr in b["stair_ramps"]:
+			var rpts := PackedVector3Array()
+			for q in sr:
+				rpts.append(Vector3(q[0], q[1], q[2]))
+			var rsh := ConvexPolygonShape3D.new()
+			rsh.points = rpts
+			var rcs := CollisionShape3D.new()
+			rcs.name = "Ramp%d" % ri
+			ri += 1
+			rcs.shape = rsh
+			rb.add_child(rcs)
+			rcs.owner = root
 	if b.has("trimesh_idx"):
 		# a SITE with whole-building parts (kits/interiors): those parts' pieces are one trimesh, beside the site's boxes
 		var tfaces := PackedVector3Array()
@@ -971,6 +994,7 @@ func _build(b: Dictionary, variant: String) -> bool:
 	meta.erase("boxes")
 	meta.erase("hulls")
 	meta.erase("hull_points")
+	meta.erase("stair_ramps")
 	meta.erase("trimesh_idx")
 	meta["piece_count"] = b["pieces"].size()
 	meta["doors_closed"] = not open_variant

@@ -73,6 +73,7 @@ class Piece:
         self.gates = []         # [(pos, w, h)] or [(pos, w, h, yaw)]: yaw (deg about Z) turns the unpaid side off +X
         self.lifts = []         # [(pos, w, d, rise, door_w, door_h)]
         self.hulls = []         # [[(x, y, z), ...]]: convex colliders (a ramp's smooth slope)
+        self.stair_hulls = []   # [[(x, y, z), ...]]: stair RAMPS, characters only (HULL_stair_: layer stair_ramp)
         self.doors = []         # [(pos, (dx, dy) out of the room, w, h, style, slide_dir)]: DOOR_ Empties
         self.props = []         # [(library piece, pos, yaw deg, collide)]: PROP_ Empties -- a LIBRARY fixture (the
                                 # konbini's restroom kit: washlet toilet, basin, mirror, ...) placed by the game
@@ -521,6 +522,7 @@ def mirror_y(p):
     p.gates = [((g[0][0], -g[0][1], g[0][2]), g[1], g[2], -(g[3] if len(g) > 3 else 0.0)) for g in p.gates]
     p.lifts = [((q[0], -q[1], q[2]),) + tuple(rest) for q, *rest in p.lifts]
     p.hulls = [[(q[0], -q[1], q[2]) for q in h] for h in p.hulls]
+    p.stair_hulls = [[(q[0], -q[1], q[2]) for q in h] for h in p.stair_hulls]
     # a door's arrow flips with the piece, and so does which way a single leaf runs (right and left swap in a mirror)
     p.doors = [((q[0], -q[1], q[2]), (d[0], -d[1]), w, h, st, -sd) for q, d, w, h, st, sd in p.doors]
     # a fixture turned by yaw is reflected by 180 - yaw (its own mirror image is not available: it keeps its hand)
@@ -599,6 +601,10 @@ def stair(p, x_top, x_bot, y0, y1, z0, z1, mat="MI_ConcreteSmooth"):
     to the top so there is no seam for a foot (or a probe's ray) to fall through."""
     n, r = SL.stair_steps(z1 - z0)
     assert abs((x_bot - x_top) - (n - 1) * SL.STAIR_RUN) < 1e-6, (x_bot - x_top, n)
+    # an invisible RAMP collider along the nosings (user 2026-10-07: characters stuck on stairs): from one run in front
+    # of the first riser at the floor to the top tread's front at the top, 0.3 m thick; the steps keep their colliders
+    x_lo, x_hi = x_bot + SL.STAIR_RUN, x_top
+    p.stair_hulls.append([(x, y, z) for x, zz in ((x_lo, z0), (x_hi, z1)) for y in (y0, y1) for z in (zz, zz - 0.3)])
     for k in range(1, n):
         p.solid((x_top, y0, z0), (x_bot - (k - 1) * SL.STAIR_RUN, y1, z0 + k * r), mat)
         p.b.box((x_bot - (k - 1) * SL.STAIR_RUN - 0.04, y0, z0 + k * r), (x_bot - (k - 1) * SL.STAIR_RUN, y1,
@@ -1386,6 +1392,14 @@ def install(p, spot, name=None):
         # the arrow (local +Z) drawn along +X, then turned about Z by the gate's yaw
         e.rotation_euler = (0.0, math.radians(90.0), math.radians(g[3] if len(g) > 3 else 0.0))
         e["w"], e["h"] = float(w), float(hh)
+        col.objects.link(e)
+    for i, pts in enumerate(p.stair_hulls):
+        e = bpy.data.objects.new("HULL_stair_%d" % i, None)
+        e.empty_display_type = "SPHERE"
+        e.empty_display_size = 0.2
+        e.location = pts[0]
+        e["pts"] = [c - pts[0][k % 3] for q in pts for k, c in enumerate(q)]
+        e.hide_render = True
         col.objects.link(e)
     for i, pts in enumerate(p.hulls):
         # a CONVEX collider (a ramp leg's wedge): drawn as a small sphere at its first point, the points (relative to

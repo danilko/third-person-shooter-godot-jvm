@@ -93,6 +93,9 @@ def sstair(b, x0, x1, y0, z0, rise, sign_=1, tread=IK.TREAD, mat="MI_ConcreteSmo
         nl, nh = (hi - 0.04, hi) if sign_ > 0 else (lo, lo + 0.04)
         b.box(group, (x0, nl, top - 0.02), (x1, nh, top + 0.005), nosing)
     L = n * tread
+    if hasattr(b, "stair_ramp"):          # the ramp collider along the nosings (interior_kit.Bld.stair_ramp)
+        y_lo, y_hi = y0 - sign_ * tread, y0 + sign_ * (n - 1) * tread
+        b.stair_ramp((x0, y_lo, z0), (x0, y_hi, z0 + rise), (x1, y_lo, z0), (x1, y_hi, z0 + rise))
     if rails:
         for x in (x0 - 0.08, x1):
             for i in range(n):
