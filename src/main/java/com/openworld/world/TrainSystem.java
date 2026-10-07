@@ -969,8 +969,8 @@ public class TrainSystem extends Node3D {
             h.maxHealth = SET_HP;
             h.hitDamageMultiplier = HIT_MULT;
             h.explosionDamageMultiplier = BLAST_MULT;
-            h.bladeDamageMultiplier = 0.0f;      // a knife or a fist does nothing to a train
-            h.bluntDamageMultiplier = 0.0f;
+            h.bladeDamageMultiplier = 0.1f;      // San Andreas style (user 2026-10-07): melee hurts a vehicle, slowly
+            h.bluntDamageMultiplier = 0.1f;
             h.displayName = "Train";
             h.invulnerable = set.invulnerable;
             body.addChild(h);

@@ -34,10 +34,10 @@ public class Health extends Node {
     public float hitDamageMultiplier = 1.0f;
     @Export
     public float explosionDamageMultiplier = 1.0f;
-    /** A blade ({@link com.openworld.world.DamageKind#BLADE}: the knife). 1 on people; a vehicle all but ignores it. */
+    /** A blade ({@link com.openworld.world.DamageKind#BLADE}: the knife). 1 on people; 0.1 on a vehicle (San Andreas). */
     @Export
     public float bladeDamageMultiplier = 1.0f;
-    /** Fists and light blunt melee ({@link com.openworld.world.DamageKind#BLUNT}). 1 on people; ~0 on a vehicle. */
+    /** Fists and light blunt melee ({@link com.openworld.world.DamageKind#BLUNT}). 1 on people; 0.1 on a vehicle (San Andreas). */
     @Export
     public float bluntDamageMultiplier = 1.0f;
 

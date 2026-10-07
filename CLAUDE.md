@@ -11406,8 +11406,9 @@ checks its "Wired in code" table against the enum. Licence rule as for art: CC0 
 - **Damage KINDS: the weapon declares, the target decides** (`world.DamageKind`, Source/Unreal damage types, user
   2026-10-07): `WeaponItem.damageKind()` is BULLET for guns, `MeleeItem` BLUNT (fists), `KnifeItem` BLADE, `AxeItem`
   HEAVY; `Health.multiplierFor(kind)` -- BULLET and HEAVY take `hitDamageMultiplier`, BLADE `bladeDamageMultiplier`,
-  BLUNT `bluntDamageMultiplier` (1 on people; 0.02 / 0.0 on every vehicle base scene, 0 / 0 on trains). A knife's
-  heavy stab does 2 HP to a car and a punch 0 (they were 40 and 5.6); an axe chop is unchanged (48). A body panel dents
+  BLUNT `bluntDamageMultiplier` (1 on people; 0.1 / 0.1 on every vehicle base scene and on trains -- SAN ANDREAS,
+  user 2026-10-07: melee hurts cars, slowly, ready for a combo system). A knife's heavy stab does 10 HP to a car and a
+  punch 1.4 (~360 punches for a 500 HP car; they were 40 and 5.6); an axe chop is unchanged (48). A body panel dents
   only from a kind that hurts the car. A new weapon picks a kind (a katana that cuts metal = HEAVY); a new kind is an
   enum value plus one Health field. Gate `probe_vehicle_armour.gd` section 1b.
 - **A helicopter at 0 HP in the air is SHOT DOWN** (`Helicopter.onVehicleDestruction` override): no lift, the rotor

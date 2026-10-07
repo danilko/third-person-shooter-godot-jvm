@@ -103,8 +103,9 @@ func _initialize() -> void:
 		helper.call("kind_hit", im, car, k[1], k[0])
 		await physics_frame
 		lost[k[0]] = h0 - _hp(car)
-	_check("a knife's heavy stab barely marks a car", lost["BLADE"] <= 2.0, "%.1f HP" % lost["BLADE"])
-	_check("a punch does nothing to a car", lost["BLUNT"] == 0.0, "%.1f HP" % lost["BLUNT"])
+	# San Andreas style (user 2026-10-07): melee hurts a vehicle, a tenth as much (a 500 HP car ~360 punches)
+	_check("a knife's heavy stab does a tenth to a car", is_equal_approx(lost["BLADE"], knife_heavy * 0.1), "%.1f HP" % lost["BLADE"])
+	_check("a punch does a tenth to a car", is_equal_approx(lost["BLUNT"], fist * 0.1), "%.1f HP" % lost["BLUNT"])
 	_check("an axe's heavy chop hurts a car like gunfire does", is_equal_approx(lost["HEAVY"], axe_heavy * 0.4), "%.1f HP" % lost["HEAVY"])
 	_check("a rifle round is unchanged on a car", is_equal_approx(lost["BULLET"], asr * 0.4), "%.1f HP" % lost["BULLET"])
 	var p0 := _hp(person)
