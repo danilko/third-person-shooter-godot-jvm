@@ -62,6 +62,12 @@ func _ground(pos: Vector3) -> Vector3:
 func _place(pos: Vector3, fwd: Vector3) -> void:
 	pos = _ground(pos)
 	player.global_position = pos
+	# a hand placement keeps MovementController's own fall speed (CLAUDE.md Known Quirks): placed every frame and
+	# never cleared, it built up to -648 m/s and dropped the body under the ground between placements (1242 frames)
+	player.set("velocity", Vector3.ZERO)
+	var mc := player.get_node_or_null("MovementController")
+	if mc != null:
+		mc.call("clear_motion")
 	var f := Vector3(fwd.x, 0, fwd.z)
 	if f.length() < 1e-3:
 		f = Vector3(0, 0, -1)
@@ -113,6 +119,8 @@ func _leg(label: String, path: Array, speed: float) -> void:
 			var th: float = world_bounds.call("terrain_height", player.global_position.x, player.global_position.z)
 			if not is_nan(th) and player.global_position.y < th - 0.2:
 				under_terrain += 1
+				if under_terrain - under0 <= 5 or (under_terrain - under0) % 200 == 0:
+					print("    under at %s, terrain %.2f, vel %s" % [str(player.global_position), th, str(player.velocity)])
 		if _arg("no-parked", false) and Engine.get_physics_frames() % 30 == 0:
 			# control: the placed-but-unused vehicles (world.ParkedVehicle remembers a spot, so it does not respawn)
 			for pv in get_nodes_in_group("parked_vehicle"):
@@ -266,7 +274,9 @@ func _initialize() -> void:
 	await _leg("drive_c1", [Vector3(40, 12.5, 100), Vector3(1160, 12.5, 100), Vector3(1160, 12.5, -560),
 			Vector3(40, 12.5, -560), Vector3(40, 12.5, 100)], 25.0)
 	# a residential walk (the SW grid), as a quiet control
-	await _leg("walk_residential", [Vector3(-1000, g, 600), Vector3(-300, g, 600)], 6.0)
+	# kichi_dori's east FOOTWAY (IslandSidewalks.json walk line): the straight line this leg used to walk crossed the
+	# SupermarketSite and the physics pushed the placed capsule out under the ground
+	await _leg("walk_residential", [Vector3(-492.0, g, 312.3), Vector3(-493.6, g, 396.3), Vector3(-493.6, g, 1065.9)], 6.0)
 	var rows := []
 	for code in cells:
 		var c: Dictionary = cells[code]
