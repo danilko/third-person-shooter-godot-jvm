@@ -2337,7 +2337,23 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         if (cfg.wreckScene == null) return;
         Node wreck = cfg.wreckScene.instantiate();
         getTree().getCurrentScene().addChild(wreck);
-        if (wreck instanceof Node3D w) w.setGlobalTransform(getGlobalTransform());
+        if (wreck instanceof Node3D w) {
+            w.setGlobalTransform(getGlobalTransform());
+            // a wreck is a STATIC body: one made in the air (a craft) would hang there, so it is set on the ground
+            var sp = getWorld3d() != null ? getWorld3d().getDirectSpaceState() : null;
+            if (sp != null) {
+                godot.core.VariantArray<godot.core.RID> ex = new godot.core.VariantArray<>(godot.core.RID.class);
+                ex.add(getRid());
+                var q = godot.api.PhysicsRayQueryParameters3D.create(getGlobalPosition(),
+                        getGlobalPosition().plus(new Vector3(0, -300, 0)), com.openworld.util.CollisionLayers.WORLD, ex);
+                godot.core.Dictionary<Object, Object> hit = sp.intersectRay(q);
+                if (hit != null && !hit.isEmpty() && hit.get("position") instanceof Vector3 g
+                        && getGlobalPosition().getY() - g.getY() > 1.5) {
+                    double yaw = getGlobalRotation().getY();
+                    w.setGlobalTransform(new godot.core.Transform3D(new godot.core.Basis(new Vector3(0, 1, 0), yaw), g));
+                }
+            }
+        }
         if (damageModel != null) {            // the panels blow off, and the wreck is this car burnt out
             damageModel.blowOff();
             showBumperHidden();   // the burnt copy is made of the VISIBLE meshes: a bumper view must not empty it

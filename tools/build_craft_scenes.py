@@ -43,7 +43,9 @@ TUNING = {
                           grounded_angular_damp=2.5)),
     # the police helicopter (user, 2026-10-06, PLAN.md W6): the Airplane scene with the Helicopter script; a 6.4 t
     # AW139, arcade hover (Helicopter.java: lift = weight x (1 + climb), pitch to move, yaw, auto-level)
-    "HLC1": dict(base="Airplane", name="HLC-1 police helicopter", mass=6400.0, health=1200.0, box=(2.3, 3.7, 9.0),
+    "HLC1": dict(base="Airplane", name="HLC-1 police helicopter", mass=6400.0, health=900.0,
+                 box=(2.3, 3.7, 9.0),
+                 hit_mult=0.6, blast_mult=3.0,     # one rocket brings it down, ~75 rifle rounds (GTA's police Maverick)
                  entrance=(6.0, 4.0, 9.0), spring=18.0,
                  script="res://src/main/java/com/openworld/carrier/helicopter/Helicopter.java",
                  cfg=dict(max_speed=70.0, acceleration=52000.0, lift_coefficient=0.0, pitch_torque=60000.0,
@@ -93,7 +95,12 @@ def build(cid):
           '[node name="%s" instance=ExtResource("1_base")]' % cid] + (['script = ExtResource("9_scr")'] if t.get("script") else []) + [
           "mass = %s" % f(t["mass"]),
           'character_info = SubResource("Resource_ci")', 'vehicle_config = SubResource("Resource_cfg")', "",
-          '[node name="Health" parent="."]', "max_health = %s" % f(t["health"]), ""]
+          '[node name="Health" parent="."]', "max_health = %s" % f(t["health"])]
+    if "hit_mult" in t:
+        L += ["hit_damage_multiplier = %s" % f(t["hit_mult"])]
+    if "blast_mult" in t:
+        L += ["explosion_damage_multiplier = %s" % f(t["blast_mult"])]
+    L += [""]
     for path in HIDE[base]:
         parent, name = path.rsplit("/", 1)
         L += ['[node name="%s" parent="%s"]' % (name, parent), "visible = false", ""]

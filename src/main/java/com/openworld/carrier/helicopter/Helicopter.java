@@ -45,6 +45,24 @@ public class Helicopter extends Vehicle {
     private double skidDrop = Double.NaN;
     private double orbitAngle, rotorSpin;
 
+    /** SHOT DOWN (user 2026-10-07: "cannot shoot it down"): health ran out in the air -- no lift, the rotor winding
+     *  down, a spin, and the explosion + wreck when it hits something or after {@link #FALL_MAX_SECONDS}. */
+    private boolean downed;
+    private double downedFor;
+    private static final double FALL_MAX_SECONDS = 8.0;
+    /** Below this over the ground a dying helicopter just explodes where it is (m). */
+    private static final double DOWN_MIN_HEIGHT = 2.5;
+
+    /** The AI orbit keeps at least this clear of whatever is under its orbit point -- a tower, a station roof (m). */
+    public double orbitClearance = 18.0;
+    private double obstacleTop = Double.NaN, obstacleIn;
+
+    /** The rotors turn about their own hubs (the meshes' pivot is the helicopter's origin), at most this per frame:
+     *  two crossed blades repeat every 90 deg, so a faster step strobes and reads as standing still or turning back. */
+    private static final double ROTOR_MAX_STEP = 0.35;
+    private double rotorAngle, tailAngle;
+    private Vector3 rotorHub, tailHub;
+
     @Override
     protected boolean requiresWheels() { return false; }
 
@@ -64,6 +82,11 @@ public class Helicopter extends Vehicle {
         Vector3 v = getLinearVelocity();
         float mass = (float) getMass();
         float g = (float) -getGravity().getY();
+        if (downed) {
+            spinRotor(false, delta);
+            fall(delta);
+            return false;
+        }
         boolean ai = aiFlyingNow();
         boolean run = ai || occupant != null;
         spinRotor(run, delta);
@@ -81,6 +104,11 @@ public class Helicopter extends Vehicle {
             Vector3 tp = aiTarget.getGlobalPosition();
             orbitAngle += orbitSpeed * delta;
             Vector3 spot = tp.plus(new Vector3(Math.cos(orbitAngle) * orbitRadius, orbitHeight, Math.sin(orbitAngle) * orbitRadius));
+            // over a tower or a station roof the orbit rises: never closer than orbitClearance to what is under it
+            obstacleIn -= delta;
+            if (obstacleIn <= 0) { obstacleIn = 0.5; obstacleTop = topBelow(spot); }
+            if (!Double.isNaN(obstacleTop) && spot.getY() < obstacleTop + orbitClearance)
+                spot = new Vector3(spot.getX(), obstacleTop + orbitClearance, spot.getZ());
             Vector3 to = spot.minus(getGlobalPosition());
             want = to.times(0.5);
             if (want.length() > cruise) want = want.normalized().times(cruise);
@@ -120,6 +148,54 @@ public class Helicopter extends Vehicle {
         return false;
     }
 
+    /** The highest WORLD surface straight under {@code at}, looking from 200 m above it; NaN if none. */
+    private double topBelow(Vector3 at) {
+        var sp = getWorld3d() != null ? getWorld3d().getDirectSpaceState() : null;
+        if (sp == null) return Double.NaN;
+        godot.core.VariantArray<godot.core.RID> ex = new godot.core.VariantArray<>(godot.core.RID.class);
+        ex.add(getRid());
+        var q = godot.api.PhysicsRayQueryParameters3D.create(at.plus(new Vector3(0, 200, 0)), at.plus(new Vector3(0, -80, 0)),
+                com.openworld.util.CollisionLayers.WORLD, ex);
+        godot.core.Dictionary<Object, Object> hit = sp.intersectRay(q);
+        return hit != null && !hit.isEmpty() && hit.get("position") instanceof Vector3 p ? p.getY() : Double.NaN;
+    }
+
+    /**
+     * Health ran out. In the air it is SHOT DOWN: it falls (see {@link #fall}) and the ordinary destruction --
+     * explosion, wreck, despawn -- runs on impact. On or near the ground it is destroyed where it is.
+     */
+    @Register
+    @Override
+    public void onVehicleDestruction() {
+        if (downed) return;
+        double clear = clearanceBelow();
+        if (Double.isNaN(clear) || clear > DOWN_MIN_HEIGHT) {
+            downed = true;
+            downedFor = 0;
+            aiTarget = null;
+            setCanSleep(false);
+            return;
+        }
+        super.onVehicleDestruction();
+    }
+
+    /** True while it is falling, shot down (probes). */
+    @Register public boolean downedNow() { return downed; }
+
+    /** A shot-down helicopter: no lift, a yaw spin, and the destruction when it lands, hits something or times out. */
+    private void fall(double delta) {
+        downedFor += delta;
+        float mass = (float) getMass();
+        applyTorque(new Vector3(0, 1, 0).times((float) ((2.5 - getAngularVelocity().getY()) * mass * 3.0)));
+        double clear = clearanceBelow();
+        boolean landed = !Double.isNaN(clear) && clear < 0.6;
+        boolean hit = getContactCount() > 0 && downedFor > 0.3;
+        if (landed || hit || downedFor > FALL_MAX_SECONDS) {
+            downed = false;            // let the base run once
+            super.onVehicleDestruction();
+        }
+    }
+
     /** The skids' height over whatever is under them (a ray down from the body, its own drop to the skids measured
      *  from the collision shapes' lowest point), NaN beyond 60 m. */
     private double clearanceBelow() {
@@ -154,7 +230,28 @@ public class Helicopter extends Vehicle {
     private void spinRotor(boolean run, double delta) {
         rotorSpin = run ? Math.min(1.0, rotorSpin + delta * 0.5) : Math.max(0.0, rotorSpin - delta * 0.2);
         if (rotorSpin <= 0) return;
-        Node r = getNodeOrNull("Model/rotor");
-        if (r instanceof Node3D n) n.rotateY((float) (rotorSpin * 40.0 * delta));
+        double step = Math.min(rotorSpin * 40.0 * delta, ROTOR_MAX_STEP);
+        rotorAngle = (rotorAngle + step) % (Math.PI * 2.0);
+        tailAngle = (tailAngle + step * 1.6) % (Math.PI * 2.0);
+        if (getNodeOrNull("Model/rotor") instanceof godot.api.MeshInstance3D r) {
+            if (rotorHub == null) rotorHub = hubOf(r);
+            r.setTransform(about(rotorHub, new Vector3(0, 1, 0), rotorAngle));
+        }
+        if (getNodeOrNull("Model/tail_rotor") instanceof godot.api.MeshInstance3D t) {
+            if (tailHub == null) tailHub = hubOf(t);
+            t.setTransform(about(tailHub, new Vector3(1, 0, 0), tailAngle));
+        }
+    }
+
+    /** The centre of a part's mesh in its own frame: its hub (a placeholder part's pivot is the craft's origin). */
+    private static Vector3 hubOf(godot.api.MeshInstance3D m) {
+        godot.core.AABB a = m.getAabb();
+        return a.getPosition().plus(a.getSize().times(0.5));
+    }
+
+    /** A rotation of {@code angle} about {@code axis} through {@code hub} (the part's rest transform is identity). */
+    private static godot.core.Transform3D about(Vector3 hub, Vector3 axis, double angle) {
+        godot.core.Basis b = new godot.core.Basis(axis, angle);
+        return new godot.core.Transform3D(b, hub.minus(b.times(hub)));
     }
 }

@@ -11396,6 +11396,24 @@ checks its "Wired in code" table against the enum. Licence rule as for art: CC0 
   them onto the stairs; also `EnforcementDispatch.underCover`: a heli shot never hits a target with WORLD geometry
   within 30 m straight above. `probe_train_fit --stations` PASS with the new roofs.
 
+## Armour, a helicopter that can be shot down, rotors on their hubs (2026-10-07, user-reported)
+
+- **Armour is per model** (`tools/build_vehicle_scenes.py` / `build_craft_scenes.py` rows `hit_mult` / `blast_mult`
+  on the Health): HLC-1 900 HP, 0.6 / 3.0 (1 ATL1 rocket, 75 ASR1 rounds); ARV-1 1600, 0.15 / 2.5 (2 rockets); LTK-1
+  2400, 0.03 / 2.5 (3); TNK-1 3200, 0.02 / 2.5 (4; a rifle magazine is under 2%). They were 1200-16000 HP on the
+  defaults, i.e. 20 rockets for a tank.
+- **A helicopter at 0 HP in the air is SHOT DOWN** (`Helicopter.onVehicleDestruction` override): no lift, the rotor
+  winds down, a yaw spin, and the ordinary destruction when it reaches the ground, touches something or after 8 s.
+  Every vehicle's static wreck is now set on the ground under it (`Vehicle.spawnWreckScene`); a helicopter's used
+  to float where it died.
+- **The AI orbit keeps `orbitClearance` (18 m) over whatever is under its orbit point** (a ray from 200 m above, every
+  0.5 s); it held 38 m over the target and flew into towers.
+- **Rotors turn about their own hubs** (a placeholder part's pivot is the craft's origin: the main rotor spun 0.4 m
+  off-centre and the tail rotor not at all), at most 0.35 rad a frame: two crossed blades repeat every 90 deg and the
+  old 0.67 rad/frame strobed. Gate `tools/godot/probe_vehicle_armour.gd` 15/15. Sizes are real (HLC-1 16.5 m rotor
+  to tail, TNK-1 12.1 m with its gun, character 1.65 m): `tools/godot/shot_vehicle_scale.gd` (display) is the picture.
+- **A body killed lying prone keeps its pose** (no clip, no ragdoll); standing up to fall back read as "crawls, then dies".
+
 ## Known Quirks / Gotchas
 
 - **Godot re-imports a glTF only when the `.gltf` FILE changes; it never hashes the `.bin`** (2026-09-29). A

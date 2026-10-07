@@ -156,6 +156,12 @@ final class CharacterRagdoll {
                     bone.setCollisionLayerValue(CollisionLayers.LAYER_HITBOX, false);
             }
         }
+        // already lying down (prone): the body stays as it lies -- standing up to fall back down read as "crawls,
+        // then dies". The AnimationTree is off, so the skeleton keeps its last pose.
+        if (owner.currentStanceName == com.openworld.movement.character.StanceName.CRAWL) {
+            ragdollFrozen = true;
+            return true;
+        }
         AnimationPlayer ap = new AnimationPlayer();
         ap.setName("DeathPlayer");
         parent.addChild(ap);
