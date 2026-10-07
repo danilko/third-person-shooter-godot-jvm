@@ -80,6 +80,16 @@ TUNING = {
     "BOT1": {"name": "BOT-1", "mass": 8000, "rest": 0.45, "spring": 62000, "damping": 23000, "over": 0.25,
              "max_speed": 27.0, "accel": 46000.0, "crash_hp": 3.0, "health": 1500, "paint": "",
              "extra_seats": [[-0.50, 3.15, 1.50], [0.50, 3.15, 1.50]]},
+    # the enforcement escalation's armour (user, 2026-10-06, PLAN.md W6): heavy, slow, very tough; a car hit by one
+    # loses. Masses are the real vehicles' (riot vehicle ~12 t, Type 16 ~26 t, Type 10 ~44 t) and the springs scale
+    "ARV1": {"name": "ARV-1", "mass": 12000, "rest": 0.50, "spring": 95000, "damping": 34000, "over": 0.25,
+             "max_speed": 28.0, "accel": 80000.0, "crash_hp": 1.5, "health": 4000, "paint": ""},
+    "LTK1": {"name": "LTK-1", "mass": 26000, "rest": 0.55, "spring": 210000, "damping": 72000, "over": 0.25,
+             "max_speed": 27.0, "accel": 170000.0, "crash_hp": 0.6, "health": 9000, "paint": "",
+             "extra_seats": [[-0.60, 0.60, 1.20], [0.60, 0.60, 1.20]]},
+    "TNK1": {"name": "TNK-1", "mass": 44000, "rest": 0.45, "spring": 360000, "damping": 125000, "over": 0.25,
+             "max_speed": 19.0, "accel": 260000.0, "crash_hp": 0.3, "health": 16000, "paint": "",
+             "extra_seats": [[-0.60, 0.70, 0.95], [0.60, 0.70, 0.95]]},
     "LAT1": {"name": "LAT-1", "mass": 13000, "rest": 0.48, "spring": 100000, "damping": 36000, "over": 0.25,
              "max_speed": 24.0, "accel": 70000.0, "crash_hp": 2.5, "health": 2000, "paint": "",
              "extra_seats": [[-0.50, 3.10, 1.55], [0.50, 3.10, 1.55]]},

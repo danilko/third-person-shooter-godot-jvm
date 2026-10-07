@@ -899,6 +899,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     @Override
     public void _process(double delta) {
         refreshLights(delta);
+        refreshEmergency(delta);
         refreshBumperView();
         damageVfxTimer -= delta;
         if (damageVfxTimer > 0.0) return;
@@ -928,6 +929,9 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     private OmniLight3D tailLeft, tailRight, reverseLight;
     /** The model's OWN lamp faces, found by material name ({@link #LAMP_SURFACE_HEAD} ...): lit in place of a lens. */
     private final ArrayList<LampSurface> headSurf = new ArrayList<>(), tailSurf = new ArrayList<>(), revSurf = new ArrayList<>();
+    /** The emergency light bar's faces (material {@link #LAMP_SURFACE_BAR}: police, ambulance, fire, riot vehicles). */
+    private final ArrayList<LampSurface> barSurf = new ArrayList<>();
+    public static final String LAMP_SURFACE_BAR = "lamp_red";
     private record LampSurface(MeshInstance3D mesh, int surface) {}
     /** Material names a vehicle model gives its lamp faces (blender/VEHICLE_AUTHORING.md "Lamps"). */
     public static final String LAMP_SURFACE_HEAD = "front.lamp.light", LAMP_SURFACE_TAIL = "back.lamp.light",
@@ -1011,6 +1015,79 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     }
 
     private boolean lightsFar;
+
+    // ── Emergency light bar and siren (PLAN.md W6, user 2026-10-06) ──────────────────────────────────────────────
+    // A police / ambulance / fire / riot vehicle ON A CALL flashes its own light-bar faces (the model's `lamp_red`
+    // material, Japan's red rotating lamps: 赤色警光灯) with a red light washing the street round it, and sounds its
+    // siren (audio.Sound.SIREN: silent until the file exists). Set by whoever sends it (EnforcementDispatch); a
+    // parked or cruising one is dark. Within LIGHT_VIEW_DISTANCE only.
+
+    private boolean emergency;
+    private double flashT;
+    /** A flashing light bar reads from much further than a headlight beam lands (m). */
+    private static final double BAR_VIEW_DISTANCE = 350.0;
+
+    private boolean withinCamera(double d) {
+        Camera3D cam = getViewport() != null ? getViewport().getCamera3d() : null;
+        if (cam == null || !GD.isInstanceValid(cam)) return true;
+        return cam.getGlobalPosition().distanceTo(getGlobalPosition()) <= d;
+    }
+    private OmniLight3D barLight;
+    private godot.api.AudioStreamPlayer3D siren;
+
+    /** On a call (lights + siren) or not. */
+    public void setEmergency(boolean on) { emergency = on; }
+
+    @Register public boolean emergencyNow() { return emergency; }
+
+    /** Is the light bar lit at this instant (a probe readout: it flashes, so sample it over time). */
+    @Register public boolean barLitNow() {
+        if (barSurf.isEmpty() || !GD.isInstanceValid(barSurf.get(0).mesh())) return false;
+        Material m = barSurf.get(0).mesh().getSurfaceOverrideMaterial(barSurf.get(0).surface());
+        return m instanceof BaseMaterial3D bm && bm.getFeature(BaseMaterial3D.Feature.EMISSION);
+    }
+
+    private void refreshEmergency(double delta) {
+        if (!emergency && barLight == null && (siren == null || !siren.isPlaying())) return;
+        if (headRight == null) buildLights(getConfig());     // finds the lamp faces (the bar's too)
+        boolean on = emergency && isAlive() && withinCamera(BAR_VIEW_DISTANCE);
+        flashT += delta;
+        boolean phase = on && (flashT % 0.5) < 0.25;
+        paintLamp(barSurf, phase ? LAMP_BAR_ON : LAMP_BAR_OFF);
+        if (on && barLight == null) {
+            barLight = new OmniLight3D();
+            barLight.setName(new StringName("BarLight"));
+            barLight.setColor(new Color(1.0, 0.08, 0.05, 1.0));
+            barLight.setParam(Light3D.Param.RANGE, 12.0f);
+            barLight.setParam(Light3D.Param.ENERGY, 3.0f);
+            barLight.setShadow(false);
+            double top = 1.0;
+            if (getNodeOrNull("CollisionShape3D") instanceof godot.api.CollisionShape3D cs && cs.getShape() != null)
+                top = cs.getShape().getDebugMesh().getAabb().getEnd().getY() + 0.3;
+            barLight.setPosition(new Vector3(0, top, 0));
+            addChild(barLight);
+        }
+        if (barLight != null) barLight.setVisible(phase);
+        if (on && siren == null) {
+            godot.api.AudioStream st = com.openworld.audio.Sounds.stream(com.openworld.audio.Sound.SIREN);
+            if (st != null) {
+                siren = new godot.api.AudioStreamPlayer3D();
+                siren.setName(new StringName("Siren"));
+                siren.setStream(st);
+                siren.setUnitSize(18.0f);
+                addChild(siren);
+            }
+        }
+        if (siren != null) {
+            if (on && !siren.isPlaying()) siren.play();
+            else if (!on && siren.isPlaying()) siren.stop();
+        }
+    }
+
+    /** The car's health now (its Health node), 1 with none. */
+    public float getHealthNow() {
+        return getNodeOrNull("Health") instanceof com.openworld.character.Health h ? h.getCurrentHealth() : 1f;
+    }
     /** A non-network frozen body's deceleration, smoothed (Vehicle.refreshLights). */
     private double decelSmoothed;
 
@@ -1067,7 +1144,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
 
     /** Every surface of the car's model wearing a lamp material, by its material's name. */
     private void findLampSurfaces() {
-        headSurf.clear(); tailSurf.clear(); revSurf.clear();
+        headSurf.clear(); tailSurf.clear(); revSurf.clear(); barSurf.clear();
         Node model = getNodeOrNull("Model");
         if (model == null) return;
         ArrayList<Node> stack = new ArrayList<>();
@@ -1084,6 +1161,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
                 if (LAMP_SURFACE_HEAD.equals(name)) headSurf.add(new LampSurface(mi, s));
                 else if (LAMP_SURFACE_TAIL.equals(name)) tailSurf.add(new LampSurface(mi, s));
                 else if (LAMP_SURFACE_REVERSE.equals(name)) revSurf.add(new LampSurface(mi, s));
+                else if (LAMP_SURFACE_BAR.equals(name) || name.startsWith(LAMP_SURFACE_BAR + ".")) barSurf.add(new LampSurface(mi, s));
             }
         }
     }
@@ -1133,7 +1211,8 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     }
 
     private static final String LAMP_HEAD_OFF = "head_off", LAMP_HEAD_ON = "head_on", LAMP_TAIL_OFF = "tail_off",
-            LAMP_TAIL_NIGHT = "tail_night", LAMP_TAIL_BRAKE = "tail_brake", LAMP_REV_OFF = "rev_off", LAMP_REV_ON = "rev_on";
+            LAMP_TAIL_NIGHT = "tail_night", LAMP_TAIL_BRAKE = "tail_brake", LAMP_REV_OFF = "rev_off", LAMP_REV_ON = "rev_on",
+            LAMP_BAR_ON = "bar_on", LAMP_BAR_OFF = "bar_off";
     /**
      * A lamp face KEEPS its model's own material (user, 2026-09-28: "stay with the same material colour"): off is that
      * material untouched (no override at all; a copy with its glow switched off if it was authored glowing), and lit is a glowing COPY of it, made once per source material and
@@ -1147,6 +1226,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             case LAMP_HEAD_ON, LAMP_REV_ON -> 4.0;
             case LAMP_TAIL_NIGHT -> 1.5;
             case LAMP_TAIL_BRAKE -> 6.0;
+            case LAMP_BAR_ON -> 7.0;
             default -> 0.0;
         };
         if (!(source instanceof BaseMaterial3D base)) return null;

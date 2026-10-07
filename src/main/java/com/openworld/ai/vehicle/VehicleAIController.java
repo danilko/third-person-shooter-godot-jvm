@@ -199,6 +199,83 @@ public class VehicleAIController extends Controller {
     /** Brake to a stop and stay (game.EnforcementDispatch: the car has arrived and its crew gets out). */
     public boolean holdStop;
 
+    // ── RAMMING (PLAN.md W6, user 2026-10-06: "on high aggression, use the vehicle to hit the player") ─────────────
+    /** A target to drive AT (the enforcement dispatch's, from ram_at stars): within {@link #ramRange} the car leaves
+     *  its lane and steers for where the target will be, flat out; beyond it, it follows its road plan. */
+    public godot.api.Node3D ramTarget;
+    /** Within this (m) of the target the car stops following the road and drives straight at it. */
+    public double ramRange = 140.0;
+    /** How far ahead of the target's motion the car aims (s, capped by the time to reach it). */
+    public double ramLeadSeconds = 1.2;
+    private double ramReverseLeft, ramSlowFor;
+    private int ramHits;
+
+    /** True while the car is driving straight at its ram target (not following the road). */
+    public boolean rammingNow() {
+        return ramTarget != null && GD.isInstanceValid(ramTarget) && vehicleBody != null
+                && flatDist(vehicleBody.getGlobalPosition(), ramTarget.getGlobalPosition()) <= ramRange;
+    }
+
+    private static double flatDist(Vector3 a, Vector3 b) {
+        double dx = a.getX() - b.getX(), dz = a.getZ() - b.getZ();
+        return Math.sqrt(dx * dx + dz * dz);
+    }
+
+    /** The target's ground velocity: its vehicle's, if it rides one, else its own. */
+    private static Vector3 targetVelocity(godot.api.Node3D t) {
+        if (t instanceof com.openworld.character.Character c && c.currentVehicleNode instanceof godot.api.RigidBody3D rb)
+            return rb.getLinearVelocity();
+        if (t instanceof godot.api.CharacterBody3D cb) return cb.getVelocity();
+        if (t instanceof godot.api.RigidBody3D rb) return rb.getLinearVelocity();
+        return new Vector3();
+    }
+
+    /**
+     * Drive at the ram target: steer for its position plus its motion over the lead time, full throttle (no corner
+     * governor, no yielding, no signals). Overshot (target behind and near) or stuck (slow under throttle for 1.5 s):
+     * back up for a second with the wheel the other way -- a three-point turn -- then go again.
+     */
+    private UserCommand ramInput(double delta) {
+        UserCommand cmd = new UserCommand();
+        Vector3 pos = vehicleBody.getGlobalPosition();
+        Vector3 tp = ramTarget.getGlobalPosition();
+        Vector3 tv = targetVelocity(ramTarget);
+        double d = flatDist(pos, tp);
+        double speed = vehicleBody.getLinearVelocity().length();
+        double lead = Math.min(ramLeadSeconds, d / Math.max(8.0, speed));
+        Vector3 aim = tp.plus(new Vector3(tv.getX() * lead, 0, tv.getZ() * lead));
+        Vector3 to = aim.minus(pos);
+        to.setY(0);
+        if (to.length() < 1e-3) return cmd;
+        Vector3 dir = to.normalized();
+        Vector3 right = vehicleBody.getGlobalTransform().getBasis().getColumn(0);
+        Vector3 fwd = vehicleBody.getGlobalTransform().getBasis().getColumn(2).times(-1.0);
+        float steer = (float) Math.max(-1.0, Math.min(1.0, -dir.dot(right) * 2.5));
+        boolean behind = dir.dot(fwd) < -0.2;
+        if (ramReverseLeft > 0) {
+            ramReverseLeft -= delta;
+            cmd.motor = -1f;
+            cmd.steerToTarget = true;
+            cmd.steering = -steer;
+            return cmd;
+        }
+        ramSlowFor = speed < 1.0 ? ramSlowFor + delta : 0.0;
+        if ((behind && d < 18.0) || ramSlowFor > 1.5) {
+            ramReverseLeft = 1.1;
+            ramSlowFor = 0.0;
+            ramHits++;
+        }
+        cmd.steerToTarget = true;
+        cmd.steering = steer;
+        cmd.motor = 1f;
+        cmd.boost = d > 25.0;
+        return cmd;
+    }
+
+    /** How many times the car has had to back up and go again (a probe readout: each is usually a hit). */
+    @Register public int ramPassesNow() { return ramHits; }
+    @Register public boolean rammingNowReg() { return rammingNow(); }
+
     /**
      * Lane ids (RoadGraph's, which are the runtime lane node names) this car should take, in order. At each lane end
      * the successor that appears EARLIEST in the plan ahead of the current lane wins; with none, the ordinary choice.
@@ -279,6 +356,12 @@ public class VehicleAIController extends Controller {
             streamEdge = true;
             finished = true;
             return cmd;
+        }
+
+        if (rammingNow() && !holdStop) {
+            // driving AT the target: not stalled, not waiting -- the dispatch decides when it has given up
+            stallSeconds = 0.0;
+            return ramInput(delta);
         }
 
         updateObstacleReach();

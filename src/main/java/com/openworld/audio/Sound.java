@@ -13,7 +13,10 @@ public enum Sound {
     /** A car window shattering (a crash, a bullet, a blast, a melee blow). 3D, at the pane. */
     GLASS_SHATTER("glass_shatter"),
     /** The local player's damage was confirmed (HitMarker). 2D. */
-    HIT_MARKER("hit_marker");
+    HIT_MARKER("hit_marker"),
+    /** An emergency vehicle on a call (Vehicle.refreshEmergency): a LOOPING Japanese siren (police: the wailing
+     *  ウーウー; an ambulance's ピーポー can be a second file later). 3D, on the car. */
+    SIREN("siren");
 
     /** File extensions tried in order (engine-free, so a unit test can read it). */
     public static final String[] EXTENSIONS = {".ogg", ".wav"};

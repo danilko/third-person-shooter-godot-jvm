@@ -22,6 +22,7 @@ Format: `.ogg` for anything longer than ~1 s or looping, `.wav` for short one-sh
 |---|---|---|
 | `glass_shatter` | `GLASS_SHATTER` | a car window breaking (crash, bullet, blast, melee), 3D at the pane |
 | `hit_marker` | `HIT_MARKER` | the local player's hit confirmed (HitMarker), 2D, short tick |
+| `siren` | `SIREN` | an emergency vehicle on a call (Vehicle.refreshEmergency), 3D, LOOPING (import with loop on) |
 
 ## Weapons sharing a sound that is not theirs (a per-weapon file replaces the shared one in its scene)
 

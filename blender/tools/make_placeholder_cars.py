@@ -33,6 +33,12 @@ Dimensions are the real vehicle's, rounded (length x width x height, wheelbase, 
   POV1  postal van (郵便 軽バン, Suzuki Every / Honda N-VAN class, red) 3.395 x 1.475 x 1.90   wb 2.43
   POT1  postal truck (郵便 2 t box truck, Isuzu Elf / Toyota Dyna class) 4.69 x 1.695 x 2.95  wb 2.50  cab-over
   BOT1  box truck (4 t ウイング/箱車, Isuzu Forward / Hino Ranger class, white) 8.50 x 2.49 x 3.40  wb 4.80  cab-over
+  ARV1  armoured riot vehicle (特型警備車, police riot unit, blue-grey, light bar) 7.00 x 2.49 x 3.05  wb 3.90  armour
+  LTK1  wheeled light tank (Type 16 MCV class, 8x8 -- the runtime drives 4 wheels, 4 more are cosmetic, olive,
+        105 mm-class turret)                                         8.45 x 2.98 x 2.87  wb 4.60  armour + turret
+  TNK1  main battle tank (Type 10 class, olive, 120 mm-class turret; its four running wheels sit inside the track
+        skirts -- the runtime has no tracks)                         9.42 x 3.24 x 2.30  wb 4.80  armour + turret
+(ARV1 / LTK1 / TNK1: user, 2026-10-06 -- the enforcement escalation's armour, PLAN.md W6.)
 (BOT1: user, 2026-10-05 -- the logistics hub's trucks at the docks, replacing the library's static Logi_Truck mesh.)
 (POV1 / POT1: user, 2026-10-03 -- the post offices' vans, small and large, placed by their MARK_vehicle markers.)
 (AMB1 / FIE1 / LAT1: user, 2026-09-28 -- the hospital's and the fire stations' vehicles, placed by the mission
@@ -57,6 +63,7 @@ COLOURS = {
     "lamp_red": (0.85, 0.04, 0.04), "taxi_body": (0.05, 0.07, 0.22), "taxi_lamp": (0.95, 0.80, 0.25),
     "olive": (0.22, 0.26, 0.15), "crate": (0.35, 0.30, 0.20),
     "container": (0.55, 0.12, 0.08), "frame": (0.08, 0.08, 0.09),
+    "riot_blue": (0.20, 0.26, 0.36), "slit": (0.05, 0.06, 0.07),
     "amb_white": (0.93, 0.93, 0.92), "post_red": (0.80, 0.06, 0.05), "fire_red": (0.72, 0.05, 0.04), "steel": (0.62, 0.63, 0.65),
     # lamps: the runtime finds these faces BY MATERIAL NAME and lights them (Vehicle.LAMP_SURFACE_*)
     "front.lamp.light": (0.85, 0.85, 0.82), "back.lamp.light": (0.45, 0.03, 0.03), "back.lamp.reverse": (0.75, 0.75, 0.75),
@@ -103,6 +110,15 @@ CARS = {
     "POT1": dict(L=4.69, W=1.695, H=2.95, wb=2.50, r=0.33, tw=0.20, shape="cabover", cab=1.55, doors=2, crate=True,
                  crate_mat="post_red", body="post_red", upper="amb_white",
                  seats=[(-0.42, 1.60, 1.05), (0.42, 1.60, 1.05)]),
+    "ARV1": dict(L=7.00, W=2.49, H=3.05, wb=3.90, r=0.52, tw=0.34, shape="armour", hull=2.75, doors=2,
+                 body="riot_blue", upper="riot_blue", bar="lamp_red",
+                 seats=[(-0.55, 1.75, 1.40), (0.55, 1.75, 1.40), (-0.55, 0.20, 1.40), (0.55, 0.20, 1.40)]),
+    "LTK1": dict(L=8.45, W=2.98, H=2.87, wb=4.60, r=0.55, tw=0.38, shape="armour", hull=2.05, doors=2,
+                 body="olive", upper="olive", turret=(2.6, 2.4, 0.82, 4.6), extra_wheels=True,
+                 seats=[(-0.60, 2.30, 1.20), (0.60, 2.30, 1.20)]),
+    "TNK1": dict(L=9.42, W=3.24, H=2.30, wb=4.80, r=0.42, tw=0.40, shape="armour", hull=1.55, doors=2,
+                 body="olive", upper="olive", turret=(3.0, 2.6, 0.75, 5.0), tracks=True,
+                 seats=[(-0.60, 2.20, 0.95), (0.60, 2.20, 0.95)]),
     "BOT1": dict(L=8.50, W=2.49, H=3.40, wb=4.80, r=0.50, tw=0.30, shape="cabover", cab=1.85, doors=2, crate=True,
                  crate_mat="amb_white", body="amb_white", upper="amb_white",
                  seats=[(-0.55, 2.95, 1.45), (0.55, 2.95, 1.45)]),
@@ -228,6 +244,40 @@ def build(vid, c):
         boot = None
         belt = cbelt
         H = cab_h
+    elif c["shape"] == "armour":
+        # an armoured hull: a slab body with a sloped glacis, a slit windscreen, optional turret + barrel (a
+        # tank), track skirts (a tracked one) and extra cosmetic road wheels (an 8x8)
+        hull = c["hull"]
+        glacis = min(1.2, 0.18 * L)
+        belt = hull * 0.55
+        ch.box((-hw + side, rear, CLEAR + 0.15), (hw - side, front - glacis, hull), body)
+        ch.wedge(-hw + side, hw - side, front - glacis, front, CLEAR + 0.15, hull, glacis * 0.8, body)
+        ch.box((-hw + 0.3, front - glacis - 0.05, hull - 0.40), (hw - 0.3, front - glacis + 0.02, hull - 0.18), "slit")
+        top = hull
+        if c.get("turret"):
+            tl, tw_, th, gun = c["turret"]
+            ty = 0.25 * L - tl / 2
+            ch.box((-tw_ / 2, ty - tl / 2, hull), (tw_ / 2, ty + tl / 2, hull + th), body)
+            # the barrel, along +Y (cylinder() runs along X, so the barrel is a long thin box)
+            ch.box((-0.08, ty + tl / 2, hull + th * 0.45), (0.08, ty + tl / 2 + gun, hull + th * 0.65), "frame")
+            top = hull + th
+        if c.get("tracks"):
+            for sx in (-1, 1):
+                x0, x1 = sorted((sx * hw, sx * (hw - 0.55)))
+                ch.box((x0, rear + 0.2, CLEAR - 0.15), (x1, front - 0.3, CLEAR + 0.95), "tyre")
+                ch.box((x0, rear + 0.1, CLEAR + 0.95), (x1, front - 0.2, CLEAR + 1.05), body)   # the skirt
+        if c.get("extra_wheels"):
+            for sy in (-0.18, 0.18):
+                for sx in (-1, 1):
+                    ch.cylinder(sx * (hw - tw / 2 - 0.01), sy * wb, r, r, tw, "tyre")
+        if c.get("bar"):
+            ch.box((-hw + 0.35, front - glacis - 0.70, hull), (hw - 0.35, front - glacis - 0.40, hull + 0.18), c["bar"])
+        windscreen = (front - glacis, front - glacis + 0.02)
+        door_y = (front - glacis - 1.4, front - glacis - 0.2)
+        parts_doors = [("door_lf", -1, door_y), ("door_rf", 1, door_y)]
+        bonnet = None
+        boot = None
+        H = top
     elif c["shape"] == "cabover":
         cab_rear = front - c["cab"]
         # the cab: lower box + glass band + roof, full height
@@ -290,13 +340,17 @@ def build(vid, c):
     if boot:
         P("boot").box((-hw + side, boot[0], belt), (hw - side, boot[1], belt + 0.04), body)
     wz0 = belt if c["shape"] != "cabover" else belt
-    P("windscreen").box((-hw + 0.12, windscreen[1] - 0.04, wz0 + 0.02),
-                        (hw - 0.12, windscreen[1], (H - 0.12) if c["shape"] in ("cabover", "tractor") else wz0 + 0.30),
-                        "glass")
+    if c["shape"] == "armour":           # bullet glass, a slit in the glacis
+        P("windscreen").box((-hw + 0.3, windscreen[0] - 0.06, c["hull"] - 0.40), (hw - 0.3, windscreen[0] - 0.02,
+                            c["hull"] - 0.18), "glass")
+    else:
+        P("windscreen").box((-hw + 0.12, windscreen[1] - 0.04, wz0 + 0.02),
+                            (hw - 0.12, windscreen[1], (H - 0.12) if c["shape"] in ("cabover", "tractor") else wz0 + 0.30),
+                            "glass")
     for name, s, (y0, y1) in parts_doors:
         d = P(name)
         x0, x1 = sorted((s * hw, s * (hw - side)))
-        top = belt + (0.45 if c["shape"] not in ("cabover", "tractor") else 0.55)
+        top = belt + (0.45 if c["shape"] not in ("cabover", "tractor", "armour") else 0.55)
         d.box((x0, y0, CLEAR + 0.10), (x1, y1, belt), body)
         d.box((x0 + (0.005 if s < 0 else 0), y0 + 0.04, belt), (x1 - (0.005 if s > 0 else 0), y1 - 0.04, min(top, H - 0.12)),
               "glass")

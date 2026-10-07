@@ -56,4 +56,31 @@ class DispatchRulesTest {
         assertEquals(1, DispatchRules.toSpawn(8, 7, 2));
         assertEquals(0, DispatchRules.toSpawn(3, 5, 2));
     }
+
+    @org.junit.jupiter.api.Test
+    void policeEscalateWithTheStars() throws Exception {
+        DispatchRules r = DispatchRules.parse(read("crimes.json"), "dispatch");
+        org.junit.jupiter.api.Assertions.assertTrue(r.weaponsFor(1).contains("PIS1"));
+        org.junit.jupiter.api.Assertions.assertTrue(r.weaponsFor(6).contains("ATL1"), "rockets at the top");
+        org.junit.jupiter.api.Assertions.assertTrue(r.vehiclesFor(6).contains("TNK1"), "a tank at 6 stars");
+        org.junit.jupiter.api.Assertions.assertTrue(r.vehiclesFor(5).contains("LTK1"), "a light tank at 5 stars");
+        org.junit.jupiter.api.Assertions.assertFalse(r.vehiclesFor(3).contains("ARV1"), "no armour at 3 stars");
+        org.junit.jupiter.api.Assertions.assertFalse(r.rams(3));
+        org.junit.jupiter.api.Assertions.assertTrue(r.rams(4));
+        org.junit.jupiter.api.Assertions.assertTrue(r.breaches(3));
+        org.junit.jupiter.api.Assertions.assertFalse(r.breaches(2));
+        org.junit.jupiter.api.Assertions.assertEquals(0, r.snipersFor(3));
+        org.junit.jupiter.api.Assertions.assertTrue(r.snipersFor(5) > 0);
+        org.junit.jupiter.api.Assertions.assertTrue(r.helisFor(5) > 0);
+        org.junit.jupiter.api.Assertions.assertTrue(r.hasGun("TNK1") && !r.hasGun("POC1"));
+        // past the table's end the last row holds
+        org.junit.jupiter.api.Assertions.assertEquals(r.vehiclesFor(6), r.vehiclesFor(9));
+    }
+
+    @org.junit.jupiter.api.Test
+    void gangsEscalateToo() throws Exception {
+        DispatchRules r = DispatchRules.parse(read("gangs.json"), "hunters");
+        org.junit.jupiter.api.Assertions.assertTrue(r.rams(4) && r.breaches(3));
+        org.junit.jupiter.api.Assertions.assertTrue(r.vehiclesFor(5).isEmpty(), "gangs drive civilian cars");
+    }
 }

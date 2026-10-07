@@ -1,82 +1,111 @@
 {
-  "note": "Gang heat (PLAN.md W5; user 2026-10-03): one heat per (player, gang), INDEPENDENT of the police stars and NOT cleared by a hospitalisation or an arrest. Stars from heat by `stars_at`. At `attack_at` stars that gang's members (the crowd's included) attack the player on sight; at `chase_at` they hunt the player (the dispatch, not built yet). Below `pay_at` stars the heat drains after `calm_seconds` at `decay_per_second`; at or above `pay_at` it only goes away by paying the gang's `fee_per_star` x stars yen as a 'donation' at one of that gang's gray-area counters. Police do not care about gang heat. Adding a gang = one entry in `gangs`; a gang crime = one row in `crimes` + one GangSystem.report call.",
-  "stars_at": [
-    40,
-    140,
-    320,
-    560,
-    860
-  ],
-  "attack_at": 1,
-  "chase_at": 3,
-  "pay_at": 2,
-  "calm_seconds": 30.0,
-  "decay_per_second": 4.0,
-  "crimes": {
-    "hit_member": {
-      "heat": 40
-    },
-    "kill_member": {
-      "heat": 160
-    },
-    "threaten_clerk": {
-      "heat": 80
-    },
-    "rob_gray": {
-      "heat": 360
-    },
-    "escape": {
-      "heat": 160
-    }
+ "note": "Gang heat (PLAN.md W5; user 2026-10-03): one heat per (player, gang), INDEPENDENT of the police stars and NOT cleared by a hospitalisation or an arrest. Stars from heat by `stars_at`. At `attack_at` stars that gang's members (the crowd's included) attack the player on sight; at `chase_at` they hunt the player (the dispatch, not built yet). Below `pay_at` stars the heat drains after `calm_seconds` at `decay_per_second`; at or above `pay_at` it only goes away by paying the gang's `fee_per_star` x stars yen as a 'donation' at one of that gang's gray-area counters. Police do not care about gang heat. Adding a gang = one entry in `gangs`; a gang crime = one row in `crimes` + one GangSystem.report call.",
+ "stars_at": [
+  40,
+  140,
+  320,
+  560,
+  860
+ ],
+ "attack_at": 1,
+ "chase_at": 3,
+ "pay_at": 2,
+ "calm_seconds": 30.0,
+ "decay_per_second": 4.0,
+ "crimes": {
+  "hit_member": {
+   "heat": 40
   },
-  "gangs": {
-    "gang_a": {
-      "name": "Kurogane-kai",
-      "name_ja": "黒鉄会",
-      "fee_per_star": 50000
-    },
-    "gang_b": {
-      "name": "Aokiba-gumi",
-      "name_ja": "青木場組",
-      "fee_per_star": 50000
-    }
+  "kill_member": {
+   "heat": 160
   },
-  "hunters": {
-    "note": "A gang hunting a player at chase_at stars or more (game.EnforcementDispatch). Index = the player's stars with that gang. Same spawn rules as the police dispatch; gang members always shoot.",
-    "foot_by_stars": [
-      0,
-      0,
-      0,
-      3,
-      4,
-      6
-    ],
-    "cars_by_stars": [
-      0,
-      0,
-      0,
-      1,
-      1,
-      2
-    ],
-    "car_crew": 2,
-    "weapons": [
-      "PIS1",
-      "SMG1",
-      "SHG1",
-      "ASR1"
-    ]
+  "threaten_clerk": {
+   "heat": 80
   },
-  "abduction": {
-    "note": "拉致 ABDUCTED (game.RespawnSystem / GangSystem, user 2026-10-06): a player who goes down with ANY standing against a gang wakes at one of that gang's places (the places record's `gang`), held by `guards` armed members. Two ways out: pay the ransom (ransom_per_star x that gang's stars; it also clears the standing), or ESCAPE -- step past escape_start metres from where they were held and the guards open fire (+ the `escape` crime's heat); past escape_free metres the player is free.",
-    "ransom_per_star": 100000,
-    "guards": 3,
-    "guard_weapons": [
-      "SMG1",
-      "PIS1",
-      "SHG1"
-    ],
-    "escape_start": 15.0,
-    "escape_free": 90.0
+  "rob_gray": {
+   "heat": 360
+  },
+  "escape": {
+   "heat": 160
   }
+ },
+ "gangs": {
+  "gang_a": {
+   "name": "Kurogane-kai",
+   "name_ja": "黒鉄会",
+   "fee_per_star": 50000
+  },
+  "gang_b": {
+   "name": "Aokiba-gumi",
+   "name_ja": "青木場組",
+   "fee_per_star": 50000
+  }
+ },
+ "hunters": {
+  "note": "A gang hunting a player at chase_at stars or more (game.EnforcementDispatch). Index = the player's stars with that gang. Same spawn rules as the police dispatch; gang members always shoot. From ram_at stars their cars drive AT the player; from breach_at they follow into buildings (PLAN.md W6).",
+  "foot_by_stars": [
+   0,
+   0,
+   0,
+   3,
+   4,
+   6
+  ],
+  "cars_by_stars": [
+   0,
+   0,
+   0,
+   1,
+   1,
+   2
+  ],
+  "car_crew": 2,
+  "weapons": [
+   "PIS1",
+   "SMG1",
+   "SHG1",
+   "ASR1"
+  ],
+  "weapons_by_stars": [
+   [],
+   [],
+   [],
+   [
+    "PIS1",
+    "SMG1"
+   ],
+   [
+    "SMG1",
+    "SHG1",
+    "ASR1"
+   ],
+   [
+    "ASR1",
+    "SHG1",
+    "ATL1"
+   ]
+  ],
+  "snipers_by_stars": [
+   0,
+   0,
+   0,
+   0,
+   1,
+   1
+  ],
+  "ram_at": 4,
+  "breach_at": 3
+ },
+ "abduction": {
+  "note": "拉致 ABDUCTED (game.RespawnSystem / GangSystem, user 2026-10-06): a player who goes down with ANY standing against a gang wakes at one of that gang's places (the places record's `gang`), held by `guards` armed members. Two ways out: pay the ransom (ransom_per_star x that gang's stars; it also clears the standing), or ESCAPE -- step past escape_start metres from where they were held and the guards open fire (+ the `escape` crime's heat); past escape_free metres the player is free.",
+  "ransom_per_star": 100000,
+  "guards": 3,
+  "guard_weapons": [
+   "SMG1",
+   "PIS1",
+   "SHG1"
+  ],
+  "escape_start": 15.0,
+  "escape_free": 90.0
+ }
 }

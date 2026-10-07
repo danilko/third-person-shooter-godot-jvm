@@ -37,7 +37,10 @@ public final class VehicleModels {
             DIR + "COT1.tscn",         // 19: COT-1 container truck (tractor + 20 ft ISO box, one rigid body)
             DIR + "POV1.tscn",         // 20: POV-1 postal kei van (郵便 軽バン)
             DIR + "POT1.tscn",         // 21: POT-1 postal 2 t box truck
-            DIR + "BOT1.tscn");        // 22: BOT-1 4 t box truck (the logistics hub's docks)
+            DIR + "BOT1.tscn",         // 22: BOT-1 4 t box truck (the logistics hub's docks)
+            DIR + "ARV1.tscn",         // 23: ARV-1 armoured riot vehicle (特型警備車), enforcement 4+ stars
+            DIR + "LTK1.tscn",         // 24: LTK-1 wheeled light tank (Type 16 class), enforcement 5+ stars
+            DIR + "TNK1.tscn");        // 25: TNK-1 main battle tank (Type 10 class), enforcement 6 stars
     // 5-14 are PLACEHOLDER block models (blender/tools/make_placeholder_cars.py), 15-18 placeholder craft
     // (blender/tools/make_placeholder_craft.py + tools/build_craft_scenes.py), until an artist models them.
 

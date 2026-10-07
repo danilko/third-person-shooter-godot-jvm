@@ -91,6 +91,8 @@ public class EnforcementDispatch extends Node {
         boolean guard;
         /** Closest it has come to its player, and how long since it last closed in (stuck detection). */
         double closest = Double.MAX_VALUE, sinceCloser;
+        /** A sniper (PLAN.md W6): placed at range on a clear line, holds there and shoots; never closes in. */
+        boolean sniper;
     }
 
     /** An officer running a player down that has not closed in by {@link #STUCK_GAIN} for this long is given up:
@@ -121,6 +123,12 @@ public class EnforcementDispatch extends Node {
         String side, playerId;
         double age, replanIn;
         boolean arrived;
+        /** The catalog model ("POC1", "TNK1" ...), whether it fires a main gun, and when it may fire next (s). */
+        String model = "";
+        boolean gun;
+        double gunIn = 2.0;
+        /** Seconds it has spent within 30 m of an on-foot player while ramming (the crew bails out after a while). */
+        double closeFor;
     }
 
     private final List<Unit> units = new ArrayList<>();
@@ -240,6 +248,13 @@ public class EnforcementDispatch extends Node {
                 continue;
             }
             brain.pursuitStand = false;
+            if (u.sniper) {
+                // a sniper holds its spot and shoots: the squad's radio says where the player is
+                brain.setPursuit(null);
+                AISquad sq = squadFor(u.playerId, u.side);
+                if (sq != null && p.isAlive()) sq.assignTarget(p, p.getGlobalPosition());
+                continue;
+            }
             boolean shoot = !POLICE.equals(u.side)
                     || (ws != null && ws.policeShoot(u.playerId));
             double dp = flat(u.body.getGlobalPosition(), p.getGlobalPosition());
@@ -311,8 +326,27 @@ public class EnforcementDispatch extends Node {
             Vector3 at = c.car.getGlobalPosition();
             boolean seenNow = inView(at);
             double far = nearestPlayer(at);
+            int starsNow = p != null ? demand.getOrDefault(c.playerId, Map.of()).getOrDefault(c.side, 0) : 0;
+            if (c.gun && wanted && r != null && p != null && p.isAlive()) fireMainGun(c, p, r);
             if (!c.arrived) {
                 VehicleAIController ctrl = c.car.getController() instanceof VehicleAIController v ? v : null;
+                // RAM (PLAN.md W6): from ram_at stars the car drives AT the player within its ram range instead of
+                // stopping 35 m out to unload. Its crew gets out only once the player is on foot and close for a
+                // while (a gun vehicle never unloads: it keeps ramming and firing).
+                boolean ram = wanted && r != null && r.rams(starsNow) && ctrl != null && c.car.getHealthNow() > 0;
+                if (ctrl != null) ctrl.ramTarget = ram ? p : null;
+                if (ram) {
+                    double dd = flat(p.getGlobalPosition(), at);
+                    boolean onFoot = p.currentVehicleNode == null;
+                    c.closeFor = onFoot && dd < 30.0 ? c.closeFor + TICK : 0.0;
+                    if (!c.gun && c.closeFor > 8.0) {
+                        ctrl.ramTarget = null;
+                        ctrl.holdStop = true;
+                        if (c.car.getLinearVelocity().length() < 1.5) unload(c);
+                        continue;
+                    }
+                    if (dd < ctrl.ramRange) continue;   // closing in by itself; far: follow the road plan below
+                }
                 boolean lost = ctrl == null || ctrl.isFinished() || c.age > CAR_GIVE_UP;
                 if (!wanted || (lost && far > (r != null ? r.arriveDist * 2 : 70.0))) {
                     if (!seenNow || !wanted) { zm().freeServiceCar(c.car); it.remove(); }
@@ -320,7 +354,7 @@ public class EnforcementDispatch extends Node {
                 }
                 double d = p.getGlobalPosition().distanceTo(at);
                 boolean stuck = ctrl != null && ctrl.stalledFor() > 4.0 && d < 150.0;
-                if (r != null && (d <= r.arriveDist || stuck || lost)) {
+                if (r != null && !c.gun && !ram && (d <= r.arriveDist || stuck || lost)) {
                     if (ctrl != null) ctrl.holdStop = true;
                     if (c.car.getLinearVelocity().length() < 1.5) unload(c);
                     continue;
@@ -444,11 +478,15 @@ public class EnforcementDispatch extends Node {
             // it is a live body until it is freed, and replacing it at once churned 100+ spawns a leg (perf probe)
         }
         for (Car c : cars) if (pid.equals(c.playerId) && side.equals(c.side) && !c.arrived) carsEnRoute++;
-        for (int i = DispatchRules.toSpawn(r.carsFor(stars), carsEnRoute, 1); i > 0; i--) spawnCar(p, side, r, ws);
-        for (int i = DispatchRules.toSpawn(r.footFor(stars), foot, spawnPerTick); i > 0; i--) {
+        for (int i = DispatchRules.toSpawn(r.carsFor(stars), carsEnRoute, 1); i > 0; i--) spawnCar(p, side, r, ws, stars);
+        int snipers = 0;
+        for (Unit u : units) if (u.sniper && pid.equals(u.playerId) && side.equals(u.side) && GD.isInstanceValid(u.body)
+                && !u.body.isDead()) snipers++;
+        for (int i = DispatchRules.toSpawn(r.snipersFor(stars), snipers, 1); i > 0; i--) spawnSniper(p, side);
+        for (int i = DispatchRules.toSpawn(r.footFor(stars), foot - snipers, spawnPerTick); i > 0; i--) {
             Vector3 at = footSpot(p.getGlobalPosition(), r.footMin, r.footMax);
             if (at == null) break;
-            AICharacter ai = spawnBody(side, at, weaponFor(side, pid, r, ws));
+            AICharacter ai = spawnBody(side, at, weaponFor(side, pid, r, ws, stars));
             if (ai == null) break;
             Unit u = new Unit();
             u.body = ai;
@@ -459,14 +497,26 @@ public class EnforcementDispatch extends Node {
     }
 
     private String weaponFor(String side, String pid, DispatchRules r, WantedSystem ws) {
-        List<String> list = POLICE.equals(side) ? (ws != null ? ws.policeWeaponsFor(pid) : List.of()) : r.weapons;
+        return weaponFor(side, pid, r, ws, 0);
+    }
+
+    /** What a unit carries: the side's row for these stars (PLAN.md W6), and for police the lethal list on top once
+     *  the player is lethal-wanted; a side with no rows uses its flat list. */
+    private String weaponFor(String side, String pid, DispatchRules r, WantedSystem ws, int stars) {
+        List<String> list = new ArrayList<>(r.weaponsFor(stars));
+        if (POLICE.equals(side)) {
+            if (list.isEmpty() || (ws != null && ws.isLethal(pid))) list.addAll(ws != null ? ws.policeWeaponsFor(pid) : List.of());
+        } else if (list.isEmpty()) list.addAll(r.weapons);
         return list.isEmpty() ? "" : list.get(rng.nextInt(list.size()));
     }
 
-    private void spawnCar(Player p, String side, DispatchRules r, WantedSystem ws) {
+    private void spawnCar(Player p, String side, DispatchRules r, WantedSystem ws, int stars) {
         ZoneManager z = zm();
         if (z == null) return;
-        Vehicle v = z.spawnServiceCar(side, "", p.getGlobalPosition(), (float) r.carMin, (float) r.carMax);
+        List<String> models = r.vehiclesFor(stars);
+        String model = models.isEmpty() ? "" : models.get(rng.nextInt(models.size()));
+        String scene = com.openworld.carrier.vehicle.VehicleModels.sceneOfId(model);
+        Vehicle v = z.spawnServiceCar(side, scene != null ? scene : "", p.getGlobalPosition(), (float) r.carMin, (float) r.carMax);
         if (v == null) return;
         String pid = p.getCharacterInfo().characterId;
         // a car whose ROAD route is far longer than the straight line (the far side of a river, a one-way loop) is
@@ -490,12 +540,12 @@ public class EnforcementDispatch extends Node {
         AISquad sq = squadFor(pid, side);
         // the driver (seated by ZoneManager) is armed and joins the squad; a partner rides beside
         if (v.getOccupant() instanceof AICharacter drv) {
-            String w = weaponFor(side, pid, r, ws);
+            String w = weaponFor(side, pid, r, ws, stars);
             if (!w.isEmpty()) WeaponGrant.grant(drv, w, this);
             drv.setSquad(sq);
         }
         for (int seat = 1; seat < Math.min(r.carCrew, v.getSeatCount()); seat++) {
-            AICharacter mate = spawnBody(side, v.getGlobalPosition(), weaponFor(side, pid, r, ws));
+            AICharacter mate = spawnBody(side, v.getGlobalPosition(), weaponFor(side, pid, r, ws, stars));
             if (mate == null) break;
             v.tryEnter(mate, seat);
             if (getNodeOrNull("/root/NetworkManager") instanceof NetworkManager net && v.getCharacterInfo() != null)
@@ -506,7 +556,83 @@ public class EnforcementDispatch extends Node {
         c.car = v;
         c.side = side;
         c.playerId = pid;
+        c.model = model;
+        c.gun = r.hasGun(model);
         cars.add(c);
+        v.setEmergency(POLICE.equals(side));      // light bar + siren while on a call
+    }
+
+    // ── the main gun (PLAN.md W6: a light tank / tank at the top stars) ──────────────────────────────────────────
+
+    private static final String SHELL_SCENE = "res://src/main/resources/com/openworld/weapon/ATL1Projectile.tscn";
+
+    /** Fire a shell from the turret at the player: in range, on a clear line, every gun_interval seconds. The shell is
+     *  the ATL1 rocket's projectile, flown on this (the authoritative) peer; other peers see its detonation. */
+    private void fireMainGun(Car c, Player p, DispatchRules r) {
+        c.gunIn -= TICK;
+        if (c.gunIn > 0) return;
+        Vector3 at = c.car.getGlobalPosition();
+        double d = flat(at, p.getGlobalPosition());
+        if (d > r.gunRange || d < 12.0) return;
+        Vector3 up = c.car.getGlobalTransform().getBasis().getColumn(1);
+        Vector3 fwd = c.car.getGlobalTransform().getBasis().getColumn(2).times(-1.0);
+        Vector3 muzzle = at.plus(up.times(2.6)).plus(fwd.times(3.0));
+        Vector3 aimAt = p.getGlobalPosition().plus(new Vector3(0, 1.0, 0));
+        if (!clearLine(muzzle.minus(new Vector3(0, 0.6, 0)), aimAt.minus(new Vector3(0, 0.6, 0)))) return;
+        if (!(GD.load(SHELL_SCENE) instanceof PackedScene ps) || !(ps.instantiate() instanceof com.openworld.weapon.RocketProjectile rp))
+            return;
+        rp.speed = 90f;
+        rp.explosionRadius = (float) r.gunRadius;
+        rp.explosionMaxDamage = (float) r.gunDamage;
+        rp.explosionPushForce = 40f;
+        rp.attackerId = c.car.getCharacterInfo() != null ? c.car.getCharacterInfo().characterId : "";
+        rp.attackerName = c.model;
+        rp.attackerFaction = c.side;
+        rp.weaponDisplayName = c.model + " gun";
+        rp.kind = "ATL1";
+        getTree().getCurrentScene().addChild(rp);
+        Vector3 dir = aimAt.minus(muzzle).normalized();
+        rp.setGlobalPosition(muzzle);
+        rp.lookAt(muzzle.plus(dir));
+        rp.setLinearVelocity(dir.times(90.0));
+        rp.addCollisionExceptionWith(c.car);
+        c.gunIn = r.gunInterval;
+        shellsFired++;
+    }
+
+    private int shellsFired;
+
+    // ── snipers ───────────────────────────────────────────────────────────────
+
+    /** A sniper 90-160 m out, out of view, at a spot with a clear line to the player at head height; SNR1, a long
+     *  sight and a modest hit chance. Holds there (tickUnits). */
+    private void spawnSniper(Player p, String side) {
+        Vector3 pp = p.getGlobalPosition();
+        for (int k = 0; k < 24; k++) {
+            double a = rng.nextDouble() * Math.PI * 2, d = 90.0 + rng.nextDouble() * 70.0;
+            Vector3 g = ground(pp.getX() + Math.cos(a) * d, pp.getZ() + Math.sin(a) * d, pp.getY() + 10.0);
+            if (g == null || inView(g)) continue;
+            if (!clearLine(g.plus(new Vector3(0, 1.0, 0)), pp.plus(new Vector3(0, 0.6, 0)))) continue;
+            AICharacter ai = spawnBody(side, g, "SNR1");
+            if (ai == null) return;
+            com.openworld.ai.AIBehaviorConfig cfg = new com.openworld.ai.AIBehaviorConfig();
+            cfg.detectionRange = 260f;
+            cfg.attackRange = 260f;
+            cfg.hearingRadius = 260f;
+            cfg.hitChance = 0.35f;
+            cfg.aimScatterRadius = 1.5f;
+            cfg.reactionTime = 1.5f;
+            cfg.detectionFovDeg = 360f;
+            ai.behaviorConfig = cfg;
+            ai.setSquad(squadFor(p.getCharacterInfo().characterId, side));
+            Unit u = new Unit();
+            u.body = ai;
+            u.side = side;
+            u.playerId = p.getCharacterInfo().characterId;
+            u.sniper = true;
+            units.add(u);
+            return;
+        }
     }
 
     private AICharacter spawnBody(String side, Vector3 at, String weapon) {
@@ -647,6 +773,20 @@ public class EnforcementDispatch extends Node {
         for (Unit u : units) if (GD.isInstanceValid(u.body) && !u.body.isDead()) foot++;
         for (Car c : cars) if (GD.isInstanceValid(c.car)) { if (c.arrived) arrived++; else enroute++; }
         return foot + "," + enroute + "," + arrived + "," + arrests + "," + stuckGivenUp + "," + carsDiscarded;
+    }
+
+    /** The escalation's readout (PLAN.md W6): "models en route;rammers;shells fired;snipers". */
+    @Register
+    public String escalationNow() {
+        StringBuilder m = new StringBuilder();
+        int rammers = 0, snipers = 0;
+        for (Car c : cars) {
+            if (!GD.isInstanceValid(c.car)) continue;
+            m.append(c.model.isEmpty() ? "car" : c.model).append(' ');
+            if (c.car.getController() instanceof VehicleAIController v && v.ramTarget != null) rammers++;
+        }
+        for (Unit u : units) if (u.sniper && GD.isInstanceValid(u.body) && !u.body.isDead()) snipers++;
+        return m.toString().trim() + ";" + rammers + ";" + shellsFired + ";" + snipers;
     }
 
     /** Live dispatched bodies on foot of {@code side} (police or a gang id). */

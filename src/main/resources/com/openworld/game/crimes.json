@@ -1,131 +1,220 @@
 {
-  "note": "The crime table (PLAN.md W5). A row is a crime id -> heat added, the minimum stars it sets at once, whether a witness is needed, and `lethal`: once a lethal crime is on a player's record, police shoot on sight and no arrest is offered, until the heat is gone or the player is hospitalized. Adding a crime = one row here + one WantedSystem.report(id, ...) call. Stars come from heat by `stars_at` (thresholds for 1..6 stars). `police_weapons` is what responding police carry (the dispatch, PLAN.md W5): heavy weapons once the player is lethal-wanted (user, 2026-10-03).",
-  "stars_at": [
-    40,
-    140,
-    320,
-    560,
-    860,
-    1250
-  ],
-  "calm_seconds": 12.0,
-  "calm_per_star": 6.0,
-  "decay_per_second": 18.0,
-  "witness_radius": 45.0,
-  "crimes": {
-    "gunfire": {
-      "heat": 10,
-      "min_stars": 0,
-      "witness": true,
-      "lethal": false
-    },
-    "assault": {
-      "heat": 30,
-      "min_stars": 1,
-      "witness": true,
-      "lethal": false
-    },
-    "murder": {
-      "heat": 120,
-      "min_stars": 2,
-      "witness": true,
-      "lethal": false
-    },
-    "assault_police": {
-      "heat": 120,
-      "min_stars": 2,
-      "witness": false,
-      "lethal": false
-    },
-    "kill_police": {
-      "heat": 300,
-      "min_stars": 3,
-      "witness": false,
-      "lethal": true
-    },
-    "car_theft": {
-      "heat": 25,
-      "min_stars": 1,
-      "witness": true,
-      "lethal": false
-    },
-    "train_attack": {
-      "heat": 500,
-      "min_stars": 4,
-      "witness": false,
-      "lethal": true
-    },
-    "bank_attack": {
-      "heat": 500,
-      "min_stars": 4,
-      "witness": false,
-      "lethal": true
-    },
-    "attack_vip": {
-      "heat": 400,
-      "min_stars": 4,
-      "witness": false,
-      "lethal": false
-    },
-    "threaten_clerk": {
-      "heat": 60,
-      "min_stars": 1,
-      "witness": false,
-      "lethal": false
-    },
-    "rob_store": {
-      "heat": 220,
-      "min_stars": 2,
-      "witness": false,
-      "lethal": true
-    }
+ "note": "The crime table (PLAN.md W5). A row is a crime id -> heat added, the minimum stars it sets at once, whether a witness is needed, and `lethal`: once a lethal crime is on a player's record, police shoot on sight and no arrest is offered, until the heat is gone or the player is hospitalized. Adding a crime = one row here + one WantedSystem.report(id, ...) call. Stars come from heat by `stars_at` (thresholds for 1..6 stars). `police_weapons` is what responding police carry (the dispatch, PLAN.md W5): heavy weapons once the player is lethal-wanted (user, 2026-10-03).",
+ "stars_at": [
+  40,
+  140,
+  320,
+  560,
+  860,
+  1250
+ ],
+ "calm_seconds": 12.0,
+ "calm_per_star": 6.0,
+ "decay_per_second": 18.0,
+ "witness_radius": 45.0,
+ "crimes": {
+  "gunfire": {
+   "heat": 10,
+   "min_stars": 0,
+   "witness": true,
+   "lethal": false
   },
-  "police_weapons": {
-    "normal": [
-      "PIS1"
-    ],
-    "lethal": [
-      "SHG1",
-      "ASR2",
-      "SMG1"
-    ]
+  "assault": {
+   "heat": 30,
+   "min_stars": 1,
+   "witness": true,
+   "lethal": false
   },
-  "dispatch": {
-    "note": "The police dispatch (game.EnforcementDispatch, PLAN.md W5). Index = stars (0..6). Officers on foot appear between foot_min and foot_max metres from the wanted player out of view; patrol cars (POC1/MPC1, a crew of car_crew) on a lane between car_min and car_max and drive the road route to the player, the crew bailing out within arrive_dist. Below shoot_at stars, and while the player is not lethal-wanted, police run the player down to ARREST (an officer within arrest_reach for arrest_seconds); at or above it police shoot. Units are freed out of view past despawn_far, or once the stars are gone. While police can see the player the calm clock does not run (seen_reach).",
-    "shoot_at": 3,
-    "foot_by_stars": [
-      0,
-      2,
-      3,
-      4,
-      6,
-      8,
-      10
-    ],
-    "cars_by_stars": [
-      0,
-      0,
-      1,
-      2,
-      2,
-      3,
-      4
-    ],
-    "car_crew": 2,
-    "foot_min": 45.0,
-    "foot_max": 75.0,
-    "car_min": 140.0,
-    "car_max": 280.0,
-    "arrive_dist": 35.0,
-    "arrest_reach": 2.2,
-    "arrest_seconds": 1.5,
-    "despawn_far": 180.0,
-    "seen_reach": 60.0,
-    "spawn_interval": 1.5
+  "murder": {
+   "heat": 120,
+   "min_stars": 2,
+   "witness": true,
+   "lethal": false
   },
-  "fees": {
-    "note": "What waking up costs (game.RecoveryRules, user 2026-10-06), yen, taken from the player's cash (never below 0). HOSPITALIZED pays `hospital`; ARRESTED -- which a death while police-wanted is too -- pays (hospital + police_per_star) x the stars; an ABDUCTION's ransom is gangs.json `abduction`, the highest.",
-    "hospital": 5000,
-    "police_per_star": 10000
+  "assault_police": {
+   "heat": 120,
+   "min_stars": 2,
+   "witness": false,
+   "lethal": false
+  },
+  "kill_police": {
+   "heat": 300,
+   "min_stars": 3,
+   "witness": false,
+   "lethal": true
+  },
+  "car_theft": {
+   "heat": 25,
+   "min_stars": 1,
+   "witness": true,
+   "lethal": false
+  },
+  "train_attack": {
+   "heat": 500,
+   "min_stars": 4,
+   "witness": false,
+   "lethal": true
+  },
+  "bank_attack": {
+   "heat": 500,
+   "min_stars": 4,
+   "witness": false,
+   "lethal": true
+  },
+  "attack_vip": {
+   "heat": 400,
+   "min_stars": 4,
+   "witness": false,
+   "lethal": false
+  },
+  "threaten_clerk": {
+   "heat": 60,
+   "min_stars": 1,
+   "witness": false,
+   "lethal": false
+  },
+  "rob_store": {
+   "heat": 220,
+   "min_stars": 2,
+   "witness": false,
+   "lethal": true
   }
+ },
+ "police_weapons": {
+  "normal": [
+   "PIS1"
+  ],
+  "lethal": [
+   "SHG1",
+   "ASR2",
+   "SMG1"
+  ]
+ },
+ "dispatch": {
+  "note": "The police dispatch (game.EnforcementDispatch, PLAN.md W5). Index = stars (0..6). Officers on foot appear between foot_min and foot_max metres from the wanted player out of view; patrol cars (POC1/MPC1, a crew of car_crew) on a lane between car_min and car_max and drive the road route to the player, the crew bailing out within arrive_dist. Below shoot_at stars, and while the player is not lethal-wanted, police run the player down to ARREST (an officer within arrest_reach for arrest_seconds); at or above it police shoot. Units are freed out of view past despawn_far, or once the stars are gone. While police can see the player the calm clock does not run (seen_reach).",
+  "shoot_at": 3,
+  "foot_by_stars": [
+   0,
+   2,
+   3,
+   4,
+   6,
+   8,
+   10
+  ],
+  "cars_by_stars": [
+   0,
+   0,
+   1,
+   2,
+   2,
+   3,
+   4
+  ],
+  "car_crew": 2,
+  "foot_min": 45.0,
+  "foot_max": 75.0,
+  "car_min": 140.0,
+  "car_max": 280.0,
+  "arrive_dist": 35.0,
+  "arrest_reach": 2.2,
+  "arrest_seconds": 1.5,
+  "despawn_far": 180.0,
+  "seen_reach": 60.0,
+  "spawn_interval": 1.5,
+  "escalation_note": "PLAN.md W6 (user 2026-10-06): heavier units as the stars rise. Index = stars (0..6). weapons_by_stars: what a unit carries (the lethal list in police_weapons is added once lethal). vehicles_by_stars: catalog model ids sent (POC1/MPC1 patrol cars, ARV1 armoured riot vehicle, LTK1 wheeled light tank, TNK1 tank). snipers_by_stars: SNR1 units placed 90-160 m out on a clear line. helis_by_stars: police helicopters (HLC1) with a door gunner. ram_at: from this many stars a car on a call drives AT the player instead of stopping to unload. breach_at: from this many stars units follow the player INTO a building through its doors. gun: the armour that fires a main gun, and how.",
+  "weapons_by_stars": [
+   [],
+   [
+    "PIS1"
+   ],
+   [
+    "PIS1"
+   ],
+   [
+    "PIS1",
+    "SMG1",
+    "SHG1"
+   ],
+   [
+    "SMG1",
+    "ASR2",
+    "SHG1"
+   ],
+   [
+    "ASR1",
+    "ASR2",
+    "SHG1"
+   ],
+   [
+    "ASR1",
+    "ASR2",
+    "ATL1"
+   ]
+  ],
+  "vehicles_by_stars": [
+   [],
+   [],
+   [
+    "POC1",
+    "MPC1"
+   ],
+   [
+    "POC1",
+    "POC1",
+    "MPC1"
+   ],
+   [
+    "POC1",
+    "ARV1"
+   ],
+   [
+    "ARV1",
+    "LTK1",
+    "POC1",
+    "POC1"
+   ],
+   [
+    "LTK1",
+    "TNK1",
+    "ARV1",
+    "POC1"
+   ]
+  ],
+  "snipers_by_stars": [
+   0,
+   0,
+   0,
+   0,
+   1,
+   2,
+   2
+  ],
+  "helis_by_stars": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   2
+  ],
+  "ram_at": 4,
+  "breach_at": 3,
+  "gun": {
+   "vehicles": [
+    "LTK1",
+    "TNK1"
+   ],
+   "interval": 4.0,
+   "range": 220.0,
+   "damage": 320.0,
+   "radius": 7.0
+  }
+ },
+ "fees": {
+  "note": "What waking up costs (game.RecoveryRules, user 2026-10-06), yen, taken from the player's cash (never below 0). HOSPITALIZED pays `hospital`; ARRESTED -- which a death while police-wanted is too -- pays (hospital + police_per_star) x the stars; an ABDUCTION's ransom is gangs.json `abduction`, the highest.",
+  "hospital": 5000,
+  "police_per_star": 10000
+ }
 }
