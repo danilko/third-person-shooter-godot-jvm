@@ -34,6 +34,22 @@ public class Health extends Node {
     public float hitDamageMultiplier = 1.0f;
     @Export
     public float explosionDamageMultiplier = 1.0f;
+    /** A blade ({@link com.openworld.world.DamageKind#BLADE}: the knife). 1 on people; a vehicle all but ignores it. */
+    @Export
+    public float bladeDamageMultiplier = 1.0f;
+    /** Fists and light blunt melee ({@link com.openworld.world.DamageKind#BLUNT}). 1 on people; ~0 on a vehicle. */
+    @Export
+    public float bluntDamageMultiplier = 1.0f;
+
+    /** The multiplier this body takes a weapon hit of {@code kind} at (bullets and heavy tools: the hit multiplier). */
+    public float multiplierFor(com.openworld.world.DamageKind kind) {
+        if (kind == null) return hitDamageMultiplier;
+        return switch (kind) {
+            case BLADE -> bladeDamageMultiplier;
+            case BLUNT -> bluntDamageMultiplier;
+            default -> hitDamageMultiplier;
+        };
+    }
 
     /** Display name used in kill notifications. Falls back to the owner node name if empty. */
     @Export

@@ -78,6 +78,16 @@ public class VehicleProbeHelper extends Node {
         return null;
     }
 
+    /** One hit of {@code damage} of damage kind {@code kind} ("BULLET", "HEAVY", "BLADE", "BLUNT") on {@code body}
+     *  through {@code ImpactManager.processHit}, the path a melee swing takes (probe_vehicle_armour.gd). */
+    @Register
+    public void kindHit(Node impactManager, Node body, float damage, String kind) {
+        if (impactManager instanceof com.openworld.world.manager.ImpactManager im && body instanceof godot.api.Node3D b) {
+            im.processHit(new com.openworld.world.HitInfo(b, b.getGlobalPosition(), new godot.core.Vector3(0, 1, 0)),
+                    damage, "probe", null, "probe", "", null, "", com.openworld.world.DamageKind.valueOf(kind));
+        }
+    }
+
     /** One weapon hit on {@code body} at world point {@code at} through {@code ImpactManager.processHit} (probe_component_car.gd). */
     @Register
     public void weaponHitAt(Node impactManager, Node body, godot.core.Vector3 at, float damage) {

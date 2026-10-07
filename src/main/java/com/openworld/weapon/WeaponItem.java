@@ -28,6 +28,10 @@ import com.openworld.movement.character.Stance;
 @Script(className = "WeaponItem")
 public class WeaponItem extends Pickup implements WeaponAction {
 
+  /** What kind of hit this weapon deals (world.DamageKind): every gun is BULLET; melee subclasses say otherwise. */
+  public com.openworld.world.DamageKind damageKind() { return com.openworld.world.DamageKind.BULLET; }
+
+
   // Internal identifier used for event bus payloads and save keys. No spaces.
   @Export public String weaponId = "";
 

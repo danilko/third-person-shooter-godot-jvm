@@ -10,4 +10,8 @@ import godot.annotation.Script;
  */
 @Script(className = "AxeItem")
 public class AxeItem extends MeleeItem {
+
+  /** A heavy tool: it hurts a vehicle like gunfire does (world.DamageKind). */
+  @Override
+  public com.openworld.world.DamageKind damageKind() { return com.openworld.world.DamageKind.HEAVY; }
 }

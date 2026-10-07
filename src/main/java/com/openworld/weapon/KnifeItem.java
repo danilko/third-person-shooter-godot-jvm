@@ -21,6 +21,10 @@ import godot.annotation.Script;
 @Script(className = "KnifeItem")
 public class KnifeItem extends MeleeItem {
 
+  /** A blade: deadly to a person, nothing to a car's panels (world.DamageKind). */
+  @Override
+  public com.openworld.world.DamageKind damageKind() { return com.openworld.world.DamageKind.BLADE; }
+
   /** Seconds of hold needed to trigger the heavy slash instead of the quick stab. */
   @Export public float chargeThreshold = 0.5f;
 

@@ -63,6 +63,10 @@ import java.util.Set;
 @Script(className = "MeleeItem")
 public class MeleeItem extends WeaponItem {
 
+  /** Light blunt melee by default (a fist); a knife says BLADE, an axe HEAVY (world.DamageKind: the target scales it). */
+  @Override
+  public com.openworld.world.DamageKind damageKind() { return com.openworld.world.DamageKind.BLUNT; }
+
   /** The bone a swing is measured from. Stance-correct for free: it rides the animated skeleton,
    *  so a crouched swing starts at a crouched chest. */
   private static final String CHEST_BONE = "spine_03";
@@ -457,7 +461,7 @@ public class MeleeItem extends WeaponItem {
   private void connect(ImpactManager im, HitInfo info, MeleeAttackStep st, boolean authoritative, boolean feel) {
     if (authoritative) {
       im.processHit(info, st.damage, getDisplayName(), weaponIcon,
-          resolveAttackerName(), resolveAttackerFaction(), resolveAttackerPosition(), resolveAttackerId());
+          resolveAttackerName(), resolveAttackerFaction(), resolveAttackerPosition(), resolveAttackerId(), damageKind());
     } else {
       im.processVisualHit(info);
       com.openworld.net.NetStats.increment("melee_predicted_hits");   // a client's own prediction (N2)

@@ -74,6 +74,15 @@ public class ImpactManager extends Node {
                            String weaponName, Texture2D weaponIcon,
                            String attackerName, String attackerFaction,
                            godot.core.Vector3 attackerPos, String attackerId) {
+        processHit(info, damage, weaponName, weaponIcon, attackerName, attackerFaction, attackerPos, attackerId,
+                com.openworld.world.DamageKind.BULLET);
+    }
+
+    /** @param kind what kind of hit this is: the target's Health scales it ({@code Health.multiplierFor}). */
+    public void processHit(HitInfo info, float damage,
+                           String weaponName, Texture2D weaponIcon,
+                           String attackerName, String attackerFaction,
+                           godot.core.Vector3 attackerPos, String attackerId, com.openworld.world.DamageKind kind) {
         // Walk the parent chain once to resolve surface type, health owner, and
         // character — previously done by three independent traversals per hit.
         HitContext ctx = resolveHitContext(info.hitNode);
@@ -93,10 +102,14 @@ public class ImpactManager extends Node {
             // vehicle counterpart of the character bone-multiplier model.
             if (ctx.wheel != null) bodyDamage = ctx.wheel.applyTireDamage(damage);
             // A body panel under the bullet dents / comes loose (GTA component damage); the car still takes the hit.
-            else if (ctx.healthOwner instanceof com.openworld.carrier.vehicle.Vehicle v && v.getDamageModel() != null)
-                v.getDamageModel().applyHit(info.hitPoint, damage);
             Health health = (Health) ctx.healthOwner.getNode(new NodePath("Health"));
-            bodyDamage *= health.hitDamageMultiplier;   // a car soaks gunfire (Health's damage kinds)
+            float kindMult = health.multiplierFor(kind);
+            // A body panel under the hit dents / comes loose (GTA component damage), as hard as the hit really is:
+            // a knife (kind multiplier ~0 on a car) dents nothing
+            if (ctx.wheel == null && ctx.healthOwner instanceof com.openworld.carrier.vehicle.Vehicle v
+                    && v.getDamageModel() != null && kindMult > 0.05f)
+                v.getDamageModel().applyHit(info.hitPoint, damage * Math.min(1f, kindMult / Math.max(1e-3f, health.hitDamageMultiplier)));
+            bodyDamage *= kindMult;   // the target decides: a car soaks gunfire, ignores a knife (Health's damage kinds)
             health.takeDamage(info.hitNode, bodyDamage, weaponName, weaponIcon, attackerName, attackerFaction, attackerPos,
                     attackerId);
         }

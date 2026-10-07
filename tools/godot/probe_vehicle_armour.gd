@@ -87,6 +87,35 @@ func _initialize() -> void:
 		for i in 5:
 			await physics_frame
 
+	print("== 1b. the damage KIND: the target decides (world.DamageKind)")
+	var knife_heavy := 100.0
+	var axe_heavy := 120.0
+	var fist := 14.0
+	var car := await _spawn("SPC1", Vector3(10, 20, 0), true)
+	var person: Node3D = (load("res://src/main/resources/com/openworld/character/AICharacter.tscn") as PackedScene).instantiate()
+	stand.add_child(person)
+	person.global_position = Vector3(-10, 0, 0)
+	for i in 5:
+		await physics_frame
+	var lost := {}
+	for k in [["BLADE", knife_heavy], ["BLUNT", fist], ["HEAVY", axe_heavy], ["BULLET", asr]]:
+		var h0 := _hp(car)
+		helper.call("kind_hit", im, car, k[1], k[0])
+		await physics_frame
+		lost[k[0]] = h0 - _hp(car)
+	_check("a knife's heavy stab barely marks a car", lost["BLADE"] <= 2.0, "%.1f HP" % lost["BLADE"])
+	_check("a punch does nothing to a car", lost["BLUNT"] == 0.0, "%.1f HP" % lost["BLUNT"])
+	_check("an axe's heavy chop hurts a car like gunfire does", is_equal_approx(lost["HEAVY"], axe_heavy * 0.4), "%.1f HP" % lost["HEAVY"])
+	_check("a rifle round is unchanged on a car", is_equal_approx(lost["BULLET"], asr * 0.4), "%.1f HP" % lost["BULLET"])
+	var p0 := _hp(person)
+	helper.call("kind_hit", im, person, 30.0, "BLADE")
+	await physics_frame
+	_check("a knife is full damage on a person", is_equal_approx(p0 - _hp(person), 30.0), "%.1f HP" % (p0 - _hp(person)))
+	car.queue_free()
+	person.queue_free()
+	for i in 5:
+		await physics_frame
+
 	print("== 2. a helicopter shot down in the air falls and wrecks on the ground")
 	var h := await _spawn("HLC1", Vector3(0, 40, 0), false)
 	var tgt := Node3D.new()
