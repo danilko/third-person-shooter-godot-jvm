@@ -44,10 +44,9 @@ import java.util.UUID;
  *   <li><b>Police</b>, from the wanted stars ({@code crimes.json} {@code dispatch}): officers on foot appear out of
  *   view between {@code foot_min} and {@code foot_max} of the player, and patrol cars (POC1 / MPC1, a driver and a
  *   partner) on a lane further out drive the ROAD route to the player ({@link VehicleAIController#setPlan}), brake
- *   within {@code arrive_dist} and their crew gets out. Below {@code shoot_at} stars, while the player is not
- *   lethal-wanted, an officer runs the player down ({@link ArrestState}, weapon drawn, no fire) and one within
- *   {@code arrest_reach} for {@code arrest_seconds} ARRESTS them ({@link RespawnSystem#arrest}); from {@code
- *   shoot_at} the police faction is hostile to players ({@link WantedSystem}) and the units fight with the ordinary
+ *   within {@code arrive_dist} and their crew gets out. Police HUNT the player down (user 2026-10-07): from {@code
+ *   shoot_at} stars (1) the police faction is hostile to players ({@link WantedSystem}), units close in with {@link
+ *   ArrestState}'s approach and fight with the ordinary
  *   FSM, told where the player is by their squad's radio ({@link AISquad#assignTarget}). Police in sight of the
  *   player stop the heat draining ({@link WantedSystem#seen}).</li>
  *   <li><b>Gangs</b>, from each gang's stars with the player at {@code chase_at} or more ({@code gangs.json}
@@ -153,10 +152,8 @@ public class EnforcementDispatch extends Node {
     private static final double HELI_SNIPE_HIT = 0.5, HELI_SNIPE_DAMAGE = 75.0;
     private int heliShots, heliHits;
     private final Map<String, AISquad> squads = new HashMap<>();
-    private final Map<String, Double> arrestClock = new HashMap<>();
     private final Random rng = new Random(0x5EED);
     private double tickIn, spawnIn;
-    private int arrests;
 
     @Register
     @Override
@@ -326,7 +323,7 @@ public class EnforcementDispatch extends Node {
                 if (brain.getCurrentState() != ArrestState.INSTANCE) brain.forceState(ArrestState.INSTANCE);
             }
             double d = flat(u.body.getGlobalPosition(), p.getGlobalPosition());
-            if (d < u.closest - STUCK_GAIN || d < (r != null ? r.arrestReach * 2 : 4.0)) {
+            if (d < u.closest - STUCK_GAIN || d < 4.0) {
                 u.closest = Math.min(u.closest, d);
                 u.sinceCloser = 0;
             } else if (playerSpeed(u.playerId, p) < OUTRUN_SPEED && (u.sinceCloser += TICK) > STUCK_SECONDS
@@ -452,39 +449,28 @@ public class EnforcementDispatch extends Node {
         c.car.removeAiDriverBrain();
     }
 
-    // ── arrests and being seen ────────────────────────────────────────────────
+    // ── being seen ───────────────────────────────────────────────────────────
 
+    /** Police in sight of a wanted player stop the heat draining. There is no arrest by proximity any more (user
+     *  2026-10-07: police hunt the player down); a wanted player who goes DOWN is arrested by RecoveryRules. */
     private void arrestsAndSight(Map<String, Player> players, WantedSystem ws, DispatchRules police) {
         if (ws == null || police == null) return;
         for (Player p : players.values()) {
             String id = p.getCharacterInfo().characterId;
-            if (ws.starsOf(id) <= 0) { arrestClock.remove(id); continue; }
+            if (ws.starsOf(id) <= 0) continue;
             Vector3 pp = p.getGlobalPosition();
-            boolean reach = false, seen = false;
+            boolean seen = false;
             for (Unit u : units) {
                 if (!POLICE.equals(u.side) || !GD.isInstanceValid(u.body) || u.body.isDead()) continue;
                 if (u.body.currentVehicleNode != null) continue;
-                double d = u.body.getGlobalPosition().distanceTo(pp);
-                if (d <= police.seenReach) seen = true;
-                if (d <= police.arrestReach) reach = true;
+                if (u.body.getGlobalPosition().distanceTo(pp) <= police.seenReach) { seen = true; break; }
             }
             for (Car c : cars) {
+                if (seen) break;
                 if (POLICE.equals(c.side) && GD.isInstanceValid(c.car)
                         && c.car.getGlobalPosition().distanceTo(pp) <= police.seenReach) seen = true;
             }
             if (seen) ws.seen(id);
-            boolean arrestable = p.isAlive() && p.currentVehicleNode == null && !ws.policeShoot(id);
-            double clock = police.arrestClock(arrestClock.getOrDefault(id, 0.0), reach, arrestable, TICK);
-            arrestClock.put(id, clock);
-            if (clock >= police.arrestSeconds) {
-                arrestClock.remove(id);
-                RespawnSystem rs = RespawnSystem.get();
-                if (rs != null && rs.arrest(p)) {
-                    arrests++;
-                    ws.clear(id);
-                    GD.print("EnforcementDispatch: " + p.getName() + " arrested");
-                }
-            }
         }
     }
 
@@ -987,13 +973,14 @@ public class EnforcementDispatch extends Node {
     }
 
     // ── probe surface ──
-    /** "foot,cars en route,cars arrived,arrests,stuck given up,cars discarded" (live units). */
+    /** "foot,cars en route,cars arrived,0,stuck given up,cars discarded" (live units; the 4th field was arrests,
+     *  kept at 0 so readers keep their indexes). */
     @Register
     public String unitsNow() {
         int foot = 0, arrived = 0, enroute = 0;
         for (Unit u : units) if (GD.isInstanceValid(u.body) && !u.body.isDead()) foot++;
         for (Car c : cars) if (GD.isInstanceValid(c.car)) { if (c.arrived) arrived++; else enroute++; }
-        return foot + "," + enroute + "," + arrived + "," + arrests + "," + stuckGivenUp + "," + carsDiscarded;
+        return foot + "," + enroute + "," + arrived + ",0," + stuckGivenUp + "," + carsDiscarded;
     }
 
     /** The escalation's readout (PLAN.md W6): "models en route;rammers;shells fired;snipers;helicopters;heli shots;heli hits". */
@@ -1023,7 +1010,6 @@ public class EnforcementDispatch extends Node {
         return out;
     }
 
-    @Register public int arrestsNow() { return arrests; }
 
     /** Live guards over captives (abductions). */
     @Register

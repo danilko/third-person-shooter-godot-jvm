@@ -5,8 +5,9 @@ extends SceneTree
 ##   stdbuf -oL godot --headless --path . --script tools/godot/probe_enforcement.gd [-- --world=island]
 ##   ... -- --control    (the dispatch off: stars still count, nobody comes, the budget does not move)
 ##
-##   1. ONE star (not lethal): police officers appear on foot round the player, the police faction stays NOT hostile,
-##      they run the player down and ARREST them (a respawn), without a shot fired;
+##   1. ONE star (not lethal): police officers appear on foot round the player and HUNT them down (user 2026-10-07:
+##      no arrest by proximity) -- the police faction is hostile at one star, and the player, put down, wakes 逮捕
+##      ARRESTED (RecoveryRules: police stars decide the outcome even on a death);
 ##   2. FOUR stars: more officers (and, where a lane qualifies, a patrol car), police are hostile, and they hurt the
 ##      player; the ambient traffic budget is reduced by the load;
 ##   3. the stars cleared: every unit leaves (freed once out of view and away);
@@ -67,35 +68,36 @@ func _initialize() -> void:
 	var budget0 := int(zm.call("effective_traffic_budget_now"))
 	print("  traffic budget at rest %d (alive %d)" % [budget0, int(zm.call("traffic_alive_now"))])
 
-	# 1. one star: an arrest (invulnerable: DebugWorld's armed "enemy" zone AI would otherwise kill the player, and a
-	#    hospital respawn clears the stars)
-	player.get_node("Health").set("invulnerable", true)
+	# 1. one star: they hunt the player down; the player is mortal (a small health pool, so the fight is short) and,
+	#    down while wanted, wakes arrested
 	var street := player.global_position
+	player.get_node("Health").set("max_health", 60.0)
+	player.get_node("Health").call("apply_replicated_health", 60.0)
 	ws.call("set_stars_now", pid, 1, false)
 	var seen_foot := 0
-	var hp0 := float(player.get_node("Health").call("health_now"))
+	var hostile1 := false
 	var respawns0 := int(rs.call("respawns_now"))
 	var t := 0.0
-	while t < 60.0:
+	while t < 90.0:
 		await _tick(30)
 		t += 0.5
+		if int(rs.call("respawns_now")) == respawns0:
+			ws.call("set_stars_now", pid, 1, false)   # hold the star until the player is down
 		var u := _units(ed)
 		seen_foot = max(seen_foot, u[0])
+		hostile1 = hostile1 or bool(fm.call("hostile_now", "police", "player"))
 		if int(t * 2) % 10 == 0:
 			print("    t=%.1f player %s | %s" % [t, (str(player.global_position.round()) if is_instance_valid(player) else "gone"), String(ed.call("debug_units_now"))])
 		if int(rs.call("respawns_now")) > respawns0:
 			break
-		# the 1-star case must not turn police hostile
-		if bool(fm.call("hostile_now", "police", "player")):
-			print("    police hostile at one star (t=%.1f)" % t)
-			break
-	var arrested := int(rs.call("respawns_now")) > respawns0
-	print("  1 star: peak foot units %d, arrests %d, %.1f s" % [seen_foot, int(ed.call("arrests_now")), t])
+	var reason := String(rs.call("last_reason_now"))
+	print("  1 star: peak foot units %d, hostile %s, respawn '%s', %.1f s" % [seen_foot, hostile1, reason, t])
 	if control:
-		_check(seen_foot == 0 and not arrested, "control: nobody came, nobody was arrested")
+		_check(seen_foot == 0, "control: nobody came (%d)" % seen_foot)
 	else:
 		_check(seen_foot >= 1, "one star sends officers on foot (%d)" % seen_foot)
-		_check(arrested and int(ed.call("arrests_now")) >= 1, "they arrested the player (%.1f s)" % t)
+		_check(hostile1, "at one star police are already hostile (they hunt the player down)")
+		_check(int(rs.call("respawns_now")) > respawns0 and reason == "ARRESTED", "the player, put down while wanted, woke ARRESTED (%s, %.1f s)" % [reason, t])
 	await _tick(60 * 6)   # the arrest card and the respawn
 	player = _player()
 	pid = player.get("character_info").get("character_id")

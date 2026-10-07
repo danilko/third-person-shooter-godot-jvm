@@ -10996,16 +10996,16 @@ Built first so peak performance can be measured with enforcement in the ring (us
 `tools/godot/probe_enforcement.gd [-- --world=island] [-- --control]` (PASS both worlds, control PASS) and
 `tools/godot/probe_recovery.gd [-- --world=island]` 23/23; unit tests `DispatchRulesTest`, `RecoveryRulesTest`.
 - **`game.EnforcementDispatch`** (a GameManager child, authority only) turns standing into units. Police from the stars
-  (`crimes.json` `dispatch`: foot units and patrol cars per star, spawn rings, `shoot_at` 3), gangs at `chase_at` or
+  (`crimes.json` `dispatch`: foot units and patrol cars per star, spawn rings, `shoot_at` 1), gangs at `chase_at` or
   more (`gangs.json` `hunters`). Rules engine-free in `game.DispatchRules`.
   * **Foot officers** appear out of view 45-75 m away, on a footway (island) with a clear line to the player, else
     any out-of-view spot (indoors: the navmesh then). They are `AICharacter.lodPinnedActive` (the PASSIVE tier held
     them on a heading and walked them away, 79 -> 165 m).
-  * **Below shoot_at (and not lethal) police ARREST**: `ai.character.ArrestState` runs at the player, weapon aimed,
-    no fire, STRAIGHT when `pursuitDirect` (the dispatcher's clear-line test), else by the navmesh (off its baked area
-    the NavAgent led officers AWAY on DebugWorld). An officer within 2.2 m for 1.5 s -> `RespawnSystem.arrest`.
-    Measured: 11-24 s from 1 star to the arrest.
-  * **At shoot_at / lethal** the police faction is hostile (`WantedSystem.applyHostility`); units APPROACH with
+  * **Police HUNT the player down; there is no arrest by proximity** (user, 2026-10-07: the walk-up arrest was
+    unreadable). `shoot_at` is 1, so from one star police are hostile; a wanted player who goes DOWN wakes 逮捕
+    ARRESTED (`RecoveryRules`), which is how an arrest happens now. `ArrestState` survives as the APPROACH state
+    (straight when `pursuitDirect`, else the navmesh, plus the breach `pursuitVia` and the guards' stand mode).
+  * **Hostile** (from `shoot_at`, or lethal): the police faction is hostile (`WantedSystem.applyHostility`); units APPROACH with
     ArrestState and hand over to the combat FSM inside 25 m (back out past 35). The FSM's own ChaseState stood still
     50-70 m out on the island. Each player's units share an `AISquad`; `assignTarget` is the radio.
   * **Patrol cars** (POC1/MPC1 + partner): `ZoneManager.spawnServiceCar` (never on expressway/ramp/rail lanes),
