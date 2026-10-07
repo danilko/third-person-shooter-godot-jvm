@@ -103,6 +103,13 @@ public class MissionManager extends Node {
      * callers (debug harness today, MissionDirector in F1) decide when this may run.
      */
     public void startMission(MissionInfo info) {
+        // Mission state is the host's: a client's copy is a MIRROR (mirrorStarted/mirrorEnded, from the world
+        // events). Starting one here would run it on this peer alone, invisible to the host and every other player.
+        if (isNetClient()) {
+            GD.printErr("MissionManager: a client cannot start a mission ('"
+                    + (info == null ? "" : info.missionId) + "'); the host starts it");
+            return;
+        }
         activeMission = info;
         active = info != null;
         remainingByFaction.clear();
@@ -141,8 +148,29 @@ public class MissionManager extends Node {
                         factionTablePath(info)));
     }
 
+    private boolean isNetClient() {
+        return getNodeOrNull("/root/NetworkManager") instanceof NetworkManager net && net.isNetworked() && !net.isServer();
+    }
+
+    /** Client: the host started a mission (WORLD_EVENT_MISSION_STARTED). Tracking stays the host's; this only lets
+     *  this peer's isActive / getActiveMission answer like the host's (ZoneTrigger's required mission, the HUD). */
+    public void mirrorStarted(String missionId, String objectiveType) {
+        MissionInfo m = new MissionInfo();
+        m.missionId = missionId == null ? "" : missionId;
+        m.objectiveType = objectiveType == null ? "" : objectiveType;
+        activeMission = m;
+        active = true;
+    }
+
+    /** Client: the host's mission completed or failed. */
+    public void mirrorEnded(String missionId) {
+        if (activeMission != null && missionId != null && !missionId.equals(activeMission.missionId)) return;
+        active = false;
+    }
+
     /** Marks the active mission complete and emits EventBus.missionCompleted. */
     public void completeMission(String winningFaction, String outcomeVariant) {
+        if (isNetClient()) return;   // the host decides; its result reaches this peer as a world event
         if (!active || activeMission == null) return;
         String missionId = activeMission.missionId;
         active = false;
@@ -160,6 +188,7 @@ public class MissionManager extends Node {
 
     /** Marks the active mission failed and emits EventBus.missionFailed. */
     public void failMission(String reason) {
+        if (isNetClient()) return;   // the host decides; its result reaches this peer as a world event
         if (!active || activeMission == null) return;
         String missionId = activeMission.missionId;
         active = false;

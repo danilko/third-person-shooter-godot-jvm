@@ -137,12 +137,12 @@ public class ShopCounter extends Area3D {
         return best;
     }
 
-    /** The menu's rows: the till first while it can be robbed, then the stock. */
+    /** The menu's rows: the stock first (the default row is always a purchase), then the donation, then the till
+     *  while it can be robbed -- never first, or Enter on an opened menu robs the shop. */
     public List<String> rows() {
-        List<String> out = new ArrayList<>();
-        if (sells(TILL)) out.add(TILL);
+        List<String> out = new ArrayList<>(items);
         if (sells(DONATION)) out.add(DONATION);
-        out.addAll(items);
+        if (sells(TILL)) out.add(TILL);
         return out;
     }
 

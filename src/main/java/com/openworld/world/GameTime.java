@@ -37,6 +37,19 @@ public final class GameTime {
         return num(d.get("hour"), 12) + num(d.get("minute"), 0) / 60.0 + num(d.get("second"), 0) / 3600.0;
     }
 
+    /**
+     * A client: take the host's time of day when this peer's is more than a game minute off (the two run at the same
+     * rate between syncs). No-op in a scene with no TimeOfDay.
+     */
+    public static void syncTo(SceneTree tree, double hostHours) {
+        Node tod = find(tree);
+        if (tod == null || !Double.isFinite(hostHours)) return;
+        double mine = num(tod.get("current_time"), hostHours);
+        double diff = Math.abs(mine - hostHours) % 24.0;
+        diff = Math.min(diff, 24.0 - diff);
+        if (diff > 1.0 / 60.0) tod.set("current_time", ((hostHours % 24.0) + 24.0) % 24.0);
+    }
+
     /** Game hours per REAL second (1/3600 in real time; 24 / (48 * 60) at Sky3D's 48 minutes a day). */
     public static double hoursPerSecond(SceneTree tree) {
         Node tod = find(tree);

@@ -34,8 +34,11 @@ import java.util.List;
  * Either way, after {@link #cardSeconds} of the card the body is replaced by a fresh Player (full health, only the
  * fist: weapons are lost; wanted level cleared), and the running mission FAILS (user: "it ends the mission").
  *
- * <p>Single player only for now: in a networked session a death keeps the old behaviour (GAME_OVER once every player
- * is down). Built in code by {@link GameManager}; {@link #enabled} off is the control.
+ * <p><b>Networked</b> (2026-10-06): the HOST runs the respawn for every player, its own and each client's: after the
+ * card time it despawns the dead body and spawns a fresh one with the same characterId and owner through the ordinary
+ * {@code MSG_DESPAWN} / {@code MSG_SPAWN}, so the owning client gets its body back the way it got it on joining (with
+ * its own PlayerController and camera). A client only shows the card for its own body and fades in when the new body
+ * arrives. Built in code by {@link GameManager}; {@link #enabled} off is the control.
  */
 @Script(className = "RespawnSystem")
 public class RespawnSystem extends Node {
@@ -54,6 +57,8 @@ public class RespawnSystem extends Node {
 
     public void setEnabled(boolean v) { enabled = v; }
     public double cardSeconds = 4.0;
+    /** A client waits at most this long (after its card) for the host's new body before fading in anyway. */
+    public double clientWaitSeconds = 10.0;
 
     /** Why the player is being respawned. */
     public enum Reason { HOSPITALIZED, ARRESTED }
@@ -65,10 +70,20 @@ public class RespawnSystem extends Node {
     public double relockDistance = 60.0;
     public double cellSearchRadius = 90.0;
 
-    private Player dead;
-    private String deadId = "";
-    private CharacterInfo deadInfo;
+    /** One player waiting to be respawned (on the authority). */
+    private static final class Job {
+        Player dead;
+        String id;
+        CharacterInfo info;
+        Reason reason;
+        double left;
+    }
+
+    private final List<Job> jobs = new ArrayList<>();
+    /** The local player's card: counting down, then (on a client) waiting for the host's new body. */
     private double cardLeft = -1;
+    private double clientWait = -1;
+    private String localDeadId = "";
     private Reason reason = Reason.HOSPITALIZED;
     private Player fresh;
     private Vector3 station;
@@ -98,27 +113,47 @@ public class RespawnSystem extends Node {
         unlocked.clear();
     }
 
+    private com.openworld.net.NetworkManager net() {
+        return getNodeOrNull("/root/NetworkManager") instanceof com.openworld.net.NetworkManager n && n.isNetworked() ? n : null;
+    }
+
+    /** This peer decides respawns (single player, or the host). */
+    private boolean authority() {
+        com.openworld.net.NetworkManager n = net();
+        return n == null || n.isServer();
+    }
+
     /** Will this death be answered by a respawn (so GameManager does not end the game)? */
     public boolean willRespawn(CharacterInfo info) {
         if (!enabled || info == null) return false;
-        if (getNodeOrNull("/root/NetworkManager") instanceof com.openworld.net.NetworkManager net && net.isNetworked())
-            return false;
         Player p = playerOf(info.characterId);
-        return p != null && p.isLocallyOwnedPlayer();
+        if (p == null) return false;
+        // networked: every player respawns (the host runs it); single player: the local player
+        return net() != null || p.isLocallyOwnedPlayer();
     }
 
     @Register
     public void onCharacterDied(CharacterInfo info) {
-        if (!willRespawn(info) || cardLeft >= 0) return;
-        start(playerOf(info.characterId), info, Reason.HOSPITALIZED);
+        if (!willRespawn(info)) return;
+        Player p = playerOf(info.characterId);
+        if (authority()) {
+            if (jobFor(info.characterId) == null) start(p, info, Reason.HOSPITALIZED);
+        } else if (p.isLocallyOwnedPlayer() && cardLeft < 0 && clientWait < 0) {
+            // a client: the card for its own body; the host sends the new one
+            reason = Reason.HOSPITALIZED;
+            localDeadId = info.characterId;
+            cardLeft = cardSeconds;
+            showCard(true);
+        }
     }
 
     /**
      * Arrest a player (the police dispatch's arrest moment, PLAN.md W5): the same respawn, in a police cell. Returns
-     * false when nothing happened (respawn off, networked, not the local player, already respawning).
+     * false when nothing happened (respawn off, not the authority, already respawning, lethal-wanted).
      */
     public boolean arrest(Player p) {
-        if (p == null || p.getCharacterInfo() == null || !willRespawn(p.getCharacterInfo()) || cardLeft >= 0) return false;
+        if (p == null || p.getCharacterInfo() == null || !willRespawn(p.getCharacterInfo()) || !authority()) return false;
+        if (jobFor(p.getCharacterInfo().characterId) != null) return false;
         // a lethal-wanted player is not arrested: police shoot (user, 2026-10-03 -- it usually ends in hospital)
         WantedSystem ws = WantedSystem.get();
         if (ws != null && ws.isLethal(p.getCharacterInfo().characterId)) return false;
@@ -127,14 +162,26 @@ public class RespawnSystem extends Node {
         return true;
     }
 
+    private Job jobFor(String id) {
+        for (Job j : jobs) if (j.id.equals(id)) return j;
+        return null;
+    }
+
     private void start(Player p, CharacterInfo info, Reason why) {
-        dead = p;
-        deadId = info.characterId;
-        deadInfo = info;
-        reason = why;
-        cardLeft = cardSeconds;
-        showCard(true);
-        // a hospitalisation or an arrest ends the running mission (user, 2026-10-03)
+        Job j = new Job();
+        j.dead = p;
+        j.id = info.characterId;
+        j.info = info;
+        j.reason = why;
+        j.left = cardSeconds;
+        jobs.add(j);
+        if (p != null && p.isLocallyOwnedPlayer()) {
+            reason = why;
+            localDeadId = j.id;
+            cardLeft = cardSeconds;
+            showCard(true);
+        }
+        // a hospitalisation or an arrest ends the running mission (user, 2026-10-03); the host decides
         if (getNodeOrNull("/root/MissionManager") instanceof com.openworld.game.mission.MissionManager mm
                 && mm.missionActiveNow()) mm.failMission(why == Reason.ARRESTED ? "player_arrested" : "player_hospitalized");
     }
@@ -150,10 +197,28 @@ public class RespawnSystem extends Node {
     @Register
     @Override
     public void _process(double delta) {
+        for (Job j : new ArrayList<>(jobs)) {
+            j.left -= delta;
+            if (j.left < 0) {
+                jobs.remove(j);
+                respawn(j);
+            }
+        }
         if (cardLeft >= 0) {
             cardLeft -= delta;
             if (black != null) black.setColor(new Color(0f, 0f, 0f, (float) Math.min(1.0, Math.max(0.0, 1.0 - cardLeft))));
-            if (cardLeft < 0) respawn();
+            if (cardLeft < 0 && !authority()) clientWait = clientWaitSeconds;
+        }
+        if (clientWait >= 0) {
+            // a client: hold the black until the host's new body for us has arrived
+            clientWait -= delta;
+            Player back = playerOf(localDeadId);
+            if ((back != null && back.isAlive() && back.isLocallyOwnedPlayer()) || clientWait < 0) {
+                clientWait = -1;
+                fresh = back;
+                respawns++;
+                fadeIn = 1.0;
+            }
         }
         if (fadeIn >= 0) {
             fadeIn -= delta;
@@ -172,21 +237,22 @@ public class RespawnSystem extends Node {
         }
     }
 
-    private void respawn() {
-        Vector3 deathAt = dead != null && GD.isInstanceValid(dead) ? dead.getGlobalPosition() : new Vector3();
+    private void respawn(Job j) {
+        Player dead = j.dead != null && GD.isInstanceValid(j.dead) ? j.dead : null;
+        Vector3 deathAt = dead != null ? dead.getGlobalPosition() : new Vector3();
         // ARRESTED: the nearest police station (a koban has no cell); HOSPITALIZED: the nearest hospital or clinic.
         // Either, else the scene's PlayerSpawn, else where it happened.
         Vector3 to = null;
-        station = null;
+        Vector3 at = null;
         double best = Double.MAX_VALUE;
         for (Places.Place p : Places.all()) {
-            boolean fits = reason == Reason.ARRESTED ? "PoliceStation".equals(p.kind()) : HOSPITAL_KINDS.contains(p.kind());
+            boolean fits = j.reason == Reason.ARRESTED ? "PoliceStation".equals(p.kind()) : HOSPITAL_KINDS.contains(p.kind());
             if (!fits) continue;
             double d = p.at().distanceTo(deathAt);
             if (d < best) {
                 best = d;
                 to = p.go();
-                if (reason == Reason.ARRESTED) station = p.at();
+                if (j.reason == Reason.ARRESTED) at = p.at();
             }
         }
         Node scene = getTree() != null ? getTree().getCurrentScene() : null;
@@ -196,44 +262,67 @@ public class RespawnSystem extends Node {
 
         GameManager gm = getParent() instanceof GameManager g ? g : null;
         Node container = gm != null ? gm.resolveCharactersContainer() : null;
-        if (container == null && dead != null && GD.isInstanceValid(dead)) container = dead.getParent();
+        if (container == null && dead != null) container = dead.getParent();
         if (!(GD.load(PLAYER_SCENE) instanceof PackedScene ps) || container == null) {
             GD.print("RespawnSystem: cannot respawn (no Player scene or Characters container)");
             return;
         }
-        if (dead != null && GD.isInstanceValid(dead)) {
+        com.openworld.net.NetworkManager net = net();
+        boolean local = dead == null ? j.info.ownerPeerId == 0 || (net != null && net.isAuthorityFor(j.info))
+                : dead.isLocallyOwnedPlayer();
+        // a remote prisoner cannot be moved by the host later (the client owns its position): put it in the cell
+        // now if the station has streamed in here
+        if (!local && at != null) {
+            Node3D cell = cellNear(at);
+            if (cell != null) to = cell.getGlobalPosition();
+        }
+        // tell every peer the old body is gone BEFORE the new one with the same id is announced
+        if (net != null) net.announceDespawn(j.id);
+        if (dead != null) {
             if (dead.getParent() != null) dead.getParent().removeChild(dead);
             dead.queueFree();
         }
-        dead = null;
         if (!(ps.instantiate() instanceof Player p)) return;
         CharacterInfo info = new CharacterInfo();
-        info.characterId = deadId;
-        info.displayName = deadInfo != null ? deadInfo.displayName : "Player";
+        info.characterId = j.id;
+        info.displayName = j.info != null ? j.info.displayName : "Player";
         info.faction = Faction.PLAYER;
+        info.ownerPeerId = j.info != null ? j.info.ownerPeerId : 0;
         p.characterInfo = info;
-        Vector3 local = to.plus(new Vector3(0, 0.3, 0));
-        if (container instanceof Node3D c3) local = c3.getGlobalTransform().affineInverse().times(local);
-        p.setPosition(local);
+        Vector3 pos = to.plus(new Vector3(0, 0.3, 0));
+        Vector3 localPos = pos;
+        if (container instanceof Node3D c3) localPos = c3.getGlobalTransform().affineInverse().times(pos);
+        p.setPosition(localPos);
         container.addChild(p);
-        fresh = p;
-        respawns++;
+        // a body spawned for a remote peer is that peer's puppet here (GameManager.spawnPlayerBody's rule)
+        if (net != null && !net.isAuthorityFor(info)) p.attachController(new com.openworld.net.NetworkController());
+        if (net != null) net.announceSpawn(p);
         WantedSystem w = WantedSystem.get();
-        if (w != null) w.clear(deadId);
-        cellWaitLeft = station != null ? cellWaitSeconds : -1;
-        fadeIn = 1.0;
-        GD.print("RespawnSystem: " + reason + " -> respawned " + deadId + " at " + to);
+        if (w != null) w.clear(j.id);
+        if (local) {
+            fresh = p;
+            respawns++;
+            station = at;
+            cellWaitLeft = station != null ? cellWaitSeconds : -1;
+            fadeIn = 1.0;
+        }
+        GD.print("RespawnSystem: " + j.reason + " -> respawned " + j.id + (local ? "" : " (remote)") + " at " + to);
     }
 
-    /** Move the fresh body into a cell once the station has streamed in. True when done. */
-    private boolean intoCell() {
+    private Node3D cellNear(Vector3 where) {
         Node3D cell = null;
         double best = cellSearchRadius;
         for (Node n : getTree().getNodesInGroup(new StringName("mission_marker"))) {
             if (!(n instanceof Node3D m) || !"prisoner".equals(String.valueOf(m.getMeta(new StringName("team"), "")))) continue;
-            double d = m.getGlobalPosition().distanceTo(station);
+            double d = m.getGlobalPosition().distanceTo(where);
             if (d < best) { best = d; cell = m; }
         }
+        return cell;
+    }
+
+    /** Move the fresh body into a cell once the station has streamed in. True when done. */
+    private boolean intoCell() {
+        Node3D cell = cellNear(station);
         if (cell == null) return false;
         fresh.setGlobalPosition(cell.getGlobalPosition().plus(new Vector3(0, 0.1, 0)));
         fresh.setVelocity(new Vector3());
@@ -284,8 +373,8 @@ public class RespawnSystem extends Node {
             cardEn.addThemeColorOverride(new StringName("font_color"), c);
         }
         if (overlay != null) overlay.setVisible(on);
-        if (card != null) card.setVisible(on && cardLeft >= 0);
-        if (cardEn != null) cardEn.setVisible(on && cardLeft >= 0);
+        if (card != null) card.setVisible(on && (cardLeft >= 0 || clientWait >= 0));
+        if (cardEn != null) cardEn.setVisible(on && (cardLeft >= 0 || clientWait >= 0));
     }
 
     static final String JP_FONT = "res://src/main/resources/com/openworld/ui/fonts/NotoSansJP-Signs.otf";

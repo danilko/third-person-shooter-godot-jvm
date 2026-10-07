@@ -390,6 +390,7 @@ public class GameManager extends Node {
                 net.sendBaselineFactionRelationships(peerId);
                 net.sendBaselineBreakables(peerId);   // already-broken destructibles (I2)
                 net.sendBaselineRace(peerId);   // a race already in progress (R2)
+                net.sendTimeOfDay(peerId);
             }
             return;
         }
@@ -408,6 +409,7 @@ public class GameManager extends Node {
             net.sendBaselineFactionRelationships(peerId);   // runtime relationship flips (D3)
             net.sendBaselineBreakables(peerId);   // already-broken destructibles (I2)
             net.sendBaselineRace(peerId);   // a race already in progress (R2)
+            net.sendTimeOfDay(peerId);
         }
         spawnPlayerBody(peerId, persistentPlayerId);
     }
@@ -1024,6 +1026,10 @@ public class GameManager extends Node {
                         && seat.getOccupant() == ch) {
                     seat.tryExit();
                 }
+                // Out of the tree NOW, not at the end of the frame: a respawned player is announced with the SAME
+                // characterId right after its despawn (RespawnSystem), and a body still in "characters" made
+                // spawnReplicatedCharacter skip the new one as a duplicate.
+                if (node.getParent() != null) node.getParent().removeChild(node);
                 node.queueFree();
                 if (despawnedVehicleDriver != null && GD.isInstanceValid(despawnedVehicleDriver))
                     despawnedVehicleDriver.queueFree();   // its own MSG_DESPAWN is idempotent if it also lands
@@ -1167,6 +1173,9 @@ public class GameManager extends Node {
      *  clock]. Every peer derives where it comes back from that time, so nothing else is sent. */
     public static final int WORLD_EVENT_TRAIN_DESTROYED = 13;
 
+    /** The host's time of day (value = hours 0-24), at join and every 15 s (NetworkManager.sweepTimeOfDay). */
+    public static final int WORLD_EVENT_TIME_OF_DAY = 14;
+
     /** Routes a decoded MSG_WORLD_EVENT to the owning system. Extend the switch as networked world state is added. */
     public void onWorldEvent(int eventType, String key, float value, java.util.List<String> args) {
         switch (eventType) {
@@ -1185,6 +1194,7 @@ public class GameManager extends Node {
                 com.openworld.world.TrainSystem ts = com.openworld.world.TrainSystem.get();
                 if (ts != null) ts.applyRemoteDestroyed(key, arg(args, 0));
             }
+            case WORLD_EVENT_TIME_OF_DAY -> com.openworld.world.GameTime.syncTo(getTree(), value);
             // case WORLD_EVENT_DOOR -> applyDoorState(key, value);
             default -> GD.print("GameManager: unhandled world event type " + eventType + " key=" + key);
         }
@@ -1208,6 +1218,8 @@ public class GameManager extends Node {
             factions.applyMissionTable(!tablePath.isEmpty()
                     && GD.load(tablePath) instanceof com.openworld.character.FactionTable t ? t : null);
         }
+        MissionManager mm = getMissionManager();
+        if (mm != null) mm.mirrorStarted(missionId, arg(args, 0));
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) bus.missionStarted.emit(missionId, arg(args, 0));
     }
@@ -1215,6 +1227,8 @@ public class GameManager extends Node {
     private void applyMissionCompleted(String missionId, java.util.List<String> args) {
         com.openworld.character.FactionManager factions = getFactionManager();
         if (factions != null) factions.applyMissionTable(null);
+        MissionManager mm = getMissionManager();
+        if (mm != null) mm.mirrorEnded(missionId);
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) bus.missionCompleted.emit(missionId, arg(args, 0), arg(args, 1));
     }
@@ -1222,6 +1236,8 @@ public class GameManager extends Node {
     private void applyMissionFailed(String missionId, java.util.List<String> args) {
         com.openworld.character.FactionManager factions = getFactionManager();
         if (factions != null) factions.applyMissionTable(null);
+        MissionManager mm = getMissionManager();
+        if (mm != null) mm.mirrorEnded(missionId);
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) bus.missionFailed.emit(missionId, arg(args, 0));
     }

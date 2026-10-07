@@ -118,6 +118,8 @@ public class NetworkManager extends Node {
     private static final int MSG_DETONATE_REQUEST       = 30; // client→host: the owner pressed its remote-charge detonator
     private static final int MSG_SHOP_REQUEST           = 31; // W3  — client→host: the owner bought an item at a shop counter
     private static final int MSG_SUPPLY_USE             = 32; // W3  — client→host: the owner used a healing supply
+    private static final int MSG_BEAT_REQUEST           = 34; // F3  — client→host: the owner's body tripped a ZoneTrigger here; the host fires its beat
+    private static final int MSG_SHOP_GRANT             = 33; // W3  — host→owner: a shop sale the host accepted; the owner grants it to its own body
 
     /** WeaponController's slotTypes table has 7 entries (FIST/PRIMARY×2/SECONDARY/MELEE/THROWABLE/CONSUMABLE) — bounds isValidSnapshot's activeSlotIndex check. */
     private static final int WEAPON_SLOT_COUNT = 7;
@@ -170,7 +172,7 @@ public class NetworkManager extends Node {
                     MSG_WORLD_EVENT, MSG_OWNERSHIP, MSG_PICKUP_REQUEST, MSG_PICKUP_TAKEN,
                     MSG_WEAPON_DROPPED, MSG_ELIMINATION, MSG_INVENTORY,
                     MSG_VEHICLE_SEAT_REQUEST, MSG_VEHICLE_OCCUPANCY, MSG_WEAPON_SWITCH,
-                    MSG_VEHICLE_SPAWN, MSG_WAYPOINT, MSG_DETONATION ->
+                    MSG_VEHICLE_SPAWN, MSG_WAYPOINT, MSG_DETONATION, MSG_SHOP_GRANT, MSG_BEAT_REQUEST ->
                     new ChannelSpec(0, ENetPacketPeer.FLAG_RELIABLE);
             case MSG_SNAPSHOT, MSG_SNAPSHOT_BATCH, MSG_VEHICLE_SNAPSHOT, MSG_VEHICLE_SNAPSHOT_BATCH ->
                     new ChannelSpec(2, 0L);
@@ -524,6 +526,30 @@ public class NetworkManager extends Node {
         broadcastVehicleSnapshots();
         sweepInventoryBroadcast(now);
         sweepVehicleOccupancyBroadcast(now);
+        sweepTimeOfDay(now);
+    }
+
+    // The time of day (world.GameTime, Sky3D's TimeOfDay) runs on every peer from the moment ITS scene loaded, so a
+    // client that joined later showed a different clock (user, 2026-10-06). The host sends its time at join and
+    // every TIME_SYNC_INTERVAL_MS; a client snaps only when it is more than a game minute off. Its own counter, not
+    // world_event_sent: it is a clock, not a world change.
+    private static final int TIME_SYNC_INTERVAL_MS = 15000;
+    private int lastTimeSyncMs = -TIME_SYNC_INTERVAL_MS;
+
+    private void sweepTimeOfDay(int now) {
+        if (now - lastTimeSyncMs < TIME_SYNC_INTERVAL_MS) return;
+        lastTimeSyncMs = now;
+        com.openworld.net.NetStats.increment("time_sync_sent");
+        broadcastMessage(NetMessageCodec.encodeWorldEvent(MSG_WORLD_EVENT, GameManager.WORLD_EVENT_TIME_OF_DAY, "tod",
+                (float) com.openworld.world.GameTime.hours(getTree()), java.util.List.of()), null);
+    }
+
+    /** Host → one joining peer: the time of day now. */
+    public void sendTimeOfDay(int targetPeerId) {
+        if (!isServer() || !isNetworked()) return;
+        com.openworld.net.NetStats.increment("time_sync_sent");
+        sendMessage(targetPeerId, NetMessageCodec.encodeWorldEvent(MSG_WORLD_EVENT, GameManager.WORLD_EVENT_TIME_OF_DAY,
+                "tod", (float) com.openworld.world.GameTime.hours(getTree()), java.util.List.of()));
     }
 
     // N2-style state-sync backstop for vehicle seats: a missed/raced MSG_VEHICLE_OCCUPANCY
@@ -842,6 +868,8 @@ public class NetworkManager extends Node {
                 case MSG_DETONATION -> handleDetonationMessage(senderPeerId, buf);
                 case MSG_DETONATE_REQUEST -> handleDetonateRequestMessage(senderPeerId, buf);
                 case MSG_SHOP_REQUEST -> handleShopRequestMessage(senderPeerId, buf);
+                case MSG_SHOP_GRANT -> handleShopGrantMessage(senderPeerId, buf);
+                case MSG_BEAT_REQUEST -> handleBeatRequestMessage(senderPeerId, buf);
                 case MSG_SUPPLY_USE -> handleSupplyUseMessage(senderPeerId, buf);
                 case MSG_WORLD_EVENT -> handleWorldEventMessage(senderPeerId, buf);
                 case MSG_OWNERSHIP -> handleOwnershipMessage(senderPeerId, buf);
@@ -1296,8 +1324,10 @@ public class NetworkManager extends Node {
         GD.print("NetworkManager: accepted MSG_DAMAGE_REQUEST from peer " + senderPeerId + " (" + kind
                 + ", victim " + req.victimCharacterId() + ", " + req.finalDamage() + " by '" + req.weaponName() + "')");
         Vector3 source = kind == DamageRequestPolicy.Kind.AREA && attacker instanceof godot.api.Node3D a ? a.getGlobalPosition() : null;
+        float before = health.getCurrentHealth();
         health.applyNetworkDamage(req.finalDamage(), req.headshot(), req.weaponName(),
                 req.attackerName(), req.attackerFaction(), source);
+        GD.print("NetworkManager:   health " + before + " -> " + health.getCurrentHealth());
     }
 
     /** Per sender: the AREA damage-request budget (N2). Cleared on disconnect. */
@@ -1835,11 +1865,68 @@ public class NetworkManager extends Node {
             if (n instanceof com.openworld.item.ShopCounter sc && sc.sells(r.itemId())
                     && sc.holds(c.getGlobalPosition(), 1.5)) {
                 com.openworld.net.NetStats.increment("shop_request_accepted");
+                GD.print("NetworkManager: shop sale '" + r.itemId() + "' to " + r.buyerCharacterId());
                 sc.grantTo(c, r.itemId());
+                // The owner's own body never takes an item from a manifest (WeaponInventorySync: an owned slot
+                // is not resurrected, and its ammo is not overwritten), so the sale is told to it directly. On
+                // channel 0 with the manifests, so a manifest built after the grant cannot overtake it.
+                if (!com.openworld.item.ShopCounter.TILL.equals(r.itemId())
+                        && !com.openworld.item.ShopCounter.DONATION.equals(r.itemId()))
+                    sendMessage(senderPeerId, NetMessageCodec.encodeShopRequest(MSG_SHOP_GRANT,
+                            r.buyerCharacterId(), r.itemId()));
                 return;
             }
         }
         com.openworld.net.NetStats.increment("shop_request_rejected_not_at_counter");
+    }
+
+    /** Client → host: our own body tripped a ZoneTrigger. Story beats run on the host (a mission starts there). */
+    public void sendBeatRequest(String characterId, String beatId) {
+        if (!isNetworked() || isServer() || characterId == null || characterId.isEmpty()) return;
+        com.openworld.net.NetStats.increment("beat_request_sent");
+        sendMessage(SERVER_PEER_ID, NetMessageCodec.encodeShopRequest(MSG_BEAT_REQUEST, characterId, beatId));
+    }
+
+    /**
+     * Host: a client's player tripped a ZoneTrigger on the client. The host's copy of the body is a puppet and may
+     * not have crossed the volume on this peer (or not yet), so the host fires it here -- through the trigger's own
+     * rules (who may trip it, one-shot, mission, required beat), for a body the sender owns, near the volume.
+     */
+    private void handleBeatRequestMessage(int senderPeerId, StreamPeerBuffer buf) {
+        NetMessageCodec.DecodedShopRequest r = NetMessageCodec.decodeShopRequest(buf);
+        if (!isValidIdentifier(r.buyerCharacterId()) || !isValidIdentifier(r.itemId())) {
+            dropInvalid("beat", "MSG_BEAT_REQUEST", senderPeerId);
+            return;
+        }
+        if (!isServer()) return;
+        Character c = findCharacterById(r.buyerCharacterId());
+        if (c == null || c.characterInfo == null || c.characterInfo.ownerPeerId != senderPeerId) {
+            com.openworld.net.NetStats.increment("beat_request_rejected_not_owner");
+            return;
+        }
+        for (Node n : getTree().getNodesInGroup(new StringName(com.openworld.world.ZoneTrigger.TRIGGER_GROUP))) {
+            if (n instanceof com.openworld.world.ZoneTrigger t && r.itemId().equals(t.beatId)
+                    && t.getGlobalPosition().distanceTo(c.getGlobalPosition()) < 60.0) {
+                boolean fired = t.fireForRemote(c);
+                com.openworld.net.NetStats.increment(fired ? "beat_request_fired" : "beat_request_refused");
+                return;
+            }
+        }
+        com.openworld.net.NetStats.increment("beat_request_no_trigger");
+    }
+
+    /** Owner: the host accepted this body's purchase -- grant it locally (the host's copy already has it). */
+    private void handleShopGrantMessage(int senderPeerId, StreamPeerBuffer buf) {
+        NetMessageCodec.DecodedShopRequest r = NetMessageCodec.decodeShopRequest(buf);
+        if (!isValidIdentifier(r.buyerCharacterId()) || !isValidIdentifier(r.itemId())) {
+            dropInvalid("shop_grant", "MSG_SHOP_GRANT", senderPeerId);
+            return;
+        }
+        if (isServer() || senderPeerId != SERVER_PEER_ID) return;
+        Character c = findCharacterById(r.buyerCharacterId());
+        if (c == null || c.characterInfo == null || !isAuthorityFor(c.characterInfo)) return;
+        com.openworld.net.NetStats.increment("shop_grant_applied");
+        com.openworld.item.WeaponGrant.grant(c, r.itemId(), this);
     }
 
     /**
@@ -1896,7 +1983,8 @@ public class NetworkManager extends Node {
             return;
         }
         if (isServer()) return;   // host owns world state; never accepts an inbound world event
-        com.openworld.net.NetStats.increment("world_event_received");
+        com.openworld.net.NetStats.increment(event.eventType() == GameManager.WORLD_EVENT_TIME_OF_DAY
+                ? "time_sync_received" : "world_event_received");
         GameManager manager = gameManager();
         if (manager != null) manager.onWorldEvent(event.eventType(), event.key(), event.value(), event.args());
     }

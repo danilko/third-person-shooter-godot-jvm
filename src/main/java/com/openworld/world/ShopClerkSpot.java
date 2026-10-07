@@ -74,6 +74,11 @@ public class ShopClerkSpot extends Node3D {
     static final double SPAWN_NEAR = 60.0, DESPAWN_FAR = 100.0;
     private boolean spent;
     private double nearScan;
+    /** A clerk has stood here (so "no clerk" means it went down, not that it never spawned). */
+    private boolean spawnedOnce;
+    /** Consecutive scans a player has aimed a drawn weapon at the clerk (a glance is not a threat). */
+    private int aimedScans;
+    static final int THREAT_SCANS = 3;
 
     @Register
     @Override
@@ -114,6 +119,7 @@ public class ShopClerkSpot extends Node3D {
         still.facePoint = getGlobalPosition().plus(getGlobalBasis().getZ().times(-3.0)).plus(new Vector3(0, 1.4, 0));
         ai.attachController(still);
         clerk = ai;
+        spawnedOnce = true;
         if (getNodeOrNull("/root/NetworkManager") instanceof com.openworld.net.NetworkManager net) net.announceSpawn(ai);
     }
 
@@ -145,8 +151,10 @@ public class ShopClerkSpot extends Node3D {
     private Player threatener() {
         boolean hurt = clerk.getNodeOrNull("Health") instanceof com.openworld.character.Health h && h.hurtWithin(1.0);
         Vector3 chest = clerk.getGlobalPosition().plus(new Vector3(0, 1.2, 0));
+        Player aimer = null;
         for (Player p : PlayerRegistry.getPlayers()) {
-            if (!GD.isInstanceValid(p) || !p.isAlive() || !p.isCombat()) continue;
+            if (!GD.isInstanceValid(p) || !p.isAlive() || !p.isCombat() || p.inputBlocked) continue;
+            if (!drawsWeapon(p)) continue;
             if (p.getGlobalPosition().distanceTo(chest) > THREAT_RANGE) continue;
             Vector3 aim = p.getAimTargetPosition();
             if (aim == null) continue;
@@ -158,8 +166,12 @@ public class ShopClerkSpot extends Node3D {
             Vector3 dir = d.div(len);
             double t = chest.minus(eye).dot(dir);
             if (t < 0) continue;
-            if (eye.plus(dir.times(t)).distanceTo(chest) <= AIM_RADIUS) return p;
+            if (eye.plus(dir.times(t)).distanceTo(chest) <= AIM_RADIUS) { aimer = p; break; }
         }
+        // a threat is HOLDING a weapon on the clerk, not a glance: a player who walks up to the counter faces the
+        // clerk, and a purchase that hands over a weapon draws it with the aim line already on the clerk
+        aimedScans = aimer != null ? aimedScans + 1 : 0;
+        if (aimer != null && aimedScans >= THREAT_SCANS) return aimer;
         if (!hurt) return null;
         Player near = null;
         double best = THREAT_RANGE;
@@ -169,6 +181,14 @@ public class ShopClerkSpot extends Node3D {
             if (d < best) { best = d; near = p; }
         }
         return near;
+    }
+
+    /** A real weapon in the hands: not fists, not a holster, not a healing supply. */
+    private static boolean drawsWeapon(Player p) {
+        var wc = p.weaponController;
+        if (wc == null || wc.isHolstered()) return false;
+        var w = wc.getCurrentWeaponItem();
+        return w != null && !(w instanceof com.openworld.weapon.FistItem) && !(w instanceof com.openworld.weapon.SupplyItem);
     }
 
     /** The one roll: by the clerk's id, so it is the same answer every time it is asked. */
@@ -244,7 +264,22 @@ public class ShopClerkSpot extends Node3D {
 
     /** The till can be robbed once the clerk has surrendered or is down. */
     public boolean robbable() {
-        return !tillTaken && (state == 1 || clerk == null || !GD.isInstanceValid(clerk) || clerk.isDead());
+        if (tillTaken) return false;
+        if (!authority()) return clientSeesClerkDown();
+        // "no clerk" only counts once one has stood here: before the clerk spawns (or on a peer that never spawns
+        // one) the till is not on offer, or an ordinary purchase lands on the robbery row
+        return state == 1 || (spawnedOnce && (clerk == null || !GD.isInstanceValid(clerk) || clerk.isDead()));
+    }
+
+    /** A client's view: the host's clerk is a replicated puppet; the till is offered once that body is down. The host
+     *  re-checks the robbery against its own state. (A surrendered clerk is not visible to a client's menu yet.) */
+    private boolean clientSeesClerkDown() {
+        if (getTree() == null) return false;
+        for (Node n : getTree().getNodesInGroup(new godot.core.StringName("characters"))) {
+            if (n instanceof AICharacter a && a.characterInfo != null && "Clerk".equals(a.characterInfo.displayName)
+                    && a.getGlobalPosition().distanceTo(getGlobalPosition()) < 4.0) return a.isDead();
+        }
+        return false;
     }
 
     /** Take the till (a ShopCounter's robbery row): the cash, and the crime -- lethal, so police come shooting. */

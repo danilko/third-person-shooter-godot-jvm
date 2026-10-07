@@ -197,7 +197,9 @@ public class WeaponSlotsUI extends PanelContainer {
     // ── Refresh helpers ───────────────────────────────────────────────────────
 
     private void refreshAllSlots() {
-        if (weaponController == null) return;
+        // the client frees its pre-placed Player on connect (and a respawn frees the dead body): the controller can
+        // be on its way out the frame this runs
+        if (weaponController == null || !GD.isInstanceValid(weaponController) || weaponController.isQueuedForDeletion()) return;
         // holstered: no slot is in hand (the fist row is not lit -- the hands are empty)
         int active = weaponController.isHolstered() ? -1 : weaponController.getWeapon();
         activeSlot = active;
@@ -212,7 +214,7 @@ public class WeaponSlotsUI extends PanelContainer {
     }
 
     private void updateHighlights() {
-        if (weaponController == null) return;
+        if (weaponController == null || !GD.isInstanceValid(weaponController) || weaponController.isQueuedForDeletion()) return;
         for (int i = 0; i < slotItems.size(); i++) {
             WeaponItem weapon = weaponController.getWeaponItem(i);
             slotItems.get(i).update(weapon, i == activeSlot, keyTexts[i]);

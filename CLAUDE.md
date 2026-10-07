@@ -10932,9 +10932,9 @@ PLAN.md "NEXT (2026-09-29 night)", one `island_world.sh --from land` rebuild.
   the dike road is only ~55 m, which is why the junction sits on the coast line and the loop on new land.
   `terminal_loop` in `island_expressway.py`.
 
-## Wanted level, jail respawn, shop counters and healing supplies (PLAN.md W3 / W5, 2026-10-03; NOT YET PROBED)
+## Wanted level, jail respawn, shop counters and healing supplies (PLAN.md W3 / W5, 2026-10-03)
 
-Written while an island rebuild ran, so compiled and unit-tested only; the gates are written and must be run.
+Gated since (probe_wanted_respawn, probe_shop_clerk, probe_weapon_counter PASS); co-op half below.
 - **Death and arrest are not game over in single player** (`game.RespawnSystem`, a child GameManager builds in code).
   The two outcomes are named in Japanese + English and deliberately NOT after another game's cards (user: Japan flavour,
   and to avoid an infringement claim): a death is **入院 HOSPITALIZED** (wake at the nearest Hospital / HospitalSmall /
@@ -10942,7 +10942,7 @@ Written while an island rebuild ran, so compiled and unit-tested only; the gates
   PoliceStation, moved onto a `mission_marker` `team = prisoner` -- the 留置場 cells -- once it streams in; the
   station's locked `Door`s unlock until the player is 60 m away). Either: a 4 s card (the sign font, `make_jp_font.py`
   `UI_WORDS`), the running mission FAILS, a fresh Player (fist only, wanted cleared). `GameManager.onCharacterDied` skips GAME_OVER when
-  `RespawnSystem.willRespawn`. A networked session keeps GAME_OVER (co-op respawn is open). `enabled` off is the
+  `RespawnSystem.willRespawn`. In co-op the HOST runs it per player (see "Co-op correctness batch"). `enabled` off is the
   control. Gate: `tools/godot/probe_wanted_respawn.gd [-- --world=island] [-- --control]`.
 - **The wanted level is DATA** (`game/crimes.json`: crime id -> heat, min stars, witness; `stars_at` thresholds, a
   calm period then a drain), rules in engine-free `game.WantedRules` (`WantedRulesTest`), state in `game.WantedSystem`
@@ -10985,6 +10985,27 @@ Written while an island rebuild ran, so compiled and unit-tested only; the gates
   Gate `tools/godot/probe_underground.gd` (3 cases, `--control`).
 - **`./gradlew test` replaces `jvm/main.jar`** (shadowJar + copyDesktopJars). While Godot bakes are running, test with
   `./gradlew test -x shadowJar -x copyDesktopJars -x packageBootstrapJar`.
+
+## Co-op correctness batch: purchases, respawn, missions, clock, passenger view (2026-10-06)
+
+User-reported gameplay bugs, all two-process. Gate: `tools/net/run_net_debugworld.sh` phase **coop** (a client buys at
+a real counter, dies, is respawned; both print the clock) -- 25/25 with walk + tour.
+- **A client's purchase reaches its own body**: an owned body never takes items from the inventory manifest, so the
+  host sends `MSG_SHOP_GRANT` (33) to the buyer after an accepted `MSG_SHOP_REQUEST`, and the owner runs `WeaponGrant`.
+- **Buying no longer robs the store**: `ShopClerkSpot.robbable()` is true only after a clerk STOOD there and
+  surrendered or died (a client asks its replicated clerk), and the till row is listed LAST. An aim threat needs a
+  drawn weapon (not fists / a supply / holstered), the player not in a menu, held 0.6 s.
+- **Co-op respawn**: `RespawnSystem` keeps a job per player on the HOST (despawn, respawn with the same id and owner; an
+  arrested remote player goes straight into a streamed cell). A client shows the card and fades in when its body
+  arrives. `GameManager.despawnReplicatedCharacter` removes the body from the tree at once, or the same-id respawn is
+  skipped as a duplicate.
+- **Missions are the host's**: a client's `MissionManager` mirrors (`mirrorStarted/mirrorEnded`) and refuses to start,
+  complete or fail one; a `ZoneTrigger` tripped by a client's player is forwarded (`MSG_BEAT_REQUEST` 34) and fired on
+  the host by the trigger's own rules. Open: a late joiner is not told about a running mission.
+- **The clock**: the host sends its time of day at join and every 15 s (`WORLD_EVENT_TIME_OF_DAY` 14, counted as
+  `time_sync_*`, so the pole test's world-event count is unchanged); measured 0.03 game min apart.
+- **Passenger view**: a local passenger looks through the carrier's chase camera (third person, free aim while holding
+  aim/fire) and aims where it looks (`Vehicle.carrierAimFor`).
 
 ## 踏切 rules for traffic, a breakable 踏切 unit, the far traffic tier, the Deck perf proxy (2026-10-05)
 

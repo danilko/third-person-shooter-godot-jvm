@@ -25,11 +25,16 @@ run_pair "$OUT/walk" --hold-action=left --hold-action=forward
 # Phase B: the client tours every zone (DebugHarness auto-walk) so the host streams BOTH zones' AI and
 # its snapshots split into more MTU frames — the load that made the client's limiter drop ~20 packets/s.
 run_pair "$OUT/tour" --idle --auto-walk
+# Phase C (2026-10-06): the client buys at a real shop counter, then dies; the host must respawn it; both print the clock.
+SECS_SAVE=$SECS; SECS=40
+run_pair "$OUT/coop" --coop-test --coop-test
+SECS=$SECS_SAVE
 echo "logs in $OUT"
-python3 - "$OUT/walk/host.log" "$OUT/walk/client.log" "$OUT/tour/host.log" "$OUT/tour/client.log" <<'PY'
+python3 - "$OUT/walk/host.log" "$OUT/walk/client.log" "$OUT/tour/host.log" "$OUT/tour/client.log" \
+    "$OUT/coop/host.log" "$OUT/coop/client.log" <<'PY'
 import re, sys
-host, client, thost, tclient = (open(p, errors="replace").read() for p in sys.argv[1:5])
-SPAWN = (-251.4, 16.0, -2.0)   # DebugWorld.tscn PlayerSpawn
+host, client, thost, tclient, chost, cclient = (open(p, errors="replace").read() for p in sys.argv[1:7])
+SPAWN = (-330.0, 6.1, 10.0)   # DebugWorld.tscn PlayerSpawn (re-derived 2026-09-28)
 # CLAUDE.md "Known noise": instancing Vehicle.tscn from code logs this cast (the embedded CharacterInfo binds late).
 KNOWN_NOISE = r"java\.lang\.ClassCastException: class godot\.api\.Resource cannot be cast to class com\.openworld\.character\.CharacterInfo"
 fails = 0
@@ -55,7 +60,7 @@ if cli:
     cid = cli[0]
     first = cc[cid][0]
     d = ((first[2] - SPAWN[0]) ** 2 + (first[4] - SPAWN[2]) ** 2) ** 0.5
-    check("  ... spawned at PlayerSpawn, on the ground", d < 25.0 and abs(first[3] - 14.6) < 3.0,
+    check("  ... spawned at PlayerSpawn, on the ground", d < 25.0 and abs(first[3] - 5.6) < 3.0,
           f"first seen at ({first[2]:.1f},{first[3]:.1f},{first[4]:.1f}), {d:.1f} m from the marker in XZ")
     hp = [p for p in hc.get(cid, []) if p[1] == "NetworkController"]
     moved = max((abs(p[4] - hp[0][4]) + abs(p[2] - hp[0][2]) for p in hp), default=0.0)
@@ -75,6 +80,30 @@ for name, text in (("host", thost), ("client", tclient)):
     check(f"tour: no rate-limited packet on the {name}", "rate limit exceeded" not in text, f"{text.count('rate limit exceeded')} drops")
     n = len(re.findall(r"java\.lang\.\w+Exception", text)) - len(re.findall(KNOWN_NOISE, text))
     check(f"tour: no JVM exception on the {name}", n == 0, f"{n}")
+print("  -- coop: purchase, respawn, clock")
+m = re.search(r"\[coop\] at counter \S+ item=(\S*)", cclient)
+check("coop: client stood at a shop counter", m is not None and m.group(1) != "", m.group(0) if m else "no counter line")
+check("coop: the host accepted the client's purchase", "NetworkManager: shop sale" in chost, "")
+m = re.search(r"\[coop\] carries (\S+)=(true|false)", cclient)
+check("coop: the client's own body carries what it bought", m is not None and m.group(2) == "true", m.group(0) if m else "")
+m = re.search(r"\[coop\] respawn alive=(\w+) owned=(\w+) pos=(.*?) respawns=(-?\d+)", cclient)
+check("coop: the client is respawned, alive and owned", m is not None and m.group(1) == "true" and m.group(2) == "true"
+      and int(m.group(4)) >= 1, m.group(0) if m else "")
+check("coop: the host ran the respawn", "RespawnSystem: HOSPITALIZED -> respawned" in chost, "")
+check("coop: no game over on either peer", "GAME_OVER" not in chost and "GAME_OVER" not in cclient, "")
+def clock(text):
+    m = re.search(r"\[coop\] clock hours=([-\d.eE]+) unix_ms=(\d+) hps=([-\d.eE]+)", text)
+    return (float(m.group(1)), int(m.group(2)), float(m.group(3))) if m else None
+hc_, cc_ = clock(chost), clock(cclient)
+if hc_ and cc_:
+    host_then = hc_[0] + (cc_[1] - hc_[1]) / 1000.0 * hc_[2]
+    diff = abs(((cc_[0] - host_then) + 12.0) % 24.0 - 12.0) * 60.0
+    check("coop: the client's clock matches the host's", diff < 2.0, f"{diff:.2f} game min apart")
+else:
+    check("coop: both peers printed the clock", False, f"host={hc_} client={cc_}")
+for name, text in (("host", chost), ("client", cclient)):
+    n = len(re.findall(r"java\.lang\.\w+Exception", text)) - len(re.findall(KNOWN_NOISE, text))
+    check(f"coop: no JVM exception on the {name}", n == 0, f"{n}")
 print("PASS (0 failures)" if fails == 0 else f"FAIL ({fails} failures)")
 sys.exit(1 if fails else 0)
 PY

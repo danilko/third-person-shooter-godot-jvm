@@ -1830,6 +1830,19 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
      * A passenger is never covered by this: they keep their own camera when they sit down, so
      * their head is decided by their own {@code isFpsMode} exactly as it is on foot.
      */
+    /** The local player riding as a passenger with this carrier's camera on screen, else null. */
+    private Character localPassenger;
+
+    /** Does this carrier's camera show {@code c}'s view (the local player as a passenger)? */
+    public boolean showsPassengerView(Character c) {
+        return c != null && c == localPassenger && vehicleCamera != null && vehicleCamera.isCurrent();
+    }
+
+    /** Where a passenger whose view is this carrier's camera is aiming, else null. */
+    public Vector3 carrierAimFor(Character c) {
+        return showsPassengerView(c) && camController != null ? camController.getAimTarget() : null;
+    }
+
     public boolean isViewInsideOccupantHead(Character c) {
         if (c == null || camController == null) return false;
         if (occupant != c) return false;                       // driver seat only
@@ -2052,6 +2065,18 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         resetSeatPosture(seatIndex);
         setOccupantAimExceptions(c, true);
         if (mode == VehicleWeaponMode.PASSENGER_WEAPON) warnIfAimSectorUnreachable(c);
+        // The LOCAL player's passenger view is the carrier's own chase camera (user, 2026-10-06: the character's
+        // over-the-shoulder boom, seated inside a car, sat in the hull and read badly). Third person only -- the
+        // carrier's first-person mounts are the DRIVER's eyes -- with free aim while holding aim/fire, and the
+        // passenger's drive-by aims where that camera looks (carrierAimFor).
+        if (c instanceof Player && c.isLocallyOwnedPlayer() && camController != null && vehicleCamera != null) {
+            localPassenger = c;
+            camController.setPassengerAimMode(mode == VehicleWeaponMode.PASSENGER_WEAPON);
+            camController.setCameraMode(CameraMode.TPS);
+            camController.setPassengerView(true);
+            vehicleCamera.makeCurrent();
+            c.refreshHeadVisibility();
+        }
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) bus.vehicleEntered.emit(this, c.characterInfo);
         nameplateChanged.emit();
@@ -2121,6 +2146,14 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         setOccupantAimExceptions(c, false);
         c.setGlobalPosition(seatExitPosition(seatIndex));
         c.exitDriveState();
+        if (c == localPassenger) {
+            localPassenger = null;
+            if (camController != null) {
+                camController.setPassengerView(false);
+                camController.setPassengerAimMode(false);
+            }
+            c.makeCameraActive();
+        }
         activeCollisions.add(c);
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) bus.vehicleExited.emit(c.characterInfo);

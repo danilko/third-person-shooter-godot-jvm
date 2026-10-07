@@ -1191,7 +1191,9 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
      * {@link #refreshHeadVisibility} turns on.
      */
     public boolean carrierOwnsView() {
-        return currentVehicleNode != null && vehicleDriver;
+        if (currentVehicleNode == null) return false;
+        // the driver, and (2026-10-06) the local player as a passenger, whose view is the carrier's chase camera
+        return vehicleDriver || (currentVehicleNode instanceof Vehicle v && v.showsPassengerView(this));
     }
 
     /**
@@ -1389,7 +1391,8 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
 
     /** Reduced input path while riding as a passenger — weapon use + aim only. */
     protected void applySeatedPassengerInput(UserCommand input) {
-        applySeatedAimTarget(input.aimTargetPosition);
+        Vector3 carrierAim = currentVehicleNode instanceof Vehicle v ? v.carrierAimFor(this) : null;
+        applySeatedAimTarget(carrierAim != null ? carrierAim : input.aimTargetPosition);
         if (vehicleWeaponMode != VehicleWeaponMode.PASSENGER_WEAPON) return;   // seat can't shoot
         if (input.fire) fireWeapon.emit();
         else            notFireWeapon.emit();
@@ -1731,6 +1734,7 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     public void refreshHeadVisibility() {
         boolean insideOwnEyes = (vehicleDriver && currentVehicleNode instanceof Vehicle v)
                 ? v.isViewInsideOccupantHead(this)
+                : (currentVehicleNode instanceof Vehicle pv && pv.showsPassengerView(this)) ? false
                 : isFirstPersonView();
         boolean visible = !insideOwnEyes;
         if (visible != headVisibleApplied) setHeadVisible(visible);

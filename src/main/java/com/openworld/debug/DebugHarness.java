@@ -637,8 +637,10 @@ public class DebugHarness extends Node {
             else if ("--net=join".equals(arg)) { netAction = "join"; netDelay = 2.0; }
             else if ("--net-diag".equals(arg)) { NetworkManager.NET_DEBUG_VEHICLES = true; }
             else if (arg.startsWith("--hold-action=")) { holdAction = arg.substring("--hold-action=".length()); }
+            else if ("--coop-test".equals(arg)) { coopTest = true; }
         }
-        setPhysicsProcess(autoWalk || dumpCollisionDelay > 0.0 || spawnRoutesDelay > 0.0 || netDelay > 0.0 || holdAction != null);
+        setPhysicsProcess(autoWalk || dumpCollisionDelay > 0.0 || spawnRoutesDelay > 0.0 || netDelay > 0.0 || holdAction != null
+                || coopTest);
         if (autoWalk) GD.print("DebugHarness: auto-walk enabled — touring every zone marker in zoneId order"
                 + (autoWalkStartFilter != null ? ", starting at first match of '" + autoWalkStartFilter + "'" : ""));
     }
@@ -650,9 +652,89 @@ public class DebugHarness extends Node {
     private String holdAction = null;
     private double holdDelay = 6.0;
 
+    /**
+     * {@code -- --coop-test} (tools/net/run_net_debugworld.sh phase "coop", 2026-10-06): a CLIENT buys a weapon at a
+     * real ShopCounter (MSG_SHOP_REQUEST -> MSG_SHOP_GRANT), then dies by self damage and must be respawned by the
+     * host; both peers print the time of day. Every step prints a "[coop]" line the script parses.
+     */
+    private boolean coopTest = false;
+    private double coopT = 0.0;
+    private int coopStep = 0;
+    private String coopItem = "";
+
+    private Player localPlayer() {
+        for (Player p : PlayerRegistry.getPlayers()) if (GD.isInstanceValid(p) && p.isLocalOwnedPlayer()) return p;
+        return null;
+    }
+
+    private void coopTick(double delta) {
+        coopT += delta;
+        NetworkManager net = getNodeOrNull("/root/NetworkManager") instanceof NetworkManager n ? n : null;
+        boolean client = net != null && net.isNetworked() && !net.isServer();
+        Player me = localPlayer();
+        if (coopStep == 0 && coopT >= 14.0) {
+            coopStep = 1;
+            if (client && me != null) {
+                com.openworld.item.ShopCounter best = null;
+                double d0 = Double.MAX_VALUE;
+                for (Node n : getTree().getNodesInGroup(new StringName(com.openworld.item.ShopCounter.GROUP))) {
+                    if (n instanceof com.openworld.item.ShopCounter c) {
+                        double d = c.getGlobalPosition().distanceTo(me.getGlobalPosition());
+                        if (d < d0) { d0 = d; best = c; }
+                    }
+                }
+                if (best != null) {
+                    for (String id : best.items()) {
+                        if (!com.openworld.item.WeaponGrant.carries(me, id) && !com.openworld.item.ShopCounter.isSupply(id)) { coopItem = id; break; }
+                    }
+                    me.setGlobalPosition(best.getGlobalPosition().plus(new godot.core.Vector3(0, 0.1, 0)));
+                    me.setVelocity(new godot.core.Vector3());
+                    GD.print("[coop] at counter " + best.getPath() + " item=" + coopItem);
+                } else GD.print("[coop] no shop counter");
+            }
+        }
+        if (coopStep == 1 && coopT >= 16.5) {
+            coopStep = 2;
+            if (client && me != null && !coopItem.isEmpty()) {
+                for (Node n : getTree().getNodesInGroup(new StringName(com.openworld.item.ShopCounter.GROUP))) {
+                    if (n instanceof com.openworld.item.ShopCounter c && c.holds(me.getGlobalPosition(), 1.0)) {
+                        c.buy(me, coopItem);
+                        GD.print("[coop] buy " + coopItem);
+                        break;
+                    }
+                }
+            }
+        }
+        if (coopStep == 2 && coopT >= 19.5) {
+            coopStep = 3;
+            if (client && me != null) GD.print("[coop] carries " + coopItem + "=" + com.openworld.item.WeaponGrant.carries(me, coopItem));
+            GD.print("[coop] clock hours=" + com.openworld.world.GameTime.hours(getTree())
+                    + " unix_ms=" + (long) (godot.api.Time.INSTANCE.getUnixTimeFromSystem() * 1000.0)
+                    + " hps=" + com.openworld.world.GameTime.hoursPerSecond(getTree()));
+        }
+        if (coopStep == 3 && coopT >= 20.5) {
+            coopStep = 4;
+            if (client && me != null && me.getNodeOrNull("Health") instanceof com.openworld.character.Health h) {
+                // a request is capped at 500 (DamageRequestPolicy); send enough to empty the bar
+                int n = (int) Math.ceil(h.maxHealth / 400.0) + 1;
+                for (int i = 0; i < n; i++) h.takeDamage(null, 400f, "fall");
+                GD.print("[coop] self damage sent x" + n);
+            }
+        }
+        if (coopStep == 4 && coopT >= 33.0) {
+            coopStep = 5;
+            var rs = com.openworld.game.RespawnSystem.get();
+            if (client) GD.print("[coop] respawn alive=" + (me != null && me.isAlive()) + " owned=" + (me != null)
+                    + " pos=" + (me != null ? me.getGlobalPosition() : "-") + " respawns=" + (rs != null ? rs.respawnsNow() : -1)
+                    + " card=" + (rs != null ? rs.cardTextNow() : ""));
+            else GD.print("[coop] host players=" + PlayerRegistry.getPlayers().size());
+        }
+    }
+
     @Register
     @Override
     public void _physicsProcess(double delta) {
+        if (coopTest) coopTick(delta);
         if (holdAction != null) {
             holdDelay -= delta;
             if (holdDelay <= 0.0) godot.api.Input.actionPress(new StringName(holdAction));

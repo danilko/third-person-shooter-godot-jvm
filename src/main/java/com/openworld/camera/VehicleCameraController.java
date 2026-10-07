@@ -243,6 +243,10 @@ public class VehicleCameraController extends Node3D {
 
     public void setPassengerAimMode(boolean enabled) { passengerAimMode = enabled; }
     public void setCameraMode(CameraMode mode)        { cameraMode = mode; }
+
+    /** A passenger is looking through this rig: third person only (the first-person mounts are the driver's eyes). */
+    private boolean passengerView = false;
+    public void setPassengerView(boolean on)          { passengerView = on; if (on) cameraMode = CameraMode.TPS; }
     public CameraMode getCameraMode()                 { return cameraMode; }
 
     /**
@@ -277,6 +281,7 @@ public class VehicleCameraController extends Node3D {
      * silently landing on a view that renders from the bonnet anyway.
      */
     public void cycleView() {
+        if (passengerView) return;
         if (cameraMode == CameraMode.TPS) {
             cameraMode = CameraMode.FPS;
             eyeMount   = (cockpitCameraMount != null) ? VehicleEyeMount.COCKPIT : VehicleEyeMount.BONNET;

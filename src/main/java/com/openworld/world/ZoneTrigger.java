@@ -152,6 +152,24 @@ public class ZoneTrigger extends Area3D {
 			return;
 		}
 		fire(c);
+		// A client's beat fires here for its own dialogue/HUD, but the beat's EFFECT (a mission starting) is the
+		// host's, and the host's puppet of this body may never cross the volume there: ask the host to fire it.
+		if (c instanceof Player p && p.isLocallyOwnedPlayer() && c.characterInfo != null
+				&& getNodeOrNull("/root/NetworkManager") instanceof com.openworld.net.NetworkManager net
+				&& net.isNetworked() && !net.isServer()) {
+			net.sendBeatRequest(c.characterInfo.characterId, beatId);
+		}
+	}
+
+	/** Host: fire for a client's character the client saw enter (MSG_BEAT_REQUEST), by the same rules. */
+	public boolean fireForRemote(Character c) {
+		if (beatId.isEmpty() || c == null) return false;
+		String refusal = refusalFor(c);
+		if (refusal != null) {
+			if (debugLog) GD.print("[ZoneTrigger] " + getName() + ": remote " + c.getName() + " — " + refusal);
+			return false;
+		}
+		return fire(c);
 	}
 
 	/** Fire the beat regardless of who entered — the console/probe entry point. */

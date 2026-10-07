@@ -125,6 +125,10 @@ func _initialize() -> void:
 				owner_name = str(up.name)
 			up = up.get_parent()
 		if owner_name.contains("_Open"):
+			# the mission's own building is within its unlock reach; other `_Open` buildings (civic plots, placed
+			# 2026-09-29) are other missions' and stay locked
+			if d3.global_position.distance_to(at) > float(job.get("door_unlock_radius")):
+				continue
 			# an INTERIOR door (staff room, toilet: automatic, never locked) is not the shop's to lock or unlock
 			if not bool(n.get("auto_open")):
 				doors.append(n)
