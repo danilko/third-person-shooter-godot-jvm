@@ -11082,12 +11082,32 @@ User: the chase stopped at buildings and every unit carried small arms. All of i
   ImpactManager damage). Parked (MARK_vehicle HLC1) on the hospital and police-station roof pads; `ParkedVehicle` lifts
   an aircraft by how far its collision box reaches below its origin. Gate `tools/godot/probe_helicopter.gd`.
 - **Units always follow the player INTO a building** (user: "officers always get in, so behaviour is consistent"), at
-  every star level, with NO interior navmesh: a player is indoors when a ray up hits a building roof (`building` meta);
-  each unit walks STRAIGHT to 2.5 m outside that building's nearest `Door_*` marker and 2.5 m inside it
-  (`AIController.pursuitVia`, followed by `ArrestState`), a locked door there is forced (unlocked, automatic), then it
-  closes as before (arrest below shoot stars, the combat FSM above). `EnforcementDispatch.breaching` is the control.
-  Gate `tools/godot/probe_breach.gd [-- --stars=N] [--control]`. Limit: a building whose door is far from the player's
-  room relies on the unit walking straight inside, which works for one-room shops and halls, not a multi-room plan.
+  every star level: a player is indoors when a ray up hits a building roof (`building` meta); each unit walks
+  STRAIGHT to 2.5 m outside that building's nearest `Door_*` marker and 2.5 m inside it (`AIController.pursuitVia`,
+  followed by `ArrestState`), and EVERY door of that building is forced (unlocked, automatic: a breach does not knock).
+  `EnforcementDispatch.breaching` is the control.
+- **Inside, units steer on a per-type INTERIOR NAVMESH** (`world.InteriorNav`, PLAN.md 1d, user 2026-10-07: "a navmesh
+  if performance allows"). Without it (measured, `probe_breach.gd --no-stop`): a player 8 m into a konbini was reached
+  by 0 units in 90 s (one stalled 6.8 m away), nobody got into a police station. With it: konbini 4 units (first at
+  8 s), clinic 5, hospital 36 m inside 2, police station 30 m inside 3; `--no-interior-nav` (the control) 0.
+  * Baked OFFLINE once per enterable TYPE by `tools/godot/bake_building_nav.gd -- --all --write` into
+    `world/buildings/nav/<Type>_nav.res` (the `_Shop` variant, door leaves and ticket gates left out; cell 0.175 m,
+    agent radius 0.35, a 1 m apron round the footprint): 112 types, 912 KB, 3-60 ms each (the 300 m Central station
+    254 ms, 62 KB), a path query 5-60 us. **Re-run it after `build_building_scenes.gd` changes a building.**
+  * Attached ON DEMAND: the dispatch calls `InteriorNav.attach(building)` the first time a player it is hunting stands
+    inside it (a `NavigationRegion3D` named `InteriorNav`; only an enterable `_Shop` / `_Open` type has a bake).
+    Attached to every enterable building as cells streamed, it cost ~1 ms p50 of frame on walk_station /
+    drive_downtown in three ordered on/off pairs (`probe_walk_perf --no-interior-nav`), though the navigation server's
+    own time rose only ~0.2 ms at p95 (the probe now prints it).
+  * Every region joins ONE separate navigation map at the 0.175 m cell (a 1.1 m konbini aisle closes at the street
+    map's 0.5 m), so the street map and its road-piece seams are untouched.
+  * A unit's NavigationAgent3D is put on that map while it stands under that building's roof OR on its interior mesh
+    (a compound's yard has no roof, and routing again from the yard sent units back out through the gate), and back
+    on the world map outside; inside, its door waypoints are dropped (walked straight, they stood a unit against a
+    wall), and a unit that is moving on the interior mesh is not "stuck" (a corridor does not shorten the straight
+    distance). Readout `interior_nav_now` ("units switched,regions attached"); `EnforcementDispatch.interior_nav` off
+    is the control.
+  * Seen: units die in their own crossfire in a police station corridor. Not addressed.
 - `escalation_now` readout: `models;rammers;shells;snipers;helis;heliShots;heliHits;breachRoutes;breachedIn;doorsForced`.
   Gate `tools/godot/probe_escalation.gd` (6 stars every piece; `--control` 2 stars none).
 - **Not built yet**: breakable building glass (shopfront panes are merged into the building mesh with a solid wall

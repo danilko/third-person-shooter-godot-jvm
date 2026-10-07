@@ -136,6 +136,7 @@ public class Door extends Breakable {
         if (bus != null) bus.connect(new StringName("mission_completed"),
                 MethodCallable.createUnsafe(this, "on_mission_completed"));
         wake();   // one tick to settle; after that a door SLEEPS until something can change it (R14, below)
+
     }
 
     /**
@@ -319,4 +320,5 @@ public class Door extends Breakable {
         }
         return eventBus;
     }
+
 }

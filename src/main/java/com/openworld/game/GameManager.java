@@ -184,6 +184,7 @@ public class GameManager extends Node {
     @Override
     public void _exitTree() {
         IconRegistry.clear();
+        com.openworld.world.InteriorNav.clear();
         com.openworld.carrier.vehicle.Vehicle.clearLampCaches();
         com.openworld.carrier.vehicle.Glass.clearCaches();
         com.openworld.audio.Sounds.clear();

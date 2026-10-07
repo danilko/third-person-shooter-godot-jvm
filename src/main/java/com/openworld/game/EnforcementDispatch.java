@@ -81,6 +81,10 @@ public class EnforcementDispatch extends Node {
     @Export public boolean enabled = true;
     /** Units follow a player INTO a building through its door (always; off = the control: they stop outside). */
     @Export public boolean breaching = true;
+    /** Interior navmeshes for breaching units (world.InteriorNav); off = the straight-line breach (the control). */
+    @godot.annotation.Visible public boolean interiorNav = true;
+    public boolean getInteriorNav() { return interiorNav; }
+    public void setInteriorNav(boolean v) { interiorNav = v; com.openworld.world.InteriorNav.enabled = v; }
     /** Foot units spawned per side per spawn tick, at most. */
     @Export public int spawnPerTick = 2;
 
@@ -230,8 +234,14 @@ public class EnforcementDispatch extends Node {
     private void tickUnits(Map<String, Player> players, Map<String, Map<String, Integer>> demand, WantedSystem ws,
                            DispatchRules police) {
         Map<String, Node3DRef> indoors = new HashMap<>();
-        for (Map.Entry<String, Player> e : players.entrySet())
-            indoors.put(e.getKey(), new Node3DRef(buildingAround(e.getValue().getGlobalPosition())));
+        for (Map.Entry<String, Player> e : players.entrySet()) {
+            Node b = buildingAround(e.getValue().getGlobalPosition());
+            // the building's interior navmesh is attached ON DEMAND, the first time a hunted player is inside it:
+            // attached to every enterable building as it streamed, it cost ~1 ms p50 of frame on the walk / drive legs
+            // (three ordered pairs, PLAN.md 1d) for regions nobody was using
+            if (b instanceof godot.api.Node3D b3 && interiorNav && !units.isEmpty()) com.openworld.world.InteriorNav.attach(b3);
+            indoors.put(e.getKey(), new Node3DRef(b));
+        }
         Iterator<Unit> it = units.iterator();
         while (it.hasNext()) {
             Unit u = it.next();
@@ -272,8 +282,13 @@ public class EnforcementDispatch extends Node {
             // get in, so the behaviour is consistent): through the building's door nearest this unit, straight (no
             // navmesh indoors), forcing a locked one
             Node3DRef in = indoors.get(u.playerId);
+            Node ub = buildingAround(u.body.getGlobalPosition());
+            // standing on that building's interior navmesh counts as inside: a compound's yard (a police station, a
+            // hospital) is under no roof, and routing again from there sent the unit back out through the gate
+            if (in != null && in.node != null && ub != in.node && com.openworld.world.InteriorNav.has(in.node)
+                    && com.openworld.world.InteriorNav.onMesh(u.body.getGlobalPosition())) ub = in.node;
             if (!u.sniper && breaching && in != null && in.node != null) {
-                if (buildingAround(u.body.getGlobalPosition()) != in.node) {
+                if (ub != in.node) {
                     if (u.breachOf != in.node || brain.pursuitVia.isEmpty()) {
                         brain.pursuitVia.clear();
                         brain.pursuitVia.addAll(breachRoute(in.node, u.body.getGlobalPosition()));
@@ -287,11 +302,17 @@ public class EnforcementDispatch extends Node {
                     u.sinceCloser = 0;          // not stuck: on its way round to the door
                     continue;
                 }
+                // inside: the door waypoints were only the way IN -- from here the interior navmesh steers (left in,
+                // a unit walked straight at a waypoint through the rooms and stood against a wall)
+                if (u.breachOf == in.node && com.openworld.world.InteriorNav.has(in.node)) brain.pursuitVia.clear();
                 if (u.breachOf == in.node && brain.pursuitVia.isEmpty()) { u.breachOf = null; breachedIn++; }
             } else if (u.breachOf != null) {
                 u.breachOf = null;
                 brain.pursuitVia.clear();
             }
+            // inside a building with an interior navmesh (world.InteriorNav), the unit steers on it: round shelves,
+            // counters and rooms, which a straight line runs into (measured: stalled 6.8 m from the player)
+            boolean interior = useInteriorNav(u.body, ub);
             if (u.sniper) {
                 // a sniper holds its spot and shoots: the squad's radio says where the player is
                 brain.setPursuit(null);
@@ -314,16 +335,19 @@ public class EnforcementDispatch extends Node {
                 // the island, so the approach is ArrestState's (straight where the line is clear), weapon up
                 brain.setPursuit(p);
                 brain.pursuitAway = false;
-                brain.pursuitDirect = clearLine(u.body.getGlobalPosition(), p.getGlobalPosition());
+                brain.pursuitDirect = !interior && clearLine(u.body.getGlobalPosition(), p.getGlobalPosition());
                 if (!inArrest) brain.forceState(ArrestState.INSTANCE);
             } else {
                 brain.setPursuit(p);
                 brain.pursuitAway = false;
-                brain.pursuitDirect = clearLine(u.body.getGlobalPosition(), p.getGlobalPosition());
+                brain.pursuitDirect = !interior && clearLine(u.body.getGlobalPosition(), p.getGlobalPosition());
                 if (brain.getCurrentState() != ArrestState.INSTANCE) brain.forceState(ArrestState.INSTANCE);
             }
             double d = flat(u.body.getGlobalPosition(), p.getGlobalPosition());
-            if (d < u.closest - STUCK_GAIN || d < 4.0) {
+            // indoors a path winds round rooms, so the straight distance is not progress: a unit on the interior
+            // navmesh that is MOVING is not stuck
+            boolean walking = interior && flat(u.body.getVelocity(), Vector3.Companion.getZERO()) > 0.6;
+            if (d < u.closest - STUCK_GAIN || d < 4.0 || walking) {
                 u.closest = Math.min(u.closest, d);
                 u.sinceCloser = 0;
             } else if (playerSpeed(u.playerId, p) < OUTRUN_SPEED && (u.sinceCloser += TICK) > STUCK_SECONDS
@@ -641,6 +665,29 @@ public class EnforcementDispatch extends Node {
     // ── breaching a building (PLAN.md W6) ─────────────────────────────────────
 
     private record Node3DRef(Node node) {}
+
+    private int interiorSteers;
+
+    /** Put the unit's NavigationAgent3D on the interior map while it stands in a building that has one, else on the
+     *  world map. Returns whether it is on the interior map. */
+    private boolean useInteriorNav(AICharacter body, Node building) {
+        var a = body.getNavAgent();
+        if (a == null) return false;
+        boolean in = com.openworld.world.InteriorNav.has(building);
+        godot.core.RID want = in ? com.openworld.world.InteriorNav.map()
+                : (body.getWorld3d() != null ? body.getWorld3d().getNavigationMap() : null);
+        if (want != null && !want.equals(a.getNavigationMap())) {
+            a.setNavigationMap(want);
+            body.aiController().clearNavTarget();
+            if (in) interiorSteers++;
+        }
+        return in;
+    }
+
+    /** Probe readout: units switched onto an interior navmesh, and interior regions attached. */
+    @Register public String interiorNavNow() {
+        return interiorSteers + "," + com.openworld.world.InteriorNav.attachedCount();
+    }
     private int breachRoutes, breachedIn;
 
     /** The building whose roof is over this point (a ray up hits it within 25 m, its owner carries the `building`
@@ -675,17 +722,17 @@ public class EnforcementDispatch extends Node {
         Vector3 c = best.getGlobalPosition();
         out.add(c.plus(o.times(2.5)));
         out.add(c.minus(o.times(2.5)));
-        forceDoorsNear(building, c);
+        forceDoorsNear(building, c, Double.MAX_VALUE);   // a breach does not knock: every door of the building
         return out;
     }
 
-    private void forceDoorsNear(Node n, Vector3 at) {
+    private void forceDoorsNear(Node n, Vector3 at, double reach) {
         for (Node c : n.getChildren()) {
-            if (c instanceof com.openworld.world.Door d && d.getGlobalPosition().distanceTo(at) < 3.0) {
+            if (c instanceof com.openworld.world.Door d && d.getGlobalPosition().distanceTo(at) < reach) {
                 if (d.isLocked()) { d.setLocked(false); doorsForced++; }
                 d.autoOpen = true;
             }
-            if (c.getChildCount() > 0 && !(c instanceof com.openworld.character.Character)) forceDoorsNear(c, at);
+            if (c.getChildCount() > 0 && !(c instanceof com.openworld.character.Character)) forceDoorsNear(c, at, reach);
         }
     }
 
@@ -1033,6 +1080,9 @@ public class EnforcementDispatch extends Node {
                     .append(c != null && c.getCurrentState() != null ? c.getCurrentState().getClass().getSimpleName() : "-")
                     .append(' ').append(u.body.getLodLevel()).append(' ')
                     .append(String.format("%.1f", u.body.getVelocity().length())).append("m/s")
+                    .append(c != null && !c.pursuitVia.isEmpty() ? " via" + c.pursuitVia.size() : "")
+                    .append(u.body.getNavAgent() != null && com.openworld.world.InteriorNav.isInteriorMap(u.body.getNavAgent().getNavigationMap()) ? " INNAV" : "")
+                    .append(c != null && c.pursuitDirect ? " direct" : "")
                     .append(u.body.isDead() ? " DEAD" : "").append(" | ");
         }
         for (Car c : cars) {

@@ -13,6 +13,7 @@ extends SceneTree
 ##       [--wanted=N] [--gang=N]   PEAK LOAD (PLAN.md W5): hold the player at N police stars (lethal, so they shoot
 ##                  rather than arrest; the player is invulnerable) and/or N stars with gang_a, so the enforcement
 ##                  dispatch's officers, patrol cars and gang hunters are in the ring for every leg
+##       [--no-interior-nav]   control: no building interior navmesh regions attach as cells stream (world.InteriorNav)
 ##       [--no-balance]   control: the dispatch adds on top of the ambient budgets (ZoneManager.enforcementBalancing)
 ##       [--traffic-budget=N] [--sim-radius=M] [--recycle=M]   PLAN.md 2c sweeps: ZoneManager's car budget, simulation
 ##                  ring and the leaving-car recycle distance (0 = off)
@@ -113,6 +114,7 @@ func _leg(label: String, path: Array, speed: float) -> void:
 	await _settle(12.0)             # streaming + the crowd around the start
 	var under0 := under_terrain
 	var near_sum := [0.0, 0.0]
+	var navt := []
 	var near_n := 0
 	var ft := []
 	var ph := []
@@ -134,6 +136,7 @@ func _leg(label: String, path: Array, speed: float) -> void:
 		var nt := pf - pf_prev
 		pf_prev = pf
 		var phys := Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
+		navt.append(Performance.get_monitor(Performance.TIME_NAVIGATION_PROCESS) * 1000.0)
 		var proc := Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
 		var chars := get_nodes_in_group("characters").size()
 		if world_bounds != null:
@@ -142,6 +145,17 @@ func _leg(label: String, path: Array, speed: float) -> void:
 				under_terrain += 1
 				if under_terrain - under0 <= 5 or (under_terrain - under0) % 200 == 0:
 					print("    under at %s, terrain %.2f, vel %s" % [str(player.global_position), th, str(player.velocity)])
+		if _arg("no-interior-nav", false) and Engine.get_physics_frames() % 30 == 0:
+			# control: the dispatch exists only after GameManager's ready, so the switch is applied here, and any
+			# region a door attached before it is removed
+			var edn := root.get_node_or_null("GameManager/EnforcementDispatch")
+			if edn != null and bool(edn.get("interior_nav")):
+				edn.set("interior_nav", false)
+				var gone := 0
+				for r in w.find_children("InteriorNav", "NavigationRegion3D", true, false):
+					r.queue_free()
+					gone += 1
+				print("CONTROL: interior navmeshes off (world.InteriorNav), %d already attached removed" % gone)
 		if _arg("no-parked", false) and Engine.get_physics_frames() % 30 == 0:
 			# control: the placed-but-unused vehicles (world.ParkedVehicle remembers a spot, so it does not respawn)
 			for pv in get_nodes_in_group("parked_vehicle"):
@@ -224,6 +238,8 @@ func _leg(label: String, path: Array, speed: float) -> void:
 		if v > 16.7:
 			over60 += 1
 	legs_out.append([label, _pct(ft, 0.5), _pct(ft, 0.95), _pct(ft, 0.99), ft.max() if not ft.is_empty() else 0.0, slow, ft.size()])
+	navt.sort()
+	print("    navigation server ms per frame: p50 %.3f p95 %.3f max %.3f" % [navt[navt.size() / 2], navt[int(navt.size() * 0.95)], navt[navt.size() - 1]])
 	print("  %-22s %5d frames | frame ms p50 %6.2f p95 %6.2f p99 %6.2f worst %7.2f | %4.1f%% over 16.7 ms | %4.1f%% under 30 fps | phys ms p50 %.2f p95 %.2f | ticks/frame p95 %d"
 			% [label, ft.size(), _pct(ft, 0.5), _pct(ft, 0.95), _pct(ft, 0.99), ft.max() if not ft.is_empty() else 0.0,
 			100.0 * over60 / max(1, ft.size()), 100.0 * slow / max(1, ft.size()), _pct(ph, 0.5), _pct(ph, 0.95), int(_pct(ticks, 0.95))])
