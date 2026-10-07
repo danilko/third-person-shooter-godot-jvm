@@ -7080,7 +7080,8 @@ the zone behaviour". **`tools/debug_world_rebuild.sh`** rebuilds all of it (~5 m
 drives with the carrier's own camera on screen (`Vehicle.isDrivenViewOf`), the racing-game convention (Forza, GT, NFS),
 drawn mirror-flipped, ON every time the player takes the wheel (C hides it for that drive). The chase view looks back from `roofLift` over the roof; the first-person views from the
 driver's eye HEIGHT but just past the back of the hull (from the eye itself the headrests filled it). `rear_view` (C)
-toggles it. Cost control: its own SubViewport at the strip's size, refreshed every `updateEvery` (2) frames, `farPlane`
+toggles it. Cost control: its own SubViewport SUPERSAMPLED at `renderScale` 1.5x a strip `widthFraction` 22% of the
+screen wide (user: smaller and crisper; about the old strip's pixel count), refreshed every `updateEvery` (2) frames, `farPlane`
 150 m, mesh LOD threshold 2, FXAA only, no positional shadows, a copy of the world Environment with SSAO / SSIL / SSR /
 glow / SDFGI / volumetric fog off, and nothing rendered while hidden. **A blurred mirror is resolution, not meshes**:
 at `renderScale` 0.6 (an upscaled target, which also samples blurrier mips) it was visibly soft; 1.0 costs nothing

@@ -34,8 +34,9 @@ import godot.global.GD;
  *
  * <p>A second camera renders the scene a second time, so its cost is held down the way those games do it:
  * <ul>
- *   <li>its own {@link SubViewport} at the strip's own screen size ({@link #renderScale} 1.0: at 0.6 it was visibly
- *   blurred -- an upscaled target that also samples blurrier mips -- and pixels are not what costs here, draws are);</li>
+ *   <li>its own {@link SubViewport} SUPERSAMPLED at {@link #renderScale} 1.5x the strip's screen size and scaled down
+ *   (user 2026-10-07: a smaller, crisper strip, 22% of the screen width). At 0.6 it was visibly blurred -- an upscaled
+ *   target that also samples blurrier mips -- and pixels are not what costs here, draws are;</li>
  *   <li>refreshed every {@link #updateEvery}-th frame (UpdateMode ONCE), so at 60 fps a mirror at 30;</li>
  *   <li>a short {@link #farPlane} -- far geometry is what costs draws -- and a coarser mesh LOD threshold;</li>
  *   <li>a cheap copy of the world's Environment (no SSAO / SSIL / SSR / glow / SDFGI / volumetric fog), no MSAA
@@ -52,10 +53,10 @@ public class RearViewMirror extends Control {
     /** On by default, and switched back on each time the player takes the wheel; the rear_view key flips it. */
     @Export public boolean enabled = true;
     /** The strip's width as a fraction of the screen width, and its aspect (width : height). */
-    @Export public float widthFraction = 0.30f;
+    @Export public float widthFraction = 0.22f;
     @Export public float aspect = 3.4f;
     /** The mirror camera renders at this fraction of the strip's on-screen pixels. */
-    @Export public float renderScale = 1.0f;
+    @Export public float renderScale = 1.5f;
     /** Render one frame in this many (2 = 30 Hz at 60 fps). */
     @Export public int updateEvery = 2;
     /** How far the mirror sees (m), and its field of view (deg). */
@@ -179,7 +180,7 @@ public class RearViewMirror extends Control {
 
     private void layoutStrip() {
         Vector2 screen = getViewportRect().getSize();
-        float w = (float) Math.max(280.0, screen.getX() * widthFraction);
+        float w = (float) Math.max(240.0, screen.getX() * widthFraction);
         float h = w / aspect;
         float x = (float) (screen.getX() - w) * 0.5f, y = 18f;
         setPosition(new Vector2(x, y));
