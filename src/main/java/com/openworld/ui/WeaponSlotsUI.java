@@ -101,7 +101,11 @@ public class WeaponSlotsUI extends PanelContainer {
     @Override
     public void _process(double delta) {
         // The holster emits no signal: poll it (one boolean) so the in-hand row follows H at once.
-        boolean h = weaponController != null && GD.isInstanceValid(weaponController) && weaponController.isHolstered();
+        // (refreshAllSlots's guard too: on a client the pre-placed Player is freed on connect, and its controller's
+        // Timer children can be gone while the controller still reads valid for the rest of the frame)
+        boolean h = weaponController != null && GD.isInstanceValid(weaponController)
+                && !weaponController.isQueuedForDeletion() && weaponController.isInsideTree()
+                && weaponController.isHolstered();
         if (h != shownHolstered) { shownHolstered = h; refreshAllSlots(); }
         if (showTimer <= 0.0) return;
         showTimer = Math.max(0.0, showTimer - delta);
