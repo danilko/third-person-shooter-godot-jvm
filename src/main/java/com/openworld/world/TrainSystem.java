@@ -720,6 +720,23 @@ public class TrainSystem extends Node3D {
         return b.toString();
     }
 
+    /**
+     * True when a car whose centre is {@code s} m along road lane {@code laneId} would stand on a 踏切 or between its
+     * hold line and its far side, open or closed: a spawn slot there puts a car where a train can hit it before its
+     * brain has run once (seen in the perf run: lane cho_0_R0, progress 0.0, state "?").
+     */
+    public boolean onCrossing(String laneId, double s) {
+        if (!enabled) return false;
+        List<Crossing> cs = byLane.get(laneId);
+        if (cs == null) return false;
+        for (Crossing c : cs) {
+            double first = groupStart(cs, c.laneS), last = first;
+            for (Crossing o : cs) if (o.laneS >= first && o.laneS <= first + CROSSING_GROUP) last = Math.max(last, o.laneS);
+            if (s + NOSE > first - HOLD_BACK && s - NOSE < last + HOLD_BACK) return true;
+        }
+        return false;
+    }
+
     /** Crossings of one lane closer than this along it are ONE 踏切 (a double track is two `Crossing`s 4 m apart). */
     public static final double CROSSING_GROUP = 25.0;
 

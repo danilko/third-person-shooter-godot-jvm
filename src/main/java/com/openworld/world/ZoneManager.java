@@ -2236,11 +2236,18 @@ public class ZoneManager extends Node {
 		for (int k = 0; k < slots; k++) {
 			double s = lane.isLoop() ? k * TRAFFIC_SPAWN_CLEARANCE
 					: Math.min(k * TRAFFIC_SPAWN_CLEARANCE, total * 0.9);
+			if (onCrossing(lane, s)) continue;
 			Vector3 p = lane.pointAtLength(s);
 			if (p == null || !isClear(p)) continue;
 			return new Placement(lane, p, travelDirection(lane, s, total));
 		}
 		return null;
+	}
+
+	/** A slot on a level crossing (or between its hold line and its far side) is never a spawn slot. */
+	private static boolean onCrossing(Lane lane, double s) {
+		TrainSystem trains = TrainSystem.get();
+		return trains != null && lane instanceof Node n && trains.onCrossing(n.getName().toString(), s);
 	}
 
 	/** Unit direction of travel at arc length {@code s} (with the lane's grade), or null where the lane gives none. */

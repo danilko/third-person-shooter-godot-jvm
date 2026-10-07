@@ -1,6 +1,7 @@
 #!/bin/bash
 # PLAN.md R-9: the Steam Deck proxy perf gate. Runs tools/godot/probe_walk_perf.gd --deck (NEEDS A DISPLAY) once as
-# shipped and once per control (--no-peds, --no-traffic, --no-buildings), then attributes each system's cost per leg
+# shipped, once per control (--no-peds, --no-traffic, --no-buildings) and once at PEAK enforcement load
+# (--wanted=6 --gang=4, reported, not judged), then attributes each system's cost per leg
 # as (shipped deck_ms p50 - control deck_ms p50) and judges it against tools/godot/perf_budget.json's
 # `systems_deck_ms_p50`, and the shipped run against its frame / count budgets.
 #   tools/perf_gate.sh [--legs=a,b] [--quick]     (--quick: the shipped run only, no attribution)
@@ -24,6 +25,7 @@ if [ -z "$QUICK" ]; then
     run no-peds --no-peds
     run no-traffic --no-traffic
     run no-buildings --no-buildings
+    run peak --wanted=6 --gang=4
 fi
 python3 - "$OUT" <<'PY'
 import json, re, sys, os
@@ -50,6 +52,11 @@ for sysname, ctl in (("peds", "no-peds"), ("traffic", "no-traffic"), ("buildings
     fail += not ok
     print("SYSTEM %-10s worst leg %-18s %+6.2f deck ms p50 (budget %.1f) %s" % (sysname, worst[1], worst[0], budget,
                                                                               "ok" if ok else "OVER"))
+pk = legs("peak")
+for k in sorted(pk):
+    if k in base:
+        print("PEAK   %-18s p50 %6.1f -> %6.1f (%+.1f)  p95 %6.1f -> %6.1f (%+.1f) deck ms  (wanted 6, gang 4)" % (
+            k, base[k][0], pk[k][0], pk[k][0] - base[k][0], base[k][1], pk[k][1], pk[k][1] - base[k][1]))
 print("logs in", out)
 sys.exit(1 if fail else 0)
 PY
