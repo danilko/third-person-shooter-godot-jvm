@@ -86,6 +86,11 @@ check("coop: client stood at a shop counter", m is not None and m.group(1) != ""
 check("coop: the host accepted the client's purchase", "NetworkManager: shop sale" in chost, "")
 m = re.search(r"\[coop\] carries (\S+)=(true|false)", cclient)
 check("coop: the client's own body carries what it bought", m is not None and m.group(2) == "true", m.group(0) if m else "")
+mb = re.search(r"\[coop\] host buy \S+ unix_ms=(\d+)", chost)
+ms = re.search(r"\[coop\] host puppet carries .* unix_ms=(\d+)", cclient)
+lag = (int(ms.group(1)) - int(mb.group(1))) / 1000.0 if mb and ms else None
+check("coop: a HOST purchase reaches the client within 1 s", lag is not None and lag < 1.0,
+      ("%.2f s" % lag) if lag is not None else ("host bought: %s, client saw: %s" % (bool(mb), bool(ms))))
 m = re.search(r"\[coop\] respawn alive=(\w+) owned=(\w+) pos=(.*?) respawns=(-?\d+)", cclient)
 check("coop: the client is respawned, alive and owned", m is not None and m.group(1) == "true" and m.group(2) == "true"
       and int(m.group(4)) >= 1, m.group(0) if m else "")

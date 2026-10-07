@@ -40,8 +40,10 @@ public final class Places {
     public static final int LANDMARK_TIER = 2;
 
     /** One place: what to call it, where its blip sits, and where a waypoint on it should send you. */
-    /** {@code gang}: the gang that owns the place ("" none) -- where an abducted player is held (RespawnSystem). */
-    public record Place(String name, String kind, int tier, Vector3 at, Vector3 go, String gang) {}
+    /** {@code gang}: the gang that owns the place ("" none) -- where an abducted player is held (RespawnSystem).
+     *  {@code respawn}: where a downed player wakes at this building (its MARK_respawn points placed with it, world
+     *  frame; empty for a building that has none) -- outside, on the forecourt (PLAN.md 1c). */
+    public record Place(String name, String kind, int tier, Vector3 at, Vector3 go, String gang, List<Vector3> respawn) {}
 
     /** A named region of the island, as an XZ box in the Godot world frame. */
     public record Region(String name, double x0, double z0, double x1, double z1) {
@@ -69,6 +71,12 @@ public final class Places {
     private static Vector3 vec(Object o) {
         @SuppressWarnings("unchecked") List<Object> a = (List<Object>) o;
         return new Vector3((Double) a.get(0), (Double) a.get(1), (Double) a.get(2));
+    }
+
+    private static List<Vector3> spots(Object o) {
+        List<Vector3> out = new ArrayList<>();
+        if (o instanceof List<?> l) for (Object v : l) out.add(vec(v));
+        return out;
     }
 
     /** {@code <DIR><scene stem>.places.json} for the scene that is up, or "" with no scene. */
@@ -116,7 +124,7 @@ public final class Places {
             Map<String, Object> m = (Map<String, Object>) o;
             places.add(new Place(String.valueOf(m.get("name")), String.valueOf(m.get("kind")),
                     (int) (double) (Double) m.get("tier"), vec(m.get("at")), vec(m.get("go")),
-                    m.get("gang") == null ? "" : String.valueOf(m.get("gang"))));
+                    m.get("gang") == null ? "" : String.valueOf(m.get("gang")), spots(m.get("respawn"))));
         }
         for (Object o : (List<Object>) doc.get("regions")) {
             Map<String, Object> m = (Map<String, Object>) o;

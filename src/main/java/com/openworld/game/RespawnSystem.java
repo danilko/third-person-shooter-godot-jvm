@@ -3,7 +3,6 @@ package com.openworld.game;
 import com.openworld.character.CharacterInfo;
 import com.openworld.character.Faction;
 import com.openworld.character.Player;
-import com.openworld.world.Door;
 import com.openworld.world.Places;
 import godot.annotation.Register;
 import godot.annotation.Script;
@@ -26,10 +25,11 @@ import java.util.List;
  * Death and arrest are not game over (PLAN.md W5, user decisions 2026-10-03). Two outcomes, named in Japanese and
  * English and NOT after another game's cards (user: "more Japan flavour, and avoid being too similar"):
  * <ul>
- *   <li><b>入院 HOSPITALIZED</b> -- a death: the player wakes at the door of the nearest hospital or clinic.</li>
- *   <li><b>逮捕 ARRESTED</b> -- {@link #arrest}: the player wakes in a CELL of the nearest police station (a
- *       {@code mission_marker} with {@code team = prisoner}, the 留置場 in {@code interior_plans.py}), once it has
- *       streamed in, and the station's locked doors open until the player is {@link #relockDistance} m away.</li>
+ *   <li><b>入院 HOSPITALIZED</b> -- a death: the player wakes outside the nearest hospital or clinic.</li>
+ *   <li><b>逮捕 ARRESTED</b> -- {@link #arrest}: the player is let go outside the nearest police station.</li>
+ *   Both on the building's authored respawn points (MARK_respawn, on its forecourt, carried in the places record),
+ *   facing the street; the fade-in waits for the world there to stream (PLAN.md 1c, user 2026-10-06: hospital and
+ *   police behave the same, outside -- GTA's steps; the interiors stay mission content).
  * </ul>
  * Either way, after {@link #cardSeconds} of the card the body is replaced by a fresh Player (full health, only the
  * fist: weapons are lost; wanted level cleared), and the running mission FAILS (user: "it ends the mission").
@@ -65,10 +65,10 @@ public class RespawnSystem extends Node {
 
     /** The place kinds a hospitalised player wakes at (world.Places kinds, nearest wins). */
     static final java.util.Set<String> HOSPITAL_KINDS = java.util.Set.of("Hospital", "HospitalSmall", "Clinic");
-    /** Seconds the cell is waited for after the respawn (it streams in with the station's building cell). */
-    public double cellWaitSeconds = 20.0;
-    public double relockDistance = 60.0;
-    public double cellSearchRadius = 90.0;
+    /** The fade-in waits at most this long for the world round the respawn point to finish streaming. */
+    public double streamWaitSeconds = 4.0;
+    /** A respawn point with a body within this distance is taken: the next one is used (co-op, two downs at once). */
+    public double pointClearance = 0.9;
 
     /** One player waiting to be respawned (on the authority). */
     private static final class Job {
@@ -95,10 +95,9 @@ public class RespawnSystem extends Node {
     /** The captive's prompt (pay the ransom, or run). */
     private Label captivePrompt;
     private Player fresh;
-    private Vector3 station;
-    private double cellWaitLeft = -1;
-    private final List<Door> unlocked = new ArrayList<>();
     private int respawns;
+    /** The fade-in is held (seconds left) until the world round the new body has streamed (no transform tear). */
+    private double streamWait = -1;
 
     private CanvasLayer overlay;
     private ColorRect black;
@@ -119,7 +118,6 @@ public class RespawnSystem extends Node {
     @Override
     public void _exitTree() {
         if (instance == this) instance = null;
-        unlocked.clear();
     }
 
     private com.openworld.net.NetworkManager net() {
@@ -216,6 +214,8 @@ public class RespawnSystem extends Node {
             reason = why;
             localDeadId = j.id;
             cardLeft = cardSeconds;
+            streamWait = -1;            // a previous respawn's fade still pending must not hide THIS card
+            fadeIn = -1;
             cardBill = why == Reason.ABDUCTED ? "身代金 ransom ¥" + String.format("%,d", recovery().ransom(j.gangStars))
                     : j.charged > 0 ? "¥" + String.format("%,d", j.charged) : "";
             showCard(true);
@@ -260,31 +260,32 @@ public class RespawnSystem extends Node {
                 fadeIn = 1.0;
             }
         }
+        if (streamWait >= 0) {
+            streamWait -= delta;
+            com.openworld.world.ZoneManager zm = com.openworld.world.ZoneManager.get();
+            if (zm == null || zm.streamingPendingNow() == 0 || streamWait < 0) {
+                streamWait = -1;
+                fadeIn = 1.0;
+            }
+        }
         if (fadeIn >= 0) {
             fadeIn -= delta;
             if (black != null) black.setColor(new Color(0f, 0f, 0f, (float) Math.max(0.0, fadeIn)));
             if (fadeIn < 0) showCard(false);
         }
         tickCaptive();
-        if (cellWaitLeft >= 0) {
-            cellWaitLeft -= delta;
-            if (fresh == null || !GD.isInstanceValid(fresh)) cellWaitLeft = -1;
-            else if (intoCell() || cellWaitLeft < 0) cellWaitLeft = -1;
-        }
-        if (!unlocked.isEmpty() && fresh != null && GD.isInstanceValid(fresh) && station != null
-                && fresh.getGlobalPosition().distanceTo(station) > relockDistance) {
-            for (Door d : unlocked) if (GD.isInstanceValid(d)) d.setLocked(true);
-            unlocked.clear();
-        }
     }
 
     private void respawn(Job j) {
         Player dead = j.dead != null && GD.isInstanceValid(j.dead) ? j.dead : null;
         Vector3 deathAt = dead != null ? dead.getGlobalPosition() : new Vector3();
-        // ARRESTED: the nearest police station (a koban has no cell); HOSPITALIZED: the nearest hospital or clinic.
-        // Either, else the scene's PlayerSpawn, else where it happened.
+        // ARRESTED: the nearest police station; HOSPITALIZED: the nearest hospital or clinic -- each woken OUTSIDE, on
+        // one of the building's authored respawn points (MARK_respawn, carried in the places record, so nothing has to
+        // be streamed; PLAN.md 1c, user 2026-10-06: hospital and police behave the same, GTA's steps). A place with
+        // no respawn points falls back to its door. ABDUCTED: the gang's place (its door; captivity is gameplay).
+        // Else the scene's PlayerSpawn, else where it happened.
         Vector3 to = null;
-        Vector3 at = null;
+        Vector3 from = null;
         double best = Double.MAX_VALUE;
         for (Places.Place p : Places.all()) {
             boolean fits = switch (j.reason) {
@@ -296,8 +297,8 @@ public class RespawnSystem extends Node {
             double d = p.at().distanceTo(deathAt);
             if (d < best) {
                 best = d;
-                to = p.go();
-                if (j.reason == Reason.ARRESTED) at = p.at();
+                from = p.at();
+                to = j.reason == Reason.ABDUCTED ? p.go() : freePoint(p);
             }
         }
         Node scene = getTree() != null ? getTree().getCurrentScene() : null;
@@ -315,12 +316,6 @@ public class RespawnSystem extends Node {
         com.openworld.net.NetworkManager net = net();
         boolean local = dead == null ? j.info.ownerPeerId == 0 || (net != null && net.isAuthorityFor(j.info))
                 : dead.isLocallyOwnedPlayer();
-        // a remote prisoner cannot be moved by the host later (the client owns its position): put it in the cell
-        // now if the station has streamed in here
-        if (!local && at != null) {
-            Node3D cell = cellNear(at);
-            if (cell != null) to = cell.getGlobalPosition();
-        }
         // tell every peer the old body is gone BEFORE the new one with the same id is announced
         if (net != null) net.announceDespawn(j.id);
         if (dead != null) {
@@ -338,6 +333,12 @@ public class RespawnSystem extends Node {
         Vector3 localPos = pos;
         if (container instanceof Node3D c3) localPos = c3.getGlobalTransform().affineInverse().times(pos);
         p.setPosition(localPos);
+        // facing AWAY from the building, out to the street; Player._ready copies the body's yaw into the camera rig,
+        // so the first frame is already behind the player
+        if (from != null) {
+            double dx = to.getX() - from.getX(), dz = to.getZ() - from.getZ();
+            if (dx * dx + dz * dz > 0.01) p.setRotation(new Vector3(0, Math.atan2(-dx, -dz) + Math.PI, 0));
+        }
         container.addChild(p);
         // a body spawned for a remote peer is that peer's puppet here (GameManager.spawnPlayerBody's rule)
         if (net != null && !net.isAuthorityFor(info)) p.attachController(new com.openworld.net.NetworkController());
@@ -356,9 +357,7 @@ public class RespawnSystem extends Node {
         if (local) {
             fresh = p;
             respawns++;
-            station = at;
-            cellWaitLeft = station != null ? cellWaitSeconds : -1;
-            fadeIn = 1.0;
+            streamWait = streamWaitSeconds;
         }
         GD.print("RespawnSystem: " + j.reason + " -> respawned " + j.id + (local ? "" : " (remote)") + " at " + to);
     }
@@ -397,41 +396,16 @@ public class RespawnSystem extends Node {
             GD.print("RespawnSystem: ransom paid");
     }
 
-    private Node3D cellNear(Vector3 where) {
-        Node3D cell = null;
-        double best = cellSearchRadius;
-        for (Node n : getTree().getNodesInGroup(new StringName("mission_marker"))) {
-            if (!(n instanceof Node3D m) || !"prisoner".equals(String.valueOf(m.getMeta(new StringName("team"), "")))) continue;
-            double d = m.getGlobalPosition().distanceTo(where);
-            if (d < best) { best = d; cell = m; }
+    /** The first of the place's respawn points with no body within {@link #pointClearance}; its door with none. */
+    private Vector3 freePoint(Places.Place p) {
+        if (p.respawn().isEmpty()) return p.go();
+        for (Vector3 v : p.respawn()) {
+            boolean taken = false;
+            for (Node n : getTree().getNodesInGroup(new StringName("characters")))
+                if (n instanceof Node3D c && c.getGlobalPosition().distanceTo(v) < pointClearance) { taken = true; break; }
+            if (!taken) return v;
         }
-        return cell;
-    }
-
-    /** Move the fresh body into a cell once the station has streamed in. True when done. */
-    private boolean intoCell() {
-        Node3D cell = cellNear(station);
-        if (cell == null) return false;
-        fresh.setGlobalPosition(cell.getGlobalPosition().plus(new Vector3(0, 0.1, 0)));
-        fresh.setVelocity(new Vector3());
-        // the station's locked doors open for the prisoner (cell doors are interior: never locked). The marker
-        // hangs under the building's own Markers node, so the building is two levels up.
-        Node building = cell.getParent() != null ? cell.getParent().getParent() : null;
-        unlockUnder(building);
-        GD.print("RespawnSystem: into the cell at " + cell.getGlobalPosition() + ", " + unlocked.size() + " door(s) unlocked");
-        return true;
-    }
-
-    private void unlockUnder(Node n) {
-        if (n == null) return;
-        if (n instanceof Door d) {
-            if (d.isLocked() && !unlocked.contains(d)) {
-                d.setLocked(false);
-                unlocked.add(d);
-            }
-            return;
-        }
-        for (Node c : n.getChildren()) unlockUnder(c);
+        return p.respawn().get(0);
     }
 
     private void showCard(boolean on) {
@@ -490,6 +464,6 @@ public class RespawnSystem extends Node {
     @Register public String lastReasonNow() { return reason.name(); }
     @Register public String cardTextNow() { return card != null && card.isVisible() ? card.getText() + " " + cardEn.getText() : ""; }
     @Register public Node respawnedPlayerNow() { return fresh; }
-    @Register public int doorsUnlockedNow() { return unlocked.size(); }
-    @Register public boolean inCellNow() { return fresh != null && cellWaitLeft < 0 && station != null; }
+    /** True once the local respawn's fade-in has begun (the world round it had streamed, or the wait ran out). */
+    @Register public boolean fadedInNow() { return fresh != null && streamWait < 0; }
 }

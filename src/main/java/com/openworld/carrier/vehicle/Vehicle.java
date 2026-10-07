@@ -996,16 +996,23 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         // a FROZEN body is the puppet mechanism (it moves kinematically and has no command): judge it by its motion
         if (isLocallySimulated() && !isFreezeEnabled()) {
             braking = this.braking || handBraking || (cmd.motor * forward < 0.0 && Math.abs(forward) > 0.5);
+        } else if (getNodeOrNull("VehicleNetworkController") instanceof com.openworld.net.VehicleNetworkController vnc) {
+            // a NETWORK puppet trusts the owner's brake bit only (PLAN.md 1c, user: a client's copy of a car showed
+            // its stop lamps on constantly): read off the interpolated motion, every snapshot hitch is a hard brake
+            braking = vnc.getLastBrake();
         } else {
-            Node n = getNodeOrNull("VehicleNetworkController");
-            braking = (n instanceof com.openworld.net.VehicleNetworkController vnc && vnc.getLastBrake())
-                    || (decel > BRAKE_DECEL && Math.abs(forward) > 0.5);
+            // any other frozen body (moved kinematically, no command): its motion, smoothed over ~0.3 s
+            double a = Math.min(1.0, dt / 0.3);
+            decelSmoothed += (decel - decelSmoothed) * a;
+            braking = decelSmoothed > BRAKE_DECEL && Math.abs(forward) > 0.5;
         }
         boolean reversing = forward < -REVERSE_SPEED;
         applyLights(alive && com.openworld.world.DayNight.lightsWanted(), alive && braking, alive && reversing);
     }
 
     private boolean lightsFar;
+    /** A non-network frozen body's deceleration, smoothed (Vehicle.refreshLights). */
+    private double decelSmoothed;
 
     private void setLightNodesVisible(boolean on) {
         for (Light3D l : new Light3D[] {headLeft, headRight, tailLeft, tailRight, reverseLight})

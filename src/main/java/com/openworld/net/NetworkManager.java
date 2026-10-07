@@ -539,6 +539,7 @@ public class NetworkManager extends Node {
         }
         broadcastSnapshotBatchChunked(entries);
         broadcastVehicleSnapshots();
+        flushChangedInventories();
         sweepInventoryBroadcast(now);
         sweepVehicleOccupancyBroadcast(now);
         sweepTimeOfDay(now);
@@ -2356,6 +2357,28 @@ public class NetworkManager extends Node {
                 && isBoundedString(elim.victimName()) && isBoundedString(elim.victimFaction())
                 && isBoundedString(elim.attackerName()) && isBoundedString(elim.attackerFaction())
                 && isBoundedString(elim.weaponName());
+    }
+
+    /** Characters whose inventory changed on the host since the last broadcast (a buy, a pickup, a drop). */
+    private final java.util.LinkedHashSet<Character> inventoryChanged = new java.util.LinkedHashSet<>();
+
+    /**
+     * Host: send THIS character's manifest with the next snapshot broadcast instead of waiting for its turn in the
+     * round-robin sweep (PLAN.md 1c: with ~70 characters loaded a full sweep is ~20 s, so a host's purchase took
+     * seconds to reach a client). The sweep stays as the backstop. Called by WeaponController on every slot change.
+     */
+    public void markInventoryChanged(Character character) {
+        if (character != null && isNetworked() && isServer()) inventoryChanged.add(character);
+    }
+
+    private void flushChangedInventories() {
+        if (inventoryChanged.isEmpty()) return;
+        for (Character c : inventoryChanged)
+            if (GD.isInstanceValid(c) && c.isInsideTree()) {
+                broadcastInventoryFor(c);
+                NetStats.increment("inventory_change_sent");
+            }
+        inventoryChanged.clear();
     }
 
     /** Host: every INVENTORY_SWEEP_INTERVAL_MS, broadcast the next character's slot manifest (round-robin). */

@@ -811,6 +811,13 @@ public class WeaponController extends Node {
 
     if (displaced != null && displaced.shouldDropToWorld()) returnWeaponToWorld(displaced, targetSlot);
     else if (displaced != null) displaced.setup(null, null, null);
+    inventoryChanged();
+  }
+
+  /** The slots changed: the host sends this character's manifest at once (NetworkManager.markInventoryChanged). */
+  void inventoryChanged() {
+    if (getNodeOrNull("/root/NetworkManager") instanceof NetworkManager net && getOwner() instanceof Character c)
+      net.markInventoryChanged(c);
   }
 
   /**
@@ -825,6 +832,7 @@ public class WeaponController extends Node {
     int slot = activeSlotIndex;
     weapons[slot] = null;
     current.hide();
+    inventoryChanged();
     // ThrowableItem with 0 carry count: clear refs but don't spawn a world pickup.
     if (current.shouldDropToWorld()) {
       pendingDrops.add(new PendingDrop(current, slot));
@@ -1251,6 +1259,7 @@ public class WeaponController extends Node {
     weapons[activeSlotIndex] = null;
     item.setup(null, null, null);
     item.hide();
+    inventoryChanged();
     item.queueFree();
     activateFirstAvailableSlot();
   }
@@ -1452,6 +1461,7 @@ public class WeaponController extends Node {
    * about Jolt not propagating setGlobalPosition on a frozen body.
    */
   private void returnWeaponToWorld(WeaponItem item, Vector3 spawnPos, Vector3 impulse) {
+    inventoryChanged();
     item.setup(null, null, null);
     item.show();
     item.onReturnedToWorld();

@@ -198,6 +198,42 @@ public class PedCrowd extends Node3D {
 		Clip stopClip;
 		boolean hidden;
 		boolean wantsFight;
+		// ── the shared schedule (PLAN.md 1c, user 2026-10-06: the crowd matches across co-op peers) ──
+		int index;            // its place in its zone's crowd: the id a promoted body carries (ped:<zone>:<index>)
+		long seed;            // hash of (zone id, index): everything about the ped is drawn from it
+		double phase;         // arc offset of its ping-pong walk (m)
+		final double[] stopOff = new double[SLOTS], stopDur = new double[SLOTS];
+		double stopTotal;     // seconds stopped per PERIOD
+		boolean promoted;     // a real body stands in for it (host: we promoted it; client: its body is here)
+		boolean gone;         // its body died: it never comes back
+		Vector3 lastBody;     // client: where its promoted body was last seen (for the hand-back)
+		boolean rejoin;       // off its schedule (after a flee, or handed back from a body): walking back onto it
+	}
+
+	/** How fast a ped that is off its schedule walks back onto it (m/s): a brisk walk. */
+	@Visible public double rejoinSpeed = 2.2;
+
+	/** The stop schedule repeats every SLOTS x SLOT seconds of the shared clock; each slot may hold one stop. */
+	static final int SLOTS = 8;
+	static final double SLOT = 40.0;
+	static final double PERIOD = SLOTS * SLOT;
+
+	/** SplitMix64: one well-mixed long from another (the seed of every per-ped draw). */
+	static long mix(long z) {
+		z += 0x9E3779B97F4A7C15L;
+		z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
+		z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL;
+		return z ^ (z >>> 31);
+	}
+
+	/** A ped's seed: the same on every peer for the same zone and index. */
+	public static long pedSeed(String zoneId, int index) { return mix(mix(zoneId.hashCode()) ^ (index * 0x632BE59BD9B4E019L)); }
+
+	/** The shared world clock (seconds): the trains' step clock, anchored to the wall clock, so peers agree. */
+	private double clock() {
+		TrainSystem ts = TrainSystem.get();
+		if (ts != null) return ts.clockNow();
+		return godot.api.Time.INSTANCE.getUnixTimeFromSystem();
 	}
 
 	private final List<Ped> peds = new ArrayList<>();
@@ -212,6 +248,8 @@ public class PedCrowd extends Node3D {
 
 	private ZoneManager owner;
 	private Object ownerZone;
+	/** The zone's id: the prefix of every promoted body's id ("ped:<zoneId>:<index>"). */
+	private String zoneId = "";
 
 	/** Every crowd in the tree, so a shot can ask them (a crowd ped has no collider). */
 	private static final List<PedCrowd> LIVE = new ArrayList<>();
@@ -230,40 +268,120 @@ public class PedCrowd extends Node3D {
 		this.ownerZone = zoneKey;
 	}
 
+	public void bind(ZoneManager manager, Object zoneKey, String zoneId) {
+		bind(manager, zoneKey);
+		this.zoneId = zoneId == null ? "" : zoneId;
+	}
+
+	/** The id a promoted body of this ped carries: the same on every peer. */
+	public String pedId(Object ped) { return ped instanceof Ped p ? "ped:" + zoneId + ":" + p.index : ""; }
+
 	public Object zoneKey() { return ownerZone; }
 
-	/** Add one ped walking {@code path} from arc position {@code along} in {@code dir} (+1 / -1). */
+	/** Add one ped walking {@code path} from arc position {@code along} in {@code dir} (+1 / -1) NOW (a probe
+	 *  stand): its schedule is rebased so it is there at this moment. */
 	@Register
 	public void addPed(PackedVector3Array path, double along, int dir) {
-		if (path.getSize() < 2) return;
+		Ped p = addSeeded(path, peds.size(), pedSeed(zoneId, peds.size()));
+		if (p != null) rebase(p, along, dir >= 0 ? 1 : -1, clock());
+	}
+
+	/**
+	 * Add ped number {@code index} of this zone's crowd, walking {@code path}. Everything about it -- its body, size,
+	 * pace, where on its walk it is at any moment of the shared clock, when it stops and with which clip, how it
+	 * reacts -- comes from {@code seed}, so every peer that loads the zone has the same people in the same places
+	 * at the same time, with no message (PLAN.md 1c; the trains' model).
+	 */
+	public Ped addSeeded(PackedVector3Array path, int index, long seed) {
+		if (path.getSize() < 2) return null;
 		List<Variant> vs = variants();
-		if (vs.isEmpty()) return;
+		if (vs.isEmpty()) return null;
 		ensureLayers(vs.size());
+		java.util.Random r = new java.util.Random(seed);
 		Ped p = new Ped();
+		p.index = index;
+		p.seed = seed;
 		p.path = path;
 		p.pts = new Vector3[path.getSize()];
 		p.cum = new double[path.getSize()];
 		for (int i = 0; i < p.pts.length; i++) p.pts[i] = path.get(i);
 		for (int i = 1; i < p.cum.length; i++) p.cum[i] = p.cum[i - 1] + p.pts[i].distanceTo(p.pts[i - 1]);
-		p.along = Math.max(0.5, Math.min(along, Math.max(0.5, length(p) - 0.5)));
-		p.dir = dir >= 0 ? 1 : -1;
-		p.variant = pickVariant(vs);
-		p.pace = 0.9 + 0.2 * rng.nextDouble();
-		p.scale = 0.96 + 0.08 * rng.nextDouble();
-		p.start = -rng.nextDouble() * 10.0;
-		int t = rng.nextInt(100);
+		p.variant = pickVariant(vs, r);
+		p.pace = 0.9 + 0.2 * r.nextDouble();
+		p.scale = 0.96 + 0.08 * r.nextDouble();
+		p.start = -r.nextDouble() * 10.0;
+		int t = r.nextInt(100);
 		p.temper = t < fightPercent ? TEMPER_FIGHT : t < fightPercent + cowerPercent ? TEMPER_COWER : TEMPER_FLEE;
-		p.timer = 15.0 + rng.nextDouble() * 45.0;
+		p.phase = r.nextDouble() * 2.0 * span(p);
+		for (int k = 0; k < SLOTS; k++) {
+			if (r.nextDouble() < 0.6) {
+				p.stopDur[k] = 4.0 + r.nextDouble() * 8.0;
+				p.stopOff[k] = r.nextDouble() * (SLOT - p.stopDur[k]);
+			}
+			p.stopTotal += p.stopDur[k];
+		}
 		p.slot = counts[p.variant]++;
 		peds.add(p);
 		growBuffer(p.variant);
+		place(p, clock());
+		return p;
+	}
+
+	/** The one-way length a ped walks (its path less 0.5 m at each end). */
+	private double span(Ped p) { return Math.max(0.01, length(p) - 1.0); }
+
+	/** Seconds of the shared clock {@code t} this ped has spent STOPPED (its repeating stop schedule). */
+	private double stoppedBy(Ped p, double t) {
+		if (!idleStops) return 0.0;
+		double n = Math.floor(t / PERIOD);
+		double r = t - n * PERIOD;
+		double acc = n * p.stopTotal;
+		int j = Math.min(SLOTS - 1, (int) Math.floor(r / SLOT));
+		for (int k = 0; k < j; k++) acc += p.stopDur[k];
+		acc += Math.max(0.0, Math.min(p.stopDur[j], r - j * SLOT - p.stopOff[j]));
+		return acc;
+	}
+
+	/** The ped's arc position on its ping-pong at shared time {@code t} (before folding). */
+	private double arcAt(Ped p, double t) { return p.phase + speed * p.pace * (t - stoppedBy(p, t)); }
+
+	/** Put the ped where its schedule says it is at {@code t}: along, direction, and walking or stopped. */
+	private void place(Ped p, double t) {
+		double L = span(p);
+		double u = (arcAt(p, t) % (2.0 * L) + 2.0 * L) % (2.0 * L);
+		p.along = 0.5 + (u < L ? u : 2.0 * L - u);
+		p.dir = u < L ? 1 : -1;
+		double n = Math.floor(t / PERIOD);
+		double r = t - n * PERIOD;
+		int j = Math.min(SLOTS - 1, (int) Math.floor(r / SLOT));
+		double in = r - j * SLOT - p.stopOff[j];
+		if (idleStops && p.stopDur[j] > 0.0 && in >= 0.0 && in < p.stopDur[j]) {
+			if (p.state != STOP) {
+				Variant v = variants().get(p.variant);
+				int k = (int) Math.floorMod(mix(p.seed ^ (long) (n * SLOTS + j)), 3L);
+				p.stopClip = k == 0 ? v.phone : k == 1 ? v.talk : v.idle;
+			}
+			p.state = STOP;
+		} else {
+			p.state = WALK;
+		}
+	}
+
+	/** Re-anchor the ped's schedule so it stands at {@code along}, heading {@code dir}, at {@code t} (after a flee,
+	 *  or handed back from a body): the walk carries on from there, on every peer from (nearly) the same place. */
+	private void rebase(Ped p, double along, int dir, double t) {
+		double L = span(p);
+		double a = Math.max(0.0, Math.min(L, along - 0.5));
+		double target = dir >= 0 ? a : 2.0 * L - a;
+		p.phase = target - speed * p.pace * (t - stoppedBy(p, t));
+		place(p, t);
 	}
 
 	/** A body by its crowd weight (character_gaits.json crowd_weights). */
-	private int pickVariant(List<Variant> vs) {
+	private int pickVariant(List<Variant> vs, java.util.Random rnd) {
 		double total = 0.0;
 		for (Variant v : vs) total += v.weight;
-		double r = rng.nextDouble() * total;
+		double r = rnd.nextDouble() * total;
 		for (int i = 0; i < vs.size(); i++) {
 			r -= vs.get(i).weight;
 			if (r < 0.0) return i;
@@ -303,7 +421,12 @@ public class PedCrowd extends Node3D {
 		layers[v].getMultimesh().setInstanceCount(cap);
 	}
 
-	@Register public int pedCount() { return peds.size(); }
+	@Register
+	public int pedCount() {
+		int n = 0;
+		for (Ped p : peds) if (!p.promoted && !p.gone) n++;
+		return n;
+	}
 
 	/** How many peds are drawn right now (hidden = a client's promote ring; beyond drawDistance counts too). */
 	@Register
@@ -317,7 +440,7 @@ public class PedCrowd extends Node3D {
 	@Register
 	public PackedVector3Array pedPositionsNow() {
 		PackedVector3Array out = new PackedVector3Array();
-		for (Ped p : peds) out.append(pointAt(p, p.along));
+		for (Ped p : peds) if (!p.promoted && !p.gone) out.append(pointAt(p, p.along));
 		return out;
 	}
 
@@ -325,7 +448,7 @@ public class PedCrowd extends Node3D {
 	@Register
 	public PackedFloat32Array pedHeightsNow() {
 		PackedFloat32Array out = new PackedFloat32Array();
-		for (Ped p : peds) out.append((float) bodyHeight(p));
+		for (Ped p : peds) if (!p.promoted && !p.gone) out.append((float) bodyHeight(p));
 		return out;
 	}
 
@@ -338,6 +461,26 @@ public class PedCrowd extends Node3D {
 	}
 
 	@Register public double walkedTotalNow() { return walkedTotal; }
+
+	/** This crowd's zone id (a probe readout). */
+	@Register public String zoneIdNow() { return zoneId; }
+
+	/** Every light ped, "index:x,z,state;..." (state 0 walk, 1 stop, 2 flee, 3 cower) -- run_net_crowd.sh compares the
+	 *  host's and a client's at the same shared-clock instant. Promoted and gone peds are left out. */
+	@Register
+	public String dumpNow() {
+		StringBuilder sb = new StringBuilder();
+		for (Ped p : peds) {
+			if (p.promoted || p.gone) continue;
+			Vector3 v = pointAt(p, p.along);
+			sb.append(p.index).append(':').append(String.format(java.util.Locale.ROOT, "%.2f,%.2f", v.getX(), v.getZ()))
+					.append(',').append(p.state).append(',').append(variants().get(p.variant).body).append(';');
+		}
+		return sb.toString();
+	}
+
+	/** The shared clock this crowd reads (a probe readout). */
+	@Register public double clockNow() { return clock(); }
 
 	/** How many peds are running from something right now (a probe readout). */
 	@Register
@@ -419,25 +562,33 @@ public class PedCrowd extends Node3D {
 		Camera3D cam = getViewport() != null ? getViewport().getCamera3d() : null;
 		Vector3 eye = cam != null ? cam.getGlobalPosition() : null;
 		boolean canPromote = owner != null && authoritative();
+		double now = clock();
+		if (!authoritative()) followHostBodies(now);
 		if (reactions) hear();
 		List<Vector3> aims = reactions ? aimPoints(players) : null;
 
 		Ped promote = null;
 		double promoteD = Double.MAX_VALUE;
 		for (Ped p : peds) {
+			if (p.promoted || p.gone) {
+				p.hidden = true;
+				write(p, null);
+				continue;
+			}
 			Vector3 here = pointAt(p, p.along);
 			if (aims != null) {
 				for (Vector3 a : aims) {
 					if (here.distanceTo(a) <= aimedAtRadius + 1.0) { scare(p, a); if (canPromote) p.wantsFight = true; break; }
 				}
 			}
-			step(p, delta);
+			step(p, delta, now);
 			here = pointAt(p, p.along);
 			double d = nearest(here, px, pz, np);
 			boolean need = d < promoteDistance || (p.wantsFight && d < panicRange);
 			if (need && canPromote && d < promoteD) { promote = p; promoteD = d; }
-			boolean hide = !canPromote && d < promoteDistance;
-			if (!hide && drawDistance > 0.0 && eye != null && here.distanceTo(eye) > drawDistance) hide = true;
+			// A client draws its own copy of every ped the host has NOT promoted (followHostBodies hides the ones
+			// it has): the same people, in the same places, on both peers.
+			boolean hide = drawDistance > 0.0 && eye != null && here.distanceTo(eye) > drawDistance;
 			p.hidden = hide;
 			write(p, here);
 		}
@@ -445,14 +596,88 @@ public class PedCrowd extends Node3D {
 		if (promote != null) {
 			boolean fight = promote.wantsFight && promote.temper == TEMPER_FIGHT;
 			if (owner.promoteSidewalkPed(ownerZone, promote.path, promote.along, promote.dir, fight,
-					variants().get(promote.variant).body, panicLeft(promote))) {
-				removePed(promote);
+					variants().get(promote.variant).body, panicLeft(promote), pedId(promote))) {
+				markPromoted(promote);
 				promotedTotal++;
 			} else {
 				promote.wantsFight = false;        // refused (budget): it stays a ped and runs like the rest
 			}
 		}
 		upload();
+	}
+
+	/** A body now stands in for this ped: it is hidden (its slot drawn as nothing) until the body is handed back. */
+	private void markPromoted(Ped p) {
+		p.promoted = true;
+		p.hidden = true;
+		write(p, null);
+		dirty = true;
+	}
+
+	/**
+	 * The ped whose body this was is a ped again (ZoneManager's demotion on the host; on a client, the body
+	 * leaving). It carries on from where the body stood, on its schedule from there. A body that died takes its ped
+	 * with it.
+	 */
+	public void handBack(String characterId, Vector3 bodyAt, boolean dead) {
+		Ped p = pedOf(characterId);
+		if (p == null || !p.promoted) return;
+		p.promoted = false;
+		p.state = WALK;
+		if (dead) { p.gone = true; return; }
+		// it carries on from where the body stood and walks back onto its schedule (history-free: see step)
+		p.along = bodyAt != null ? project(p, bodyAt) : p.along;
+		p.rejoin = true;
+		dirty = true;
+	}
+
+	/** The ped a promoted body's id names, in this crowd, or null. */
+	private Ped pedOf(String characterId) {
+		String pre = "ped:" + zoneId + ":";
+		if (characterId == null || !characterId.startsWith(pre)) return null;
+		int idx;
+		try { idx = Integer.parseInt(characterId.substring(pre.length())); } catch (NumberFormatException e) { return null; }
+		for (Ped q : peds) if (q.index == idx) return q;
+		return null;
+	}
+
+	/**
+	 * Client: hide exactly the peds the HOST has promoted (their bodies arrive as ordinary replicated characters
+	 * with the id "ped:<zone>:<index>") and hand each back when its body leaves -- so the passer-by a client sees is
+	 * the person the host simulates, not one of its own standing in the same place.
+	 */
+	private void followHostBodies(double now) {
+		String pre = "ped:" + zoneId + ":";
+		java.util.Set<Integer> live = new java.util.HashSet<>();
+		for (Node n : getTree().getNodesInGroup(new godot.core.StringName("characters"))) {
+			if (!(n instanceof com.openworld.character.Character c) || c.characterInfo == null) continue;
+			String id = c.characterInfo.characterId;
+			if (id == null || !id.startsWith(pre)) continue;
+			Ped p = pedOf(id);
+			if (p == null) continue;
+			live.add(p.index);
+			p.lastBody = c.getGlobalPosition();
+			if (!c.isAlive()) p.gone = true;
+			if (!p.promoted) markPromoted(p);
+		}
+		for (Ped p : peds) {
+			if (p.promoted && !p.gone && !live.contains(p.index)) handBack("ped:" + zoneId + ":" + p.index, p.lastBody, false);
+		}
+	}
+
+	/** The arc position on the ped's path nearest {@code at} (plan distance). */
+	private double project(Ped p, Vector3 at) {
+		double best = Double.MAX_VALUE, s0 = p.along;
+		for (int i = 0; i + 1 < p.pts.length; i++) {
+			Vector3 a = p.pts[i], b = p.pts[i + 1];
+			double dx = b.getX() - a.getX(), dz = b.getZ() - a.getZ();
+			double l2 = dx * dx + dz * dz;
+			double f = l2 < 1e-12 ? 0.0 : Math.max(0.0, Math.min(1.0, ((at.getX() - a.getX()) * dx + (at.getZ() - a.getZ()) * dz) / l2));
+			double qx = a.getX() + dx * f - at.getX(), qz = a.getZ() + dz * f - at.getZ();
+			double d = qx * qx + qz * qz;
+			if (d < best) { best = d; s0 = p.cum[i] + f * (p.cum[i + 1] - p.cum[i]); }
+		}
+		return s0;
 	}
 
 	/** True when the buffers changed since the last upload outside a tick (a promotion by a shot or a blast). */
@@ -506,11 +731,11 @@ public class PedCrowd extends Node3D {
 	 * the damage. Authoritative peer only; null when this crowd cannot promote.
 	 */
 	public com.openworld.character.AICharacter promoteHit(CrowdHit hit) {
-		if (!(hit.ped() instanceof Ped p) || owner == null || !authoritative() || !peds.contains(p)) return null;
+		if (!(hit.ped() instanceof Ped p) || owner == null || !authoritative() || !peds.contains(p) || p.promoted) return null;
 		com.openworld.character.AICharacter ai = owner.promoteForShot(ownerZone, p.path, p.along, p.dir,
-				variants().get(p.variant).body, panicLeft(p));
+				variants().get(p.variant).body, panicLeft(p), pedId(p));
 		if (ai != null) {
-			removePed(p);
+			markPromoted(p);
 			promotedTotal++;
 			if (dirty) upload();   // outside this crowd's tick: do not draw the ped beside its body for a frame
 		}
@@ -594,42 +819,49 @@ public class PedCrowd extends Node3D {
 				foot.getX(), foot.getY(), foot.getZ(), height, radius);
 	}
 
-	/** Advance one ped's state and place by dt. */
-	private void step(Ped p, double dt) {
-		double moved = 0.0;
+	/**
+	 * Advance one ped by dt. Calm, it is wherever the shared schedule puts it at {@code now}. Scared, it runs or
+	 * cowers for its panic seconds (a local override: every peer hears the same gunfire, roughly together), then
+	 * picks its schedule up again from where it ended up.
+	 */
+	private void step(Ped p, double dt, double now) {
 		switch (p.state) {
-			case WALK -> {
-				moved = speed * p.pace * dt;
-				p.timer -= dt;
-				if (idleStops && p.timer <= 0.0) {
-					p.state = STOP;
-					Variant v = variants().get(p.variant);
-					int k = rng.nextInt(3);
-					p.stopClip = k == 0 ? v.phone : k == 1 ? v.talk : v.idle;
-					p.timer = 4.0 + rng.nextDouble() * 8.0;
-				}
-			}
-			case STOP -> {
-				p.timer -= dt;
-				if (p.timer <= 0.0) { p.state = WALK; p.timer = 20.0 + rng.nextDouble() * 50.0; }
-			}
 			case FLEE -> {
-				moved = fleeSpeed * dt;
+				double moved = fleeSpeed * dt;
 				p.timer -= dt;
-				if (p.timer <= 0.0) { p.state = WALK; p.timer = 20.0 + rng.nextDouble() * 50.0; p.wantsFight = false; }
+				p.along += p.dir * moved;
+				walkedTotal += moved;
+				double L = length(p);
+				if (p.along >= L - 0.5) { p.along = Math.max(0.5, L - 0.5); p.dir = -1; }
+				if (p.along <= 0.5) { p.along = 0.5; p.dir = 1; }
+				if (p.timer <= 0.0) { p.state = WALK; p.wantsFight = false; p.rejoin = true; }
 			}
 			case COWER -> {
 				p.timer -= dt;
-				if (p.timer <= 0.0) { p.state = WALK; p.timer = 20.0 + rng.nextDouble() * 50.0; p.wantsFight = false; }
+				if (p.timer <= 0.0) { p.state = WALK; p.wantsFight = false; p.rejoin = true; }
 			}
-			default -> { }
-		}
-		if (moved > 0.0) {
-			p.along += p.dir * moved;
-			walkedTotal += moved;
-			double L = length(p);
-			if (p.along >= L - 0.5) { p.along = Math.max(0.5, L - 0.5); p.dir = -1; }
-			if (p.along <= 0.5) { p.along = 0.5; p.dir = 1; }
+			default -> {
+				double before = p.along;
+				if (p.rejoin) {
+					// walk back onto the schedule rather than re-anchoring it: the schedule stays a function of the
+					// shared clock ALONE, so a peer that joined later (and never saw this ped run) agrees with us
+					int dirWas = p.dir;
+					place(p, now);
+					double target = p.along;
+					double step = rejoinSpeed * dt;
+					if (Math.abs(target - before) <= step) {
+						p.rejoin = false;
+					} else {
+						p.dir = target > before ? 1 : -1;
+						p.along = before + p.dir * step;
+						p.state = WALK;
+						if (p.dir == 0) p.dir = dirWas;
+					}
+				} else {
+					place(p, now);
+				}
+				walkedTotal += Math.abs(p.along - before) < 5.0 ? Math.abs(p.along - before) : 0.0;
+			}
 		}
 	}
 
@@ -666,23 +898,6 @@ public class PedCrowd extends Node3D {
 		b[o + 19] = clip.fps * rate;
 	}
 
-	/** A promoted ped leaves the buffer: the last instance of its body type moves into its slot. */
-	private void removePed(Ped p) {
-		int v = p.variant;
-		int last = --counts[v];
-		if (p.slot != last) {
-			for (Ped q : peds) {
-				if (q.variant == v && q.slot == last) {
-					System.arraycopy(bufs[v], last * FLOATS, bufs[v], p.slot * FLOATS, FLOATS);
-					q.slot = p.slot;
-					break;
-				}
-			}
-		}
-		peds.remove(p);
-		dirty = true;
-	}
-
 	/** True where this peer decides what exists: single player, or the host. */
 	private boolean authoritative() {
 		Node n = getNodeOrNull("/root/NetworkManager");
@@ -707,6 +922,7 @@ public class PedCrowd extends Node3D {
 					&& st.type != StimulusManager.Type.WEAPON_DRAWN) continue;
 			double r = Math.min(panicRange, st.radius);
 			for (Ped p : peds) {
+				if (p.promoted || p.gone) continue;
 				if (pointAt(p, p.along).distanceTo(st.origin) <= r) scare(p, st.origin);
 			}
 		}

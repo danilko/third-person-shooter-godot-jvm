@@ -638,6 +638,7 @@ public class DebugHarness extends Node {
             else if ("--net-diag".equals(arg)) { NetworkManager.NET_DEBUG_VEHICLES = true; }
             else if (arg.startsWith("--hold-action=")) { holdAction = arg.substring("--hold-action=".length()); }
             else if ("--coop-test".equals(arg)) { coopTest = true; }
+            else if ("--crowd-dump".equals(arg)) { crowdDump = true; }
             else if ("--car-trace".equals(arg)) { com.openworld.net.VehicleNetworkController.TRACE = true; }
         }
         setPhysicsProcess(autoWalk || dumpCollisionDelay > 0.0 || spawnRoutesDelay > 0.0 || netDelay > 0.0 || holdAction != null
@@ -668,6 +669,54 @@ public class DebugHarness extends Node {
         return null;
     }
 
+    /**
+     * {@code -- --crowd-dump} (tools/net/run_net_crowd.sh, PLAN.md 1c): after 50 s, each time the SHARED clock crosses a
+     * multiple of 10 s (four times), print every light ped of every crowd -- host and client then name the same
+     * instant, and the script compares them ped by ped.
+     */
+    private boolean crowdDump = false;
+    private double crowdT = 0.0;
+    private long crowdBucket = Long.MIN_VALUE;
+    private int crowdDumps = 0;
+
+    private void crowdDumpTick(double delta) {
+        crowdT += delta;
+        if (crowdT < 50.0 || crowdDumps >= 4) return;
+        java.util.List<com.openworld.world.PedCrowd> crowds = new java.util.ArrayList<>();
+        collectCrowds(getTree().getRoot(), crowds);
+        if (crowds.isEmpty()) return;
+        double clock = crowds.get(0).clockNow();
+        long b = (long) Math.floor(clock / 10.0);
+        if (crowdBucket == Long.MIN_VALUE) { crowdBucket = b; return; }
+        if (b == crowdBucket) return;
+        crowdBucket = b;
+        crowdDumps++;
+        for (com.openworld.world.PedCrowd c : crowds)
+            GD.print("[crowd] bucket=" + b + " clock=" + String.format(java.util.Locale.ROOT, "%.3f", clock)
+                    + " zone=" + c.zoneIdNow() + " peds=" + c.dumpNow());
+    }
+
+    private static void collectCrowds(Node n, java.util.List<com.openworld.world.PedCrowd> out) {
+        if (n instanceof com.openworld.world.PedCrowd c) { out.add(c); return; }
+        for (Node k : n.getChildren()) collectCrowds(k, out);
+    }
+
+    private java.util.Set<String> coopHostCarried = new java.util.HashSet<>();
+    private double coopHostSeenAt = -1;
+    private boolean coopHostBought = false;
+
+    /** Client: every catalog weapon any shop sells that the HOST's puppet here carries. */
+    private java.util.Set<String> hostPuppetCarries() {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        for (Player p : PlayerRegistry.getPlayers()) {
+            if (!GD.isInstanceValid(p) || p.isLocalOwnedPlayer()) continue;
+            for (Node n : getTree().getNodesInGroup(new StringName(com.openworld.item.ShopCounter.GROUP)))
+                if (n instanceof com.openworld.item.ShopCounter c)
+                    for (String id : c.items()) if (com.openworld.item.WeaponGrant.carries(p, id)) out.add(id);
+        }
+        return out;
+    }
+
     private void coopTick(double delta) {
         coopT += delta;
         NetworkManager net = getNodeOrNull("/root/NetworkManager") instanceof NetworkManager n ? n : null;
@@ -692,6 +741,44 @@ public class DebugHarness extends Node {
                     me.setVelocity(new godot.core.Vector3());
                     GD.print("[coop] at counter " + best.getPath() + " item=" + coopItem);
                 } else GD.print("[coop] no shop counter");
+            }
+            if (!client && me != null) {
+                // the HOST buys too (PLAN.md 1c: a host purchase took seconds to reach the client): the first weapon its
+                // nearest counter sells that it does not carry
+                com.openworld.item.ShopCounter best = null;
+                double d0 = Double.MAX_VALUE;
+                for (Node n : getTree().getNodesInGroup(new StringName(com.openworld.item.ShopCounter.GROUP))) {
+                    if (n instanceof com.openworld.item.ShopCounter c) {
+                        double d = c.getGlobalPosition().distanceTo(me.getGlobalPosition());
+                        if (d < d0) { d0 = d; best = c; }
+                    }
+                }
+                if (best != null) {
+                    for (String id : best.items())
+                        if (!com.openworld.item.WeaponGrant.carries(me, id) && !com.openworld.item.ShopCounter.isSupply(id)) { coopItem = id; break; }
+                    me.setGlobalPosition(best.getGlobalPosition().plus(new godot.core.Vector3(0.6, 0.1, 0)));
+                    me.setVelocity(new godot.core.Vector3());
+                }
+            }
+            if (client) coopHostCarried = hostPuppetCarries();
+        }
+        if (coopStep >= 1 && client && coopHostSeenAt < 0) {
+            java.util.Set<String> now = hostPuppetCarries();
+            now.removeAll(coopHostCarried);
+            if (!now.isEmpty()) {
+                coopHostSeenAt = coopT;
+                GD.print("[coop] host puppet carries " + now + " unix_ms=" + (long) (godot.api.Time.INSTANCE.getUnixTimeFromSystem() * 1000.0));
+            }
+        }
+        if (!client && !coopHostBought && coopT >= 26.0 && me != null && !coopItem.isEmpty()) {
+            // the client starts ~6 s after the host: buying at 26 s puts it well after the client's "before" look
+            coopHostBought = true;
+            for (Node n : getTree().getNodesInGroup(new StringName(com.openworld.item.ShopCounter.GROUP))) {
+                if (n instanceof com.openworld.item.ShopCounter c && c.holds(me.getGlobalPosition(), 1.0)) {
+                    c.buy(me, coopItem);
+                    GD.print("[coop] host buy " + coopItem + " unix_ms=" + (long) (godot.api.Time.INSTANCE.getUnixTimeFromSystem() * 1000.0));
+                    break;
+                }
             }
         }
         if (coopStep == 1 && coopT >= 16.5) {
@@ -736,6 +823,7 @@ public class DebugHarness extends Node {
     @Override
     public void _physicsProcess(double delta) {
         if (coopTest) coopTick(delta);
+        if (crowdDump) crowdDumpTick(delta);
         if (holdAction != null) {
             holdDelay -= delta;
             if (holdDelay <= 0.0) godot.api.Input.actionPress(new StringName(holdAction));

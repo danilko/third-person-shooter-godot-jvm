@@ -14,6 +14,8 @@ extends SceneTree
 ##                  rather than arrest; the player is invulnerable) and/or N stars with gang_a, so the enforcement
 ##                  dispatch's officers, patrol cars and gang hunters are in the ring for every leg
 ##       [--no-balance]   control: the dispatch adds on top of the ambient budgets (ZoneManager.enforcementBalancing)
+##       [--traffic-budget=N] [--sim-radius=M]   PLAN.md 2c sweeps: ZoneManager's car budget and simulation ring
+##       [--haze=<end m>]   PLAN.md 2b: Sky3D's distance haze on, ending at that distance (start at a third of it)
 ##       [--deck]   the Steam Deck PROXY (PLAN.md R-9): 1280x800, each frame's deck_ms = max(cpu x cpu_factor,
 ##                  gpu x gpu_factor) from tools/godot/perf_budget.json, judged against its frame and count budgets;
 ##                  prints a `DECK <leg> p50 p95` line per leg that tools/perf_gate.sh reads for per-system attribution
@@ -205,13 +207,16 @@ func _leg(label: String, path: Array, speed: float) -> void:
 	if under_terrain > under0:
 		print("    UNDER the terrain on %d frames of this leg" % (under_terrain - under0))
 	var slow := 0
+	var over60 := 0
 	for v in ft:
 		if v > 33.3:
 			slow += 1
+		if v > 16.7:
+			over60 += 1
 	legs_out.append([label, _pct(ft, 0.5), _pct(ft, 0.95), _pct(ft, 0.99), ft.max() if not ft.is_empty() else 0.0, slow, ft.size()])
-	print("  %-22s %5d frames | frame ms p50 %6.2f p95 %6.2f p99 %6.2f worst %7.2f | %4.1f%% under 30 fps | phys ms p50 %.2f p95 %.2f | ticks/frame p95 %d"
+	print("  %-22s %5d frames | frame ms p50 %6.2f p95 %6.2f p99 %6.2f worst %7.2f | %4.1f%% over 16.7 ms | %4.1f%% under 30 fps | phys ms p50 %.2f p95 %.2f | ticks/frame p95 %d"
 			% [label, ft.size(), _pct(ft, 0.5), _pct(ft, 0.95), _pct(ft, 0.99), ft.max() if not ft.is_empty() else 0.0,
-			100.0 * slow / max(1, ft.size()), _pct(ph, 0.5), _pct(ph, 0.95), int(_pct(ticks, 0.95))])
+			100.0 * over60 / max(1, ft.size()), 100.0 * slow / max(1, ft.size()), _pct(ph, 0.5), _pct(ph, 0.95), int(_pct(ticks, 0.95))])
 	if deck:
 		var fb := float(budget_cfg.get("frame_deck_ms_p95", 33.3))
 		var cb: Dictionary = budget_cfg.get("counts_p95", {})
@@ -271,6 +276,23 @@ func _initialize() -> void:
 	player.get_node("Health").set("max_health", 1000000.0)
 	if _arg("wanted") != null or _arg("gang") != null:
 		player.get_node("Health").set("invulnerable", true)
+	if zm != null and _arg("traffic-budget") != null:
+		zm.set("traffic_budget", int(_arg("traffic-budget")))
+		print("SWEEP: traffic budget %d" % int(_arg("traffic-budget")))
+	if zm != null and _arg("sim-radius") != null:
+		zm.set("traffic_sim_radius", float(_arg("sim-radius")))
+		print("SWEEP: traffic simulation ring %.0f m" % float(_arg("sim-radius")))
+	if _arg("haze") != null:
+		var sky := w.get_node_or_null("Sky3D")
+		var dome := w.get_node_or_null("Sky3D/SkyDome")
+		var end_m := float(_arg("haze"))
+		if sky != null:
+			sky.set("fog_enabled", true)
+		if dome != null:
+			dome.set("fog_visible", true)
+			dome.set("fog_start", end_m / 3.0)
+			dome.set("fog_end", end_m)
+		print("SWEEP: haze %.0f .. %.0f m" % [end_m / 3.0, end_m])
 	if _arg("no-balance", false) and zm != null:
 		zm.set("enforcement_balancing", false)
 		print("CONTROL: no enforcement balancing")

@@ -2,7 +2,7 @@
 
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/Arena.tscn" id="1"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/FactorySmall.tscn" id="2"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/Koban.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/Koban_Shop.tscn" id="3"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/OfficeMid_W10.tscn" id="4"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ParkingLot14.tscn" id="5"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ParkingLot28.tscn" id="6"]
@@ -185,10 +185,10 @@ transform = Transform3D(-0.999999, 0, -0.001414, 0, 1, 0, 0.001414, 0, -0.999999
 [node name="Mesh" parent="./FactorySmall_010" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="Koban_011" parent="." instance=ExtResource("3")]
+[node name="Koban_Shop_011" parent="." instance=ExtResource("3")]
 transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, 143.500, 5.740, 667.500)
 
-[node name="Mesh" parent="./Koban_011" index="0"]
+[node name="Mesh" parent="./Koban_Shop_011" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
 [node name="FactorySmall_012" parent="." instance=ExtResource("2")]

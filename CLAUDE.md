@@ -10937,10 +10937,13 @@ PLAN.md "NEXT (2026-09-29 night)", one `island_world.sh --from land` rebuild.
 Gated since (probe_wanted_respawn, probe_shop_clerk, probe_weapon_counter PASS); co-op half below.
 - **Death and arrest are not game over in single player** (`game.RespawnSystem`, a child GameManager builds in code).
   The two outcomes are named in Japanese + English and deliberately NOT after another game's cards (user: Japan flavour,
-  and to avoid an infringement claim): a death is **入院 HOSPITALIZED** (wake at the nearest Hospital / HospitalSmall /
-  Clinic door, `world.Places`); `RespawnSystem.arrest(player)` is **逮捕 ARRESTED** (wake at the nearest
-  PoliceStation, moved onto a `mission_marker` `team = prisoner` -- the 留置場 cells -- once it streams in; the
-  station's locked `Door`s unlock until the player is 60 m away). Since 2026-10-06 a third outcome, 拉致 ABDUCTED, and
+  and to avoid an infringement claim): a death is **入院 HOSPITALIZED** and `RespawnSystem.arrest(player)` is **逮捕 ARRESTED**:
+  BOTH wake OUTSIDE (user, 2026-10-06), on the nearest Hospital / HospitalSmall / Clinic or PoliceStation's authored
+  respawn points -- `MARK_respawn` Empties in the building's .blend, copied placed into the places record (`respawn`)
+  by `island_buildings.py places`, so nothing has to stream; the first point free of bodies, facing the street, the
+  fade held until `ZoneManager.streamingPendingNow()` is 0 (max 4 s). Those buildings stand open (`_Shop`); the cells
+  and armoury are mission content. Gate `tools/godot/probe_respawn_points.gd` (ground, capsule clear, a wall between
+  the point and the building; `--control` moves each point inside). Since 2026-10-06 a third outcome, 拉致 ABDUCTED, and
   bills: see "Police and gang dispatch, and where a downed player wakes". Either: a 4 s card (the sign font, `make_jp_font.py`
   `UI_WORDS`), the running mission FAILS, a fresh Player (fist only, wanted cleared). `GameManager.onCharacterDied` skips GAME_OVER when
   `RespawnSystem.willRespawn`. In co-op the HOST runs it per player (see "Co-op correctness batch"). `enabled` off is the

@@ -204,9 +204,21 @@ func _pick(lo: float, hi: float, h: float) -> Vector3:
 			continue
 		var q := PhysicsRayQueryParameters3D.create(cam.global_position, (v as Vector3) + Vector3(0, h, 0), 1)
 		q.exclude = [player.get_rid()]
-		if player.get_world_3d().direct_space_state.intersect_ray(q).is_empty():
+		if player.get_world_3d().direct_space_state.intersect_ray(q).is_empty() and not _ped_on_line(cam.global_position, v, h):
 			bd = d; best = v
 	return best
+
+## Another light ped stands on the line of fire to `v` (within 0.8 m of it): the shot would hit that one first.
+func _ped_on_line(from: Vector3, v: Vector3, h: float) -> bool:
+	var to := v + Vector3(0, h, 0)
+	for o in _all_peds():
+		if (o as Vector3).distance_to(v) < 0.05:
+			continue
+		var mid := (o as Vector3) + Vector3(0, 1.0, 0)
+		var t := clampf((mid - from).dot(to - from) / (to - from).length_squared(), 0.0, 1.0)
+		if (from + (to - from) * t).distance_to(mid) < 0.8 and t < 0.98:
+			return true
+	return false
 
 ## Fire one pull at `ped` + h; returns [the new body nearest the ped (or null), its health after].
 func _shoot(gun: Node3D, ped: Vector3, h: float) -> Array:
@@ -256,7 +268,23 @@ func _run() -> void:
 	await _wait(1.0)
 	var ps := _all_peds()
 	check(ps.size() > 20, "the probe zone filled its crowd (%d light peds)" % ps.size())
-	_put_player(ps[0] + Vector3(0, 1.0, 0))
+	# stand at a ped that HAS another 12-30 m off (the first REV1 case): the crowd is spread over the zone's whole
+	# radius, so the first ped in the list need not have one
+	# ...and NOT inside that ped (a light ped has no collider, and the muzzle would start inside its body): 1.5 m
+	# along the footway toward the neighbour
+	var stand: Vector3 = ps[0]
+	for a in ps:
+		var has := 0
+		var toward := Vector3.ZERO
+		for b in ps:
+			var d := (a as Vector3).distance_to(b)
+			if d >= 14.0 and d <= 28.0:
+				has += 1
+				toward = ((b as Vector3) - (a as Vector3)).normalized()
+		if has >= 2:
+			stand = (a as Vector3) + Vector3(toward.x, 0, toward.z) * 1.5
+			break
+	_put_player(stand + Vector3(0, 1.0, 0))
 	await _wait(2.0)
 
 	var rev := await _arm("REV1")

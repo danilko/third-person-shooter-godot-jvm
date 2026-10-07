@@ -1591,17 +1591,22 @@ public class ZoneManager extends Node {
 		pool();
 		PedCrowd crowd = new PedCrowd();
 		container.addChild(crowd);
-		crowd.bind(this, t.marker);
+		String zid = zone.zoneId != null && !zone.zoneId.isEmpty() ? zone.zoneId : String.valueOf(t.marker.getName());
+		crowd.bind(this, t.marker, zid);
 		t.lz.crowd = crowd;
 		// R8 (PLAN.md review): ONE WORK ITEM PER PED. Each is an instantiate() of a skinned body plus its addChild, and a
 		// busy cell asks for 40: done here in one go, that was a frame of its own outside the streaming budget. As
 		// work items they drain with the rest of the zone's SPAWN phase, `streamBudgetMs` a frame (at least one item).
+		// SEEDED per (zone, index), never from a shared stream: every peer that loads this zone builds the same
+		// people on the same footways (PLAN.md 1c) -- PedCrowd then puts each where the shared clock says it is.
 		for (int i = 0; i < want; i++) {
+			final int index = i;
 			t.spawnWork.add(() -> {
 				if (!GD.isInstanceValid(crowd)) return;
-				Sidewalks.Spot walk = Sidewalks.randomNear(center, radius, sidewalkRng);
+				long seed = PedCrowd.pedSeed(zid, index);
+				Sidewalks.Spot walk = Sidewalks.randomNear(center, radius, new java.util.Random(seed ^ 0x5DEECE66DL));
 				if (walk == null) return;        // no footway data here: a zone with no city under it
-				crowd.addPed(walk.walk().packed(), walk.along(), sidewalkRng.nextBoolean() ? 1 : -1);
+				crowd.addSeeded(walk.walk().packed(), index, seed);
 			});
 		}
 		if (debugLog) {
@@ -1615,7 +1620,7 @@ public class ZoneManager extends Node {
 	 * SpawnConfig left, the pool exhausted), and the crowd then simply keeps walking it.
 	 */
 	boolean promoteSidewalkPed(Object zoneKey, PackedVector3Array path, double along, int dir) {
-		return promoteSidewalkPed(zoneKey, path, along, dir, false, "", 0.0);
+		return promoteSidewalkPed(zoneKey, path, along, dir, false, "", 0.0, "");
 	}
 
 	/**
@@ -1623,7 +1628,7 @@ public class ZoneManager extends Node {
 	 * has to land on something, and the damage follows in the same frame. Null when the zone cannot take one.
 	 */
 	com.openworld.character.AICharacter promoteForShot(Object zoneKey, PackedVector3Array path, double along, int dir,
-			String body, double panic) {
+			String body, double panic, String pedId) {
 		LoadedZone lz = loaded.get(zoneKey);
 		if (lz == null) return null;
 		ZoneMarker marker = (ZoneMarker) zoneKey;
@@ -1634,7 +1639,7 @@ public class ZoneManager extends Node {
 		}
 		Node container = charactersContainer();
 		if (cfg == null || container == null) return null;
-		return spawnSidewalkWalker(lz, cfg, container, path, along, dir, false, body, panic);
+		return spawnSidewalkWalker(lz, cfg, container, path, along, dir, false, body, panic, pedId);
 	}
 
 	/** Every live promoted sidewalk body, and how many of them fight: the two budgets above. */
@@ -1657,7 +1662,7 @@ public class ZoneManager extends Node {
 	 * same person ("" = the default). Refused (false) past a budget; the ped then stays light.
 	 */
 	boolean promoteSidewalkPed(Object zoneKey, PackedVector3Array path, double along, int dir, boolean fighter,
-			String body, double panic) {
+			String body, double panic, String pedId) {
 		int[] live = sidewalkBodies();
 		if (fighter ? (fighterBudget > 0 && live[1] >= effectiveFighterBudget())
 				: (walkerBudget > 0 && live[0] >= effectiveWalkerBudget())) return false;
@@ -1672,19 +1677,20 @@ public class ZoneManager extends Node {
 		if (cfg == null) return false;
 		Node container = charactersContainer();
 		if (container == null) return false;
-		return spawnSidewalkWalker(lz, cfg, container, path, along, dir, fighter, body, panic) != null;
+		return spawnSidewalkWalker(lz, cfg, container, path, along, dir, fighter, body, panic, pedId) != null;
 	}
 
 	/** The one place a full sidewalk walker is built, shared by a promotion and by nothing else today. */
 	private AICharacter spawnSidewalkWalker(LoadedZone lz, SpawnConfig cfg, Node container,
 											PackedVector3Array path, double along, int dir, boolean fighter,
-											String body, double panic) {
+											String body, double panic, String pedId) {
 		SpawnPool sp = pool();
 		AICharacter ai = sp.acquire();
 		if (ai == null) return null;
 		boolean recycled = sp.wasLastAcquireRecycled();
 		CharacterInfo info = new CharacterInfo();
-		info.characterId = UUID.randomUUID().toString();
+		// a crowd ped's body carries the PED's id (ped:<zone>:<index>), so a client hides exactly that light ped
+		info.characterId = pedId != null && !pedId.isEmpty() ? pedId : UUID.randomUUID().toString();
 		info.displayName = cfg.faction + " walker";
 		info.faction = fighter ? FIGHTER_FACTION : cfg.faction;
 		ai.characterInfo = info;
@@ -1732,7 +1738,11 @@ public class ZoneManager extends Node {
 			if (crowd == null || !GD.isInstanceValid(crowd)) continue;
 			for (int i = lz.pooled.size() - 1; i >= 0; i--) {
 				AICharacter ai = lz.pooled.get(i);
-				if (!GD.isInstanceValid(ai) || ai.isDead()) continue;
+				if (!GD.isInstanceValid(ai)) continue;
+				if (ai.isDead()) {
+					if (ai.characterInfo != null) crowd.handBack(ai.characterInfo.characterId, null, true);   // gone for good
+					continue;
+				}
 				if (!(ai.getController() instanceof com.openworld.ai.SidewalkWalkerController w)) continue;
 				if (nearestPlayerDistXZ(ai.getGlobalPosition()) <= crowd.demoteDistance) continue;
 				// A body stays a body for a while: one promoted a moment ago (a shot from 70 m, a fighter's
@@ -1741,7 +1751,9 @@ public class ZoneManager extends Node {
 				if (at != null && godot.api.Time.getTicksMsec() - at < DEMOTE_AFTER_MSEC) continue;
 				if (ai.getNodeOrNull("Health") instanceof com.openworld.character.Health hh && hh.hurtWithin(20.0)) continue;
 				promotedAtMsec.remove(ai.getInstanceId());
-				crowd.addPed(w.path, w.along, w.dir);
+				if (ai.characterInfo != null && ai.characterInfo.characterId.startsWith("ped:"))
+					crowd.handBack(ai.characterInfo.characterId, ai.getGlobalPosition(), false);
+				else crowd.addPed(w.path, w.along, w.dir);
 				lz.pooled.remove(i);
 				if (net != null && ai.characterInfo != null) net.announceDespawn(ai.characterInfo.characterId);
 				silenceWeaponAudio(ai);

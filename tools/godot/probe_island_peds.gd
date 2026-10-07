@@ -23,7 +23,7 @@ const AHEAD_MIN := 15           # must already be walking when it comes into vie
 # whole crowd at 693 worst in range costs +6.8 ms p50 downtown and +5.9 at the station, most of it the <= 12 PROMOTED
 # bodies (ZoneManager.walkerBudget), not the light tier
 const BUDGET := 750
-const PED_MAX := 40             # island_buildings.PED_MAX
+const PED_MAX := 200            # island_buildings.PED_MAX (raised 40 -> 200 in 935ae37e, denser street crowds)
 
 var w: Node
 var player: Node3D

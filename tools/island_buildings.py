@@ -989,9 +989,11 @@ CIVIC_SCENE = {"BankLarge": "_Open", "OfficeHQ": "_Open", "SafeHouseCityLarge": 
                "SafeHouseLarge": "_Open", "SecureMansion": "_Open", "WarehouseYard": "_Open",
                "DepartmentStore": "_Shop", "FashionBuilding": "_Shop", "CivicCenter": "_Shop", "Izakaya": "_Shop",
                "MaidCafe": "_Shop", "OnsenRyokan": "_Shop", "PostOffice": "_Shop", "PostOfficeSmall": "_Shop",
-               # open: a death respawns the player at a hospital door, and their counters sell medical supplies.
-               # Clinic is not listed: it is still a library massing with no interior (no _Shop scene)
-               "Hospital": "_Shop", "HospitalSmall": "_Shop", "SupermarketSite": "_Shop",
+               # open: a downed player wakes on a hospital's / clinic's / police station's forecourt (its MARK_respawn
+               # points, PLAN.md 1c), the hospital and clinic counters sell medical supplies, and a Japanese police
+               # station's lobby (and a koban) is public -- its cells and armoury stay a mission's business
+               "Hospital": "_Shop", "HospitalSmall": "_Shop", "Clinic": "_Shop", "PoliceStation": "_Shop",
+               "Koban": "_Shop", "SupermarketSite": "_Shop",
                "ParkingGarage": "_Shop"}   # a 立体駐車場 is always open: a hiding place and a chase short-cut
 CIVIC_LABELS = {"PoliceStation": ("Police Station", 1), "Koban": ("Police Box", 1), "FireStation": ("Fire Station", 1),
                 "FireBranch": ("Fire Station", 1), "PostOffice": ("Post Office", 1),
@@ -1407,6 +1409,30 @@ def site_places(text):
     return out
 
 
+_RESPAWN = None
+
+
+def respawn_marks():
+    """{building type: [(x, y, z)]} of every MARK_respawn in a kits/interiors piece, in the type's own frame (the
+    piece's Godot frame: a plot_origin custom stands on its piece's origin)."""
+    global _RESPAWN
+    if _RESPAWN is None:
+        _RESPAWN = {}
+        kit = os.path.join(ROOT, "assets", "world_source", "kits", "interiors", "pieces.json")
+        types = os.path.join(ROOT, "assets", "world_source", "buildings", "building_types.json")
+        if os.path.exists(kit) and os.path.exists(types):
+            k = json.load(open(kit))
+            pieces = k.get("pieces", k)
+            for row in json.load(open(types)).get("custom", []):
+                if row.get("kit") != "interiors" or not row.get("plot_origin"):
+                    continue
+                marks = (pieces.get(row.get("piece"), {}) or {}).get("marks", [])
+                pts = [tuple(m["pos"]) for m in marks if (m.get("props") or {}).get("kind") == "respawn"]
+                if pts:
+                    _RESPAWN[row["id"]] = pts
+    return _RESPAWN
+
+
 def write_places(placed, aabbs, text):
     """PLAN.md 3.18n: the map's own record of somewhere a player can GO, derived from what is already placed.
 
@@ -1438,6 +1464,12 @@ def write_places(placed, aabbs, text):
                       round(b["pos"][2] + c * z1, 2)]}
         if gang_of.get(b.get("civic")):
             row["gang"] = gang_of[b["civic"]]
+        spots = respawn_marks().get(b["type"])
+        if spots:
+            # where a downed player wakes (MARK_respawn in the building's own .blend, PLAN.md 1c), placed with the
+            # building, so game.RespawnSystem needs nothing streamed to put a body there
+            row["respawn"] = [[round(b["pos"][0] + lx * c + lz * sn, 2), round(b["pos"][1] + ly, 2),
+                               round(b["pos"][2] - lx * sn + lz * c, 2)] for lx, ly, lz in spots]
         places.append(row)
     for name, x, z in site_places(text):
         if name.startswith("Parking_"):
@@ -2235,6 +2267,10 @@ def drive_ramp(b):
 def scene_of(b):
     # a DEEP-pocket big building of a type a civic plot opens (a supermarket sells at its counter, a 立体駐車場 is always
     # open) stands as the same variant: one rule for "which of this type are walked into", wherever it was placed
+    # a civic plot's variant is CIVIC_SCENE's answer NOW, not the one recorded at the derive: opening a building type
+    # (the clinic and the police stations, PLAN.md 1c) is a `write`, never a re-derive
+    if b.get("civic") and b["type"] in CIVIC_SCENE:
+        return b["type"] + CIVIC_SCENE[b["type"]]
     if "scene" not in b and b.get("deep") and b["type"] in CIVIC_SCENE:
         return b["type"] + CIVIC_SCENE[b["type"]]
     return b.get("scene", b["type"])

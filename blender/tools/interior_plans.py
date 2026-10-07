@@ -281,6 +281,10 @@ def police_station(b):
     b.mark("spawn", -11.6, FY0 + 1.8, 0.0, 180.0, team="police", note="立番: the standing guard at the public gate")
     JP.guard_post(b, 11.6, FY0 + 0.4, 14.4, FY0 + 3.2, door_side="b")
     b.mark("spawn", 14.6, FY0 + 4.2, 0.0, 180.0, team="police", note="the vehicle gates' guard")
+    # where an ARRESTED player is let go (PLAN.md 1c, user 2026-10-06: outside, like the hospital -- GTA's police
+    # station steps): on the forecourt between the entrance and the public gate, beside the walk, facing the street
+    for x in (-12.6, -11.2, -6.8, -5.4):
+        b.mark("respawn", x, -14.0, F1, 180.0)
     for x, sgn in ((-15.2, 1), (15.2, -1)):                                           # the barriers, raised
         b.box("Site", (x - 0.15, FY0 + 0.3, 0.0), (x + 0.15, FY0 + 0.6, 1.1), "MI_PaintYellow")
         b.box("Site", (x - 0.1, FY0 + 0.35, 1.1), (x + 0.1, FY0 + 0.55, 5.2), "MI_PaintWhite")
@@ -676,6 +680,11 @@ def hospital(b):
     b.put("Hosp_WaitingBench", -9.2, -10.6, 180.0)
     b.put("Shop_ATM", -21.5, -10.0, 90.0)
     b.mark("spawn", -14.0, -7.0, F1, 0.0, team="civilian")
+    # where a HOSPITALIZED player wakes (PLAN.md 1c, user 2026-10-06: outside, on the entrance forecourt, GTA's
+    # hospital steps): side by side under the canopy, clear of the door, facing the street. Read by
+    # tools/island_buildings.py into the places record, so nothing has to be streamed for a respawn.
+    for x in (-18.4, -16.8, -11.2, -9.6):
+        b.mark("respawn", x, -14.8, F1, 180.0)
     # the pharmacy window at the east reception counter (PLAN.md W3): medical supplies, bought at the counter
     b.mark("shop_counter", -9.0, -6.2, F1, 0.0, stock="bandage,first_aid,med_kit", title="PHARMACY", w=3.0,
            d=1.4, h=2.0)
@@ -695,11 +704,15 @@ def hospital(b):
     b.put("Hosp_NurseStation", 17.9, -5.0, 180.0)
     b.mark("spawn", 18.0, -8.0, F1, 90.0, team="doctor", note="the ER team, met at the 搬入口")
     # back row: stair B | pharmacy store | X-ray | two WCs | the bed lift | stair A | the doctors' office | treatment
+    # (2026-10-06, user: "replace certain offices with clinics per Japanese hospital conventions") the back-row
+    # office east of stair A is now two more 診察室 (consulting rooms 5 and 6): a Japanese hospital's ground floor is
+    # the 外来 (outpatient department) -- numbered consulting rooms along a 中待合 (inner waiting corridor) with
+    # benches, each 診療科 (department) named on a board over its door; the doctors' office (医局) is upstairs.
     part(b, "x", CB, xi0, xi1, F1, 4.3, doors=[(-20.4, -1, 1.2), (-15.5, -1), (-9.0, -1, 1.2, SL),
                                              (-4.65, -1, 1.0, SL), (-1.95, -1, 1.0, SL),
-                                             (1.0, -1, 1.3, "", "open", 2.1), (3.9, -1, 1.2), (9.5, -1),
-                                             (17.9, -1, 1.6, SL)])
-    for x in (-19.0, -12.0, -6.0, -3.3, -0.6, 2.5, 5.3, 14.0):
+                                             (1.0, -1, 1.3, "", "open", 2.1), (3.9, -1, 1.2),
+                                             (7.5, -1, 1.2, SL), (11.8, -1, 1.2, SL), (17.9, -1, 1.6, SL)])
+    for x in (-19.0, -12.0, -6.0, -3.3, -0.6, 2.5, 5.3, 9.65, 14.0):
         part(b, "y", x, CB, yb, F1, 4.3)
     part(b, "x", 3.3, -6.0, -0.6, F1, 4.3)
     b.put("Shop_StockShelf", -15.5, yb - 0.4, 0.0)
@@ -709,10 +722,19 @@ def hospital(b):
         b.put("WC_Toilet", x, 2.9, 0.0)
         b.put("WC_GrabRail", x + 0.7, 3.2, 0.0)
         b.put("WC_Basin", x - 1.0, 1.0, 90.0)
-    b.put("Office_DeskIsland", 9.6, 4.8, 0.0)
-    chairs_around(b, 9.6, 4.8, 2, 0.6, 0.85)
-    b.put("Office_Cabinet", 13.6, 2.5, 270.0)
-    b.put("Hosp_Bed", 17.9, 5.8, 0.0)
+    for cx in (7.475, 11.825):                                 # 診察室 5 / 6 (the former office)
+        b.put("Office_Desk", cx - 1.0, 6.8, 180.0)
+        b.put("Office_Chair", cx - 1.0, 6.15, 0.0)
+        b.put("Hosp_ExamTable", cx + 1.2, 5.6, 0.0)
+        b.put("Hosp_Curtain", cx + 1.2, 3.9, 0.0)
+    # the 中待合: benches along the corridor between the doors, a 診療科 board over every consulting room door
+    # (内科 blue, 外科 green, 整形外科 orange, 小児科 yellow -- colour boxes for the artist's real boards)
+    b.put("Hosp_WaitingBench", -1.0, CF + 0.35, 0.0)
+    b.put("Hosp_WaitingBench", 9.0, CF + 0.35, 0.0)
+    for x, y, m in ((-3.5, CF - 0.08, "MI_SignCyan"), (1.5, CF - 0.08, "MI_SignCyan"), (6.5, CF - 0.08, "MI_SignGreen"),
+                    (11.5, CF - 0.08, "MI_SignGreen"), (7.5, CB + 0.08, "MI_SignRed"), (11.8, CB + 0.08, "MI_SignYellow")):
+        b.box("Walls_0", (x - 0.6, y - 0.03, 2.55), (x + 0.6, y + 0.03, 2.85), m)
+    b.put("Hosp_Bed", 17.9, 5.8, 0.0)                          # 処置室 (treatment)
     b.put("Kitchen_Sink", 21.2, 3.0, 270.0)
     # ── F2: the operating suite and the ICU
     part(b, "x", CF, xi0, xi1, F2, 3.8, doors=[(-18.0, 1, 1.2, SL), (-10.5, 1, 1.6, SL), (-3.5, 1, 1.6, SL),
@@ -782,6 +804,89 @@ def hospital(b):
                     "stops at every floor and the roof. TWO entrances: the MAIN one on the street (a 風除室, the "
                     "drop-off under the canopy, green signs) and the EMERGENCY side on the right (the ambulance lane "
                     "to its canopy, the 救急搬入口 vestibule into the ER, the walk-in 救急外来 door; red signs)."}
+
+
+# ── 診療所: a street clinic (医院 / クリニック) with the doctor's home above ────────────────────────────────────────
+
+def clinic(b):
+    """診療所 on a 14 x 18 plot (user, 2026-10-06: the shut clinic massing becomes a real one, Japanese convention).
+    12 x 13 m, two storeys (3.6 + 3.0). F1 the clinic: the entrance into the 待合室 (waiting room, benches, open to
+    the corridor), the 受付・会計 window (reception and payment; a Japanese clinic prescribes OUTSIDE -- 院外処方 --
+    so the window sells only first aid), an accessible WC, and off the 中待合 corridor two 診察室, the 処置室
+    (treatment: two beds for 点滴, drips) and the X-ray room (レントゲン室). The doctor's family lives above (F2), up a
+    stair with its own door at the side -- the clinic and the home never share a door."""
+    X0, X1, Y0, Y1 = -6.0, 6.0, -5.5, 7.5
+    F1, F2, TOP = 0.0, 3.6, 6.6
+    xi0, xi1, yf, yb = X0 + EXT_T, X1 - EXT_T, Y0 + EXT_T, Y1 - EXT_T
+    SL = "slide"
+    apron(b, -7.0, -9.0, 7.0, 9.0)
+    well = (3.6, yf, xi1, 0.9)
+    hole = b.ustair(*well, F1, F2 - F1, near="s")
+    b.ustair(*well, F2, TOP - F2, near="s", cap=True)
+    b.slab(X0, Y0, X1, Y1, F1, "MI_TileWhite")
+    b.slab(X0, Y0, X1, Y1, F2, "MI_Wood", holes=[hole])
+    roof(b, X0, Y0, X1, Y1, TOP, units=1)
+    ext(b, X0, Y0, X1, Y1, F1, F2 - F1, "MI_TileWhite", {
+        "f": ([(-3.0, -1, 1.6, SL, "exit")], [b.window(-0.4, F1, 2.2, 0.9, 2.4), b.window(2.3, F1, 1.4, 0.9, 2.2)]),
+        "r": ([(-4.6, 1, 0.9, "swing", "exit")], []),              # the home's own door, onto its stair
+        "l": ((), band_windows(b, 3.4, 6.8, F1, 3.4, every=2.8, w=1.4)),
+        "b": ((), band_windows(b, -5.0, 2.6, F1, 3.4, every=2.8, w=1.2, sill=1.4)),
+    })
+    ext(b, X0, Y0, X1, Y1, F2, TOP - F2, "MI_TileBeige", {
+        "f": ((), band_windows(b, -5.0, 2.8, F2, 3.0, every=2.6, w=1.6)),
+        "b": ((), band_windows(b, -5.0, 5.0, F2, 3.0, every=2.6, w=1.4)),
+    })
+    b.box("Facade", (-4.4, Y0 - 1.2, 2.55), (-1.6, Y0, 2.7), "MI_PaintedMetal")       # the entrance canopy
+    sign(b, -5.6, 5.6, Y0, 2.85, 3.45, "MI_SignGreen")                                # the clinic's name board
+    # ── F1: the waiting room (south-west, open to the corridor), reception / payment east of it
+    CF0, CF1 = 1.0, 2.8                                       # the 中待合 corridor, y 1.0 .. 2.8
+    part(b, "y", 1.0, yf, 1.0, F1, 3.4, doors=[(-1.6, -1, 0.8)],
+         wins=[Opening(-3.9, -2.1, F1 + 0.9, F1 + 2.0)])        # the 受付 window (a pass opening)
+    part(b, "x", -1.0, 1.0, 3.54, F1, 3.4)                    # reception | accessible WC
+    part(b, "y", 3.54, yf, CF0, F1, 3.4)                     # the home's stair, sealed from the clinic
+    part(b, "x", CF0, 1.0, xi1, F1, 3.4, doors=[(2.3, 1, 1.0, SL)])
+    part(b, "x", CF1, xi0, xi1, F1, 3.4, doors=[(-4.4, 1, 1.0, SL), (-1.6, 1, 1.0, SL), (1.4, 1, 1.2, SL),
+                                               (4.4, 1, 1.2, SL)])
+    for x in (-3.0, -0.2, 3.0):
+        part(b, "y", x, CF1, yb, F1, 3.4)
+    for x in (-4.2, -1.4):
+        b.put("Hosp_WaitingBench", x, -1.6, 0.0)
+    b.put("Hosp_WaitingBench", -4.2, -3.5, 0.0)
+    b.put("Office_Desk", 2.2, -3.0, 90.0)
+    b.put("Office_Chair", 2.85, -3.0, 270.0)
+    b.put("Office_Cabinet", 3.1, -4.9, 0.0)
+    b.mark("shop_counter", 0.45, -3.0, F1, 90.0, stock="bandage,first_aid", title="RECEPTION", w=2.0, d=1.2, h=2.0)
+    b.mark("spawn", 2.4, -2.2, F1, 270.0, team="civilian", note="the receptionist")
+    b.put("WC_Toilet", 2.9, -0.6, 180.0)
+    b.put("WC_GrabRail", 2.2, -0.7, 180.0)
+    b.put("WC_Basin", 1.3, 0.3, 90.0)
+    for cx in (-4.4, -1.6):                                   # 診察室 1 / 2
+        b.put("Office_Desk", cx - 0.5, 6.6, 180.0)
+        b.put("Office_Chair", cx - 0.5, 5.95, 0.0)
+        b.put("Hosp_ExamTable", cx + 0.8, 5.2, 0.0)
+    b.mark("spawn", -4.9, 5.6, F1, 0.0, team="doctor")
+    for x in (0.65, 2.15):                                    # 処置室: two beds for a drip
+        b.put("Hosp_Bed", x, 6.0, 0.0)
+    b.put("Hosp_XRay", 4.4, 5.8, 0.0)                        # レントゲン室
+    # where a HOSPITALIZED player wakes: outside the entrance, side by side, facing the street (PLAN.md 1c)
+    for x in (-5.2, -0.8, 0.8):
+        b.mark("respawn", x, -7.2, F1, 180.0)
+    # ── F2: the doctor's home (LDK, a bedroom, the bath and WC), its door off the stair landing
+    part(b, "y", 3.54, yf, 1.5, F2, 3.0, doors=[(-4.6, -1, 0.9)])
+    part(b, "x", 1.5, xi0, xi1, F2, 3.0, doors=[(-3.0, 1, 0.9), (2.0, 1, 0.8, SL)])
+    part(b, "y", 0.0, 1.5, yb, F2, 3.0)
+    b.put("Rest_Table", -2.0, -2.0, 0.0, z=F2)
+    for x in (-2.35, -1.65):
+        b.put("Rest_Chair", x, -2.8, 0.0, z=F2)
+        b.put("Rest_Chair", x, -1.2, 180.0, z=F2)
+    b.put("Office_Sofa", -4.6, 0.6, 0.0, z=F2)
+    b.put("Kitchen_Sink", -0.6, -4.9, 0.0, z=F2)
+    b.put("Kitchen_Fridge", 3.0, -1.0, 270.0, z=F2)
+    b.put("Hotel_Bed", -3.0, 5.6, 0.0, z=F2)
+    b.put("WC_Toilet", 4.8, 6.9, 0.0, z=F2)
+    b.put("WC_Basin", 1.0, 6.9, 0.0, z=F2)
+    return {"note": "診療所: a street clinic, two storeys; F1 the clinic (waiting room, reception / payment window, two "
+                    "consulting rooms, treatment, X-ray, accessible WC), F2 the doctor's home up its own stair."}
 
 
 # ── オフィスビル: a four-storey office building ────────────────────────────────────────────────────────────────
@@ -1789,7 +1894,7 @@ def cargo_ship(b):
 
 
 PLANS = {"Koban": koban, "FireBranch": fire_branch, "PoliceStation": police_station,
-         "FireStation": fire_station, "Hospital": hospital,
+         "FireStation": fire_station, "Hospital": hospital, "Clinic": clinic,
          "OfficeHQ": office_hq, "ResortHotel": resort_hotel,
          "WarehouseYard": warehouse_yard, "MilHQ": mil_hq, "MilBarracks": mil_barracks,
          "MilArmoury": mil_armoury, "MilHangar": mil_hangar, "MilControlTower": mil_control_tower,

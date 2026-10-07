@@ -107,10 +107,8 @@ func _initialize() -> void:
 		if island:
 			var near := 1e9
 			var places: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://src/main/resources/com/openworld/world/places/World.places.json"))
-			for pl in places["places"]:
-				if pl["kind"] in ["Hospital", "HospitalSmall", "Clinic"]:
-					near = minf(near, fresh.global_position.distance_to(Vector3(pl["go"][0], pl["go"][1], pl["go"][2])))
-			_check(near < 3.0, "the player woke at a hospital / clinic door (%.1f m)" % near)
+			near = _near_respawn(fresh.global_position, ["Hospital", "HospitalSmall", "Clinic"])
+			_check(near < 1.5, "the player woke on a hospital / clinic respawn point, outside (%.1f m)" % near)
 	# 4. arrested
 	await _tick(60)
 	_check(bool(rs.call("arrest_now", fresh)), "the player can be arrested")
@@ -123,11 +121,24 @@ func _initialize() -> void:
 			break
 	_check(int(rs.call("respawns_now")) == 2 and String(rs.call("last_reason_now")) == "ARRESTED", "the player respawned, arrested")
 	if island:
-		for i in 60 * 25:
+		for i in 60 * 6:
 			await physics_frame
-			if bool(rs.call("in_cell_now")):
+			if bool(rs.call("faded_in_now")):
 				break
-		_check(bool(rs.call("in_cell_now")), "the arrested player is in a police cell")
-		_check(int(rs.call("doors_unlocked_now")) > 0, "the station's locked doors opened (%d)" % int(rs.call("doors_unlocked_now")))
+		_check(bool(rs.call("faded_in_now")), "the arrested player's screen faded in")
+		var jailed: Node3D = rs.call("respawned_player_now")
+		if jailed != null:
+			var nj := _near_respawn(jailed.global_position, ["PoliceStation"])
+			_check(nj < 1.5, "the arrested player was let go on a police station respawn point, outside (%.1f m)" % nj)
 	print("RESULT %s (%d failures)" % ["PASS" if fails == 0 else "FAIL", fails])
 	quit(1 if fails else 0)
+
+
+func _near_respawn(pos: Vector3, kinds: Array) -> float:
+	var near := 1e9
+	var places: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://src/main/resources/com/openworld/world/places/World.places.json"))
+	for pl in places["places"]:
+		if pl["kind"] in kinds:
+			for r in pl.get("respawn", []):
+				near = minf(near, Vector2(pos.x, pos.z).distance_to(Vector2(r[0], r[2])))
+	return near

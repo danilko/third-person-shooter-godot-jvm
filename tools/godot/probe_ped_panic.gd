@@ -94,11 +94,15 @@ func _run() -> void:
 	var c := _xs()
 	await _frames(60)
 	var d := _xs()
+	# a ped that ran walks back onto its shared-clock schedule (PedCrowd.rejoinSpeed, PLAN.md 1c: so a peer that
+	# joined later agrees with it) -- a brisk walk, never the 4.5 m/s run
 	var calm := 0
+	var rejoin: float = crowd.get("rejoin_speed")
 	for k in 10:
-		if absf(absf(d[k] - c[k]) - 1.4) < 0.25:
+		var v := absf(d[k] - c[k])
+		if absf(v - 1.4) < 0.25 or absf(v - rejoin) < 0.25:
 			calm += 1
-	check(calm == 10, "after the panic runs out every ped walks again (%d of 10)" % calm)
+	check(calm == 10, "after the panic runs out every ped walks again, at a walk or walking back to its schedule (%d of 10)" % calm)
 	check(int(crowd.fleeing_now()) == 0, "nobody is fleeing any more")
 	print("RESULT %s (%d passed, %d failed)" % ["PASS" if fail_n == 0 else "FAIL", pass_n, fail_n])
 	crowd.queue_free()
