@@ -11,6 +11,7 @@ import com.openworld.net.Vec3;
 import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.api.Node;
+import godot.global.GD;
 import godot.core.Basis;
 import godot.core.Quaternion;
 import godot.core.Vector3;
@@ -38,6 +39,20 @@ import com.openworld.character.Health;
 public class VehicleNetworkController extends Controller {
 
     private final RigidSnapshotInterpolator interpolator = new RigidSnapshotInterpolator();
+
+    /**
+     * {@code -- --car-trace} (DebugHarness, PLAN.md 1b "stop-and-go on a client"): per puppet car, measure how
+     * snapshots ARRIVE (local gaps) and how the rendered body MOVES against the speed the host reported. A STALL
+     * frame is one where the latest sample says > 3 m/s and the body moved under 40 % of that; a SURGE frame one
+     * where it moved over 160 %. Printed every 5 s as a "[cartrace]" line and reset.
+     */
+    public static boolean TRACE = false;
+    private long traceLastArrivalMs = -1;
+    private long traceMaxGapMs = 0;
+    private int traceGaps100 = 0, traceSamples = 0, traceFrames = 0, traceStall = 0, traceSurge = 0, traceCapped = 0;
+    private double traceSpeedSum = 0.0, traceProjMax = 0.0;
+    private Vector3 tracePrevPos = null;
+    private long traceLastPrintMs = 0;
     // Unwraps the wire's 32-bit senderTimeMs into a never-wrapping 64-bit timeline — same
     // rationale as NetworkController's senderClock (survives the ~24.8-day int rollover).
     private final TimestampUnwrapper senderClock = new TimestampUnwrapper();
@@ -93,6 +108,16 @@ public class VehicleNetworkController extends Controller {
         Vector3 lin = snap.linearVelocity();
         Vector3 ang = snap.angularVelocity();
         long senderMs = senderClock.unwrap(snap.senderTimeMs());
+        if (TRACE) {
+            long now = godot.api.Time.getTicksMsec();
+            if (traceLastArrivalMs >= 0) {
+                long gap = now - traceLastArrivalMs;
+                if (gap > traceMaxGapMs) traceMaxGapMs = gap;
+                if (gap > 100) traceGaps100++;
+            }
+            traceLastArrivalMs = now;
+            traceSamples++;
+        }
         interpolator.addSample(senderMs / 1000.0,
                 new Vec3(pos.getX(), pos.getY(), pos.getZ()),
                 new Quat(q.getX(), q.getY(), q.getZ(), q.getW()),
@@ -147,6 +172,7 @@ public class VehicleNetworkController extends Controller {
 
         Vec3 p = out.position();
         Quat q = out.orientation();
+        if (TRACE) traceFrame(vehicle, p, out.linearVelocity(), delta);
         vehicle.setGlobalPosition(new Vector3((float) p.x(), (float) p.y(), (float) p.z()));
         vehicle.setGlobalBasis(new Basis(new Quaternion(
                 (float) q.x(), (float) q.y(), (float) q.z(), (float) q.w())));
@@ -160,6 +186,33 @@ public class VehicleNetworkController extends Controller {
         boolean skidding = lastHandbrake || lastSlipping;
         for (VehicleWheel w : vehicle.getWheels()) {
             w.applyPuppetVisuals((float) delta, lastSteerAngle, forwardSpeed, skidding);
+        }
+    }
+
+    private void traceFrame(Vehicle vehicle, Vec3 p, Vec3 sampleVel, double delta) {
+        Vector3 pos = new Vector3((float) p.x(), (float) p.y(), (float) p.z());
+        double reported = Math.hypot(sampleVel.x(), sampleVel.z());
+        if (tracePrevPos != null && delta > 1e-4) {
+            double moved = Math.hypot(pos.getX() - tracePrevPos.getX(), pos.getZ() - tracePrevPos.getZ()) / delta;
+            traceFrames++;
+            traceSpeedSum += reported;
+            if (reported > 3.0 && moved < 0.4 * reported) traceStall++;
+            if (reported > 3.0 && moved > 1.6 * reported) traceSurge++;
+        }
+        tracePrevPos = pos;
+        long sinceMs = traceLastArrivalMs < 0 ? 0 : godot.api.Time.getTicksMsec() - traceLastArrivalMs;
+        if (sinceMs > 150) traceCapped++;
+        if (sinceMs / 1000.0 > traceProjMax) traceProjMax = sinceMs / 1000.0;
+        long now = godot.api.Time.getTicksMsec();
+        if (traceLastPrintMs == 0) traceLastPrintMs = now;
+        if (now - traceLastPrintMs >= 5000 && traceFrames > 0) {
+            String id = vehicle.getCharacterInfo() != null ? vehicle.getCharacterInfo().characterId : "?";
+            GD.print(String.format("[cartrace] %s frames=%d samples=%d avg_speed=%.1f gaps100=%d max_gap_ms=%d "
+                    + "frames_past_cap=%d stall=%d surge=%d", id.length() > 8 ? id.substring(0, 8) : id, traceFrames,
+                    traceSamples, traceSpeedSum / traceFrames, traceGaps100, traceMaxGapMs, traceCapped, traceStall, traceSurge));
+            traceLastPrintMs = now;
+            traceFrames = traceSamples = traceGaps100 = traceStall = traceSurge = traceCapped = 0;
+            traceMaxGapMs = 0; traceSpeedSum = 0.0; traceProjMax = 0.0;
         }
     }
 }

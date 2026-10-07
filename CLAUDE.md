@@ -11004,6 +11004,14 @@ a real counter, dies, is respawned; both print the clock) -- 25/25 with walk + t
   the host by the trigger's own rules. Open: a late joiner is not told about a running mission.
 - **The clock**: the host sends its time of day at join and every 15 s (`WORLD_EVENT_TIME_OF_DAY` 14, counted as
   `time_sync_*`, so the pole test's world-event count is unchanged); measured 0.03 game min apart.
+- **Cars stop-and-go on a client: ENet's packet throttle** (measured with `-- --car-trace`, DebugHarness: per puppet car
+  `[cartrace]` every 5 s -- snapshot arrival gaps, frames past the 0.15 s projection cap, stall/surge frames -- plus
+  `[nettrace]` host broadcast gaps, frame hitches, per-batch arrival-vs-send gaps and the host's peer throttle). On the
+  island with two peers the host's ENet throttle fell to 0/32 for 27 broadcasts: ENet drops UNRELIABLE packets when a
+  peer's RTT jumps (a frame hitch is enough), so whole snapshot batches never left and every car in them froze, then
+  snapped. `handlePeerConnected` sets `throttleConfigure(5000, 2, 0)` (never back off). Four runs before vs after: per-car
+  gaps >100 ms 243-1129 -> 165, frames past the cap 1211-3451 -> 247, stalled frames 213-904 -> 77; what is left matches
+  the headless host's own 150-260 ms hitches (headless loads synchronously). On DebugWorld it was already 0.
 - **Passenger view**: a local passenger looks through the carrier's chase camera (third person, free aim while holding
   aim/fire) and aims where it looks (`Vehicle.carrierAimFor`).
 

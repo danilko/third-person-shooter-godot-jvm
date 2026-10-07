@@ -638,6 +638,7 @@ public class DebugHarness extends Node {
             else if ("--net-diag".equals(arg)) { NetworkManager.NET_DEBUG_VEHICLES = true; }
             else if (arg.startsWith("--hold-action=")) { holdAction = arg.substring("--hold-action=".length()); }
             else if ("--coop-test".equals(arg)) { coopTest = true; }
+            else if ("--car-trace".equals(arg)) { com.openworld.net.VehicleNetworkController.TRACE = true; }
         }
         setPhysicsProcess(autoWalk || dumpCollisionDelay > 0.0 || spawnRoutesDelay > 0.0 || netDelay > 0.0 || holdAction != null
                 || coopTest);

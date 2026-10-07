@@ -279,6 +279,10 @@ public class NetworkManager extends Node {
     @Register
     @Override
     public void _process(double delta) {
+        if (com.openworld.net.VehicleNetworkController.TRACE && delta > 0.1) {
+            GD.print("[nettrace] frame " + Math.round(delta * 1000) + " ms at " + nowMs()
+                    + (isServer() ? " (host)" : " (client)"));
+        }
         if (connection == null) return;
         if (!delayedSends.isEmpty()) flushDelayedSends();
         int now = nowMs();
@@ -503,6 +507,17 @@ public class NetworkManager extends Node {
         // N5: the hitbox history, on the same clock and at the same moment snapshots are stamped with.
         if (!peersById.isEmpty()) lagCompensator.record(getTree(), now);
         if (now - lastSnapshotBroadcastMs < REPLICATION_INTERVAL_MS) return;
+        if (com.openworld.net.VehicleNetworkController.TRACE) {
+            for (var e : peersById.entrySet()) {
+                double thr = e.getValue().getStatistic(ENetPacketPeer.PeerStatistic.PACKET_THROTTLE);
+                if (thr < 32.0) GD.print("[nettrace] peer " + e.getKey() + " packet throttle " + (int) thr
+                        + "/32 rtt " + (int) e.getValue().getStatistic(ENetPacketPeer.PeerStatistic.ROUND_TRIP_TIME) + " at " + now);
+            }
+        }
+        if (com.openworld.net.VehicleNetworkController.TRACE && lastSnapshotBroadcastMs > 0
+                && now - lastSnapshotBroadcastMs > 100) {
+            GD.print("[nettrace] host broadcast gap " + (now - lastSnapshotBroadcastMs) + " ms at " + now);
+        }
         lastSnapshotBroadcastMs = now;
 
         List<NetMessageCodec.DecodedSnapshot> entries = new ArrayList<>();
@@ -719,7 +734,18 @@ public class NetworkManager extends Node {
         }
     }
 
+    /**
+     * ENet's packet throttle (PLAN.md 1b, 2026-10-06): when a peer's round-trip time jumps -- a frame hitch on either
+     * side is enough -- ENet lowers the share of UNRELIABLE packets it sends, down to none, and lets it recover by 2/32
+     * per 5 s interval. Measured on the island with two peers, the host's throttle sat at 0/32 for 27 broadcasts and
+     * below full for ~200 more: whole snapshot batches never left, and every car in them stopped, then snapped on --
+     * the client's "stop-and-go". Congestion control for a 30 Hz stream of a few kB on a LAN costs more than it saves,
+     * so the deceleration is 0 (the throttle never backs off).
+     */
+    private static final int ENET_THROTTLE_INTERVAL_MS = 5000, ENET_THROTTLE_ACCELERATION = 2, ENET_THROTTLE_DECELERATION = 0;
+
     private void handlePeerConnected(ENetPacketPeer peer) {
+        peer.throttleConfigure(ENET_THROTTLE_INTERVAL_MS, ENET_THROTTLE_ACCELERATION, ENET_THROTTLE_DECELERATION);
         int id = amServer ? nextPeerId++ : SERVER_PEER_ID;
         peersById.put(id, peer);
         idsByPeer.put(peer, id);
@@ -882,7 +908,9 @@ public class NetworkManager extends Node {
                 case MSG_DESPAWN -> handleDespawnMessage(senderPeerId, buf);
                 case MSG_VEHICLE_SNAPSHOT -> applyVehicleSnapshotEntry(senderPeerId, NetMessageCodec.decodeVehicleSnapshot(buf));
                 case MSG_VEHICLE_SNAPSHOT_BATCH -> {
-                    for (NetMessageCodec.DecodedVehicleSnapshot snap : NetMessageCodec.decodeVehicleSnapshotBatch(buf)) {
+                    List<NetMessageCodec.DecodedVehicleSnapshot> batch = NetMessageCodec.decodeVehicleSnapshotBatch(buf);
+                    if (com.openworld.net.VehicleNetworkController.TRACE && !batch.isEmpty()) traceBatchArrival(batch.get(0).senderTimeMs());
+                    for (NetMessageCodec.DecodedVehicleSnapshot snap : batch) {
                         applyVehicleSnapshotEntry(senderPeerId, snap);
                     }
                 }
@@ -1067,6 +1095,20 @@ public class NetworkManager extends Node {
      * owner (applied via VehicleNetworkController), health to the host (a client applies
      * the host's value; the host never applies a client's).
      */
+    private int traceBatchArrivalMs = -1, traceBatchSenderMs = 0;
+
+    /** {@code --car-trace}: an arrival gap with a normal send gap is buffering/delivery; with a large send gap it is loss. */
+    private void traceBatchArrival(int senderMs) {
+        int now = nowMs();
+        if (senderMs == traceBatchSenderMs) return;   // another chunk of the same broadcast
+        if (traceBatchArrivalMs >= 0 && now - traceBatchArrivalMs > 100) {
+            GD.print("[nettrace] vehicle batch arrival gap " + (now - traceBatchArrivalMs) + " ms, send gap "
+                    + (senderMs - traceBatchSenderMs) + " ms, at " + now);
+        }
+        traceBatchArrivalMs = now;
+        traceBatchSenderMs = senderMs;
+    }
+
     private void applyVehicleSnapshotEntry(int senderPeerId, NetMessageCodec.DecodedVehicleSnapshot snap) {
         if (!isValidVehicleSnapshot(snap)) {
             dropInvalid("vehicle_snapshot", "vehicle snapshot", senderPeerId);
