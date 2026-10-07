@@ -1,5 +1,5 @@
 {
- "about": "Quaternius Universal Animation Library 1+2 (CC0) retargeted onto Godot-chan by blender/tools/retarget_ual.py. 'clips' adds each source clip under a scheme name (character_anim_naming.json); 'replace' writes a source clip (or 'A+B', played one after the other) INTO an existing placeholder action, keeping its name, so the AnimationTree picks it up with no scene edit. A_TPose is skipped: the rig's own tpose is the reference. A replace value may be {src, arms_over}: only the arms (clavicles down) take the source, in WORLD directions, over the named action's first-frame pose -- for clips the tree plays through an arms filter. 'Clip@N' holds one frame as a static loop. 'Clip@A:B' takes frames A..B. A 'clips' value may also be {name, arms_over}. 'drop' removes a clip (death_fall_back: the ragdoll is the death, CLAUDE.md W35). 'fist_axis' [x,y,z] (armature space) turns only the right wrist so a held handle points that way: melee and throwable hold the FIST's guard with the weapon stood up, 20 deg forward (W36).",
+ "about": "Quaternius Universal Animation Library 1+2 (CC0) retargeted onto Godot-chan by blender/tools/retarget_ual.py. 'clips' adds each source clip under a scheme name (character_anim_naming.json); 'replace' writes a source clip (or 'A+B', played one after the other) INTO an existing placeholder action, keeping its name, so the AnimationTree picks it up with no scene edit. A_TPose is skipped: the rig's own tpose is the reference. A replace value may be {src, arms_over}: only the arms (clavicles down) take the source, in WORLD directions, over the named action's first-frame pose -- for clips the tree plays through an arms filter. 'Clip@N' holds one frame as a static loop. 'Clip@A:B' takes frames A..B. A 'clips' value may also be {name, arms_over}. 'drop' removes a clip (death_fall_back came back 2026-10-07: the death is an animation now, the ragdoll a mid-air fallback). 'fist_axis' [x,y,z] (armature space) turns only the right wrist so a held handle points that way: melee and throwable hold the FIST's guard with the weapon stood up, 20 deg forward (W36).",
  "sources": {
   "UAL1": "assets/Universal Animation Library_1/Unreal-Godot/UAL1_Standard.glb",
   "UAL2": "assets/Universal_Animation_Library_2/Unreal-Godot/UAL2_Standard.glb"
@@ -13,6 +13,7 @@
   "UAL1/Crouch_Fwd_Loop": "crouch_sneak_forward-loop",
   "UAL1/Crouch_Idle_Loop": "crouch_sneak_idle-loop",
   "UAL1/Dance_Loop": "upright_dance-loop",
+  "UAL1/Death01": "death_fall_back",
   "UAL1/Fixing_Kneeling": "kneel_fix",
   "UAL1/Hit_Chest": "hit_chest",
   "UAL1/Hit_Head": "hit_head",
@@ -190,7 +191,5 @@
    ]
   }
  },
- "drop": [
-  "death_fall_back"
- ]
+ "drop": []
 }

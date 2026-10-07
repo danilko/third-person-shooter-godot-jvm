@@ -1,62 +1,85 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://src/main/java/com/openworld/world/ZoneMarker.java" id="1_yl1ba"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/world/NamedCharacterConfig.java" id="2_2icm3"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Zone.java" id="3_pemn8"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/world/SpawnConfig.java" id="4_dsxmi"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/world/VehicleSpawnConfig.java" id="5_f7egt"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/world/VehicleRoute.java" id="6_16cls"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/world/IntersectionZone.java" id="7_qnqnr"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/ZoneMarker.java" id="1_2icm3"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/NamedCharacterConfig.java" id="2_pemn8"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Zone.java" id="3_dsxmi"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/SpawnConfig.java" id="4_f7egt"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/VehicleSpawnConfig.java" id="5_16cls"]
+[ext_resource type="Script" path="jvm://VehicleRoute.java" id="6_qnqnr"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/WaterVolume.java" id="7_kp4eo"]
+[ext_resource type="Script" path="jvm://IntersectionZone.java" id="8_g8keo"]
 
-[sub_resource type="Resource" id="Resource_kp4eo"]
-script = ExtResource("4_dsxmi")
+[sub_resource type="Resource" id="Resource_lsx0u"]
+script = ExtResource("4_f7egt")
+faction = "enemy"
 count = 2
+weapon_scene_path = "res://src/main/resources/com/openworld/weapon/ASR1.tscn"
+behavior = ""
 
-[sub_resource type="Resource" id="Resource_g8keo"]
-script = ExtResource("3_pemn8")
+[sub_resource type="Resource" id="Resource_6v40x"]
+script = ExtResource("3_dsxmi")
 zone_id = "test"
+size = Vector3(60, 10, 60)
 load_radius = 180.0
 unload_radius = 330.0
-spawn_configs = Array[ExtResource("4_dsxmi")]([SubResource("Resource_kp4eo")])
+geometry_path = ""
+lod_low_geometry_path = ""
+geometry_world_placed = false
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+spawn_configs = Array[ExtResource("4_f7egt")]([SubResource("Resource_lsx0u")])
+named_characters = Array[ExtResource("2_pemn8")]([])
+vehicle_spawn_configs = Array[ExtResource("5_16cls")]([])
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_lsx0u"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_8rf5p"]
 size = Vector3(8, 3, 8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_6v40x"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_0aj5k"]
 size = Vector3(7, 4, 7)
 
-[node name="WorldSource" type="Node3D" unique_id=970922020]
+[node name="WorldSource" type="Node3D" unique_id=493910994]
 
-[node name="ZoneMarker_test" type="Node3D" parent="." unique_id=1927980535]
-script = ExtResource("1_yl1ba")
-zone = SubResource("Resource_g8keo")
+[node name="ZoneMarker_test" type="Node3D" parent="." unique_id=2097672719]
+script = ExtResource("1_2icm3")
+zone = SubResource("Resource_6v40x")
+show_debug_volume = true
 
-[node name="loopA" type="Node3D" parent="." unique_id=1004182718]
-script = ExtResource("6_16cls")
+[node name="loopA" type="Node3D" parent="." unique_id=1676746392]
+script = ExtResource("6_qnqnr")
+loop = true
+next_routes = ""
+next_weights = ""
+turn = ""
+approach = ""
 lane_offset = 1.75
+lane_width = 3.5
 end_behavior = "DESPAWN"
+return_route = ""
 
-[node name="@Marker3D@955" type="Marker3D" parent="loopA" unique_id=1493105183]
+[node name="@Marker3D@5341" type="Marker3D" parent="loopA" unique_id=699739880]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.2, 10)
 
-[node name="@Marker3D@956" type="Marker3D" parent="loopA" unique_id=1767560203]
+[node name="@Marker3D@5342" type="Marker3D" parent="loopA" unique_id=1737081297]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.2, -10)
 
-[node name="@Marker3D@957" type="Marker3D" parent="loopA" unique_id=1683509450]
+[node name="@Marker3D@5343" type="Marker3D" parent="loopA" unique_id=1827123441]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.2, -10)
 
-[node name="@Marker3D@958" type="Marker3D" parent="loopA" unique_id=1074041267]
+[node name="@Marker3D@5344" type="Marker3D" parent="loopA" unique_id=1341903973]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.2, 10)
 
-[node name="Water_pond" type="Area3D" parent="." unique_id=2027638496 groups=["water"]]
+[node name="Water_pond" type="Area3D" parent="." unique_id=1533079656]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25, 0, 0)
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("7_kp4eo")
+far_ocean_extent = 0.0
 
-[node name="@CollisionShape3D@959" type="CollisionShape3D" parent="Water_pond" unique_id=326945567]
-shape = SubResource("BoxShape3D_lsx0u")
+[node name="@CollisionShape3D@5345" type="CollisionShape3D" parent="Water_pond" unique_id=1667528498]
+shape = SubResource("BoxShape3D_8rf5p")
 
-[node name="Intersection_main" type="Area3D" parent="." unique_id=877084973]
+[node name="Intersection_main" type="Area3D" parent="." unique_id=772504365]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 18)
-script = ExtResource("7_qnqnr")
+script = ExtResource("8_g8keo")
 
-[node name="@CollisionShape3D@960" type="CollisionShape3D" parent="Intersection_main" unique_id=1923747919]
-shape = SubResource("BoxShape3D_6v40x")
+[node name="@CollisionShape3D@5346" type="CollisionShape3D" parent="Intersection_main" unique_id=428966269]
+shape = SubResource("BoxShape3D_0aj5k")

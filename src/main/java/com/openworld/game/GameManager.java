@@ -115,6 +115,11 @@ public class GameManager extends Node {
             ed.setName(new godot.core.StringName("EnforcementDispatch"));
             addChild(ed);
         }
+        if (getNodeOrNull("WorldJanitor") == null) {
+            WorldJanitor wj = new WorldJanitor();
+            wj.setName(new godot.core.StringName("WorldJanitor"));
+            addChild(wj);
+        }
         if (getNodeOrNull("RespawnSystem") == null) {
             RespawnSystem rs = new RespawnSystem();
             rs.setName(new godot.core.StringName("RespawnSystem"));
@@ -1182,6 +1187,9 @@ public class GameManager extends Node {
     /** The host's time of day (value = hours 0-24), at join and every 15 s (NetworkManager.sweepTimeOfDay). */
     public static final int WORLD_EVENT_TIME_OF_DAY = 14;
 
+    /** A dropped weapon left lying long enough was cleared by the host's {@link WorldJanitor} -- key = its pickupId. */
+    public static final int WORLD_EVENT_PICKUP_CLEARED = 15;
+
     /** Routes a decoded MSG_WORLD_EVENT to the owning system. Extend the switch as networked world state is added. */
     public void onWorldEvent(int eventType, String key, float value, java.util.List<String> args) {
         switch (eventType) {
@@ -1201,6 +1209,10 @@ public class GameManager extends Node {
                 if (ts != null) ts.applyRemoteDestroyed(key, arg(args, 0));
             }
             case WORLD_EVENT_TIME_OF_DAY -> com.openworld.world.GameTime.syncTo(getTree(), value);
+            case WORLD_EVENT_PICKUP_CLEARED -> {
+                com.openworld.item.Pickup p = findPickupById(key);
+                if (p != null && !p.isTaken()) WorldJanitor.freePickup(p);
+            }
             // case WORLD_EVENT_DOOR -> applyDoorState(key, value);
             default -> GD.print("GameManager: unhandled world event type " + eventType + " key=" + key);
         }

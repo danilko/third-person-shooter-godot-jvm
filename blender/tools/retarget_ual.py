@@ -232,7 +232,10 @@ def write_action(tgt, name, keyed, start=0.0):
 def main():
     opt = args()
     table = json.load(open(TABLE))
-    tgt = bpy.data.objects[ARM_NAME]
+    tgt = bpy.data.objects.get(ARM_NAME)
+    if tgt is None:     # the clip owner since W49 is shino.blend: the armature that carries the contract's bones, not a control rig
+        tgt = next(o for o in bpy.data.objects if o.type == 'ARMATURE' and "pelvis" in o.data.bones
+                   and "c_pos" not in o.data.bones)
     tgt_rest = rest_world(tgt)
     scene = bpy.context.scene
     keep = (scene.render.fps, scene.render.fps_base, scene.frame_start, scene.frame_end, scene.frame_current)

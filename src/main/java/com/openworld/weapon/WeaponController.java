@@ -1466,6 +1466,8 @@ public class WeaponController extends Node {
     item.show();
     item.onReturnedToWorld();
     item.placeInWorld(getTree().getCurrentScene(), spawnPos, impulse);
+    // a DROPPED weapon (never a scene-placed pickup) is cleared once it has lain long enough (game.WorldJanitor)
+    item.setMeta(new godot.core.StringName(com.openworld.game.WorldJanitor.DROPPED_META), godot.api.Time.getTicksMsec());
   }
 
   // After a drop, fall back to fist (slot 0) which is always available.

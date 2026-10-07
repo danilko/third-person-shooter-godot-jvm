@@ -57,6 +57,27 @@ public class VehicleProbeHelper extends Node {
         }
     }
 
+    /** One weapon hit of {@code damage} on {@code body}'s ragdoll bone named {@code bone} (e.g. "spine_03"), the shot
+     *  travelling FROM {@code from}, through {@code ImpactManager.processHit} like a bullet (probe_death_anim.gd). */
+    @Register
+    public void boneHitFrom(Node impactManager, Node body, String bone, godot.core.Vector3 from, float damage) {
+        if (!(impactManager instanceof com.openworld.world.manager.ImpactManager im)) return;
+        godot.api.Node3D target = findBone(body, "Physical Bone " + bone);
+        if (target == null) return;
+        godot.core.Vector3 at = target.getGlobalPosition();
+        im.processHit(new com.openworld.world.HitInfo(target, at, from.minus(at).normalized()),
+                damage, "probe", null, "probe", "", from);
+    }
+
+    private static godot.api.Node3D findBone(Node n, String name) {
+        if (n instanceof godot.api.PhysicalBone3D b && name.equals(b.getName().toString())) return b;
+        for (int i = 0; i < n.getChildCount(); i++) {
+            godot.api.Node3D r = findBone(n.getChild(i), name);
+            if (r != null) return r;
+        }
+        return null;
+    }
+
     /** One weapon hit on {@code body} at world point {@code at} through {@code ImpactManager.processHit} (probe_component_car.gd). */
     @Register
     public void weaponHitAt(Node impactManager, Node body, godot.core.Vector3 at, float damage) {

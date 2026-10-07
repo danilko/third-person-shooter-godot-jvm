@@ -323,6 +323,9 @@ public class RespawnSystem extends Node {
             dead.queueFree();
         }
         if (!(ps.instantiate() instanceof Player p)) return;
+        // what the last fight left behind goes as soon as the camera is at the new body (the old scene is out of view)
+        WorldJanitor wj = WorldJanitor.get();
+        if (wj != null) wj.sweepSoon(1.5);
         CharacterInfo info = new CharacterInfo();
         info.characterId = j.id;
         info.displayName = j.info != null ? j.info.displayName : "Player";

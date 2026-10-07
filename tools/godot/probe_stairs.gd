@@ -85,6 +85,13 @@ func _initialize() -> void:
 			ramps.append([cs, e])
 			if control:
 				(cs as CollisionShape3D).disabled = true
+		# the stand's floor goes UNDER the building's lowest flight: an elevated hub's concourse is 7.8 m below its
+		# origin, and a floor at y 0 sliced through its stairs (every upper flight read as "stuck" under it)
+		var low := 0.0
+		for rp in ramps:
+			low = minf(low, (rp[1][0] as Vector3).y)
+		floor_body.position = Vector3(0, low - 0.5 - (0.05 if low < 0.0 else 0.0), 0)
+		await physics_frame
 		print("%s: %d stair ramp(s)%s" % [nm, ramps.size(), " (DISABLED: the control)" if control else ""])
 		for rp in ramps:
 			var lo: Vector3 = rp[1][0]
@@ -122,8 +129,11 @@ func _initialize() -> void:
 					var hit := sp.intersect_ray(q)
 					print("    ahead at +%.1f m: %s" % [hgt, ("%s at %.2f m" % [str((hit["collider"] as Node).name) + "/" + str(hit.get("shape", -1)), (hit["position"] as Vector3).distance_to(p.global_position + Vector3(0, hgt, 0))]) if not hit.is_empty() else "clear"])
 				var qu := PhysicsRayQueryParameters3D.create(p.global_position + Vector3(0, 1.0, 0), p.global_position + Vector3(0, 3.0, 0), 1 | 64)
+				qu.exclude = [p.get_rid()]
 				var hu := sp.intersect_ray(qu)
-				print("    overhead: %s" % (("%.2f m up" % ((hu["position"] as Vector3).y - p.global_position.y)) if not hu.is_empty() else "clear"))
+				print("    overhead: %s" % (("%.2f m up: %s/%s at %s" % [(hu["position"] as Vector3).y - p.global_position.y,
+					str((hu["collider"] as Node).get_parent().name) + "/" + str((hu["collider"] as Node).name), str(hu.get("shape", -1)),
+					(hu["position"] as Vector3).snapped(Vector3.ONE * 0.01)]) if not hu.is_empty() else "clear"))
 			_check(made, "%s: up the flight %.1f m high, %.1f m run (%s, got %.1f of %.1f m along, at y %.2f)%s" % [
 				nm, hi.y - lo.y, run, ("%.1f s" % (t / 60.0)) if made else "STUCK", best, run, p.global_position.y,
 				"" if made else " foot %s top %s, now at %s" % [lo.snapped(Vector3.ONE * 0.01), hi.snapped(Vector3.ONE * 0.01), p.global_position.snapped(Vector3.ONE * 0.01)]])

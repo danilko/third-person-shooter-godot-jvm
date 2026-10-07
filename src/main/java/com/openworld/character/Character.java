@@ -97,6 +97,18 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     public float ragdollDuration = 3.0f;
 
     /**
+     * A body that dies standing plays the library's death clip (`death_fall_back`, turned so it falls AWAY from
+     * whoever killed it) instead of starting the ragdoll (user 2026-10-07: "the ragdoll falls in very strange
+     * directions"). The ragdoll stays the answer for a body killed in the air, by a blast or by a car, where the
+     * throw IS the point. Off = always the ragdoll.
+     */
+    @Export
+    public boolean deathAnimation = true;
+
+    /** Engine msec when this body's death visuals ran (-1 while alive): {@code world.WorldJanitor} ages corpses by it. */
+    public long diedAtMs = -1;
+
+    /**
      * Seconds a full breath lasts while held behind a scope (PLAN.md 2.7 piece 2). The breath is this
      * body's, not the weapon's — the weapon only says how far it wanders ({@code scopeSwayDegrees}).
      */
@@ -1560,6 +1572,10 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
      * bone impulse on a started ragdoll. Public surface unchanged for ImpactManager /
      * ExplosionManager / Vehicle; delegates to {@link CharacterRagdoll}.
      */
+    /** True while this corpse's death is the death CLIP rather than the ragdoll (probe_death_anim.gd). */
+    @Register
+    public boolean deathClipNow() { return ragdoll.playingDeathClip(); }
+
     public void applyHitImpulse(Node hitNode, Vector3 bulletDir, float damage) {
         ragdoll.applyHitImpulse(hitNode, bulletDir, damage);
     }

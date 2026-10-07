@@ -11372,6 +11372,30 @@ checks its "Wired in code" table against the enum. Licence rule as for art: CC0 
   it (a downward ray bounded by `WorldBounds.terrain_height`; an elevated leg takes the deck) and the run FAILS if any
   frame has the player under the terrain. `probe_city_perf.gd` and `probe_ped_crowd.gd` ground the same way.
 
+## Death is a clip, corpses and drops are cleared, hub stairs have ramps, sheds stop the helicopter (2026-10-07, user-reported)
+
+- **A body that dies standing plays `death_fall_back`** (Quaternius UAL1 `Death01`, retargeted onto shino.blend with
+  `retarget_ual.py --only death_fall_back`; the script now finds the deform armature when it is not Godot-chan's).
+  `CharacterRagdoll.startDeathClip`: the AnimationTree goes inactive, a one-off `DeathPlayer` AnimationPlayer beside it
+  plays the clip from the tree's own library, aim/IK modifiers off, bones off the hitbox layer. The first bullet within
+  0.15 s turns MeshRoot to face the shooter, so the backward fall goes AWAY from them. **The ragdoll is kept** for a
+  body killed in the air, and for a hit with no struck bone (a blast, a car, a train), where the clip hands over
+  (`clipToRagdoll`). `Character.deathAnimation` off = always ragdoll. The ragdoll's per-bone impulse is capped at 6 N·s
+  (a PhysicalBone3D is 1 kg: a 150-dmg round was 45 m/s on a hand). **Still open: every ragdoll joint is a PIN joint
+  with no limits** (`build_character_visuals.gd`), which is why a ragdoll bends where a body cannot. Gate
+  `tools/godot/probe_death_anim.gd` 11/11 (`--control` fails the 3 clip checks).
+- **`game.WorldJanitor`** (built in code by GameManager, authority only): a dead non-player body goes after 30 s out of
+  view (camera frustum within 90 m), at most 12 (oldest out of view first), all after 180 s; story characters, mission
+  entities and seated corpses are left alone; corpses go to peers by `announceDespawn`. A DROPPED weapon
+  (`WeaponController` stamps meta `dropped_at_ms`; never a scene pickup): 60 s / 24 / 300 s, sent as
+  `WORLD_EVENT_PICKUP_CLEARED` (15). A respawn sweeps everything out of view 1.5 s later. Wrecks already had a 15 s timer.
+- **Elevated-hub stairs carry ramp hulls** (`build_station_blends.eh_stair_hulls`, one per flight between landings):
+  Central, Suburb and Airport had none. `probe_stairs.gd` now puts its floor under the lowest flight (its floor at y 0
+  had sliced through an elevated hub's stair and read as "stuck"), and names what is overhead.
+- **Platform shed roofs collide** (all three station forms). With no collider a helicopter's door gunner shot through
+  them onto the stairs; also `EnforcementDispatch.underCover`: a heli shot never hits a target with WORLD geometry
+  within 30 m straight above. `probe_train_fit --stations` PASS with the new roofs.
+
 ## Known Quirks / Gotchas
 
 - **Godot re-imports a glTF only when the `.gltf` FILE changes; it never hashes the `.bin`** (2026-09-29). A

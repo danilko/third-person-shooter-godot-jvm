@@ -114,7 +114,8 @@ def shed(w, pre="OA", cat="open_air"):
     z0 = SL.SHED_CLEAR
     yc = w / 2 - min(1.0, w / 3)
     p.solid((-0.14, yc - 0.14, 0), (0.14, yc + 0.14, z0), "MI_PaintedMetal")
-    p.b.box((-L / 2, -w / 2 + 0.2, z0), (L / 2, w / 2, z0 + SL.SHED_T), "MI_Corrugated")
+    # the roof COLLIDES (2026-10-07): with no collider a helicopter gunner shot straight through it at people below
+    p.solid((-L / 2, -w / 2 + 0.2, z0), (L / 2, w / 2, z0 + SL.SHED_T), "MI_Corrugated")
     p.b.box((-L / 2, -w / 2 + 0.2, z0 - 0.08), (L / 2, -w / 2 + 0.28, z0 + SL.SHED_T), "MI_PaintedMetal")
     p.b.box((-L / 2, yc - 0.6, z0 - 0.3), (L / 2, yc + 0.6, z0), "MI_PaintedMetal")    # the beam on the columns
     p.b.box((-1.0, -w / 2 + 0.8, z0 - 0.05), (1.0, -w / 2 + 1.0, z0), "MI_Light")
@@ -692,7 +693,7 @@ def island_shed(w):
     p = Piece("GH_IslandShed_%s" % wname(w), "ground_hub")
     L, z0 = MODULE, SL.SHED_CLEAR
     p.solid((-0.15, -0.15, 0), (0.15, 0.15, z0), "MI_PaintedMetal")
-    p.b.box((-L / 2, -w / 2 + 0.2, z0), (L / 2, w / 2 - 0.2, z0 + SL.SHED_T), "MI_Corrugated")
+    p.solid((-L / 2, -w / 2 + 0.2, z0), (L / 2, w / 2 - 0.2, z0 + SL.SHED_T), "MI_Corrugated")   # collides: see shed()
     p.b.box((-L / 2, -0.8, z0 - 0.3), (L / 2, 0.8, z0), "MI_PaintedMetal")
     for sg in (-1.0, 1.0):
         a, b = sorted((sg * (w / 2 - 1.0), sg * (w / 2 - 0.8)))
@@ -983,6 +984,7 @@ def eh_side(w, hand, role):
         for xf, zt in steps:
             p.solid((x_top, p1, -lift), (xf, b1, zt), "MI_ConcreteSmooth")
             p.b.box((xf - 0.04, p1, zt), (xf, b1, zt + 0.004), "MI_PaintYellow")
+        eh_stair_hulls(p, steps, x_top, p1, b1)
         railing(p, (x_top, p1 - 0.05, hp), (xb + 0.3, p1, hp))              # the platform's edge over the stair well
         railing(p, (xb + 0.3, p1, hp), (xb + 0.35, b1, hp))
         # the balustrades (user, 2026-09-27): on the side open to the F1 hall, up to the hall's ceiling, where a
@@ -1014,7 +1016,7 @@ def eh_side(w, hand, role):
     p.col((x0, b1, zg), (x1, w1, sh))
     p.b.box((x0, b1, sh - 0.3), (x1, w1, sh), "MI_PaintedMetal")                              # the wall's top beam
     # the shed: roof over platform and band, a column on the platform's back half each module
-    p.b.box((x0, p0 + 0.2, sh), (x1, w1, sh + SL.SHED_T), "MI_Corrugated")
+    p.solid((x0, p0 + 0.2, sh), (x1, w1, sh + SL.SHED_T), "MI_Corrugated")     # collides: see shed()
     p.b.box((x0, p0 + 0.2, sh - 0.08), (x1, p0 + 0.28, sh + SL.SHED_T), "MI_PaintedMetal")
     yc = p1 - 0.6
     for k in range(int(round(L / MODULE))):
@@ -1126,6 +1128,22 @@ def eh_stair_runs(steps, x_top):
     return runs
 
 
+def eh_stair_hulls(p, steps, x_top, y0, y1):
+    """The elevated hub's F1 -> platform stair carries the same invisible RAMP collider every other flight does
+    (`stair()`; user 2026-10-07: "the character is not smooth going up Central's stairs, stuck time to time" -- these
+    flights had none). One hull per flight, along its nosing line: from one run in front of the flight's first nosing
+    at the floor (or landing) it rises from, to the front of the tread it arrives on, 0.3 m thick."""
+    pts = list(steps) + [(x_top, SL.PLATFORM_H)]
+    z_from, first = -SL.EH_LIFT, 0
+    for i in range(1, len(pts) + 1):
+        if i == len(pts) or pts[i - 1][0] - pts[i][0] > SL.STAIR_RUN + 1e-6:
+            x_lo, x_hi = pts[first][0] + SL.STAIR_RUN, pts[i - 1][0]
+            z_hi = pts[i - 1][1]
+            p.stair_hulls.append([(x, y, z) for x, zz in ((x_lo, z_from), (x_hi, z_hi)) for y in (y0, y1)
+                                  for z in (zz, zz - 0.3)])
+            z_from, first = z_hi, i
+
+
 def clip_runs(runs, zmax):
     """The part of each run whose treads lie at or below zmax (a run crossing it is cut where it does)."""
     out = []
@@ -1233,6 +1251,7 @@ def eh_island(wi, role):
         for xf, zt in steps:
             p.solid((x_top, -sw / 2, -lift), (xf, sw / 2, zt), "MI_ConcreteSmooth")
             p.b.box((xf - 0.04, -sw / 2, zt), (xf, sw / 2, zt + 0.004), "MI_PaintYellow")
+        eh_stair_hulls(p, steps, x_top, -sw / 2, sw / 2)
         runs = eh_stair_runs(steps, x_top)
         for sg in (-1.0, 1.0):
             stair_rail(p, clip_runs(runs, zc), sg * (sw / 2 + 0.03))
@@ -1260,7 +1279,7 @@ def eh_island(wi, role):
     # the shed: columns on the centre line (none over the well or the shaft), the roof inside the platform
     for xc in cols:
         p.solid((xc - 0.15, -0.15, hp), (xc + 0.15, 0.15, sh), "MI_PaintedMetal")
-    p.b.box((x0, -wi / 2 + 0.2, sh), (x1, wi / 2 - 0.2, sh + SL.SHED_T), "MI_Corrugated")
+    p.solid((x0, -wi / 2 + 0.2, sh), (x1, wi / 2 - 0.2, sh + SL.SHED_T), "MI_Corrugated")   # collides: see shed()
     if role == "plain":
         p.b.box((x0, -0.8, sh - 0.3), (x1, 0.8, sh), "MI_PaintedMetal")
     for sg in (-1.0, 1.0):

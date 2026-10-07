@@ -1,6 +1,8 @@
 package com.openworld.character;
 
 import com.openworld.util.CollisionLayers;
+import godot.api.AnimationLibrary;
+import godot.api.AnimationPlayer;
 import godot.api.AnimationTree;
 import godot.api.CollisionShape3D;
 import godot.api.Node;
@@ -37,6 +39,22 @@ final class CharacterRagdoll {
     private static final float ALIVE_HIT_VELOCITY_SCALE = 0.05f;
     // Impulse magnitude per damage point applied to the hit ragdoll bone (N·s per dmg).
     private static final float DEATH_BONE_IMPULSE_SCALE = 0.3f;
+    /**
+     * The most impulse one shot may put into one ragdoll bone (N·s). A PhysicalBone3D weighs 1 kg here, so a
+     * 150-damage sniper round was 45 N·s on a hand -- 45 m/s -- which is the "falls in very strange directions"
+     * report: the arm flew and dragged the body after it.
+     */
+    private static final float DEATH_BONE_IMPULSE_MAX = 6.0f;
+
+    /** The death clip in the shared library (falls backward; see {@link Character#deathAnimation}). */
+    static final String DEATH_CLIP = "death_fall_back";
+    /** How long after death a hit may still turn the falling body to face its killer (s). */
+    private static final double DEATH_TURN_WINDOW = 0.15;
+
+    /** The player of the death clip while one is playing, else null. */
+    private AnimationPlayer deathPlayer;
+    private double deathClock = -1.0;
+    private boolean deathTurned = false;
 
     private final Character owner;
 
@@ -72,6 +90,7 @@ final class CharacterRagdoll {
      * {@code Character._process(delta)} — a no-op until {@link #enableRagdoll()} arms the countdown.
      */
     void tickFreeze(double delta) {
+        if (deathClock >= 0) deathClock += delta;
         if (ragdollFreezeCountdown <= 0) return;
         ragdollFreezeCountdown -= delta;
         if (ragdollFreezeCountdown <= 0) freezeRagdoll();
@@ -96,17 +115,104 @@ final class CharacterRagdoll {
         }
         if (animationTree == null) animationTree = (AnimationTree) owner.getNodeOrNull("AnimationTree");
         if (animationTree != null) animationTree.setActive(false);
+        owner.diedAtMs = godot.api.Time.getTicksMsec();
 
         if (owner.currentVehicleNode != null) {
             enableSeatedDeath();
             return;
         }
 
-        enableRagdoll();
+        if (!startDeathClip(animationTree)) enableRagdoll();
 
         // Disabled current stance to let ragdoll take over
         Stance s = owner.stanceCache.get(owner.currentStanceName);
         if (s != null && s.getCollider() != null) s.getCollider().setDisabled(true);
+    }
+
+    /**
+     * The death as an ANIMATION: the shared library's {@link #DEATH_CLIP} on a one-off {@link AnimationPlayer} beside
+     * the (now inactive) AnimationTree, driving the same skeleton, held on its last frame. No simulation: the body
+     * falls where it stood, in the direction {@link #applyHitImpulse} turns it to. Refused (and the ragdoll used) for a
+     * body in the air, a body whose library has no death clip, or with {@link Character#deathAnimation} off.
+     */
+    private boolean startDeathClip(AnimationTree tree) {
+        if (!owner.deathAnimation || tree == null || owner.isAirborneNow()) return false;
+        AnimationLibrary lib = tree.getAnimationLibrary("");
+        Node parent = tree.getParent();
+        Node target = tree.getNodeOrNull(tree.getRootNode());
+        if (lib == null || parent == null || target == null || !lib.hasAnimation(new godot.core.StringName(DEATH_CLIP)))
+            return false;
+        stopBody();
+        Skeleton3D skel = skeleton();
+        if (skel == null) skel = findSkeleton(target);
+        if (skel != null) {
+            for (int i = 0; i < skel.getChildCount(); i++) {
+                if (skel.getChild(i) instanceof SkeletonModifier3D m && !(m instanceof PhysicalBoneSimulator3D)) m.setActive(false);
+            }
+        }
+        if (owner.physicalBoneSimulator != null) {
+            for (int i = 0; i < owner.physicalBoneSimulator.getChildCount(); i++) {
+                if (owner.physicalBoneSimulator.getChild(i) instanceof PhysicalBone3D bone)
+                    bone.setCollisionLayerValue(CollisionLayers.LAYER_HITBOX, false);
+            }
+        }
+        AnimationPlayer ap = new AnimationPlayer();
+        ap.setName("DeathPlayer");
+        parent.addChild(ap);
+        ap.setRootNode(ap.getPathTo(target));
+        ap.addAnimationLibrary("", lib);
+        ap.play(DEATH_CLIP, 0.12, 1.0f, false);
+        deathPlayer = ap;
+        deathClock = 0.0;
+        ragdollFrozen = true;               // nothing to freeze: there is no simulation
+        return true;
+    }
+
+    private static Skeleton3D findSkeleton(Node n) {
+        if (n instanceof Skeleton3D s) return s;
+        for (int i = 0; i < n.getChildCount(); i++) {
+            Skeleton3D s = findSkeleton(n.getChild(i));
+            if (s != null) return s;
+        }
+        return null;
+    }
+
+    /** Stop the body's own movement and its stance capsules (both death paths). */
+    private void stopBody() {
+        owner.setPhysicsProcess(false);
+        if (owner.hasNode("MovementController")) owner.getNode("MovementController").setPhysicsProcess(false);
+        for (int i = 0; i < owner.getChildCount(); i++) {
+            if (owner.getChild(i) instanceof CollisionShape3D shape) shape.setDisabled(true);
+        }
+    }
+
+    /** True while the death clip (not the ragdoll) is this corpse's death. */
+    boolean playingDeathClip() { return deathPlayer != null; }
+
+    /** Turn the falling body so its back is to {@code bulletDir}'s source: the clip falls backward, away from the killer. */
+    private void faceKiller(Vector3 bulletDir) {
+        if (deathTurned) return;
+        deathTurned = true;
+        Node meshRoot = owner.visualsInstance != null && owner.meshConfig != null
+                ? owner.visualsInstance.getNodeOrNull(owner.meshConfig.meshRootPath) : null;
+        if (!(meshRoot instanceof Node3D mr)) return;
+        double fx = bulletDir.getX(), fz = bulletDir.getZ();
+        if (fx * fx + fz * fz < 1e-6) return;
+        // the mesh faces -Z; face the shooter, i.e. along -bulletDir (MovementController.aimYaw's atan2(-dx, -dz))
+        double yaw = Math.atan2(fx, fz);
+        Vector3 r = mr.getGlobalRotation();
+        mr.setGlobalRotation(new Vector3(r.getX(), yaw, r.getZ()));
+    }
+
+    /** A blast or a car took the life: the throw is the point, so the clip gives way to the ragdoll. */
+    private void clipToRagdoll() {
+        if (deathPlayer == null) return;
+        deathPlayer.stop();
+        deathPlayer.queueFree();
+        deathPlayer = null;
+        deathClock = -1.0;
+        ragdollFrozen = false;
+        enableRagdoll();
     }
 
     /** True while a seated corpse is waiting for its seat to release it. */
@@ -186,24 +292,9 @@ final class CharacterRagdoll {
     }
 
     private void enableRagdoll() {
-        // Stop Character's own input/apply cycle
-        owner.setPhysicsProcess(false);
-
-        // Stop MovementController — it is a separate Node with its own
-        // _physicsProcess that applies gravity and calls moveAndSlide().
-        // Without this, the CharacterBody3D keeps falling even after death.
-        if (owner.hasNode("MovementController")) {
-            owner.getNode("MovementController").setPhysicsProcess(false);
-        }
-
-        // Disable all CharacterBody3D stance capsules so the frozen corpse
-        // shell doesn't block navigation or other characters.
-        for (int i = 0; i < owner.getChildCount(); i++) {
-            Node child = owner.getChild(i);
-            if (child instanceof CollisionShape3D shape) {
-                shape.setDisabled(true);
-            }
-        }
+        // Stop Character's own input/apply cycle and MovementController (a separate Node whose own _physicsProcess
+        // applies gravity and calls moveAndSlide()), and drop every stance capsule so the corpse shell blocks nothing.
+        stopBody();
 
         if (owner.physicalBoneSimulator == null) {
             ragdollFrozen = true; // nothing to freeze later
@@ -285,10 +376,15 @@ final class CharacterRagdoll {
      */
     void applyHitImpulse(Node hitNode, Vector3 bulletDir, float damage) {
         Vector3 dir = bulletDir.normalized();
+        if (!owner.isAlive() && deathPlayer != null) {
+            if (deathClock > DEATH_TURN_WINDOW) return;            // already falling: later hits do not spin it
+            if (hitNode instanceof PhysicalBone3D) { faceKiller(dir); return; }
+            clipToRagdoll();                                         // no struck bone: a blast or a car -> thrown
+        }
         if (owner.isAlive()) {
             owner.setVelocity(owner.getVelocity().plus(dir.times(damage * ALIVE_HIT_VELOCITY_SCALE)));
         } else if (hitNode instanceof PhysicalBone3D bone) {
-            bone.applyCentralImpulse(dir.times(damage * DEATH_BONE_IMPULSE_SCALE));
+            bone.applyCentralImpulse(dir.times(Math.min(damage * DEATH_BONE_IMPULSE_SCALE, DEATH_BONE_IMPULSE_MAX)));
         } else if (owner.physicalBoneSimulator != null) {
             // No struck bone: a BLAST (ExplosionManager passes the character itself) or a vehicle
             // strike. It used to fall into neither branch, so a body killed by an explosion dropped
@@ -298,7 +394,7 @@ final class CharacterRagdoll {
                 if (owner.physicalBoneSimulator.getChild(i) instanceof PhysicalBone3D) n++;
             }
             if (n == 0) return;
-            Vector3 share = dir.times(damage * DEATH_BONE_IMPULSE_SCALE / n);
+            Vector3 share = dir.times(Math.min(damage * DEATH_BONE_IMPULSE_SCALE / n, DEATH_BONE_IMPULSE_MAX));
             for (int i = 0; i < owner.physicalBoneSimulator.getChildCount(); i++) {
                 if (owner.physicalBoneSimulator.getChild(i) instanceof PhysicalBone3D b) b.applyCentralImpulse(share);
             }

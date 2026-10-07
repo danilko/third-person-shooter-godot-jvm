@@ -812,7 +812,9 @@ public class EnforcementDispatch extends Node {
         Vector3 gun = e.h.getGlobalPosition().plus(new Vector3(0, -1.2, 0));
         Vector3 chest = p.getGlobalPosition().plus(new Vector3(0, 1.1, 0));
         double d = gun.distanceTo(chest);
-        boolean clear = d <= HELI_RANGE && clearShot(gun, chest, e.h);
+        // a gunner in a helicopter hits nobody UNDER COVER (user 2026-10-07: shot on Central's stairs with no shooter in
+        // sight): anything solid over the target within HELI_COVER_UP blocks it, even where a gap lines up with the door
+        boolean clear = d <= HELI_RANGE && !underCover(chest) && clearShot(gun, chest, e.h);
         e.gunIn -= TICK;
         if (e.burstLeft <= 0 && e.gunIn <= 0) { e.burstLeft = 1.2; e.gunIn = 3.0; }
         if (e.burstLeft > 0) {
@@ -843,6 +845,20 @@ public class EnforcementDispatch extends Node {
                 break;
             }
         }
+    }
+
+    /** How far above a target a roof, a deck or a platform shed counts as cover from the helicopter (m). */
+    private static final double HELI_COVER_UP = 30.0;
+
+    /** Something on the WORLD layer straight above {@code at} within {@link #HELI_COVER_UP}. */
+    private boolean underCover(Vector3 at) {
+        if (getViewport() == null || getViewport().getWorld3d() == null) return false;
+        var sp = getViewport().getWorld3d().getDirectSpaceState();
+        var q = godot.api.PhysicsRayQueryParameters3D.create(at.plus(new Vector3(0, 0.9, 0)),
+                at.plus(new Vector3(0, HELI_COVER_UP, 0)), CollisionLayers.WORLD,
+                new godot.core.VariantArray<>(godot.core.RID.class));
+        godot.core.Dictionary<Object, Object> hit = sp.intersectRay(q);
+        return hit != null && !hit.isEmpty();
     }
 
     /** Nothing on the WORLD layer between the door and the player (the helicopter's own body excepted). */
