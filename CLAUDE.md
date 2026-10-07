@@ -11033,6 +11033,40 @@ Built first so peak performance can be measured with enforcement in the ring (us
   marker yet (they wake at the place's door, guards round them).
 - Peak load for perf: `probe_walk_perf.gd --wanted=N --gang=N [--no-balance]`.
 
+## Enforcement escalation: armour, rammers, snipers, a helicopter, and units that come inside (PLAN.md W6, 2026-10-06)
+
+User: the chase stopped at buildings and every unit carried small arms. All of it is DATA in `crimes.json` `dispatch`
+/ `gangs.json` `hunters` (`DispatchRules`, `DispatchRulesTest`): `weapons_by_stars`, `vehicles_by_stars`,
+`snipers_by_stars`, `helis_by_stars`, `ram_at`, `gun` (which models carry a main gun, interval, range, damage, radius).
+- **Armour**: ARV1 (riot van), LTK1 (light tank), TNK1 (tank), placeholder `armour` shape in
+  `make_placeholder_cars.py`, VehicleModels 23-25. LTK1/TNK1 fire an ATL1 rocket from the turret every `gun` interval
+  in range (`EnforcementDispatch.fireMainGun`) and never unload their crew.
+- **Ramming** from `ram_at` stars: `VehicleAIController.ramTarget` steers at the player's predicted position at full
+  throttle (boost past 25 m, reverse and re-try when it overshoots or stalls); the crew bails out on foot only after 8 s
+  close.
+- **Light bars + siren**: `Vehicle.setEmergency` flashes a `lamp_red` bar material (0.5 s) with a red light and plays
+  `Sound.SIREN` (file missing: silent), within 350 m of the camera. Set by the dispatcher on its cars only; not
+  replicated yet, and an ambulance / fire engine on a call does not use it yet.
+- **Snipers**: placed at range on a clear line with SNR1, they hold and shoot.
+- **The helicopter** (`carrier/helicopter/Helicopter`, HLC1, VehicleModels 26; the Airplane scene with this script via
+  `build_craft_scenes` `script`): an arcade hover -- lift holds the weight, space climbs, shift descends, forward flies,
+  steer yaws, kept level, `setCanSleep(false)` while the rotor runs (Jolt sleeps a body whose forces balance). With
+  `aiTarget` set and nobody aboard it orbits 38 m up / 55 m out, nose on the target. The dispatcher spawns it in the air
+  out of view with a pilot and a sniper; door-gun bursts and aimed shots are hitscan from the door (tracers,
+  ImpactManager damage). Parked (MARK_vehicle HLC1) on the hospital and police-station roof pads; `ParkedVehicle` lifts
+  an aircraft by how far its collision box reaches below its origin. Gate `tools/godot/probe_helicopter.gd`.
+- **Units always follow the player INTO a building** (user: "officers always get in, so behaviour is consistent"), at
+  every star level, with NO interior navmesh: a player is indoors when a ray up hits a building roof (`building` meta);
+  each unit walks STRAIGHT to 2.5 m outside that building's nearest `Door_*` marker and 2.5 m inside it
+  (`AIController.pursuitVia`, followed by `ArrestState`), a locked door there is forced (unlocked, automatic), then it
+  closes as before (arrest below shoot stars, the combat FSM above). `EnforcementDispatch.breaching` is the control.
+  Gate `tools/godot/probe_breach.gd [-- --stars=N] [--control]`. Limit: a building whose door is far from the player's
+  room relies on the unit walking straight inside, which works for one-room shops and halls, not a multi-room plan.
+- `escalation_now` readout: `models;rammers;shells;snipers;helis;heliShots;heliHits;breachRoutes;breachedIn;doorsForced`.
+  Gate `tools/godot/probe_escalation.gd` (6 stars every piece; `--control` 2 stars none).
+- **Not built yet**: breakable building glass (shopfront panes are merged into the building mesh with a solid wall
+  collider; making them breakable needs per-pane nodes from `build_building_scenes.gd`).
+
 ## Co-op correctness batch: purchases, respawn, missions, clock, passenger view (2026-10-06)
 
 User-reported gameplay bugs, all two-process. Gate: `tools/net/run_net_debugworld.sh` phase **coop** (a client buys at
