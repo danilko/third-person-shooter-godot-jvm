@@ -100,6 +100,9 @@ public class AIController extends Controller {
         intendedAttackStance = StanceName.UPRIGHT;
         scriptedDestination = null;
         scriptedArrived = false;
+        pursuit = null;
+        pursuitAway = false;
+        pursuitStand = false;
         transitionTo(initialState());
     }
 
@@ -146,6 +149,26 @@ public class AIController extends Controller {
         scriptedDestination = null;
         scriptedArrived = false;
     }
+
+    // ── Pursuit to arrest (game.EnforcementDispatch, ArrestState) ─────────────
+
+    private com.openworld.character.Character pursuit;
+
+    /** Who {@code ArrestState} runs down (a wanted player police mean to arrest, not shoot), or null. */
+    public com.openworld.character.Character getPursuit() {
+        if (pursuit != null && (!GD.isInstanceValid(pursuit) || !pursuit.isInsideTree())) pursuit = null;
+        return pursuit;
+    }
+
+    public void setPursuit(com.openworld.character.Character c) { pursuit = c; }
+
+    /** Nothing solid between this body and its pursuit (the dispatcher measures it): run straight, not by the
+     *  navmesh, which off its own baked area leads the body away (measured on DebugWorld). */
+    public boolean pursuitDirect;
+    /** Stood down: walk AWAY from the pursuit instead (the dispatch's unit leaving the scene). */
+    public boolean pursuitAway;
+    /** Stand and cover the pursuit, weapon on them (a gang guard over a captive). */
+    public boolean pursuitStand;
 
     public boolean hasScriptedArrived()            { return scriptedArrived; }
     public void    setScriptedArrived(boolean v)   { scriptedArrived = v; }

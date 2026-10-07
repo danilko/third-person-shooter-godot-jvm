@@ -6,7 +6,7 @@ extends SceneTree
 ##
 ##   1. a player hitting a civilian with someone there to see it is wanted (>= 1 star);
 ##   2. killing a police officer is at least 3 stars at once;
-##   3. the player dies: the 入院 HOSPITALIZED card, the game is NOT over, a fresh Player stands at the nearest
+##   3. the player dies (stars cleared first: a death while wanted is jail, probe_recovery.gd): the 入院 HOSPITALIZED card, the game is NOT over, a fresh Player stands at the nearest
 ##      hospital / clinic door (island) or the PlayerSpawn (DebugWorld has none), alive (only the fist), wanted 0, and
 ##      the running mission (if any) has failed;
 ##   4. the player is ARRESTED (RespawnSystem.arrest, the police dispatch's call): the 逮捕 ARRESTED card, a second
@@ -75,7 +75,9 @@ func _initialize() -> void:
 	await _tick(2)
 	_check(int(ws.call("stars_now", pid)) >= 3, "killing a police officer is >= 3 stars (%d)" % int(ws.call("stars_now", pid)))
 
-	# 3. death -> hospitalised
+	# 3. death -> hospitalised. Since 2026-10-06 a death WHILE WANTED is jail (probe_recovery.gd covers that), so the
+	#    stars are cleared first: this case is the plain hospital path.
+	ws.call("clear_now", pid)
 	var mm: Node = root.get_node_or_null("MissionManager")
 	helper.call("kill", player)
 	await _tick(10)
@@ -91,7 +93,7 @@ func _initialize() -> void:
 		print("RESULT %s (%d failures)" % ["PASS" if fails == 0 else "FAIL", fails])
 		quit(1 if fails else 0)
 		return
-	_check(card == "入院 HOSPITALIZED", "a death shows the hospitalised card (%s)" % card)
+	_check(card.begins_with("入院 HOSPITALIZED"), "a death shows the hospitalised card (%s)" % card.replace("\n", " "))
 	_check(bool(gm.call("playing_now")), "a death is not game over")
 	_check(int(rs.call("respawns_now")) == 1 and String(rs.call("last_reason_now")) == "HOSPITALIZED", "the player respawned, hospitalised")
 	var fresh: Node3D = rs.call("respawned_player_now")
@@ -114,7 +116,7 @@ func _initialize() -> void:
 	_check(bool(rs.call("arrest_now", fresh)), "the player can be arrested")
 	await _tick(10)
 	card = String(rs.call("card_text_now"))
-	_check(card == "逮捕 ARRESTED", "an arrest shows the arrested card (%s)" % card)
+	_check(card.begins_with("逮捕 ARRESTED"), "an arrest shows the arrested card (%s)" % card.replace("\n", " "))
 	for i in 60 * 6:
 		await physics_frame
 		if int(rs.call("respawns_now")) > 1:

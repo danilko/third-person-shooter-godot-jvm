@@ -10940,7 +10940,8 @@ Gated since (probe_wanted_respawn, probe_shop_clerk, probe_weapon_counter PASS);
   and to avoid an infringement claim): a death is **入院 HOSPITALIZED** (wake at the nearest Hospital / HospitalSmall /
   Clinic door, `world.Places`); `RespawnSystem.arrest(player)` is **逮捕 ARRESTED** (wake at the nearest
   PoliceStation, moved onto a `mission_marker` `team = prisoner` -- the 留置場 cells -- once it streams in; the
-  station's locked `Door`s unlock until the player is 60 m away). Either: a 4 s card (the sign font, `make_jp_font.py`
+  station's locked `Door`s unlock until the player is 60 m away). Since 2026-10-06 a third outcome, 拉致 ABDUCTED, and
+  bills: see "Police and gang dispatch, and where a downed player wakes". Either: a 4 s card (the sign font, `make_jp_font.py`
   `UI_WORDS`), the running mission FAILS, a fresh Player (fist only, wanted cleared). `GameManager.onCharacterDied` skips GAME_OVER when
   `RespawnSystem.willRespawn`. In co-op the HOST runs it per player (see "Co-op correctness batch"). `enabled` off is the
   control. Gate: `tools/godot/probe_wanted_respawn.gd [-- --world=island] [-- --control]`.
@@ -10985,6 +10986,49 @@ Gated since (probe_wanted_respawn, probe_shop_clerk, probe_weapon_counter PASS);
   Gate `tools/godot/probe_underground.gd` (3 cases, `--control`).
 - **`./gradlew test` replaces `jvm/main.jar`** (shadowJar + copyDesktopJars). While Godot bakes are running, test with
   `./gradlew test -x shadowJar -x copyDesktopJars -x packageBootstrapJar`.
+
+## Police and gang dispatch, and where a downed player wakes (PLAN.md W5, 2026-10-06, user-asked)
+
+Built first so peak performance can be measured with enforcement in the ring (user). Gates:
+`tools/godot/probe_enforcement.gd [-- --world=island] [-- --control]` (PASS both worlds, control PASS) and
+`tools/godot/probe_recovery.gd [-- --world=island]` 23/23; unit tests `DispatchRulesTest`, `RecoveryRulesTest`.
+- **`game.EnforcementDispatch`** (a GameManager child, authority only) turns standing into units. Police from the stars
+  (`crimes.json` `dispatch`: foot units and patrol cars per star, spawn rings, `shoot_at` 3), gangs at `chase_at` or
+  more (`gangs.json` `hunters`). Rules engine-free in `game.DispatchRules`.
+  * **Foot officers** appear out of view 45-75 m away, on a footway (island) with a clear line to the player, else
+    any out-of-view spot (indoors: the navmesh then). They are `AICharacter.lodPinnedActive` (the PASSIVE tier held
+    them on a heading and walked them away, 79 -> 165 m).
+  * **Below shoot_at (and not lethal) police ARREST**: `ai.character.ArrestState` runs at the player, weapon aimed,
+    no fire, STRAIGHT when `pursuitDirect` (the dispatcher's clear-line test), else by the navmesh (off its baked area
+    the NavAgent led officers AWAY on DebugWorld). An officer within 2.2 m for 1.5 s -> `RespawnSystem.arrest`.
+    Measured: 11-24 s from 1 star to the arrest.
+  * **At shoot_at / lethal** the police faction is hostile (`WantedSystem.applyHostility`); units APPROACH with
+    ArrestState and hand over to the combat FSM inside 25 m (back out past 35). The FSM's own ChaseState stood still
+    50-70 m out on the island. Each player's units share an `AISquad`; `assignTarget` is the radio.
+  * **Patrol cars** (POC1/MPC1 + partner): `ZoneManager.spawnServiceCar` (never on expressway/ramp/rail lanes),
+    `VehicleAIController.setPlan` = `RoadGraph.routeFromLane` from the car's OWN lane (a position snap picked the
+    other carriageway: cars drove away). A car whose road route is > 2.5x the straight line is discarded at spawn.
+    `racing` set. Within 35 m (or stuck/finished) it `holdStop`s, the crew gets out and joins the foot units.
+    Measured: arrives ~16 s after spawn.
+  * Stuck (no 2 m gain in 8 s) -> walks off, replaced. Stood down units walk AWAY (ArrestState `pursuitAway`) and are
+    freed out of view; an arrived car stays parked until out of view. Police in reach stop the heat draining
+    (`WantedSystem.seen`).
+- **Enforcement balancing** (user: "reduce crowd when enforcement occurs"): the dispatch reports its load and
+  `ZoneManager.effectiveTrafficBudget` = budget - 2/car - 1 per 2 bodies (floor `trafficFloor` 6); walker and fighter
+  budgets likewise. Ambient cars over it are SHED one a tick, farthest, out of view, past 60 m.
+  `enforcementBalancing` off is the control (`probe_walk_perf --no-balance`).
+- **Where a downed player wakes** (`game.RecoveryRules`, user 2026-10-06): any gang standing -> **拉致 ABDUCTED**;
+  else police stars -> **逮捕 ARRESTED** (jail, a death included); else **入院 HOSPITALIZED**. Bills from cash, never
+  below 0, carried to the new body: hospital `fees.hospital` (¥5,000); arrested (hospital + `police_per_star`) x
+  stars (¥15,000/star); abduction: a ransom `ransom_per_star` x that gang's stars (¥100,000/star, the highest).
+  Abducted: woken at the nearest place of that gang (the places record's new `gang` field, from the civic plots),
+  `gangs.json` `abduction.guards` guards cover them (ArrestState `pursuitStand`; the gang is held NON-hostile while
+  the captive stays), prompt "拉致 ... [E] pay or run". Pay (`GangSystem.payRansom`, or a donation at that gang's
+  counter) clears the standing and the guards stand down; past `escape_start` (15 m) they are escaping (gang hostile,
+  + the `escape` heat), past `escape_free` (90 m) free. The card shows the bill. `make_jp_font.py` adds 拉致身代金¥ and
+  the gang names. Not done: a client paying a ransom (the key is read on the authority only); no interior "captive"
+  marker yet (they wake at the place's door, guards round them).
+- Peak load for perf: `probe_walk_perf.gd --wanted=N --gang=N [--no-balance]`.
 
 ## Co-op correctness batch: purchases, respawn, missions, clock, passenger view (2026-10-06)
 

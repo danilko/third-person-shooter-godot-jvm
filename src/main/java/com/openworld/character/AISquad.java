@@ -83,6 +83,20 @@ public class AISquad extends Node {
         }
     }
 
+    /**
+     * The dispatcher's radio (game.EnforcementDispatch): every member is told about {@code target}, whatever its
+     * distance, and the forget clock restarts. A dispatched unit hunts a wanted player it has not seen yet.
+     */
+    public void assignTarget(Character target, Vector3 pos) {
+        if (target == null) return;
+        sharedTarget = target;
+        sharedLastKnownPosition = (pos != null) ? new Vector3(pos) : new Vector3(target.getGlobalPosition());
+        lastSpottedTime = elapsed;
+        for (AICharacter m : members) {
+            if (GD.isInstanceValid(m) && !m.isDead()) m.adoptSquadTarget(target, sharedLastKnownPosition);
+        }
+    }
+
     /** Drop a still-alive shared target (e.g. the squad gave up the search). */
     public void clearThreat() {
         sharedTarget = null;

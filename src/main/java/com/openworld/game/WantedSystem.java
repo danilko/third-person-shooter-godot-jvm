@@ -30,7 +30,8 @@ import java.util.Map;
  * <p>LETHAL crimes (a robbery, a dead policeman) make police shoot the player on sight until the heat is gone
  * (`applyHostility`), and no arrest is offered meanwhile. Gangs are a separate standing: {@link GangSystem}.
  *
- * <p>Not done yet (PLAN.md W5): replication to clients (a client's HUD shows no stars), police dispatch, the arrest trigger.
+ * <p>The police dispatch and the arrest are {@link EnforcementDispatch}'s. Not done yet (PLAN.md W5): replication to
+ * clients (a client's HUD shows no stars).
  */
 @Script(className = "WantedSystem")
 public class WantedSystem extends Node {
@@ -44,6 +45,7 @@ public class WantedSystem extends Node {
     }
 
     private WantedRules rules;
+    private DispatchRules dispatch;
     private final Map<String, WantedRules.State> states = new HashMap<>();
     private double now;
     private final List<Node> scratch = new ArrayList<>();
@@ -54,8 +56,11 @@ public class WantedSystem extends Node {
     @Override
     public void _ready() {
         instance = this;
-        if (FileAccess.fileExists(TABLE)) rules = WantedRules.parse(FileAccess.getFileAsString(TABLE));
-        else GD.print("WantedSystem: no crime table at " + TABLE);
+        if (FileAccess.fileExists(TABLE)) {
+            String text = FileAccess.getFileAsString(TABLE);
+            rules = WantedRules.parse(text);
+            dispatch = DispatchRules.parse(text, "dispatch");
+        } else GD.print("WantedSystem: no crime table at " + TABLE);
     }
 
     @Register
@@ -78,10 +83,14 @@ public class WantedSystem extends Node {
         }
     }
 
-    /** Police are HOSTILE to players while any player is lethal-wanted (FactionFlips restores them after). */
+    /**
+     * Police are HOSTILE to players while any player is lethal-wanted, or wanted at the dispatch's shoot_at stars or
+     * more (FactionFlips restores them after). Below that, dispatched officers run the player down to arrest.
+     */
     private void applyHostility() {
         java.util.Set<String> want = new java.util.HashSet<>();
-        for (WantedRules.State st : states.values()) if (st.lethal) want.add(Faction.POLICE);
+        for (WantedRules.State st : states.values())
+            if (st.lethal || (dispatch != null && rules.starsFor(st.heat) >= dispatch.shootAt)) want.add(Faction.POLICE);
         flips.apply(getNodeOrNull("/root/FactionManager") instanceof com.openworld.character.FactionManager fm ? fm : null, want);
     }
 
@@ -157,6 +166,30 @@ public class WantedSystem extends Node {
         return s == null || rules == null ? 0 : rules.starsFor(s.heat);
     }
 
+    /** The police dispatch's rules (crimes.json `dispatch`), or null. */
+    public DispatchRules dispatchRules() { return dispatch; }
+
+    /** Do police shoot this player now (lethal, or at the shoot_at stars)? */
+    public boolean policeShoot(String playerId) {
+        WantedRules.State s = states.get(playerId);
+        if (s == null || rules == null) return false;
+        return s.lethal || (dispatch != null && dispatch.shoots(rules.starsFor(s.heat), false));
+    }
+
+    /** Police have the player in sight (the dispatch asks): the heat holds until they lose them. */
+    public void seen(String playerId) {
+        WantedRules.State s = states.get(playerId);
+        if (s != null && rules != null) rules.seen(s, now);
+    }
+
+    /** Set a player's stars outright (a probe, a perf run, a mission script). */
+    public void setStars(String playerId, int stars, boolean lethal) {
+        if (rules == null || playerId == null) return;
+        WantedRules.State s = states.computeIfAbsent(playerId, k -> new WantedRules.State());
+        rules.setStars(s, stars, lethal, now);
+        applyHostility();
+    }
+
     /** Clear a player's wanted level (a jail respawn, a mission script). */
     public void clear(String playerId) {
         WantedRules.State s = states.get(playerId);
@@ -172,4 +205,5 @@ public class WantedSystem extends Node {
     }
     @Register public void clearNow(String playerId) { clear(playerId); }
     @Register public boolean lethalNow(String playerId) { return isLethal(playerId); }
+    @Register public void setStarsNow(String playerId, int stars, boolean lethal) { setStars(playerId, stars, lethal); }
 }

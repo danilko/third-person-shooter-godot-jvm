@@ -160,7 +160,8 @@ public class VehicleAIController extends Controller {
             return false;
         }
 
-        Lane next = route.pickNextRoute();   // explicit override first
+        Lane next = planned();               // a dispatched car follows its plan where it can
+        if (next == null) next = route.pickNextRoute();   // explicit override first
         if (next == null) {
             List<Lane> succ = LaneGraph.successorsOf(route);
             if (!succ.isEmpty()) {
@@ -189,6 +190,46 @@ public class VehicleAIController extends Controller {
                 && p.nextRoutes != null && !p.nextRoutes.isBlank();
         finished = true;   // END_DESPAWN, or no reverse lane authored
         return false;
+    }
+
+    // ── A route PLAN (game.EnforcementDispatch: a patrol car driving to a wanted player) ───────────────
+
+    private List<String> plan;
+
+    /** Brake to a stop and stay (game.EnforcementDispatch: the car has arrived and its crew gets out). */
+    public boolean holdStop;
+
+    /**
+     * Lane ids (RoadGraph's, which are the runtime lane node names) this car should take, in order. At each lane end
+     * the successor that appears EARLIEST in the plan ahead of the current lane wins; with none, the ordinary choice.
+     * A route's lateral lane changes are not legal successors, so they are simply skipped over. Null = no plan.
+     */
+    public void setPlan(List<String> laneIds) { plan = laneIds == null || laneIds.isEmpty() ? null : laneIds; }
+
+    public boolean hasPlan() { return plan != null; }
+
+    /** "index of the current lane in the plan / plan size: the next two" (diagnostics). */
+    public String planDebug() {
+        if (plan == null) return "no plan";
+        int here = route instanceof Node rn ? plan.indexOf(rn.getName().toString()) : -1;
+        return here + "/" + plan.size() + " next " + plan.subList(Math.max(0, here + 1), Math.min(plan.size(), here + 3));
+    }
+
+    /** Metres along the current lane (where a re-plan starts from). */
+    public double routeProgressNow() { return routeProgress; }
+
+    private Lane planned() {
+        if (plan == null || !(route instanceof Node rn)) return null;
+        int here = plan.indexOf(rn.getName().toString());
+        List<Lane> succ = new java.util.ArrayList<>(LaneGraph.successorsOf(route));
+        Lane best = null;
+        int bestAt = Integer.MAX_VALUE;
+        for (Lane l : succ) {
+            if (!(l instanceof Node ln) || !GD.isInstanceValid(ln)) continue;
+            int i = plan.indexOf(ln.getName().toString());
+            if (i > here && i < bestAt) { bestAt = i; best = l; }
+        }
+        return best;
     }
 
     /** True when {@link #isFinished()} because the lane's successors are in an unstreamed road piece, not a dead end. */
@@ -243,6 +284,11 @@ public class VehicleAIController extends Controller {
         updateObstacleReach();
         VehicleAIState next = currentState.update(vehicleBody, this, cmd, delta);
         if (next != currentState) transitionTo(next);
+        if (holdStop) {   // a dispatched car has arrived: stand on the brakes for the crew to get out
+            cmd.motor = 0f;
+            cmd.brake = true;
+            cmd.handbrake = true;
+        }
 
         // After the state tick, so routeProgress is this frame's.
         waitingForSignal = heldAtSignal || queuedBehindSignal();

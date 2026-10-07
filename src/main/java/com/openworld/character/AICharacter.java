@@ -170,7 +170,14 @@ public class AICharacter extends Character {
     /** Back-compat shorthand: kept so existing FROZEN-only callers keep working. */
     public boolean isLodFrozen() { return lodLevel == AILodLevel.FROZEN; }
 
+    /**
+     * Held ACTIVE whatever the distance (game.EnforcementDispatch's units): a dispatched officer 85 m from the player
+     * is on its way TO the player, and the PASSIVE tier would hold its heading and walk it away (measured: 79 -> 165 m).
+     */
+    public boolean lodPinnedActive;
+
     private AILodLevel classifyLod(float nearestPlayer) {
+        if (lodPinnedActive) return AILodLevel.ACTIVE;
         if (nearestPlayer > LOD_FREEZE_DIST * lodDistanceBias) return AILodLevel.FROZEN;
         if (nearestPlayer > LOD_ACTIVE_DIST * lodDistanceBias) return AILodLevel.PASSIVE;
         return AILodLevel.ACTIVE;

@@ -426,7 +426,31 @@ public final class RoadGraph {
     public Route route(double fx, double fy, double fz, double tx, double ty, double tz) {
         finish();
         if (lanes.isEmpty()) return null;
-        List<Snap> starts = snaps(fx, fy, fz, 1.0);
+        return routeFrom(snaps(fx, fy, fz, 1.0), tx, ty, tz);
+    }
+
+    /**
+     * The cheapest legal route from a car ON lane {@code laneId} at {@code offset} metres along it (it cannot start
+     * on the other carriageway, which a position snap may pick: a car cannot turn round where it stands), to
+     * {@code to}. Null when the lane is unknown or nothing is reachable (game.EnforcementDispatch's patrol cars).
+     */
+    public Route routeFromLane(String laneId, double offset, double tx, double ty, double tz) {
+        finish();
+        Lane l = lanes.get(laneId);
+        if (l == null) return null;
+        double o = Math.max(0.0, Math.min(l.length(), offset));
+        double[] at = {l.x[0], l.y[0], l.z[0]};
+        for (int i = 0; i + 1 < l.x.length; i++) {
+            if (o > l.cum[i + 1] && i + 2 < l.x.length) continue;
+            double seg = l.cum[i + 1] - l.cum[i], t = seg < 1e-9 ? 0 : Math.max(0, Math.min(1, (o - l.cum[i]) / seg));
+            at = new double[]{l.x[i] + (l.x[i + 1] - l.x[i]) * t, l.y[i] + (l.y[i + 1] - l.y[i]) * t,
+                    l.z[i] + (l.z[i + 1] - l.z[i]) * t};
+            break;
+        }
+        return routeFrom(List.of(new Snap(l, o, 0.0, at)), tx, ty, tz);
+    }
+
+    private Route routeFrom(List<Snap> starts, double tx, double ty, double tz) {
         List<Snap> goals = snaps(tx, ty, tz, 0.0);
 
         // E[L] = cost to be at the START of L; prev = how we got there.

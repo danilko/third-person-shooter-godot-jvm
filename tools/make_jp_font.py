@@ -20,8 +20,10 @@ NAMES = os.path.join(ROOT, "src/main/resources/com/openworld/world/IslandStreetN
 STATIONS = os.path.join(ROOT, "src/main/resources/com/openworld/world/StationNames.json")
 OUT = os.path.join(ROOT, "src/main/resources/com/openworld/ui/fonts/NotoSansJP-Signs.otf")
 SRC = "/usr/share/fonts/google-noto-sans-cjk-vf-fonts/NotoSansCJK-VF.ttc"
-# words the HUD itself prints (game.RespawnSystem's cards: hospitalized / arrested)
-UI_WORDS = "入院逮捕"
+# words the HUD itself prints (game.RespawnSystem's cards: hospitalized / arrested / abducted, the ransom line, ¥)
+UI_WORDS = "入院逮捕拉致身代金¥"
+# the gangs' names (gangs.json name_ja), printed on the abduction prompt
+GANGS = os.path.join(ROOT, "src/main/resources/com/openworld/game/gangs.json")
 KANA = "".join(chr(c) for c in range(0x3041, 0x3097)) + "".join(chr(c) for c in range(0x30A1, 0x30FB)) + "ー・、。「」"
 
 
@@ -31,6 +33,8 @@ def wanted():
     chars = set(st["words"])
     for v in st["stations"].values():
         chars |= set(v["ja"])
+    for g in json.load(open(GANGS)).get("gangs", {}).values():
+        chars |= set(g.get("name_ja", ""))
     return set(doc["chars"]) | chars | set(UI_WORDS) | set(chr(c) for c in range(0x20, 0x7F)) | set(KANA)
 
 

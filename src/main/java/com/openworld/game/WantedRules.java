@@ -89,12 +89,15 @@ public final class WantedRules {
     public static final class State {
         public double heat;
         public double lastCrimeAt = Double.NEGATIVE_INFINITY;
+        /** Police last had the player in sight (game.EnforcementDispatch): the calm clock runs from the later. */
+        public double lastSeenAt = Double.NEGATIVE_INFINITY;
         /** A lethal crime is on the record: police shoot on sight, no arrest -- until the heat is gone. */
         public boolean lethal;
 
         public void clear() {
             heat = 0.0;
             lastCrimeAt = Double.NEGATIVE_INFINITY;
+            lastSeenAt = Double.NEGATIVE_INFINITY;
             lethal = false;
         }
     }
@@ -112,11 +115,21 @@ public final class WantedRules {
         return true;
     }
 
+    /** Police can see the player: the heat does not start draining until they have lost them for the calm period. */
+    public void seen(State s, double now) { if (s.heat > 0.0) s.lastSeenAt = now; }
+
+    /** Set the stars outright (a probe, a mission script): the heat at the start of that star. */
+    public void setStars(State s, int stars, boolean lethal, double now) {
+        s.heat = heatFor(Math.max(0, Math.min(MAX_STARS, stars)));
+        s.lastCrimeAt = now;
+        s.lethal = lethal && s.heat > 0.0;
+    }
+
     /** Advance the state to {@code now} after {@code dt} seconds: heat drains once the calm period is over. */
     public void tick(State s, double now, double dt) {
         if (s.heat <= 0.0) return;
         double calm = calmSeconds + calmPerStar * starsFor(s.heat);
-        if (now - s.lastCrimeAt < calm) return;
+        if (now - Math.max(s.lastCrimeAt, s.lastSeenAt) < calm) return;
         s.heat = Math.max(0.0, s.heat - decayPerSecond * dt);
         if (s.heat <= 0.0) s.lethal = false;
     }

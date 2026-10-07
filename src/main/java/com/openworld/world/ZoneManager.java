@@ -258,7 +258,159 @@ public class ZoneManager extends Node {
 		return n;
 	}
 
-	private boolean trafficFull() { return trafficBudget > 0 && trafficAlive() >= trafficBudget; }
+	private boolean trafficFull() { return trafficBudget > 0 && trafficAlive() >= effectiveTrafficBudget(); }
+
+	// ── ENFORCEMENT BALANCING (user, 2026-10-06: "reduce crowd when enforcement occurs to balance performance") ──
+	//
+	// A wanted player brings police (and a hunted one gang members) into the simulation ring: full AI bodies and
+	// driven cars on top of the ambient population, at exactly the moment the frame is busiest. GTA answers that by
+	// thinning the ambient population during a chase, and so do we: every dispatched body and car takes ambient
+	// slots, so the total of simulated characters stays near what the budgets were measured for. The ambient
+	// traffic over the reduced budget is SHED (reclaimed out of view, farthest first); promoted walkers over it
+	// simply stop being promoted. game.EnforcementDispatch reports its load every tick.
+
+	/** Off = the dispatch adds on top of the ambient budgets (the control). */
+	@Export public boolean enforcementBalancing = true;
+	/** Ambient cars kept whatever the enforcement load; the street must not empty. */
+	@Export public int trafficFloor = 6;
+	private int enforcementBodies, enforcementCars;
+
+	/** The dispatch's live units (bodies on foot or seated, and cars). */
+	public void setEnforcementLoad(int bodies, int cars) {
+		enforcementBodies = Math.max(0, bodies);
+		enforcementCars = Math.max(0, cars);
+	}
+
+	/** Each dispatched car is a car + crew (two ambient cars' worth); each two bodies another. */
+	int effectiveTrafficBudget() {
+		if (trafficBudget <= 0 || !enforcementBalancing) return trafficBudget;
+		return Math.max(Math.min(trafficFloor, trafficBudget), trafficBudget - 2 * enforcementCars - enforcementBodies / 2);
+	}
+
+	int effectiveWalkerBudget() {
+		if (walkerBudget <= 0 || !enforcementBalancing) return walkerBudget;
+		return Math.max(2, walkerBudget - enforcementBodies / 2);
+	}
+
+	int effectiveFighterBudget() {
+		if (fighterBudget <= 0 || !enforcementBalancing) return fighterBudget;
+		return Math.max(1, fighterBudget - enforcementBodies / 3);
+	}
+
+	@Register public int effectiveTrafficBudgetNow() { return effectiveTrafficBudget(); }
+	@Register public int trafficAliveNow() { return trafficAlive(); }
+
+	/**
+	 * Over the (enforcement-reduced) budget: reclaim ONE ambient car a tick, the farthest from every player that is
+	 * also out of this peer's view and beyond {@link #stallReclaimMinDist} -- a car never vanishes in front of anyone.
+	 */
+	private void shedTrafficOverBudget(NetworkManager net) {
+		if (trafficBudget <= 0 || trafficAlive() <= effectiveTrafficBudget()) return;
+		LoadedZone bestZone = null;
+		Vehicle best = null;
+		double bestD = stallReclaimMinDist;
+		for (LoadedZone lz : loaded.values()) {
+			for (Vehicle v : lz.vehicles) {
+				if (!GD.isInstanceValid(v) || missionProtected(v) || v.getOccupant() instanceof Player) continue;
+				double d = nearestPlayerDistXZ(v.getGlobalPosition());
+				if (d <= bestD || inLocalView(v.getGlobalPosition(), 1e9)) continue;
+				bestD = d;
+				best = v;
+				bestZone = lz;
+			}
+		}
+		if (best == null) return;
+		noteReclaim(best, "shed");
+		if (debugLog) GD.print("ZoneManager: traffic shed (enforcement load) at " + Math.round(bestD) + " m");
+		freeTrafficCar(bestZone, best, net);
+		bestZone.vehicles.remove(best);
+	}
+
+	/** True when {@code p} (+1 m) is inside this peer's camera frustum within {@code dist}. */
+	public boolean inLocalView(Vector3 p, double dist) {
+		godot.api.Viewport vp = getViewport();
+		godot.api.Camera3D cam = vp != null ? vp.getCamera3d() : null;
+		if (cam == null || !GD.isInstanceValid(cam)) return false;
+		Vector3 c = cam.getGlobalPosition();
+		double dx = p.getX() - c.getX(), dz = p.getZ() - c.getZ();
+		return dx * dx + dz * dz < dist * dist && cam.isPositionInFrustum(p.plus(new Vector3(0, 1.0, 0)));
+	}
+
+	/**
+	 * A SERVICE car (game.EnforcementDispatch: a patrol car, a gang's car) with a seated driver of {@code faction}, on
+	 * a spawnable lane whose entry is between {@code minD} and {@code maxD} of {@code near}, at a clear slot out of
+	 * this peer's view. NOT ambient traffic: no zone keeps it, the caller owns it (and frees it with
+	 * {@link #freeServiceCar}). Null when no lane qualifies this time.
+	 */
+	public Vehicle spawnServiceCar(String faction, String scenePath, Vector3 near, float minD, float maxD) {
+		Node container = charactersContainer();
+		if (container == null || near == null) return null;
+		List<Lane> lanes = new ArrayList<>();
+		for (Lane r : routes.values()) {
+			if (r instanceof Node rn && rn.isInGroup("rail_track")) continue;
+			// not on an expressway or its ramps: from a deck the road route down to a street is kilometres long
+			if (r instanceof PathLaneRoute pl && SERVICE_SKIP_CLASSES.contains(pl.roadClass)) continue;
+			if (!isSpawnCandidate(r, near, maxD)) continue;
+			Vector3 e = r.entryPoint();
+			double dx = e.getX() - near.getX(), dz = e.getZ() - near.getZ();
+			if (dx * dx + dz * dz < (double) minD * minD) continue;
+			lanes.add(r);
+		}
+		if (lanes.isEmpty()) return null;
+		int start = (int) (GD.randi() % lanes.size());
+		for (int k = 0; k < lanes.size() && k < 24; k++) {
+			Lane lane = lanes.get((start + k) % lanes.size());
+			Placement at = placementOn(lane);
+			if (at == null || inLocalView(at.position, maxD + 100.0)) continue;
+			String path = scenePath != null && !scenePath.isEmpty() ? scenePath
+					: com.openworld.carrier.vehicle.VehicleModels.trafficScene(faction, GD.randf());
+			if (!(GD.load(path) instanceof PackedScene scene)) return null;
+			Node inst = scene.instantiate();
+			if (!(inst instanceof Vehicle v)) { if (inst != null) inst.queueFree(); return null; }
+			v.characterInfo = new CharacterInfo();
+			v.characterInfo.characterId = UUID.randomUUID().toString();
+			v.characterInfo.displayName = faction + " car";
+			v.characterInfo.faction = faction;
+			container.addChild(v);
+			Vector3 up = new Vector3(0, 1, 0);
+			Vector3 pos = at.position.plus(up.times(v.groundClearanceAtRest() + 0.05));
+			v.setGlobalPosition(pos);
+			if (at.facing != null) v.lookAt(pos.plus(at.facing), up);
+			VehicleAIController ctrl = new VehicleAIController();
+			v.attachController(ctrl);
+			ctrl.setRoute(lane);
+			v.addToGroup(new StringName(Vehicle.STREAMED_GROUP));
+			NetworkManager net = networkManager();
+			if (net != null) net.announceVehicleSpawn(v);
+			VehicleSpawnConfig vc = new VehicleSpawnConfig();
+			vc.faction = faction;
+			spawnTrafficDriver(vc, v, container);
+			return v;
+		}
+		return null;
+	}
+
+	private static final java.util.Set<String> SERVICE_SKIP_CLASSES = java.util.Set.of("expressway", "ramp", "rail");
+
+	/** Free a service car and whoever is still seated in it (an AI; a player is never freed). */
+	public void freeServiceCar(Vehicle v) {
+		if (v == null || !GD.isInstanceValid(v)) return;
+		NetworkManager net = networkManager();
+		for (int seat = v.getSeatCount() - 1; seat >= 0; seat--) {
+			Character c = v.getSeatOccupant(seat);
+			if (c == null || c instanceof Player) continue;
+			v.tryExit(seat);
+			if (GD.isInstanceValid(c)) {
+				if (net != null && c.getCharacterInfo() != null) net.announceDespawn(c.getCharacterInfo().characterId);
+				silenceWeaponAudio(c);
+				c.queueFree();
+			}
+		}
+		if (v.getOccupant() instanceof Player) return;
+		if (net != null && v.getCharacterInfo() != null) net.announceDespawn(v.getCharacterInfo().characterId);
+		silenceWeaponAudio(v);
+		v.queueFree();
+	}
 
 	/** The spawn gate for traffic: the ring, or the zone's own 0.9 x unload where that is smaller. */
 	private float trafficSpawnGate(Zone zone) {
@@ -865,6 +1017,7 @@ public class ZoneManager extends Node {
 		Node container = charactersContainer();
 		if (container == null) return;
 		boolean logStatus = debugLog && ++trafficLogTick % TRAFFIC_LOG_EVERY == 0;
+		shedTrafficOverBudget(net);
 
 		for (Map.Entry<ZoneMarker, LoadedZone> e : loaded.entrySet()) {
 			ZoneMarker marker = e.getKey();
@@ -1506,8 +1659,8 @@ public class ZoneManager extends Node {
 	boolean promoteSidewalkPed(Object zoneKey, PackedVector3Array path, double along, int dir, boolean fighter,
 			String body, double panic) {
 		int[] live = sidewalkBodies();
-		if (fighter ? (fighterBudget > 0 && live[1] >= fighterBudget)
-				: (walkerBudget > 0 && live[0] >= walkerBudget)) return false;
+		if (fighter ? (fighterBudget > 0 && live[1] >= effectiveFighterBudget())
+				: (walkerBudget > 0 && live[0] >= effectiveWalkerBudget())) return false;
 		LoadedZone lz = loaded.get(zoneKey);
 		if (lz == null) return false;
 		ZoneMarker marker = (ZoneMarker) zoneKey;

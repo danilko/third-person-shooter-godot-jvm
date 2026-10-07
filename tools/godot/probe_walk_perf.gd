@@ -10,6 +10,10 @@ extends SceneTree
 ##
 ##   <godot> --path . --script tools/godot/probe_walk_perf.gd [-- --legs=a,b] [--budget=16.7] [--top=12]
 ##       [--no-peds] [--no-traffic] [--no-buildings] [--no-hlod] [--no-parked]      (controls: remove that derived block before the world loads)
+##       [--wanted=N] [--gang=N]   PEAK LOAD (PLAN.md W5): hold the player at N police stars (lethal, so they shoot
+##                  rather than arrest; the player is invulnerable) and/or N stars with gang_a, so the enforcement
+##                  dispatch's officers, patrol cars and gang hunters are in the ring for every leg
+##       [--no-balance]   control: the dispatch adds on top of the ambient budgets (ZoneManager.enforcementBalancing)
 ##       [--deck]   the Steam Deck PROXY (PLAN.md R-9): 1280x800, each frame's deck_ms = max(cpu x cpu_factor,
 ##                  gpu x gpu_factor) from tools/godot/perf_budget.json, judged against its frame and count budgets;
 ##                  prints a `DECK <leg> p50 p95` line per leg that tools/perf_gate.sh reads for per-system attribution
@@ -75,6 +79,17 @@ func _place(pos: Vector3, fwd: Vector3) -> void:
 	cam.global_position = pos - f * 5.0 + Vector3(0, 2.2, 0)
 	cam.look_at(pos + f * 20.0 + Vector3(0, 1.2, 0), Vector3.UP)
 
+func _hold_standing() -> void:
+	# PEAK LOAD: keep the stars up (the heat would drain, the arrest would end the run)
+	var gm := root.get_node_or_null("GameManager")
+	if gm == null or player == null:
+		return
+	var pid: String = player.get("character_info").get("character_id")
+	if _arg("wanted") != null and gm.get_node_or_null("WantedSystem") != null:
+		gm.get_node("WantedSystem").call("set_stars_now", pid, int(_arg("wanted")), true)
+	if _arg("gang") != null and gm.get_node_or_null("GangSystem") != null:
+		gm.get_node("GangSystem").call("set_gang_stars_now", pid, "gang_a", int(_arg("gang")))
+
 func _settle(seconds: float) -> void:
 	var t0 := Time.get_ticks_msec()
 	while Time.get_ticks_msec() - t0 < seconds * 1000.0:
@@ -91,6 +106,7 @@ func _leg(label: String, path: Array, speed: float) -> void:
 	if _arg("legs") != null and not (label in str(_arg("legs")).split(",")):
 		return
 	_place(path[0], path[1] - path[0])
+	_hold_standing()
 	await _settle(12.0)             # streaming + the crowd around the start
 	var under0 := under_terrain
 	var ft := []
@@ -125,6 +141,8 @@ func _leg(label: String, path: Array, speed: float) -> void:
 			# control: the placed-but-unused vehicles (world.ParkedVehicle remembers a spot, so it does not respawn)
 			for pv in get_nodes_in_group("parked_vehicle"):
 				pv.queue_free()
+		if Engine.get_process_frames() % 60 == 0:
+			_hold_standing()
 		var code := _code(player.global_position)
 		if not cells.has(code):
 			cells[code] = {"ft": [], "phys": [], "proc": [], "ticks": [], "dc": [], "tris": [], "chars": [], "legs": {}}
@@ -179,6 +197,11 @@ func _leg(label: String, path: Array, speed: float) -> void:
 			doors += 1
 			ticking += 1 if dn.call("ticking_now") else 0
 	print("    census at leg end: %s, light peds %d, doors %d (%d ticking)" % [str(census), light, doors, ticking])
+	var ed := root.get_node_or_null("GameManager/EnforcementDispatch")
+	var zmc := root.get_node_or_null("ZoneManager")
+	if ed != null and zmc != null:
+		print("    enforcement units (foot,cars en route,cars arrived,arrests) %s; ambient traffic %d / budget %d" % [
+				str(ed.call("units_now")), int(zmc.call("traffic_alive_now")), int(zmc.call("effective_traffic_budget_now"))])
 	if under_terrain > under0:
 		print("    UNDER the terrain on %d frames of this leg" % (under_terrain - under0))
 	var slow := 0
@@ -246,6 +269,11 @@ func _initialize() -> void:
 	player = w.get_node("Characters/Player")
 	world_bounds = w.find_child("WorldBounds", true, false)
 	player.get_node("Health").set("max_health", 1000000.0)
+	if _arg("wanted") != null or _arg("gang") != null:
+		player.get_node("Health").set("invulnerable", true)
+	if _arg("no-balance", false) and zm != null:
+		zm.set("enforcement_balancing", false)
+		print("CONTROL: no enforcement balancing")
 	player.set_physics_process(false)      # moved by the probe; everything that reads its position still does
 	cam = Camera3D.new()
 	cam.far = 4000.0

@@ -1416,6 +1416,11 @@ def write_places(placed, aabbs, text):
     (`RoadMap` then snaps the goal to the nearest lane, so `go` decides which SIDE of the block you are routed
     to, not the last two metres.)"""
     places = []
+    # which gang a civic plot belongs to (IslandCivicSites.json `gang`): the abduction respawn takes a player to one
+    # of that gang's places (game.RespawnSystem, PLAN.md W5)
+    civic_path = os.path.join(ROOT, "assets", "world_source", "buildings", "IslandCivicSites.json")
+    gang_of = {p["id"]: p["gang"] for p in (json.load(open(civic_path)).get("plots", [])
+                                            if os.path.exists(civic_path) else []) if p.get("gang")}
     for b in placed:
         scene = scene_of(b)
         if scene == b["type"] and b["type"] not in CIVIC_LABELS:
@@ -1427,10 +1432,13 @@ def write_places(placed, aabbs, text):
         x0, z0, x1, z1, _h = aabbs[b["type"]]
         a = math.radians(b["yaw"])
         c, sn = math.cos(a), math.sin(a)
-        places.append({"name": label, "kind": b["type"], "tier": tier,
-                       "at": [round(b["pos"][0], 2), round(b["pos"][1], 2), round(b["pos"][2], 2)],
-                       "go": [round(b["pos"][0] + sn * z1, 2), round(b["pos"][1], 2),
-                              round(b["pos"][2] + c * z1, 2)]})
+        row = {"name": label, "kind": b["type"], "tier": tier,
+               "at": [round(b["pos"][0], 2), round(b["pos"][1], 2), round(b["pos"][2], 2)],
+               "go": [round(b["pos"][0] + sn * z1, 2), round(b["pos"][1], 2),
+                      round(b["pos"][2] + c * z1, 2)]}
+        if gang_of.get(b.get("civic")):
+            row["gang"] = gang_of[b["civic"]]
+        places.append(row)
     for name, x, z in site_places(text):
         if name.startswith("Parking_"):
             continue                       # a site's car park is part of the site, not a place of its own

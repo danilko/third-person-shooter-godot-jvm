@@ -40,7 +40,8 @@ public final class Places {
     public static final int LANDMARK_TIER = 2;
 
     /** One place: what to call it, where its blip sits, and where a waypoint on it should send you. */
-    public record Place(String name, String kind, int tier, Vector3 at, Vector3 go) {}
+    /** {@code gang}: the gang that owns the place ("" none) -- where an abducted player is held (RespawnSystem). */
+    public record Place(String name, String kind, int tier, Vector3 at, Vector3 go, String gang) {}
 
     /** A named region of the island, as an XZ box in the Godot world frame. */
     public record Region(String name, double x0, double z0, double x1, double z1) {
@@ -114,7 +115,8 @@ public final class Places {
         for (Object o : (List<Object>) doc.get("places")) {
             Map<String, Object> m = (Map<String, Object>) o;
             places.add(new Place(String.valueOf(m.get("name")), String.valueOf(m.get("kind")),
-                    (int) (double) (Double) m.get("tier"), vec(m.get("at")), vec(m.get("go"))));
+                    (int) (double) (Double) m.get("tier"), vec(m.get("at")), vec(m.get("go")),
+                    m.get("gang") == null ? "" : String.valueOf(m.get("gang"))));
         }
         for (Object o : (List<Object>) doc.get("regions")) {
             Map<String, Object> m = (Map<String, Object>) o;

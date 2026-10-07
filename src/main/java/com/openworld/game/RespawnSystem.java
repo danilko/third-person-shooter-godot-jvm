@@ -61,7 +61,7 @@ public class RespawnSystem extends Node {
     public double clientWaitSeconds = 10.0;
 
     /** Why the player is being respawned. */
-    public enum Reason { HOSPITALIZED, ARRESTED }
+    public enum Reason { HOSPITALIZED, ARRESTED, ABDUCTED }
 
     /** The place kinds a hospitalised player wakes at (world.Places kinds, nearest wins). */
     static final java.util.Set<String> HOSPITAL_KINDS = java.util.Set.of("Hospital", "HospitalSmall", "Clinic");
@@ -77,6 +77,11 @@ public class RespawnSystem extends Node {
         CharacterInfo info;
         Reason reason;
         double left;
+        /** The standing when they went down (the wanted level is cleared at the respawn). */
+        int policeStars, gangStars;
+        String gang = "";
+        /** Cash carried to the new body, after the bill. */
+        int cash, charged;
     }
 
     private final List<Job> jobs = new ArrayList<>();
@@ -85,6 +90,10 @@ public class RespawnSystem extends Node {
     private double clientWait = -1;
     private String localDeadId = "";
     private Reason reason = Reason.HOSPITALIZED;
+    /** The bill line under the card ("¥15,000", or the ransom). */
+    private String cardBill = "";
+    /** The captive's prompt (pay the ransom, or run). */
+    private Label captivePrompt;
     private Player fresh;
     private Vector3 station;
     private double cellWaitLeft = -1;
@@ -137,7 +146,7 @@ public class RespawnSystem extends Node {
         if (!willRespawn(info)) return;
         Player p = playerOf(info.characterId);
         if (authority()) {
-            if (jobFor(info.characterId) == null) start(p, info, Reason.HOSPITALIZED);
+            if (jobFor(info.characterId) == null) start(p, info, outcomeFor(info.characterId));
         } else if (p.isLocallyOwnedPlayer() && cardLeft < 0 && clientWait < 0) {
             // a client: the card for its own body; the host sends the new one
             reason = Reason.HOSPITALIZED;
@@ -162,6 +171,24 @@ public class RespawnSystem extends Node {
         return true;
     }
 
+    /**
+     * Where a player who went down wakes (user, 2026-10-06; {@link RecoveryRules}): a gang that has any standing
+     * against them takes them (拉致); else the police, if they want them (逮捕, a death included); else hospital.
+     */
+    private Reason outcomeFor(String id) {
+        GangSystem gs = GangSystem.get();
+        WantedSystem ws = WantedSystem.get();
+        String g = gs != null ? gs.worstGang(id) : "";
+        int gangStars = g.isEmpty() ? 0 : gs.starsOf(id, g);
+        RecoveryRules.Outcome o = RecoveryRules.onDown(gangStars, ws != null ? ws.starsOf(id) : 0);
+        return Reason.valueOf(o.name());
+    }
+
+    private RecoveryRules recovery() {
+        GangSystem gs = GangSystem.get();
+        return gs != null && gs.recoveryRules() != null ? gs.recoveryRules() : RecoveryRules.parse(null, null);
+    }
+
     private Job jobFor(String id) {
         for (Job j : jobs) if (j.id.equals(id)) return j;
         return null;
@@ -174,16 +201,29 @@ public class RespawnSystem extends Node {
         j.info = info;
         j.reason = why;
         j.left = cardSeconds;
+        // the standing NOW (it is cleared at the respawn), and the bill (RecoveryRules)
+        WantedSystem ws = WantedSystem.get();
+        GangSystem gs = GangSystem.get();
+        j.policeStars = ws != null ? ws.starsOf(j.id) : 0;
+        j.gang = gs != null ? gs.worstGang(j.id) : "";
+        j.gangStars = j.gang.isEmpty() ? 0 : gs.starsOf(j.id, j.gang);
+        int bill = recovery().fee(RecoveryRules.Outcome.valueOf(why.name()), j.policeStars);
+        int cash = p != null ? p.cash : 0;
+        j.charged = RecoveryRules.charge(cash, bill);
+        j.cash = cash - j.charged;
         jobs.add(j);
         if (p != null && p.isLocallyOwnedPlayer()) {
             reason = why;
             localDeadId = j.id;
             cardLeft = cardSeconds;
+            cardBill = why == Reason.ABDUCTED ? "身代金 ransom ¥" + String.format("%,d", recovery().ransom(j.gangStars))
+                    : j.charged > 0 ? "¥" + String.format("%,d", j.charged) : "";
             showCard(true);
         }
         // a hospitalisation or an arrest ends the running mission (user, 2026-10-03); the host decides
         if (getNodeOrNull("/root/MissionManager") instanceof com.openworld.game.mission.MissionManager mm
-                && mm.missionActiveNow()) mm.failMission(why == Reason.ARRESTED ? "player_arrested" : "player_hospitalized");
+                && mm.missionActiveNow()) mm.failMission(why == Reason.ARRESTED ? "player_arrested"
+                : why == Reason.ABDUCTED ? "player_abducted" : "player_hospitalized");
     }
 
     private static Player playerOf(String id) {
@@ -225,6 +265,7 @@ public class RespawnSystem extends Node {
             if (black != null) black.setColor(new Color(0f, 0f, 0f, (float) Math.max(0.0, fadeIn)));
             if (fadeIn < 0) showCard(false);
         }
+        tickCaptive();
         if (cellWaitLeft >= 0) {
             cellWaitLeft -= delta;
             if (fresh == null || !GD.isInstanceValid(fresh)) cellWaitLeft = -1;
@@ -246,7 +287,11 @@ public class RespawnSystem extends Node {
         Vector3 at = null;
         double best = Double.MAX_VALUE;
         for (Places.Place p : Places.all()) {
-            boolean fits = j.reason == Reason.ARRESTED ? "PoliceStation".equals(p.kind()) : HOSPITAL_KINDS.contains(p.kind());
+            boolean fits = switch (j.reason) {
+                case ARRESTED -> "PoliceStation".equals(p.kind());
+                case ABDUCTED -> j.gang.equals(p.gang());
+                default -> HOSPITAL_KINDS.contains(p.kind());
+            };
             if (!fits) continue;
             double d = p.at().distanceTo(deathAt);
             if (d < best) {
@@ -299,6 +344,15 @@ public class RespawnSystem extends Node {
         if (net != null) net.announceSpawn(p);
         WantedSystem w = WantedSystem.get();
         if (w != null) w.clear(j.id);
+        p.cash = j.cash;                    // the bill was taken from what they had (RecoveryRules)
+        if (j.reason == Reason.ABDUCTED) {
+            // held where they wake, by the gang's guards, until they pay or run
+            GangSystem gs = GangSystem.get();
+            RecoveryRules rr = recovery();
+            if (gs != null) gs.hold(j.id, j.gang, to, rr.ransom(j.gangStars));
+            EnforcementDispatch ed = EnforcementDispatch.get();
+            if (ed != null) ed.guard(p, j.gang, to, rr.guards, rr.guardWeapons);
+        }
         if (local) {
             fresh = p;
             respawns++;
@@ -307,6 +361,40 @@ public class RespawnSystem extends Node {
             fadeIn = 1.0;
         }
         GD.print("RespawnSystem: " + j.reason + " -> respawned " + j.id + (local ? "" : " (remote)") + " at " + to);
+    }
+
+    /**
+     * The local player held by a gang: a prompt with the ransom, and the interact key pays it (single player / host;
+     * a client's ransom is not sent yet). Escape needs nothing here: GangSystem watches the distance.
+     */
+    private void tickCaptive() {
+        GangSystem gs = GangSystem.get();
+        Player me = null;
+        for (Player q : PlayerRegistry.getPlayers()) if (q.isLocallyOwnedPlayer()) me = q;
+        GangSystem.Captivity c = gs != null && me != null && me.getCharacterInfo() != null
+                ? gs.captivityOf(me.getCharacterInfo().characterId) : null;
+        boolean show = c != null && !c.escaping;
+        if (show && captivePrompt == null) {
+            showCard(false);
+            captivePrompt = label(26);
+            captivePrompt.setAnchorsPreset(Control.LayoutPreset.PRESET_CENTER_BOTTOM, false);
+            captivePrompt.setOffset(godot.core.Side.TOP, -120f);
+            captivePrompt.setOffset(godot.core.Side.LEFT, -420f);
+            captivePrompt.setOffset(godot.core.Side.RIGHT, 420f);
+            CanvasLayer layer = new CanvasLayer();
+            layer.setLayer(60);
+            layer.addChild(captivePrompt);
+            addChild(layer);
+        }
+        if (captivePrompt == null) return;
+        captivePrompt.setVisible(show);
+        if (!show) return;
+        var g = gs.gang(c.gang);
+        captivePrompt.setText("拉致 " + (g != null ? g.nameJa() + " " + g.name() : c.gang) + "\n身代金 ransom ¥"
+                + String.format("%,d", c.ransom) + "  [E] pay   (cash ¥" + String.format("%,d", me.cash)
+                + ")   or run for it");
+        if (authority() && godot.api.Input.INSTANCE.isActionJustPressed("interact") && gs.payRansom(me))
+            GD.print("RespawnSystem: ransom paid");
     }
 
     private Node3D cellNear(Vector3 where) {
@@ -365,10 +453,13 @@ public class RespawnSystem extends Node {
             addChild(overlay);
         }
         if (on && card != null) {
-            boolean arrested = reason == Reason.ARRESTED;
-            Color c = arrested ? new Color(1f, 0.78f, 0.28f, 1f) : new Color(0.62f, 0.86f, 1f, 1f);
-            card.setText(arrested ? "逮捕" : "入院");
-            cardEn.setText(arrested ? "ARRESTED" : "HOSPITALIZED");
+            Color c = switch (reason) {
+                case ARRESTED -> new Color(1f, 0.78f, 0.28f, 1f);
+                case ABDUCTED -> new Color(1f, 0.38f, 0.42f, 1f);
+                default -> new Color(0.62f, 0.86f, 1f, 1f);
+            };
+            card.setText(switch (reason) { case ARRESTED -> "逮捕"; case ABDUCTED -> "拉致"; default -> "入院"; });
+            cardEn.setText(reason.name() + (cardBill.isEmpty() ? "" : "\n\n" + cardBill));
             card.addThemeColorOverride(new StringName("font_color"), c);
             cardEn.addThemeColorOverride(new StringName("font_color"), c);
         }
@@ -395,6 +486,7 @@ public class RespawnSystem extends Node {
     // ── probe surface ──
     @Register public int respawnsNow() { return respawns; }
     @Register public boolean arrestNow(Node player) { return player instanceof Player p && arrest(p); }
+    @Register public String captivePromptNow() { return captivePrompt != null && captivePrompt.isVisible() ? captivePrompt.getText() : ""; }
     @Register public String lastReasonNow() { return reason.name(); }
     @Register public String cardTextNow() { return card != null && card.isVisible() ? card.getText() + " " + cardEn.getText() : ""; }
     @Register public Node respawnedPlayerNow() { return fresh; }

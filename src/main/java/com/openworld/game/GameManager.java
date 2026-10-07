@@ -110,6 +110,11 @@ public class GameManager extends Node {
             gs.setName(new godot.core.StringName("GangSystem"));
             addChild(gs);
         }
+        if (getNodeOrNull("EnforcementDispatch") == null) {
+            EnforcementDispatch ed = new EnforcementDispatch();
+            ed.setName(new godot.core.StringName("EnforcementDispatch"));
+            addChild(ed);
+        }
         if (getNodeOrNull("RespawnSystem") == null) {
             RespawnSystem rs = new RespawnSystem();
             rs.setName(new godot.core.StringName("RespawnSystem"));

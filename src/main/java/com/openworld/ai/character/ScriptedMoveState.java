@@ -79,7 +79,7 @@ public class ScriptedMoveState implements AIState {
      * a mission beat authored anywhere the bake did not reach — and it is exactly where a scripted
      * order must not turn into a runaway.
      */
-    private static Vector3 steerDirection(AICharacter body, Vector3 dest) {
+    static Vector3 steerDirection(AICharacter body, Vector3 dest) {
         Vector3 pos = body.getGlobalPosition();
         Vector3 dir = null;
         if (body.getNavAgent() != null && !body.getNavAgent().isNavigationFinished()) {

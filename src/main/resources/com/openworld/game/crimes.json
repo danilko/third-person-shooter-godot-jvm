@@ -89,5 +89,43 @@
       "ASR2",
       "SMG1"
     ]
+  },
+  "dispatch": {
+    "note": "The police dispatch (game.EnforcementDispatch, PLAN.md W5). Index = stars (0..6). Officers on foot appear between foot_min and foot_max metres from the wanted player out of view; patrol cars (POC1/MPC1, a crew of car_crew) on a lane between car_min and car_max and drive the road route to the player, the crew bailing out within arrive_dist. Below shoot_at stars, and while the player is not lethal-wanted, police run the player down to ARREST (an officer within arrest_reach for arrest_seconds); at or above it police shoot. Units are freed out of view past despawn_far, or once the stars are gone. While police can see the player the calm clock does not run (seen_reach).",
+    "shoot_at": 3,
+    "foot_by_stars": [
+      0,
+      2,
+      3,
+      4,
+      6,
+      8,
+      10
+    ],
+    "cars_by_stars": [
+      0,
+      0,
+      1,
+      2,
+      2,
+      3,
+      4
+    ],
+    "car_crew": 2,
+    "foot_min": 45.0,
+    "foot_max": 75.0,
+    "car_min": 140.0,
+    "car_max": 280.0,
+    "arrive_dist": 35.0,
+    "arrest_reach": 2.2,
+    "arrest_seconds": 1.5,
+    "despawn_far": 180.0,
+    "seen_reach": 60.0,
+    "spawn_interval": 1.5
+  },
+  "fees": {
+    "note": "What waking up costs (game.RecoveryRules, user 2026-10-06), yen, taken from the player's cash (never below 0). HOSPITALIZED pays `hospital`; ARRESTED -- which a death while police-wanted is too -- pays (hospital + police_per_star) x the stars; an ABDUCTION's ransom is gangs.json `abduction`, the highest.",
+    "hospital": 5000,
+    "police_per_star": 10000
   }
 }
