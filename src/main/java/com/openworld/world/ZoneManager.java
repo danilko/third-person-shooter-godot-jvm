@@ -149,15 +149,44 @@ public class ZoneManager extends Node {
 	 * trafficReclaimMargin} (the smaller of that and the zone's unload radius). 0 = the zone's radii alone (the old
 	 * behaviour, and the control).
 	 */
-	@Export public float trafficSimRadius = 300.0f;
-	@Export public float trafficReclaimMargin = 120.0f;
+	@Export public float trafficSimRadius = 250.0f;
+	@Export public float trafficReclaimMargin = 50.0f;
+	/**
+	 * RECYCLE A CAR THAT IS LEAVING (user, 2026-10-07: "keep 10 cars around the player, recycle faster, a busy Japanese
+	 * street"). With a budget of 10 a car that drives away holds its slot until it crosses the reclaim radius, so the
+	 * street round the player empties while the fleet is busy elsewhere. A car beyond this distance (m) from every
+	 * player, OUT of this peer's camera view and further away than at the last eval tick, is reclaimed so its slot is
+	 * spawned again round the player (GTA's rule for the cars behind you). At most one a tick. 0 = off (the control).
+	 */
+	@Export public float trafficRecycleDist = 140.0f;
+	/** ...but only while fewer than this many cars are within {@code trafficNearRadius} of the player, and at most one
+	 *  every {@code trafficRecycleSeconds}: measured 2026-10-07, recycling freely doubled the cars near the player
+	 *  (0.6 -> 3.7 within 100 m) and the frames over 16.7 ms (10% -> 53%), from a recycle every ~second. */
+	@Export public int trafficNearTarget = 6;
+	@Export public float trafficNearRadius = 200.0f;
+	@Export public float trafficRecycleSeconds = 2.0f;
+	private long lastRecycleMsec = 0;
+	private final java.util.Map<Long, Float> lastTrafficDist = new java.util.HashMap<>();
+	private int trafficRecycled = 0;
+
+	/** Probe readout: cars recycled for leaving (the rule above). */
+	@Register public int trafficRecycledNow() { return trafficRecycled; }
+
+	/** Probe readout: ambient traffic cars within {@code r} m (XZ) of the nearest player. */
+	@Register public int trafficNearNow(float r) {
+		int n = 0;
+		for (LoadedZone lz : loaded.values())
+			for (Vehicle v : lz.vehicles)
+				if (GD.isInstanceValid(v) && nearestPlayerDistXZ(v.getGlobalPosition()) <= r) n++;
+		return n;
+	}
 	/**
 	 * THE CAR BUDGET: ambient traffic cars alive across EVERY loaded zone. The ring alone concentrated traffic -- each of
 	 * the island's 29 traffic zones covers ~1.5 km of lanes, so all of them filled their cars inside the ring (measured:
 	 * 49 cars + 48 seated drivers within 420 m downtown). A car and its driver cost ~0.16-0.18 ms of physics each per
 	 * tick (3.6), so the budget is what bounds the frame. 0 = unlimited (the control).
 	 */
-	@Export public int trafficBudget = 20;
+	@Export public int trafficBudget = 10;
 	/**
 	 * THE FAR TRAFFIC TIER (PLAN.md R-10): script-free cars on the lanes from the simulation ring out to 700 m
 	 * ({@link FarTraffic}), local to each peer. Off = the old behaviour, an empty street past the ring (the control).
@@ -1018,6 +1047,10 @@ public class ZoneManager extends Node {
 		if (container == null) return;
 		boolean logStatus = debugLog && ++trafficLogTick % TRAFFIC_LOG_EVERY == 0;
 		shedTrafficOverBudget(net);
+		boolean recycledThisTick = trafficRecycleDist <= 0f
+				|| godot.api.Time.INSTANCE.getTicksMsec() - lastRecycleMsec < (long) (trafficRecycleSeconds * 1000f)
+				|| trafficNearNow(trafficNearRadius) >= trafficNearTarget;
+		java.util.Map<Long, Float> seenDist = new java.util.HashMap<>();
 
 		for (Map.Entry<ZoneMarker, LoadedZone> e : loaded.entrySet()) {
 			ZoneMarker marker = e.getKey();
@@ -1093,7 +1126,26 @@ public class ZoneManager extends Node {
 					it.remove();
 					continue;
 				}
-				if (dead || fin || fell || far || unrouted || stalled || abandoned) {
+				boolean leaving = false;
+				if (!dead && !fin && !fell && !far && !unrouted && !stalled && !abandoned && trafficRecycleDist > 0f
+						&& !(v.getOccupant() instanceof Player)) {
+					long key = v.getInstanceId();
+					float dn = nearestPlayerDistXZ(v.getGlobalPosition());
+					Float before = lastTrafficDist.get(key);
+					seenDist.put(key, dn);
+					leaving = !recycledThisTick && before != null && dn > trafficRecycleDist && dn > before + 1.0f
+							&& !inThisCameraView(v.getGlobalPosition());
+					if (leaving) { recycledThisTick = true; lastRecycleMsec = godot.api.Time.INSTANCE.getTicksMsec(); }
+				}
+				if (dead || fin || fell || far || unrouted || stalled || abandoned || leaving) {
+					if (leaving) {
+						trafficRecycled++;
+						noteReclaim(v, "leaving");
+						if (debugLog) GD.print("ZoneManager: traffic reclaim in '" + marker.zone.zoneId + "' (leaving)");
+						freeTrafficCar(lz, v, net);
+						it.remove();
+						continue;
+					}
 					// "finished" reclaims should be ~0 away from map edges once lanes chain through
 					// junctions (roads-v2 Phase 1) — a steady stream of them means broken wiring.
 					if (!dead) noteReclaim(v, dead ? "dead" : fin ? "route-finished" : fell ? "fell-out" : far ? "out-of-range"
@@ -1148,6 +1200,16 @@ public class ZoneManager extends Node {
 				lz.vehicles.add(v);
 			}
 		}
+		lastTrafficDist.clear();
+		lastTrafficDist.putAll(seenDist);
+	}
+
+	/** Is this point (1 m up) inside this peer's current camera frustum? False with no camera (a headless host with no
+	 *  view treats everything as out of view). */
+	private boolean inThisCameraView(Vector3 p) {
+		godot.api.Viewport vp = getViewport();
+		godot.api.Camera3D cam = vp != null ? vp.getCamera3d() : null;
+		return cam != null && GD.isInstanceValid(cam) && cam.isPositionInFrustum(p.plus(new Vector3(0, 1.0, 0)));
 	}
 
 	/**

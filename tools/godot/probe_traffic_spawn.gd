@@ -185,7 +185,7 @@ func _initialize() -> void:
 				# road (road pieces stream nearer than traffic spawns), far out of sight: not a failure to drive either.
 				var zm := root.get_node_or_null("ZoneManager")
 				var why: String = str(zm.call("reclaim_reason_of", id)) if zm != null else ""
-				if why == "stream-edge" or why == "out-of-range":
+				if why == "stream-edge" or why == "out-of-range" or why == "leaving":   # leaving = ZoneManager.trafficRecycleDist, by design
 					out_of_range = true
 				if not c["early"]:
 					if out_of_range:

@@ -9434,6 +9434,15 @@ downstream is hand-edited.
   not better: every zone covers ~1.5 km of lanes, so all of them fill their cars inside the ring. Measured p50 downtown
   walk 33.3 -> 10.9 ms, into Tokyo Station 35.1 -> 13.8, downtown drive 32.8 -> 8.8. Zone-load spawns are
   player-gated too while the ring is on (a zone loads 1+ km out). 0 on either = the old behaviour.
+- **Budget 10, ring 250 m, and the leaving car is recycled** (PLAN.md 2c, user 2026-10-07: "10 cars, recycle faster,
+  keep a busy street"). `trafficBudget` 10, `trafficSimRadius` 250 + `trafficReclaimMargin` 50. A car beyond
+  `trafficRecycleDist` (140 m) of every player, out of this peer's camera view and further than at the last eval tick,
+  is reclaimed (reason `leaving`) so its slot respawns near the player -- but only while fewer than `trafficNearTarget`
+  (6) cars are within `trafficNearRadius` (200 m), at most one every `trafficRecycleSeconds` (2 s). Measured
+  (`probe_walk_perf --deck`, this PC, % frames over 16.7 ms, cars within 100 / 200 m): shipped 20-car budget 98% /
+  88%; budget 10 no recycle 9.7% / 5.6%, 0.6 / 4.3 cars; recycling freely 52.6% / 38.9%, 3.7 / 8.1 cars (a recycle a
+  second, the near cars all full detail); the shipped gentle rule 4.8% / 5.0%, 1.5 / 6.0 cars. `--recycle=0` is the
+  probe's control; `traffic_near_now(r)` / `traffic_recycled_now` its readouts.
 - **`tools/godot/probe_walk_perf.gd`** (display) moves the REAL player along walk/drive legs and files every frame
   under its postal code; it prints per-leg frame/physics times, a census (cars, seated drivers, walking AI, light
   peds) and the worst cells, which `postal <code> tp` in the console goes straight to. `--no-traffic` / `--no-peds` /

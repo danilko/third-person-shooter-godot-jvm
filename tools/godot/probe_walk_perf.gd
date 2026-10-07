@@ -14,7 +14,8 @@ extends SceneTree
 ##                  rather than arrest; the player is invulnerable) and/or N stars with gang_a, so the enforcement
 ##                  dispatch's officers, patrol cars and gang hunters are in the ring for every leg
 ##       [--no-balance]   control: the dispatch adds on top of the ambient budgets (ZoneManager.enforcementBalancing)
-##       [--traffic-budget=N] [--sim-radius=M]   PLAN.md 2c sweeps: ZoneManager's car budget and simulation ring
+##       [--traffic-budget=N] [--sim-radius=M] [--recycle=M]   PLAN.md 2c sweeps: ZoneManager's car budget, simulation
+##                  ring and the leaving-car recycle distance (0 = off)
 ##       [--haze=<end m>]   PLAN.md 2b: Sky3D's distance haze on, ending at that distance (start at a third of it)
 ##       [--deck]   the Steam Deck PROXY (PLAN.md R-9): 1280x800, each frame's deck_ms = max(cpu x cpu_factor,
 ##                  gpu x gpu_factor) from tools/godot/perf_budget.json, judged against its frame and count budgets;
@@ -111,6 +112,8 @@ func _leg(label: String, path: Array, speed: float) -> void:
 	_hold_standing()
 	await _settle(12.0)             # streaming + the crowd around the start
 	var under0 := under_terrain
+	var near_sum := [0.0, 0.0]
+	var near_n := 0
 	var ft := []
 	var ph := []
 	var ticks := []
@@ -145,6 +148,11 @@ func _leg(label: String, path: Array, speed: float) -> void:
 				pv.queue_free()
 		if Engine.get_process_frames() % 60 == 0:
 			_hold_standing()
+			var zmn := root.get_node_or_null("ZoneManager")
+			if zmn != null:
+				near_sum[0] += int(zmn.call("traffic_near_now", 100.0))
+				near_sum[1] += int(zmn.call("traffic_near_now", 200.0))
+				near_n += 1
 		var code := _code(player.global_position)
 		if not cells.has(code):
 			cells[code] = {"ft": [], "phys": [], "proc": [], "ticks": [], "dc": [], "tris": [], "chars": [], "legs": {}}
@@ -204,6 +212,8 @@ func _leg(label: String, path: Array, speed: float) -> void:
 	if ed != null and zmc != null:
 		print("    enforcement units (foot,cars en route,cars arrived,arrests) %s; ambient traffic %d / budget %d" % [
 				str(ed.call("units_now")), int(zmc.call("traffic_alive_now")), int(zmc.call("effective_traffic_budget_now"))])
+		print("    traffic near the player over the leg: mean %.1f within 100 m, %.1f within 200 m; recycled (leaving) %d" % [
+				near_sum[0] / maxf(1.0, near_n), near_sum[1] / maxf(1.0, near_n), int(zmc.call("traffic_recycled_now"))])
 	if under_terrain > under0:
 		print("    UNDER the terrain on %d frames of this leg" % (under_terrain - under0))
 	var slow := 0
@@ -279,6 +289,9 @@ func _initialize() -> void:
 	if zm != null and _arg("traffic-budget") != null:
 		zm.set("traffic_budget", int(_arg("traffic-budget")))
 		print("SWEEP: traffic budget %d" % int(_arg("traffic-budget")))
+	if zm != null and _arg("recycle") != null:
+		zm.set("traffic_recycle_dist", float(_arg("recycle")))
+		print("SWEEP: traffic recycle distance %.0f m (0 = off)" % float(_arg("recycle")))
 	if zm != null and _arg("sim-radius") != null:
 		zm.set("traffic_sim_radius", float(_arg("sim-radius")))
 		print("SWEEP: traffic simulation ring %.0f m" % float(_arg("sim-radius")))
