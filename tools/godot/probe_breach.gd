@@ -137,6 +137,8 @@ func _initialize() -> void:
 	var inn := 0
 	var forced := 0
 	var nearest_in := 1e9
+	var doors_used := {}
+	var door_split := ""
 	var t0 := Time.get_ticks_msec()
 	var space := (world as Node3D).get_world_3d().direct_space_state
 	var reached := {}
@@ -152,6 +154,11 @@ func _initialize() -> void:
 		routes = maxi(routes, int(e[7]))
 		inn = maxi(inn, int(e[8]))
 		forced = maxi(forced, int(e[9]))
+		var doors_now := String(ed.call("breach_doors_now"))
+		if doors_now != "":
+			door_split = doors_now
+			for part in doors_now.split(","):
+				doors_used[part.split(":")[0]] = true
 		if "--verbose" in args and Engine.get_physics_frames() % 600 == 0:
 			print("  t=%.0f %s" % [(Time.get_ticks_msec() - t0) / 1000.0, String(ed.call("debug_units_now"))])
 		phys_ms += Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
@@ -175,6 +182,7 @@ func _initialize() -> void:
 	print("probe_breach: REACH %s deep %.0f m: %d unit(s) came within 3 m, first at %.1f s; units now %s; physics %.2f ms/frame avg" % [
 		place, deep, reached.size(), first_reach, String(ed.call("units_now")), phys_ms / maxf(1.0, phys_n)])
 	print("probe_breach: interior nav (units switched onto it, regions attached) %s" % String(ed.call("interior_nav_now")))
+	print("probe_breach: doors used %s (last split %s)" % [str(doors_used.keys()), door_split])
 	if control:
 		_check(routes == 0, "with breaching off nobody plans a way in (%d routes)" % routes)
 	else:

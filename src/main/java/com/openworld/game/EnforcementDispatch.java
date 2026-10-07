@@ -100,6 +100,12 @@ public class EnforcementDispatch extends Node {
         boolean sniper;
         /** The building it is breaching (its player is inside), or null. */
         Node breachOf;
+        /** The door marker this unit is breaching through: units are spread over a building's doors. */
+        Node breachDoor;
+        /** Doors this unit could not reach (no progress for BREACH_STUCK_SECONDS): skipped by the next route. */
+        final java.util.Set<Node> badDoors = new java.util.HashSet<>();
+        Vector3 breachMark;
+        double breachStill;
     }
 
     /** An officer running a player down that has not closed in by {@link #STUCK_GAIN} for this long is given up:
@@ -289,9 +295,19 @@ public class EnforcementDispatch extends Node {
                     && com.openworld.world.InteriorNav.onMesh(u.body.getGlobalPosition())) ub = in.node;
             if (!u.sniper && breaching && in != null && in.node != null) {
                 if (ub != in.node) {
-                    if (u.breachOf != in.node || brain.pursuitVia.isEmpty()) {
+                    // no progress toward this door (a neighbour against the wall, a fence): give it up, take another
+                    Vector3 here = u.body.getGlobalPosition();
+                    if (u.breachMark == null || flat(here, u.breachMark) > 1.5) { u.breachMark = here; u.breachStill = 0; }
+                    else if ((u.breachStill += TICK) > BREACH_STUCK_SECONDS && u.breachDoor != null) {
+                        u.badDoors.add(u.breachDoor);
+                        u.breachStill = 0;
                         brain.pursuitVia.clear();
-                        brain.pursuitVia.addAll(breachRoute(in.node, u.body.getGlobalPosition()));
+                        doorsGivenUp++;
+                    }
+                    if (u.breachOf != in.node || brain.pursuitVia.isEmpty()) {
+                        if (u.breachOf != in.node) u.badDoors.clear();
+                        brain.pursuitVia.clear();
+                        brain.pursuitVia.addAll(breachRoute(in.node, u));
                         u.breachOf = in.node;
                         breachRoutes++;
                     }
@@ -308,6 +324,7 @@ public class EnforcementDispatch extends Node {
                 if (u.breachOf == in.node && brain.pursuitVia.isEmpty()) { u.breachOf = null; breachedIn++; }
             } else if (u.breachOf != null) {
                 u.breachOf = null;
+                u.breachDoor = null;
                 brain.pursuitVia.clear();
             }
             // inside a building with an interior navmesh (world.InteriorNav), the unit steers on it: round shelves,
@@ -704,26 +721,108 @@ public class EnforcementDispatch extends Node {
         return null;
     }
 
-    /** Outside the building's door nearest {@code from}, then 2.5 m inside it (its Door_* markers: -Z points out).
-     *  A locked door there is forced: unlocked and made automatic (a breach does not knock). */
-    private List<Vector3> breachRoute(Node building, Vector3 from) {
+    /** A door already taken by this many units costs this much more (m), so a squad spreads over a building's doors
+     *  -- front, back and side -- instead of every unit queueing at the one nearest them (user 2026-10-07). */
+    private static final double DOOR_SHARE_COST = 25.0;
+    /** A breaching unit that has not moved 1.5 m in this long gives up its door (s). */
+    private static final double BREACH_STUCK_SECONDS = 6.0;
+    private int doorsGivenUp;
+    /** How far outside the building's walls a unit walks round a corner (m). */
+    private static final double CORNER_MARGIN = 2.5;
+
+    /**
+     * The way in for {@code u}: round the building's corners if its walls stand between the unit and the door, then
+     * outside the door, then 2.5 m inside it (Door_* markers: -Z points out). The door is the cheapest of the
+     * building's doors -- the walk there, plus {@link #DOOR_SHARE_COST} for every unit already going through it.
+     * Every door is forced: unlocked and made automatic (a breach does not knock).
+     */
+    private List<Vector3> breachRoute(Node building, Unit u) {
         List<Vector3> out = new ArrayList<>();
+        Vector3 from = u.body.getGlobalPosition();
+        java.util.Map<Node, Integer> taken = new java.util.HashMap<>();
+        for (Unit w : units) {
+            if (w != u && w.breachOf == building && w.breachDoor != null && GD.isInstanceValid(w.body) && !w.body.isDead())
+                taken.merge(w.breachDoor, 1, Integer::sum);
+        }
         godot.api.Node3D best = null;
         double bd = Double.MAX_VALUE;
         for (Node c : building.getChildren()) {
             if (!(c instanceof godot.api.Node3D m) || !c.getName().toString().startsWith("Door_")) continue;
-            double d = m.getGlobalPosition().distanceTo(from);
+            if (u.badDoors.contains(m)) continue;
+            double d;
+            d = routeLength(from, pathAround(building, from, outsideOf(m))) + DOOR_SHARE_COST * taken.getOrDefault(m, 0);
             if (d < bd) { bd = d; best = m; }
         }
-        if (best == null) return out;
-        Vector3 o = best.getGlobalTransform().getBasis().getColumn(2).times(-1.0);
-        o.setY(0);
-        o = o.length() > 1e-3 ? o.normalized() : new Vector3(0, 0, 1);
+        if (best == null) {
+            if (!u.badDoors.isEmpty()) { u.badDoors.clear(); return breachRoute(building, u); }   // every door tried: again
+            return out;
+        }
+        u.breachDoor = best;
         Vector3 c = best.getGlobalPosition();
-        out.add(c.plus(o.times(2.5)));
+        Vector3 o = outsideOf(best).minus(c).normalized();
+        out.addAll(pathAround(building, from, outsideOf(best)));
         out.add(c.minus(o.times(2.5)));
         forceDoorsNear(building, c, Double.MAX_VALUE);   // a breach does not knock: every door of the building
         return out;
+    }
+
+    /** 2.5 m outside a door marker (its -Z points out), on the marker's height. */
+    private static Vector3 outsideOf(godot.api.Node3D door) {
+        Vector3 o = door.getGlobalTransform().getBasis().getColumn(2).times(-1.0);
+        o.setY(0);
+        o = o.length() > 1e-3 ? o.normalized() : new Vector3(0, 0, 1);
+        return door.getGlobalPosition().plus(o.times(2.5));
+    }
+
+    /**
+     * From {@code from} to {@code to} (both outside the building): straight when nothing is in the way, else round
+     * the building's footprint corners (meta `footprint_m`, its own frame, grown by {@link #CORNER_MARGIN}), the
+     * shorter way round. A straight walk to a back door ran into the building's own wall and stayed there.
+     * Returns the waypoints, {@code to} last.
+     */
+    private List<Vector3> pathAround(Node building, Vector3 from, Vector3 to) {
+        List<Vector3> path = new ArrayList<>();
+        if (clearLine(from, to) || !(building instanceof godot.api.Node3D b)) { path.add(to); return path; }
+        double hx = 0, hz = 0;
+        if (b.getMeta(new StringName("building"), null) instanceof godot.core.Dictionary<?, ?> meta
+                && meta.get("footprint_m") instanceof godot.core.VariantArray<?> fp && fp.size() >= 2) {
+            hx = ((Number) fp.get(0)).doubleValue() / 2.0;
+            hz = ((Number) fp.get(1)).doubleValue() / 2.0;
+        }
+        if (hx <= 0 || hz <= 0) { path.add(to); return path; }
+        hx += CORNER_MARGIN;
+        hz += CORNER_MARGIN;
+        Vector3[] corner = {
+                b.toGlobal(new Vector3(-hx, 0, -hz)), b.toGlobal(new Vector3(hx, 0, -hz)),
+                b.toGlobal(new Vector3(hx, 0, hz)), b.toGlobal(new Vector3(-hx, 0, hz))};
+        int ia = nearestCorner(corner, from), ib = nearestCorner(corner, to);
+        List<Vector3> best = null;
+        double bestLen = Double.MAX_VALUE;
+        for (int dir : new int[] {1, -1}) {
+            List<Vector3> p = new ArrayList<>();
+            for (int i = ia; ; i = (i + dir + 4) % 4) {
+                Vector3 q = corner[i];
+                p.add(new Vector3(q.getX(), from.getY(), q.getZ()));
+                if (i == ib) break;
+            }
+            p.add(to);
+            double len = routeLength(from, p);
+            if (len < bestLen) { bestLen = len; best = p; }
+        }
+        return best;
+    }
+
+    private static int nearestCorner(Vector3[] corner, Vector3 at) {
+        int k = 0;
+        for (int i = 1; i < corner.length; i++) if (flat(corner[i], at) < flat(corner[k], at)) k = i;
+        return k;
+    }
+
+    private static double routeLength(Vector3 from, List<Vector3> path) {
+        double len = 0;
+        Vector3 a = from;
+        for (Vector3 q : path) { len += flat(a, q); a = q; }
+        return len;
     }
 
     private void forceDoorsNear(Node n, Vector3 at, double reach) {
@@ -737,6 +836,20 @@ public class EnforcementDispatch extends Node {
     }
 
     private int doorsForced;
+
+    /** "Door_front_7:3,Door_back_2:2": how many live units are breaching through each door (probes). */
+    @Register
+    public String breachDoorsNow() {
+        java.util.Map<String, Integer> n = new java.util.TreeMap<>();
+        for (Unit u : units) {
+            if (u.breachDoor != null && GD.isInstanceValid(u.breachDoor) && GD.isInstanceValid(u.body) && !u.body.isDead())
+                n.merge(u.breachDoor.getName().toString(), 1, Integer::sum);
+        }
+        StringBuilder sb = new StringBuilder();
+        if (doorsGivenUp > 0) n.put("gave_up", doorsGivenUp);
+        for (var e : n.entrySet()) sb.append(sb.length() > 0 ? "," : "").append(e.getKey()).append(':').append(e.getValue());
+        return sb.toString();
+    }
 
     // ── helicopters (PLAN.md W6) ──────────────────────────────────────────────
 
