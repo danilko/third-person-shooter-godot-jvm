@@ -133,6 +133,21 @@ public class EnforcementDispatch extends Node {
 
     private final List<Unit> units = new ArrayList<>();
     private final List<Car> cars = new ArrayList<>();
+
+    /** A helicopter on a call (PLAN.md W6): it orbits its player with a door gunner and a sniper aboard. */
+    private static final class Heli {
+        com.openworld.carrier.helicopter.Helicopter h;
+        String side, playerId;
+        double age, gunIn = 2.0, burstLeft, shotIn = 0.1, sniperIn = 4.0, retiredFor;
+    }
+
+    private final List<Heli> helis = new ArrayList<>();
+    private static final String HELI_SCENE = "res://src/main/resources/com/openworld/vehicle/HLC1.tscn";
+    /** Door gun: a 1.2 s burst every 3 s, a shot every 0.12 s, each hitting with this chance (in line, in range). */
+    private static final double HELI_RANGE = 140.0, HELI_HIT = 0.22, HELI_DAMAGE = 14.0;
+    /** The sniper aboard: one aimed shot every 4 s, this chance, this damage. */
+    private static final double HELI_SNIPE_HIT = 0.5, HELI_SNIPE_DAMAGE = 75.0;
+    private int heliShots, heliHits;
     private final Map<String, AISquad> squads = new HashMap<>();
     private final Map<String, Double> arrestClock = new HashMap<>();
     private final Random rng = new Random(0x5EED);
@@ -192,6 +207,7 @@ public class EnforcementDispatch extends Node {
         measurePlayerSpeeds(players);
         tickUnits(players, demand, ws, police);
         tickCars(players, demand, police, hunters);
+        tickHelis(players, demand);
         arrestsAndSight(players, ws, police);
 
         spawnIn -= TICK;
@@ -483,6 +499,9 @@ public class EnforcementDispatch extends Node {
         for (Unit u : units) if (u.sniper && pid.equals(u.playerId) && side.equals(u.side) && GD.isInstanceValid(u.body)
                 && !u.body.isDead()) snipers++;
         for (int i = DispatchRules.toSpawn(r.snipersFor(stars), snipers, 1); i > 0; i--) spawnSniper(p, side);
+        int hs = 0;
+        for (Heli h : helis) if (pid.equals(h.playerId) && side.equals(h.side) && GD.isInstanceValid(h.h) && h.retiredFor == 0) hs++;
+        for (int i = DispatchRules.toSpawn(r.helisFor(stars), hs, 1); i > 0; i--) spawnHeli(p, side);
         for (int i = DispatchRules.toSpawn(r.footFor(stars), foot - snipers, spawnPerTick); i > 0; i--) {
             Vector3 at = footSpot(p.getGlobalPosition(), r.footMin, r.footMax);
             if (at == null) break;
@@ -601,6 +620,124 @@ public class EnforcementDispatch extends Node {
     }
 
     private int shellsFired;
+
+    // ── helicopters (PLAN.md W6) ──────────────────────────────────────────────
+
+    /** In the air, out of view, 220-280 m from the player and 60 m up, a pilot and a gunner aboard, orbiting. */
+    private void spawnHeli(Player p, String side) {
+        if (!(GD.load(HELI_SCENE) instanceof PackedScene ps) || !(ps.instantiate() instanceof com.openworld.carrier.helicopter.Helicopter h))
+            return;
+        Vector3 pp = p.getGlobalPosition();
+        Vector3 at = null;
+        for (int k = 0; k < 12 && at == null; k++) {
+            double a = rng.nextDouble() * Math.PI * 2, d = 220.0 + rng.nextDouble() * 60.0;
+            Vector3 q = new Vector3(pp.getX() + Math.cos(a) * d, pp.getY() + 60.0, pp.getZ() + Math.sin(a) * d);
+            if (!inView(q)) at = q;
+        }
+        if (at == null) { h.queueFree(); return; }
+        CharacterInfo info = new CharacterInfo();
+        info.characterId = UUID.randomUUID().toString();
+        info.displayName = "Police helicopter";
+        info.faction = side;
+        h.characterInfo = info;
+        Node container = getTree().getCurrentScene().getNodeOrNull("Characters");
+        if (container == null) container = getTree().getCurrentScene();
+        container.addChild(h);
+        h.setGlobalPosition(at);
+        h.aiTarget = p;
+        h.setEmergency(POLICE.equals(side));
+        if (getNodeOrNull("/root/NetworkManager") instanceof NetworkManager net) net.announceVehicleSpawn(h);
+        for (int seat = 0; seat < Math.min(2, h.getSeatCount()); seat++) {
+            AICharacter crew = spawnBody(side, at, seat == 0 ? "" : "SNR1");
+            if (crew == null) break;
+            h.tryEnter(crew, seat);
+        }
+        Heli e = new Heli();
+        e.h = h;
+        e.side = side;
+        e.playerId = p.getCharacterInfo().characterId;
+        helis.add(e);
+    }
+
+    private void tickHelis(Map<String, Player> players, Map<String, Map<String, Integer>> demand) {
+        Iterator<Heli> it = helis.iterator();
+        while (it.hasNext()) {
+            Heli e = it.next();
+            if (!GD.isInstanceValid(e.h)) { it.remove(); continue; }
+            e.age += TICK;
+            Player p = players.get(e.playerId);
+            boolean wanted = p != null && p.isAlive() && demand.getOrDefault(e.playerId, Map.of()).containsKey(e.side);
+            if (!wanted || e.h.getHealthNow() <= 0) {
+                // stand down: fly off (a wide orbit), freed out of view or after a while
+                e.retiredFor += TICK;
+                e.h.orbitRadius = 600.0;
+                e.h.setEmergency(false);
+                if ((e.retiredFor > 6.0 && !inView(e.h.getGlobalPosition())) || e.retiredFor > 40.0) {
+                    for (int seat = e.h.getSeatCount() - 1; seat >= 0; seat--)
+                        if (e.h.getSeatOccupant(seat) instanceof AICharacter ai) free(ai);
+                    if (getNodeOrNull("/root/NetworkManager") instanceof NetworkManager net && e.h.getCharacterInfo() != null)
+                        net.announceDespawn(e.h.getCharacterInfo().characterId);
+                    e.h.queueFree();
+                    it.remove();
+                }
+                continue;
+            }
+            e.retiredFor = 0;
+            e.h.orbitRadius = 55.0;
+            e.h.aiTarget = p;
+            heliFire(e, p);
+        }
+    }
+
+    /** The door gun (bursts) and the sniper aboard: hitscan from the cabin door at the player, each shot hitting with
+     *  its chance when the line is clear and the range short enough; tracers either way. */
+    private void heliFire(Heli e, Player p) {
+        Vector3 gun = e.h.getGlobalPosition().plus(new Vector3(0, -1.2, 0));
+        Vector3 chest = p.getGlobalPosition().plus(new Vector3(0, 1.1, 0));
+        double d = gun.distanceTo(chest);
+        boolean clear = d <= HELI_RANGE && clearShot(gun, chest, e.h);
+        e.gunIn -= TICK;
+        if (e.burstLeft <= 0 && e.gunIn <= 0) { e.burstLeft = 1.2; e.gunIn = 3.0; }
+        if (e.burstLeft > 0) {
+            e.burstLeft -= TICK;
+            for (int k = 0; k < 2; k++) heliShot(e, p, gun, chest, clear, HELI_HIT, HELI_DAMAGE, "HLC-1 door gun");
+        }
+        e.sniperIn -= TICK;
+        if (e.sniperIn <= 0) {
+            e.sniperIn = 4.0;
+            heliShot(e, p, gun, chest, clear, HELI_SNIPE_HIT, HELI_SNIPE_DAMAGE, "HLC-1 sniper");
+        }
+    }
+
+    private void heliShot(Heli e, Player p, Vector3 gun, Vector3 chest, boolean clear, double chance, double dmg, String what) {
+        heliShots++;
+        boolean hit = clear && rng.nextDouble() < chance;
+        Vector3 end = hit ? chest : chest.plus(new Vector3((rng.nextDouble() - 0.5) * 6.0, (rng.nextDouble() - 0.5) * 2.0,
+                (rng.nextDouble() - 0.5) * 6.0));
+        for (Node n : getTree().getNodesInGroup(new StringName("bullet_tracer_manager"))) {
+            if (n instanceof com.openworld.world.manager.BulletTracerManager tm) { tm.spawnTracer(gun, end); break; }
+        }
+        if (!hit) return;
+        for (Node n : getTree().getNodesInGroup(new StringName("impact_manager"))) {
+            if (n instanceof com.openworld.world.manager.ImpactManager im) {
+                im.processHit(new com.openworld.world.HitInfo(p, chest, gun.minus(chest).normalized()), (float) dmg, what,
+                        null, "Police", e.side, gun, e.h.getCharacterInfo() != null ? e.h.getCharacterInfo().characterId : "");
+                heliHits++;
+                break;
+            }
+        }
+    }
+
+    /** Nothing on the WORLD layer between the door and the player (the helicopter's own body excepted). */
+    private boolean clearShot(Vector3 from, Vector3 to, godot.api.CollisionObject3D self) {
+        if (getViewport() == null || getViewport().getWorld3d() == null) return true;
+        var sp = getViewport().getWorld3d().getDirectSpaceState();
+        godot.core.VariantArray<godot.core.RID> ex = new godot.core.VariantArray<>(godot.core.RID.class);
+        ex.append(self.getRid());
+        var q = godot.api.PhysicsRayQueryParameters3D.create(from, to, CollisionLayers.WORLD, ex);
+        godot.core.Dictionary<Object, Object> hit = sp.intersectRay(q);
+        return hit == null || hit.isEmpty();
+    }
 
     // ── snipers ───────────────────────────────────────────────────────────────
 
@@ -775,7 +912,7 @@ public class EnforcementDispatch extends Node {
         return foot + "," + enroute + "," + arrived + "," + arrests + "," + stuckGivenUp + "," + carsDiscarded;
     }
 
-    /** The escalation's readout (PLAN.md W6): "models en route;rammers;shells fired;snipers". */
+    /** The escalation's readout (PLAN.md W6): "models en route;rammers;shells fired;snipers;helicopters;heli shots;heli hits". */
     @Register
     public String escalationNow() {
         StringBuilder m = new StringBuilder();
@@ -786,7 +923,9 @@ public class EnforcementDispatch extends Node {
             if (c.car.getController() instanceof VehicleAIController v && v.ramTarget != null) rammers++;
         }
         for (Unit u : units) if (u.sniper && GD.isInstanceValid(u.body) && !u.body.isDead()) snipers++;
-        return m.toString().trim() + ";" + rammers + ";" + shellsFired + ";" + snipers;
+        int hl = 0;
+        for (Heli h : helis) if (GD.isInstanceValid(h.h) && h.retiredFor == 0) hl++;
+        return m.toString().trim() + ";" + rammers + ";" + shellsFired + ";" + snipers + ";" + hl + ";" + heliShots + ";" + heliHits;
     }
 
     /** Live dispatched bodies on foot of {@code side} (police or a gang id). */

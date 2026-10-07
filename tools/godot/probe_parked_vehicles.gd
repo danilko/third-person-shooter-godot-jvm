@@ -82,6 +82,11 @@ func _run() -> void:
 			var want: Vector3 = -(m as Node3D).global_transform.basis.z
 			var ang := rad_to_deg(Vector2(fwd.x, fwd.z).angle_to(Vector2(want.x, want.z)))
 			var model := str(v.scene_file_path).get_file().get_basename()
+			# an aircraft's origin is its collision box's centre (a car's is on the ground): ParkedVehicle lifts it by
+			# how far that box reaches below the origin, so "on the floor" is judged from the box's bottom
+			var vcs := v.get_node_or_null("CollisionShape3D") as CollisionShape3D
+			if vcs != null and vcs.shape is BoxShape3D:
+				d.y -= maxf(0.0, -(vcs.position.y - (vcs.shape as BoxShape3D).size.y / 2.0))
 			_check(label + ": the model, on the floor, facing the marker's way", model == str(m.get("vehicle_id"))
 				and v.get_parent() != b and Vector2(d.x, d.z).length() < 0.6 and absf(ang) < 10.0 and d.y < 1.2
 				and d.y > -0.2, "%s  plan %.2f m  y %+.2f  yaw off %.1f" % [model, Vector2(d.x, d.z).length(), d.y, ang])

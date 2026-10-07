@@ -10,7 +10,8 @@ extends SceneTree
 ##   2. a car RAMS (drives straight at the player, not stopping to unload);
 ##   3. a main gun fires a shell;
 ##   4. a sniper is placed;
-##   5. a dispatched police vehicle's light bar flashes (lit at some samples, dark at others).
+##   5. a dispatched police vehicle's light bar flashes (lit at some samples, dark at others);
+##   6. a police helicopter arrives and its door gunner / sniper fire.
 
 const ISLAND := "res://src/main/resources/com/openworld/world/World.tscn"
 
@@ -49,6 +50,8 @@ func _initialize() -> void:
 	var rammed := false
 	var shells := 0
 	var snipers := 0
+	var helis := 0
+	var heli_shots := 0
 	var lit := 0
 	var dark := 0
 	var t0 := Time.get_ticks_msec()
@@ -66,13 +69,15 @@ func _initialize() -> void:
 		rammed = rammed or int(e[1]) > 0
 		shells = maxi(shells, int(e[2]))
 		snipers = maxi(snipers, int(e[3]))
+		helis = maxi(helis, int(e[4]))
+		heli_shots = maxi(heli_shots, int(e[5]))
 		for n in get_nodes_in_group("characters"):
 			if n is RigidBody3D and n.has_method("emergency_now") and bool(n.call("emergency_now")):
 				if bool(n.call("bar_lit_now")):
 					lit += 1
 				else:
 					dark += 1
-		if not control and armour and rammed and shells > 0 and snipers > 0 and lit > 0 and dark > 0:
+		if not control and armour and rammed and shells > 0 and snipers > 0 and lit > 0 and dark > 0 and heli_shots > 0:
 			break
 	print("probe_escalation: %d stars, last readout '%s'" % [stars, last])
 	if control:
@@ -80,11 +85,13 @@ func _initialize() -> void:
 		_check(not rammed, "no ramming at %d stars" % stars)
 		_check(shells == 0, "no main gun at %d stars" % stars)
 		_check(snipers == 0, "no sniper at %d stars" % stars)
+		_check(helis == 0, "no helicopter at %d stars" % stars)
 	else:
 		_check(armour, "an armoured vehicle is dispatched (ARV1 / LTK1 / TNK1)")
 		_check(rammed, "a car RAMS the player")
 		_check(shells > 0, "a main gun fired (%d shells)" % shells)
 		_check(snipers > 0, "a sniper is placed (%d)" % snipers)
+		_check(helis > 0 and heli_shots > 0, "a police helicopter arrives and fires from the air (%d shots)" % heli_shots)
 		_check(lit > 0 and dark > 0, "a police vehicle's light bar flashes (lit %d, dark %d samples)" % [lit, dark])
 	print("RESULT %s (%d failures)" % ["PASS" if fails == 0 else "FAIL", fails])
 	quit(1 if fails else 0)

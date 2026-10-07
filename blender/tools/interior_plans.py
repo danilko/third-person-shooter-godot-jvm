@@ -307,9 +307,17 @@ def police_station(b):
     shaft = b.lift(7.55, 1.92, 1.8, 1.8, [F1, F2], faces=1, turned=True)
     b.slab(X0, Y0, X1, Y1, F1, "MI_Terrazzo")
     b.slab(X0, Y0, X1, Y1, F2, "MI_Terrazzo", holes=[holeB, holeA, shaft])
-    roof(b, X0, Y0, X1, Y1, TOP, holes=[holeA2], units=5)
+    roof(b, X0, Y0, X1, Y1, TOP, holes=[holeA2], units=0)
     stair_house(b, wellA[0], wellA[1], wellA[2], wellA[3], TOP)
     b.box("Roof", (11.0, 4.0, TOP), (11.3, 4.3, TOP + 12.0), "MI_Steel")                  # the radio mast
+    # the roof HELIPAD (user, 2026-10-06, PLAN.md W6): a police helicopter parks here (the roof's AC units moved off
+    # it); 14 m square west of the stair house, the H painted on it
+    hx, hy = -6.0, -1.3
+    b.box("Roof", (hx - 7.0, hy - 7.0, TOP), (hx + 7.0, hy + 7.0, TOP + 0.05), "MI_ConcreteSmooth")
+    for lo, hi in (((hx - 2.0, hy - 3.0), (hx - 1.2, hy + 3.0)), ((hx + 1.2, hy - 3.0), (hx + 2.0, hy + 3.0)),
+                   ((hx - 1.2, hy - 0.4), (hx + 1.2, hy + 0.4))):
+        b.box("Roof", (lo[0], lo[1], TOP + 0.05), (hi[0], hi[1], TOP + 0.07), "MI_PaintWhite")
+    b.mark("vehicle", hx, hy, TOP, 0.0, vehicle="HLC1", faction="police", note="the police helicopter's pad")
     # ── the shell
     hall_skip = (-9.0,)
     ext(b, X0, Y0, X1, Y1, F1, F2 - F1, "MI_TileBrown", {
@@ -615,7 +623,7 @@ def hospital(b):
     b.box("Roof", (-18.0, -11.0, TOP), (-4.0, 3.0, TOP + 0.05), "MI_ConcreteSmooth")
     for lo, hi in (((-13.0, -6.0), (-12.2, 0.0)), ((-9.8, -6.0), (-9.0, 0.0)), ((-12.2, -3.4), (-9.8, -2.6))):
         b.box("Roof", (lo[0], lo[1], TOP + 0.05), (hi[0], hi[1], TOP + 0.07), "MI_PaintWhite")
-    b.mark("vehicle", -11.0, -4.0, TOP, 0.0, note="helipad: a helicopter lands here")
+    b.mark("vehicle", -11.0, -4.0, TOP, 0.0, vehicle="HLC1", note="helipad: a helicopter parks here (W6)")
     lob = (-0.8, -3.2, 2.8, CB - 0.1)
     for s_, axis, c, a0, a1, sgn in (("f", "x", lob[1] - 0.1, lob[0] - 0.2, lob[2] + 0.2, -1),
                                      ("l", "y", lob[0] - 0.1, lob[1], lob[3], -1), ("r", "y", lob[2] + 0.1, lob[1], lob[3], 1)):

@@ -15,6 +15,8 @@ by hand (no `placeholder_craft` scene property, or --force), then EXPORTS `asset
   LIP1  light plane (Cessna 172 class, high wing)     8.3 x 11.0 x 2.7 m   flyable (Airplane)
   WOB1  harbour work boat (作業船 / small tug)         12.0 x 4.2  x 4.5 m  drivable (Boat)
   FIB1  small fishing boat (小型漁船, 集魚灯 line)      10.4 x 2.9  x 3.8 m  drivable (Boat)
+  HLC1  police helicopter (警視庁 AW139 class, white with the blue band; user 2026-10-06, PLAN.md W6)
+                                                   13.8 x 13.8 rotor x 3.7 m  flyable (Helicopter)
 The airliner and the container ship are NOT here: too large to control, they are static props / a walkable level
 (kits/library Airport_Airliner, kits/interiors CargoShip).
 """
@@ -117,6 +119,30 @@ def wob1(P):
     return {"seats": [(0.0, 2.6, 0.95), (-0.9, 1.2, 0.95), (0.9, 1.2, 0.95), (0.0, -3.0, 0.95)], "eye": (0.0, 2.6, 2.3)}
 
 
+def hlc1(P):
+    # the fuselage (cabin + nose), the tail boom and fin, the main rotor (two crossed blades over a hub: the runtime
+    # spins the part named `rotor`) and the tail rotor, skids. Origin at the collision box's centre.
+    P("fuselage").box((-1.15, -2.2, -1.0), (1.15, 3.2, 1.0), "white")
+    P("nose").box((-1.15, 3.2, -1.0), (1.15, 4.6, 0.6), "white", taper=(0.55, 0.45))
+    P("cabin_glass").box((-1.16, 2.4, -0.1), (1.16, 4.2, 0.85), "glass")
+    P("band").box((-1.16, -2.2, -0.35), (1.16, 3.6, -0.05), "blue_band")
+    P("door_glass").box((-1.17, -0.8, 0.0), (1.17, 1.6, 0.8), "glass")
+    P("tail_boom").box((-0.35, -8.6, -0.1), (0.35, -2.2, 0.55), "white", taper=None)
+    P("tail_fin").box((-0.08, -9.2, 0.2), (0.08, -8.2, 2.2), "white")
+    P("tail_band").box((-0.09, -9.0, 1.0), (0.09, -8.4, 1.5), "blue_band")
+    P("stabilizer").box((-1.3, -8.4, 0.25), (1.3, -7.8, 0.35), "white")
+    P("tail_rotor").box((0.10, -9.0, 0.5), (0.14, -8.4, 2.0), "dark")
+    P("mast").box((-0.15, 0.2, 1.0), (0.15, 0.6, 1.5), "dark")
+    P("rotor").box((-6.9, 0.25, 1.5), (6.9, 0.55, 1.56), "dark").box((-0.15, -6.5, 1.5), (0.15, 7.3, 1.56), "dark")
+    for sx in (-1, 1):
+        P("skids").box((sx * 1.05 - 0.06, -1.8, -1.85), (sx * 1.05 + 0.06, 2.8, -1.75), "dark")
+        for y in (-1.0, 1.8):
+            P("skids").box((sx * 0.9 - 0.05, y - 0.05, -1.75), (sx * 0.9 + 0.05, y + 0.05, -1.0), "dark")
+    P("searchlight").box((-0.2, 3.6, -1.25), (0.2, 4.0, -1.0), "lamp")
+    return {"seats": [(-0.45, 2.7, -0.35), (0.45, 2.7, -0.35), (-0.6, 0.4, -0.35), (0.6, 0.4, -0.35)],
+            "eye": (-0.45, 2.75, 0.35)}
+
+
 def fib1(P):
     P("hull").box((-1.45, -5.2, -0.6), (1.45, 3.8, 0.6), "white")
     P("bow").box((-1.45, 3.8, -0.6), (1.45, 5.2, 0.75), "white", taper=(1.2, 0.0))
@@ -132,7 +158,7 @@ def fib1(P):
     return {"seats": [(0.0, -0.4, 0.85), (-0.7, 2.5, 0.85), (0.7, 2.5, 0.85), (0.0, -4.0, 0.85)], "eye": (0.0, -0.4, 2.1)}
 
 
-CRAFT = {"FIJ1": fij1, "LIP1": lip1, "WOB1": wob1, "FIB1": fib1}
+CRAFT = {"FIJ1": fij1, "LIP1": lip1, "WOB1": wob1, "FIB1": fib1, "HLC1": hlc1}
 
 
 def generated(path):

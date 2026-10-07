@@ -1377,7 +1377,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
 
     /** True when the current command applies no drive intent — nothing pushes the car this tick.
      *  Epsilon comparisons, not == 0: analog stick drift must not hold the car awake forever. */
-    private boolean isIdleInput() {
+    protected boolean isIdleInput() {
         return Math.abs(cmd.motor) < 0.01f && !cmd.brake && !cmd.handbrake
                 && Math.abs(cmd.steering) < 0.05f;
     }

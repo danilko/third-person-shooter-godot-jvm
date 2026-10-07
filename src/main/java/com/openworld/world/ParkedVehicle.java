@@ -146,7 +146,13 @@ public class ParkedVehicle extends Node3D {
         v.characterInfo.displayName = vehicleId;
         v.characterInfo.faction = faction;
         scene.addChild(v);
-        v.setGlobalTransform(new Transform3D(at.getBasis().orthonormalized(), o.plus(new Vector3(0, dropHeight, 0))));
+        // an aircraft's origin is its collision box's CENTRE (a car's is on the ground): lift it by however far its
+        // collision shape reaches below the origin, or it spawns half inside the roof / apron it is parked on
+        double below = 0.0;
+        if (v.getNodeOrNull("CollisionShape3D") instanceof godot.api.CollisionShape3D cs
+                && cs.getShape() instanceof godot.api.BoxShape3D bx)
+            below = Math.max(0.0, -(cs.getPosition().getY() - bx.getSize().getY() / 2.0));
+        v.setGlobalTransform(new Transform3D(at.getBasis().orthonormalized(), o.plus(new Vector3(0, dropHeight + below, 0))));
         v.addToGroup(new StringName(Vehicle.STREAMED_GROUP));
         v.addToGroup(new StringName(GROUP));
         if (nm != null) nm.announceVehicleSpawn(v);
