@@ -9,7 +9,8 @@ extends SceneTree
 ##   2. driving in the CHASE view it shows and looks straight back (camera forward . car forward < -0.95), and renders
 ##      at about half the frame rate (updateEvery 2);
 ##   3. in the first-person (cockpit) view it shows and looks back too;
-##   4. the rear_view key (C) hides it and stops it rendering, and brings it back;
+##   4. the rear_view key (C) hides it and stops it rendering, and brings it back; hidden, then out of the car and in
+##      again, it is ON (it starts on every time the player takes the wheel);
 ##   5. the COST: frame ms p50/p95 and draw calls with the mirror on vs off, the car parked in the street.
 
 const DEBUG := "res://src/main/resources/com/openworld/world/DebugWorld.tscn"
@@ -113,6 +114,15 @@ func _initialize() -> void:
 			off[i] += b[i] / 3.0
 	_check(hidden_ok, "hidden, it renders nothing")
 	_check(bool(mirror.call("shown_now")), "the key brings it back")
+	# hidden, then out of the car and back in: it starts ON again
+	await _press("rear_view")
+	helper.call("exit_driver", car)
+	await _frames(30)
+	player.set("collision_layer", 0)
+	player.set("collision_mask", 0)
+	helper.call("seat_character", car, player)
+	await _frames(30)
+	_check(bool(mirror.call("shown_now")), "hidden with C, then out and back in: it is on again")
 	await _press("view")
 	await _frames(30)
 	var dot2 := float(mirror.call("look_dot_forward_now"))

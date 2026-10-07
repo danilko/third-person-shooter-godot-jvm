@@ -7078,7 +7078,7 @@ the zone behaviour". **`tools/debug_world_rebuild.sh`** rebuilds all of it (~5 m
 
 `ui.RearViewMirror` (built in code by HUDManager, self-managed): a strip at the top centre while the LOCAL player
 drives with the carrier's own camera on screen (`Vehicle.isDrivenViewOf`), the racing-game convention (Forza, GT, NFS),
-drawn mirror-flipped. The chase view looks back from `roofLift` over the roof; the first-person views from the
+drawn mirror-flipped, ON every time the player takes the wheel (C hides it for that drive). The chase view looks back from `roofLift` over the roof; the first-person views from the
 driver's eye HEIGHT but just past the back of the hull (from the eye itself the headrests filled it). `rear_view` (C)
 toggles it. Cost control: its own SubViewport at the strip's size, refreshed every `updateEvery` (2) frames, `farPlane`
 150 m, mesh LOD threshold 2, FXAA only, no positional shadows, a copy of the world Environment with SSAO / SSIL / SSR /

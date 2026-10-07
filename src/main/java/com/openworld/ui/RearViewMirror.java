@@ -29,8 +29,8 @@ import godot.global.GD;
  * THE REAR-VIEW MIRROR while driving (user, 2026-10-07): a strip at the top centre of the screen showing what is
  * behind the car, the racing-game convention (Forza, Gran Turismo, Need for Speed). In the CHASE view it looks back
  * from over the roof; in the cockpit / bonnet views it looks back from the driver's own eye. Drawn mirror-flipped,
- * like a real mirror. Only for the local player driving with the carrier's own camera on screen; {@code rear_view}
- * (C) toggles it.
+ * like a real mirror. Only for the local player driving with the carrier's own camera on screen; it is ON every time
+ * they take the wheel, and {@code rear_view} (C) toggles it for that drive.
  *
  * <p>A second camera renders the scene a second time, so its cost is held down the way those games do it:
  * <ul>
@@ -49,7 +49,7 @@ public class RearViewMirror extends Control {
 
     static final String PANEL = "res://src/main/resources/com/openworld/ui/hud_panel.tres";
 
-    /** On by default; the rear_view key flips it. */
+    /** On by default, and switched back on each time the player takes the wheel; the rear_view key flips it. */
     @Export public boolean enabled = true;
     /** The strip's width as a fraction of the screen width, and its aspect (width : height). */
     @Export public float widthFraction = 0.30f;
@@ -75,6 +75,7 @@ public class RearViewMirror extends Control {
     private double roofY = 1.4, rearZ = 2.0;
     private int frame;
     private boolean shownNow;
+    private boolean driving;
     private long renders;
 
     @Register
@@ -113,6 +114,9 @@ public class RearViewMirror extends Control {
     public void _process(double delta) {
         if (Input.INSTANCE.isActionJustPressed("rear_view", false)) enabled = !enabled;
         Vehicle v = drivenCar();
+        // every time the player takes the wheel the mirror starts ON (user 2026-10-07); C hides it for this drive only
+        if (v != null && !driving) enabled = true;
+        driving = v != null;
         boolean show = enabled && v != null;
         if (show != shownNow) {
             shownNow = show;
