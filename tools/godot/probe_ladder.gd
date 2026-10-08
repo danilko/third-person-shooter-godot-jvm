@@ -3,8 +3,15 @@ extends SceneTree
 ## and down along it"): world.Ladder on each track-facing platform edge (tools/station_layout.py `ladders`), climbed by
 ## MovementController's ladder branch. A real Player through Input on DebugWorld's station A:
 ##   1. on the track bed facing the ladder, holding forward (looking level): on the ladder, then up onto the platform;
-##   2. on the ladder half way, looking DOWN, holding forward: down to the bed;
-##   3. jump on the ladder lets go of it.
+##   2. looking DOWN, holding forward still climbs UP (pitch plays no part, user 2026-10-07);
+##   3. no input hangs on the ladder;
+##   4. looking UP, holding back climbs down to the bed, then steps off the ladder;
+##   5. jump on the ladder lets go of it;
+##   6. walking ALONG the bed past the ladder does not grab it (grab on intent only, 2026-10-08);
+##   7. walking along the platform edge over the ladder does not grab it;
+##   8. interact on the platform grabs it from the top, and back then climbs down to the bed;
+##   9. interact on the ladder lets go;
+##  10. with ladder_auto_grab off, walking into it does not grab it and interact does.
 ##   ... -- --control   (the station's ladders removed: the player stays on the bed)
 
 const DEBUG := "res://src/main/resources/com/openworld/world/DebugWorld.tscn"
@@ -38,6 +45,28 @@ func _hold(action: String, seconds: float, look: Vector3, pitch: float) -> Array
 			on = true
 	Input.action_release(action)
 	return [on]
+
+
+func _mc() -> Node:
+	return player.get_node("MovementController")
+
+
+func _on() -> bool:
+	return bool(_mc().call("on_ladder_now"))
+
+
+func _tap(action: String) -> void:
+	Input.action_press(action)
+	await physics_frame
+	await physics_frame
+	Input.action_release(action)
+	await physics_frame
+
+
+## Put the body on the ladder where it hangs (the interact key, as a player would).
+func _grab() -> void:
+	if not _on():
+		await _tap("interact")
 
 
 func _initialize() -> void:
@@ -85,17 +114,37 @@ func _initialize() -> void:
 		return
 	_check(r[0], "the player was on the ladder")
 	_check(y > top - 0.15 and onto > 0.2, "...and climbed onto the platform (%.2f m up, %.2f m in)" % [y, onto])
-	# 2. down: on the ladder half way, looking down
-	_place(base - into * 0.4 + Vector3(0, top * 0.6, 0), into, -60.0)
+	# 2. looking DOWN, forward still climbs UP (the view's pitch plays no part)
+	_place(base - into * 0.4 + Vector3(0, top * 0.4, 0), into, -60.0)
 	for i in 3:
 		await physics_frame
-	r = await _hold("forward", 2.0, into, -60.0)
+	await _grab()
+	var y0: float = player.global_position.y - base.y
+	r = await _hold("forward", 0.5, into, -60.0)
 	y = player.global_position.y - base.y
-	_check(y < 0.3, "looking down, forward climbs down to the bed (%.2f m)" % y)
-	# 3. jump lets go
+	_check(y > y0 + 0.5, "looking down, forward still climbs up (%.2f -> %.2f m)" % [y0, y])
+	# 3. no input: hangs where it is
 	_place(base - into * 0.4 + Vector3(0, top * 0.5, 0), into, 0.0)
 	for i in 3:
 		await physics_frame
+	await _grab()
+	y0 = player.global_position.y - base.y
+	for i in 60:
+		await physics_frame
+	y = player.global_position.y - base.y
+	var hanging := bool(player.get_node("MovementController").call("on_ladder_now"))
+	_check(hanging and absf(y - y0) < 0.05, "no input stays on the ladder (%.2f -> %.2f m, on: %s)" % [y0, y, hanging])
+	# 4. back (looking UP) climbs down to the bed, and at the foot steps off the ladder
+	r = await _hold("back", 3.0, into, 30.0)
+	y = player.global_position.y - base.y
+	var out_m := (player.global_position - base).dot(-into)
+	_check(y < 0.3, "looking up, back climbs down to the bed (%.2f m)" % y)
+	_check(out_m > 0.8, "...and at the foot back steps off the ladder (%.2f m out)" % out_m)
+	# 5. jump lets go
+	_place(base - into * 0.4 + Vector3(0, top * 0.5, 0), into, 0.0)
+	for i in 3:
+		await physics_frame
+	await _grab()
 	var on_before := bool(player.get_node("MovementController").call("on_ladder_now"))
 	Input.action_press("jump")
 	for i in 3:
@@ -105,5 +154,50 @@ func _initialize() -> void:
 		await physics_frame
 	var off := (player.global_position - base).dot(-into)
 	_check(on_before and off > 0.6, "jump lets go of the ladder (on it before: %s, %.2f m out after)" % [on_before, off])
+	var along := Vector3(-into.z, 0.0, into.x)
+	# 6. walking ALONG the bed past the ladder: not grabbed
+	_place(base - into * 0.5 - along * 2.5 + Vector3(0, 0.1, 0), along, 0.0)
+	for i in 20:
+		await physics_frame
+	r = await _hold("forward", 2.0, along, 0.0)
+	y = player.global_position.y - base.y
+	_check(not r[0] and y < 0.3, "walking along the bed past the ladder does not grab it (on: %s, %.2f m up)" % [r[0], y])
+	# 7. walking along the platform edge over the ladder: not grabbed
+	_place(base + into * 0.4 - along * 2.5 + Vector3(0, top + 0.1, 0), along, 0.0)
+	for i in 20:
+		await physics_frame
+	r = await _hold("forward", 2.0, along, 0.0)
+	y = player.global_position.y - base.y
+	_check(not r[0] and y > top - 0.1, "walking the platform edge over the ladder does not grab it (on: %s, %.2f m up)" % [r[0], y])
+	# 8. interact on the platform grabs it from the top; back climbs down
+	_place(base + into * 0.4 + Vector3(0, top + 0.1, 0), -into, 0.0)
+	for i in 20:
+		await physics_frame
+	await _tap("interact")
+	var grabbed := _on()
+	y = player.global_position.y - base.y
+	_check(grabbed and y < top, "interact on the platform grabs the ladder from the top (on: %s, %.2f m up)" % [grabbed, y])
+	r = await _hold("back", 3.0, into, 0.0)
+	y = player.global_position.y - base.y
+	_check(y < 0.3, "...and back climbs down to the bed (%.2f m)" % y)
+	# 9. interact on the ladder lets go
+	_place(base - into * 0.4 + Vector3(0, top * 0.5, 0), into, 0.0)
+	for i in 3:
+		await physics_frame
+	await _grab()
+	on_before = _on()
+	await _tap("interact")
+	for i in 6:
+		await physics_frame
+	_check(on_before and not _on(), "interact on the ladder lets go (on before: %s, after: %s)" % [on_before, _on()])
+	# 10. auto-grab off: walking into it does not grab, interact does
+	_mc().set("ladder_auto_grab", false)
+	_place(base - into * 0.6 + Vector3(0, 0.1, 0), into, 0.0)
+	for i in 20:
+		await physics_frame
+	r = await _hold("forward", 1.0, into, 0.0)
+	await _tap("interact")
+	_check(not r[0] and _on(), "auto-grab off: walking in does not grab (%s), interact does (%s)" % [r[0], _on()])
+	_mc().set("ladder_auto_grab", true)
 	print("RESULT %s (%d failures)" % ["PASS" if fails == 0 else "FAIL", fails])
 	quit(0)

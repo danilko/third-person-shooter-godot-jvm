@@ -254,6 +254,7 @@ public class PlayerController extends Controller {
         cmd.drop    = inp.isActionJustPressed("drop", false);
         cmd.wantHolster = inp.isActionJustPressed("holster", false);
         cmd.jump    = inp.isActionJustPressed("jump", false);
+        cmd.useLadder = inp.isActionJustPressed("interact", false);
 
         // ── Stance (hold or toggle, configurable via stanceToggleMode) ────────
         // Resolve the desired stance from the modal crouch/crawl inputs; crawl (prone)

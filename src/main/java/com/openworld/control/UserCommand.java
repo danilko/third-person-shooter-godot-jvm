@@ -71,6 +71,8 @@ public class UserCommand {
 
     // ── Body actions ──────────────────────────────────────────────────────────
     public boolean jump;
+    /** One-tick edge: the interact key, as a body action -- grabs / lets go of a ladder (world.Ladder). */
+    public boolean useLadder;
 
     /** Vertical swim intent while in the SWIM stance: +1 surface/ascend, -1 dive, 0 hold. */
     public double swimVertical;
@@ -126,6 +128,7 @@ public class UserCommand {
         reload            = false;
         drop              = false;
         jump              = false;
+        useLadder         = false;
         swimVertical      = 0.0;
         desiredStance     = null;
         desiredWeapon     = -1;
@@ -158,6 +161,7 @@ public class UserCommand {
         c.reload          = reload;
         c.drop            = drop;
         c.jump            = jump;
+        c.useLadder       = useLadder;
         c.swimVertical    = swimVertical;
         c.desiredStance   = desiredStance;
         c.desiredWeapon   = desiredWeapon;

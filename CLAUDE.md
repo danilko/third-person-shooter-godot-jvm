@@ -11517,13 +11517,19 @@ Somebody on the track bed climbs back onto the platform by a vertical ladder: `w
 CHARACTER, `top` = the ledge over its origin, its -Z INTO the face) on every TRACK-FACING edge of every platform,
 `LADDER_INSET` 2 m in from both ends (`tools/station_layout.py ladders` -> layout `ladders` -> `build_building_scenes.gd
 _add_ladders`, a yellow rung mesh 2-5 cm off the face, inside the ~6 cm the train's gauge leaves). Inside its volume
-`MovementController`'s ladder branch replaces gravity, CS 1.6's rule: FORWARD along the view climbs the way the view
-points (up while level or up, down below `LADDER_DOWN_PITCH` 30 deg), BACK the reverse, sideways slides along it, at
-`LADDER_SPEED` 2.5 m/s; over the ledge the push carries the body onto it; at the foot stepping back is plain walking;
-jump lets go (pushed off, no re-grab for 0.5 s; `Character.applyInput` -> `MovementController.ladderJump`). No
-animation. AI uses the same branch (it moves toward the ladder; its nav does not path to ladders yet). A ladder also
-lets a fare-dodger onto the platform, as in life. Gate `tools/godot/probe_ladder.gd [-- --control]` (DebugWorld
-station A: up onto the platform, down looking down, jump lets go; control: no ladder, stays on the bed).
+`MovementController`'s ladder branch replaces gravity. **Grabbing is on INTENT, never on contact** (2026-10-08; the
+volume reaches 0.2 m onto the platform, so contact grabbed a body walking the edge and held it with no gravity): walking
+INTO the face within `LADDER_GRAB_DEG` 40 deg from below the ledge grabs it (Source / L4D / Apex / Fortnite), and the
+interact key grabs it from anywhere in the volume, from the ledge too (the body is set on the face just under the top,
+ready to climb down -- the only way down that is not a jump). `ladderAutoGrab` (`@Export`, on) off = the interact key
+only (Battlefield / Tarkov). On it (user, 2026-10-07): FORWARD climbs UP, BACK climbs DOWN, no input hangs, the view's
+pitch plays no part, sideways slides, at `LADDER_SPEED` 2.5 m/s; over the top forward carries the body onto the ledge
+and lets go; at the foot back steps off; jump (`ladderJump`) or interact (`ladderUse`, `UserCommand.useLadder`) lets go,
+no re-grab for 0.5 s. No animation. AI uses the same branch (it grabs by walking into the face; its nav does not path to
+ladders yet). A ladder also lets a fare-dodger onto the platform, as in life. Gate `tools/godot/probe_ladder.gd
+[-- --control]` 16/16 (DebugWorld station A: up onto the platform, forward climbs while looking down, no input hangs,
+back climbs down and steps off, jump lets go, walking along the bed or the platform edge grabs nothing, interact grabs
+from the top and back climbs down, interact lets go, auto-grab off; control: no ladder, stays on the bed).
 
 ## Armour, a helicopter that can be shot down, rotors on their hubs (2026-10-07, user-reported)
 

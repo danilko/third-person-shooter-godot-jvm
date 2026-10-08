@@ -11,11 +11,11 @@ import godot.core.Vector3;
 
 /**
  * A vertical ladder (user 2026-10-07: "a vertical stair at the platform, like early CS 1.6, the character flows up and
- * down along it"): an Area3D in front of a climbable face. A character inside it climbs (movement.character
- * .MovementController's ladder branch, CS 1.6's rule): pushing INTO the ladder goes up while looking level or up and
- * down while looking down, pushing away does the opposite, sideways slides along it, jump lets go, and at the top a
- * push carries the body onto the ledge. No animation (the body keeps its stance clip). Its {@code -Z} points INTO the
- * face (the way a climber looks); {@link #top} is the ledge's height over the node's origin. Built by
+ * down along it"): an Area3D in front of a climbable face. Being inside it grabs nothing: a character GRABS it by
+ * walking into the face (within MovementController.LADDER_GRAB_DEG, from below the ledge) or with the interact key
+ * (from the ledge too); on it, forward climbs up and over the top, back climbs down and steps off at the foot, jump or
+ * interact lets go (movement.character.MovementController's ladder branch). No animation. Its {@code -Z} points INTO
+ * the face (the way a climber looks); {@link #top} is the ledge's height over the node's origin. Built by
  * build_building_scenes.gd from a layout's {@code ladders} (station platforms: tools/station_layout.py).
  */
 @Script(className = "Ladder")

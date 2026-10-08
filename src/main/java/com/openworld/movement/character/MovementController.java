@@ -238,27 +238,65 @@ public class MovementController extends Node {
   // ── ladders (world.Ladder) ──
   /** Climb speed on a ladder, m/s (CS 1.6's 200 u/s is 5 m/s; a calmer 2.5). */
   public static final double LADDER_SPEED = 2.5;
-  /** Looking further down than this (degrees) while pushing into a ladder climbs DOWN (CS's rule). */
-  public static final double LADDER_DOWN_PITCH = 30.0;
+  /**
+   * Auto-grab cone: the move input must point INTO the ladder's face within this many degrees (Source / L4D / Apex /
+   * Fortnite: walking into a ladder grabs it; walking past it or along it does not).
+   */
+  public static final double LADDER_GRAB_DEG = 40.0;
+  /** Off: only the interact key grabs a ladder (Battlefield / Tarkov). On: a deliberate walk into it grabs it too. */
+  @Export public boolean ladderAutoGrab = true;
   private com.openworld.world.Ladder ladder;
+  /** On the ladder: being inside its volume is not enough (2026-10-08: an edge-walker was grabbed, with no gravity). */
+  private boolean ladderMounted;
   private double ladderLetGo;
 
   public void setLadder(com.openworld.world.Ladder l) { ladder = l; }
 
-  public void clearLadder(com.openworld.world.Ladder l) { if (ladder == l) ladder = null; }
+  public void clearLadder(com.openworld.world.Ladder l) {
+    if (ladder == l) { ladder = null; ladderMounted = false; }
+  }
 
-  /** True while the body is on a ladder (not let go). */
-  public boolean onLadder() { return ladder != null && GD.isInstanceValid(ladder) && ladderLetGo <= 0.0 && !swimming; }
+  private boolean ladderValid() { return ladder != null && GD.isInstanceValid(ladder) && !swimming; }
+
+  /** True while the body is on a ladder (grabbed, not let go). */
+  public boolean onLadder() { return ladderMounted && ladderValid() && ladderLetGo <= 0.0; }
 
   @Register public boolean onLadderNow() { return onLadder(); }
 
-  /** Jump on a ladder: let go, pushed off its face, and do not grab it again for half a second. */
-  public void ladderJump() {
-    if (!onLadder()) return;
+  /** Let go: pushed a little off the face, and no re-grab for half a second. */
+  private void letGo(double push, double lift) {
     Vector3 out = ladder.outward();
-    velocity.setY(1.5);
-    player.setVelocity(new Vector3(out.getX() * 2.5, 1.5, out.getZ() * 2.5));
+    velocity.setY(lift);
+    player.setVelocity(new Vector3(out.getX() * push, lift, out.getZ() * push));
+    ladderMounted = false;
     ladderLetGo = 0.5;
+  }
+
+  /** Jump on a ladder: let go, pushed off its face. */
+  public void ladderJump() {
+    if (onLadder()) letGo(2.5, 1.5);
+  }
+
+  /**
+   * The interact key near a ladder: on it, let go; off it, grab it. Grabbing from the TOP (standing on the ledge) puts
+   * the body on the face just under the ledge, ready to climb down -- the one way down a ladder that is not a jump.
+   */
+  public void ladderUse() {
+    if (!ladderValid() || ladderLetGo > 0.0) return;
+    if (ladderMounted) { letGo(0.8, 0.0); return; }
+    ladderMounted = true;
+    Vector3 out = ladder.outward();
+    Vector3 o = ladder.getGlobalPosition();
+    Vector3 p = player.getGlobalPosition();
+    if (p.getY() >= ladder.topY() - 0.3) {
+      Vector3 along = new Vector3(-out.getZ(), 0, out.getX());
+      double lat = (p.getX() - o.getX()) * along.getX() + (p.getZ() - o.getZ()) * along.getZ();
+      lat = Math.max(-0.3, Math.min(0.3, lat));
+      player.setGlobalPosition(new Vector3(o.getX() + along.getX() * lat + out.getX() * 0.45,
+          ladder.topY() - 0.35, o.getZ() + along.getZ() * lat + out.getZ() * 0.45));
+    }
+    velocity.setY(0.0);
+    player.setVelocity(Vector3.Companion.getZERO());
   }
 
   @Register
@@ -347,22 +385,35 @@ public class MovementController extends Node {
       }
     }
 
-    // ── A LADDER (world.Ladder; CS 1.6's rule, user 2026-10-07) ─────────────────────────────────────────────
-    boolean climbing = ladder != null && GD.isInstanceValid(ladder) && !swimming && ladderLetGo <= 0.0;
+    // ── A LADDER (world.Ladder; user 2026-10-07/08) ──────────────────────────────────────────────────────────
+    // GRAB on intent only (the Source / L4D / Apex rule): walking INTO the face within LADDER_GRAB_DEG from below the
+    // ledge, or the interact key (ladderUse). Standing in the volume, walking past it or along the platform edge grabs
+    // nothing. ON it: FORWARD climbs up (over the top onto the ledge), BACK climbs down (at the foot steps off), no
+    // input hangs, sideways slides; the view's pitch plays no part; jump or interact lets go.
     if (ladderLetGo > 0.0) ladderLetGo -= delta;
+    if (!ladderValid()) ladderMounted = false;
+    else if (!ladderMounted && ladderAutoGrab && ladderLetGo <= 0.0 && normDir.lengthSquared() > 0.0001) {
+      Vector3 out = ladder.outward();
+      double into = -(normDir.getX() * out.getX() + normDir.getZ() * out.getZ());
+      boolean belowLedge = player.getGlobalPosition().getY() < ladder.topY() - 0.3;
+      if (belowLedge && into >= Math.cos(Math.toRadians(LADDER_GRAB_DEG))) ladderMounted = true;
+    }
+    boolean climbing = onLadder();
     if (climbing) {
       Vector3 out = ladder.outward();
       Vector3 along = new Vector3(-out.getZ(), 0, out.getX());
       double side = normDir.getX() * along.getX() + normDir.getZ() * along.getZ();
-      // CS 1.6: FORWARD (along the view) climbs the way the view points -- up while looking level or up, down while
-      // looking down -- and BACK the opposite, whichever way the body faces; sideways slides along the ladder
-      double pitch = self != null ? self.controlRotation.pitch : 0.0;
       double yaw = self != null ? Math.toRadians(self.controlRotation.yaw) : 0.0;
       double fwd = normDir.getX() * -Math.sin(yaw) + normDir.getZ() * -Math.cos(yaw);
-      double up = Math.abs(fwd) > 0.3 ? Math.signum(fwd) * (pitch < -LADDER_DOWN_PITCH ? -1.0 : 1.0) : 0.0;
+      double up = Math.abs(fwd) > 0.3 ? Math.signum(fwd) : 0.0;
       double feet = player.getGlobalPosition().getY();
-      if (up < 0 && onFloor) climbing = false;                   // at the foot, stepping back: plain walking again
-      else {
+      if (up < 0 && onFloor) {                                   // at the foot, stepping back: plain walking again
+        climbing = false;
+        ladderMounted = false;
+      } else if (onFloor && feet >= ladder.topY() - 0.1) {      // carried over onto the ledge: off the ladder
+        climbing = false;
+        ladderMounted = false;
+      } else {
         double vy = up * LADDER_SPEED;
         double hx = along.getX() * side * LADDER_SPEED * 0.5, hz = along.getZ() * side * LADDER_SPEED * 0.5;
         if (up > 0 && feet >= ladder.topY() - 0.15) {
