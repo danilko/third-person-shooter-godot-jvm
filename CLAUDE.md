@@ -2629,8 +2629,7 @@ pictures `tools/godot/shot_hud.gd`, needs a display):
 |---|---|---|
 | bottom-left | `Minimap` (150 px) over `FootHUD` health number + bar (and the air bar while swimming) | same |
 | bottom-right | `WeaponHUD` (icon cropped to its silhouette and drawn at one common height, `ui.IconFit`; name; magazine large / reserve small; no count for fist or melee); `WeaponSlotsUI` above it is ALWAYS visible at `idle_alpha` 0.6 (PUBG / Valorant / Apex: six slots and a growing loadout should be readable at a glance) and comes up to full for 2.5 s on a switch or an inventory change; `idle_alpha = 0` is the CS behaviour | the DRIVER gets the vehicle cluster: speed (km/h; `imperial` for mph) beside `VehicleStatus`, a top-down damage diagram (body coloured by health, a square per wheel where the wheels really are: white, amber when the tire is damaged, red when flat, pulsing while sliding), and beside it the car's health as a PERCENTAGE in the same colour ramp (user, 2026-09-22: colour alone did not say how close the car was to burning); the car smokes and burns as well. In a drive-by car the compact `WeaponHUD` stacks ABOVE the cluster (always, no swap on aim); the inventory column stays hidden (the weapon wheel shows the loadout). A PASSENGER with a gun gets the weapon panel and column. While a race runs (`RaceDirector.raceActiveNow`) the weapon HUD and column step aside for `RaceHUD`; missions hide anything via `setWidgetEnabled` |
-| top-right | kill feed (`Feed`) | same |
-| top-left | pickup / mission notices (`StatusFeed`) | same |
+| top-right | the clock, the wanted stars (police row, gang row) and under them ONE feed (`Feed`): kill lines and pickup / mission / radio notices in one column (2026-10-08; `StatusFeed` is gone, `HUDManager.feedTop`) | same |
 | centre | crosshair, `WeaponProgress` ring, hit marker, damage direction, interact prompt just under the crosshair | same |
 
 - **One background**: `ui/hud_panel.tres`, the minimap's translucent black, behind every panel (a `Background`
@@ -4989,7 +4988,7 @@ PLACEHOLDER rectangle — ATL4, T1, MW2 today) to `assets/ui/weapons/<id>.png`, 
 The spec is `weapon_catalog.json` `icon` (one owner for the tool and the test): an orthographic view of the
 weapon's LEFT side with no tilt, so the barrel points LEFT (`side`/`muzzle`; the image is mirrored only if the
 two disagree), flat white on transparent (the UI tints it), rendered at 4x and box-filtered, centred in a
-**384x128** frame and FITTED to it with 6 px padding (`scale` "fit"). Fit, not true relative size, is the HUD
+**384x128** frame (since 2026-10-08 `align` "left": the muzzle on the left padding edge, and the HUD boxes draw it top-left at a smaller height) and FITTED to it with 6 px padding (`scale` "fit"). Fit, not true relative size, is the HUD
 convention — kill feeds, weapon wheels and slot bars all size icons for legibility at ~20-44 px, and true
 scale is for size-as-gameplay inventory grids; at one 330 px/m scale a grenade was ~10x8 px in the radial
 slot. `scale` "uniform" + `pixels_per_metre` remain in the tool. The frame is 3:1 because the largest slot is
@@ -11000,7 +10999,7 @@ Gated since (probe_wanted_respawn, probe_shop_clerk, probe_weapon_counter PASS);
   calm period then a drain), rules in engine-free `game.WantedRules` (`WantedRulesTest`), state in `game.WantedSystem`
   (authority only). A new crime = one row + one `WantedSystem.report(id, where, playerId)` call. Seams today:
   `Health.applyDamage` (a player hurting / killing a civilian or a police officer) and `FirearmItem` (gunfire). A
-  witnessed crime needs a living non-player character within `witness_radius`. `ui.WantedStars` draws six stars left
+  witnessed crime needs a living non-player character within `witness_radius`. `ui.WantedStars` draws FIVE stars (police and gangs alike, `WantedRules.MAX_STARS`, 2026-10-08) left
   of the clock. **Replicated (2026-10-08):** the host sends each player's SHOWN standing -- police stars, lethal, the
   worst gang and its stars -- as `WORLD_EVENT_WANTED` (16) when it changes (checked 4x a second) and to a joining peer
   (`WantedSystem.sendBaseline`); a client keeps the mirror and `WantedSystem.hudOf` answers from it (`WantedStars`
@@ -11072,6 +11071,15 @@ Built first so peak performance can be measured with enforcement in the ring (us
   `ZoneManager.effectiveTrafficBudget` = budget - 2/car - 1 per 2 bodies (floor `trafficFloor` 6); walker and fighter
   budgets likewise. Ambient cars over it are SHED one a tick, farthest, out of view, past 60 m.
   `enforcementBalancing` off is the control (`probe_walk_perf --no-balance`).
+- **Playtest batch, 2026-10-08** (PLAN.md 1i): police and gangs both top out at FIVE stars (`WantedRules.MAX_STARS`;
+  special forces + armour at 5; every `*_by_stars` table has 6 rows). A body row may carry `extra_weapons`
+  (special forces: MEW1, used by the close-quarters fallback; `AICharacter.selectBestWeapon` now takes a ranged weapon
+  with ammo first). Black is special forces only; gang_a wears its magenta. **Approach slots**
+  (`EnforcementDispatch.approachSlots`): each unit closes on its own point 12 m round the player (1.6 m for melee) on
+  the side it came from, fanned 0.45 rad per unit, and foot units spawn >= 6 m apart (`probe_police_spread.gd`).
+  **A body that dies seated is unseated before it is freed** (`Vehicle.releaseOccupant`, from `RespawnSystem.respawn`
+  and `GameManager.despawnReplicatedCharacter`): the car had kept the dead player's PlayerController and camera and the
+  HUD its vehicle situation. Gate `tools/godot/probe_die_seated.gd [-- --seat=passenger] [--control]`.
 - **Where a downed player wakes** (`game.RecoveryRules`, user 2026-10-06): any gang standing -> **拉致 ABDUCTED**;
   else police stars -> **逮捕 ARRESTED** (jail, a death included); else **入院 HOSPITALIZED**. Bills from cash, never
   below 0, carried to the new body: hospital `fees.hospital` (¥5,000); arrested (hospital + `police_per_star`) x
@@ -11137,7 +11145,7 @@ User: the chase stopped at buildings and every unit carried small arms. All of i
     is the control.
   * Seen: units die in their own crossfire in a police station corridor. Not addressed.
 - `escalation_now` readout: `models;rammers;shells;snipers;helis;heliShots;heliHits;breachRoutes;breachedIn;doorsForced`.
-  Gate `tools/godot/probe_escalation.gd` (6 stars every piece; `--control` 2 stars none).
+  Gate `tools/godot/probe_escalation.gd` (5 stars every piece; `--control` 2 stars none).
 - **Not built yet**: breakable building glass (shopfront panes are merged into the building mesh with a solid wall
   collider; making them breakable needs per-pane nodes from `build_building_scenes.gd`).
 
