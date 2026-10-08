@@ -14,6 +14,7 @@ extends SceneTree
 ##                  rather than arrest; the player is invulnerable) and/or N stars with gang_a, so the enforcement
 ##                  dispatch's officers, patrol cars and gang hunters are in the ring for every leg
 ##       [--no-interior-nav]   control: no building interior navmesh regions attach as cells stream (world.InteriorNav)
+##       [--no-dummy] [--no-think]   controls: no dummy traffic cars (1g e) / every AI decides every tick (1g d)
 ##       [--no-balance]   control: the dispatch adds on top of the ambient budgets (ZoneManager.enforcementBalancing)
 ##       [--traffic-budget=N] [--sim-radius=M] [--recycle=M]   PLAN.md 2c sweeps: ZoneManager's car budget, simulation
 ##                  ring and the leaving-car recycle distance (0 = off)
@@ -322,6 +323,9 @@ func _initialize() -> void:
 			dome.set("fog_start", end_m / 3.0)
 			dome.set("fog_end", end_m)
 		print("SWEEP: haze %.0f .. %.0f m" % [end_m / 3.0, end_m])
+	if _arg("no-dummy", false) and zm != null:
+		zm.set("dummy_out_dist", 0.0)
+		print("CONTROL: no dummy traffic cars (PLAN.md 1g e)")
 	if _arg("no-balance", false) and zm != null:
 		zm.set("enforcement_balancing", false)
 		print("CONTROL: no enforcement balancing")
@@ -335,6 +339,15 @@ func _initialize() -> void:
 	await process_frame
 	await process_frame
 	cam.make_current()
+	if _arg("no-think", false):
+		# after the world's first frames: GameManager builds the dispatch in its _ready
+		var gm0 := root.get_node_or_null("GameManager")
+		var ed0 = gm0.get_node_or_null("EnforcementDispatch") if gm0 != null else null
+		if ed0 != null:
+			ed0.call("set_think_budget_now", false)
+			print("CONTROL: every AI decides every tick (PLAN.md 1g d)")
+		else:
+			print("CONTROL --no-think NOT applied: no EnforcementDispatch")
 	var g := 0.75 + 0.9     # standing on a footway / lot (world y of the plain is 0.6 + kerb)
 	# walk the downtown grid (the E-W street through the station quarter), walking pace
 	await _leg("walk_downtown", [Vector3(80, g, -100), Vector3(1150, g, -100)], 6.0)

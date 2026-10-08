@@ -11480,6 +11480,23 @@ route's legs are not clear (`wayClear`), and never sends anyone to a null door. 
 doors island-wide). Gate: probe_breach (default and `--stars=3`), and the fragile spawn case passes too.
 Re-run `island_buildings.py places` after any building change.
 
+## Shop windows break, and AI sees through them (PLAN.md 1g g, 2026-10-07)
+
+In an ENTERABLE variant (`_Shop` / `_Open`; the shut building keeps its solid glass, user decision) every shop window
+of a downtown-kit shop (KonbiniS/L, FamilyRestaurant, GasKiosk, Supermarket) is its own `world.Breakable`
+(`build_building_scenes.gd _add_panes`): `Panes/Pane<n>` on the WORLD layer (so it stops bodies, bullets and grenades
+exactly as the wall did), the piece's glass and its 目隠し strip as `IntactVisual` (one mesh per kit piece + livery,
+`Pane_<piece>_<stripe>_mesh.res`), a box collider, `health` 25, `restore_delay` 180 s, `surface_type` GLASS
+(`SurfaceType.GLASS`, appended: the ordinal rides MSG_SHOT_RESULT_BATCH), in group `glass_pane`; it plays
+`Sound.GLASS_SHATTER` on break. The wall's collision box is cut through its WHOLE depth at each pane (`_aabb_minus`):
+the glass stands a few cm in front of the wall's box, so a pane-thick cut missed it and the window stayed a wall. AI
+sight passes an intact pane (`AICharacter.seenPastGlass`, re-queried past up to two panes on the aim ray's mask), so a
+hostile outside sees a player inside, fires, and the glass breaks. Breaks are host-authoritative and replicated by the
+existing `WORLD_EVENT_BREAKABLE` (the id is the node path, deterministic per cell). Gate
+`tools/godot/probe_shop_glass.gd` (DebugWorld's konbini: a pane stops a ray, a 40-damage hit opens it, restore closes
+it, a hostile shoots the window out in ~2.5 s); `OW_NO_GLASS_SIGHT=1 ... -- --control` (no glass sight: it never
+fires). Not covered yet: glass modelled into library/interiors pieces (mission buildings, stations), train windows.
+
 ## Armour, a helicopter that can be shot down, rotors on their hubs (2026-10-07, user-reported)
 
 - **Armour is per model, ONE damage rule** (early-GTA, user 2026-10-07: a rifle hurts a tank too, just slowly;

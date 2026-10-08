@@ -102,6 +102,9 @@ public class Breakable extends HittableBody {
 		// Toggling collision must happen outside the physics query flush (ImpactManager runs mid-physics).
 		callDeferred(StringNames.toGodotName("applyBrokenVisual"));
 		if (spawnDebris) emitDebris();
+		if (resolveSurfaceType() == SurfaceType.GLASS && getTree() != null && getTree().getCurrentScene() != null)
+			com.openworld.audio.Sounds.play3D(getTree().getCurrentScene(), com.openworld.audio.Sound.GLASS_SHATTER,
+					getGlobalPosition(), 6f, 0.1f);
 		if (restoreDelay > 0.0f) { restoreTimer = restoreDelay; setPhysicsProcess(true); }
 		if (broadcast) broadcastState(1.0f);
 	}
@@ -118,6 +121,11 @@ public class Breakable extends HittableBody {
 		callDeferred(StringNames.toGodotName("applyIntactVisual"));
 		if (broadcast) broadcastState(0.0f);
 	}
+
+	/** Probe readouts / actions (question-named so godot-jvm does not merge them with the field). */
+	@Register public boolean brokenNow() { return broken; }
+
+	@Register public void restoreNow() { restore(true); }
 
 	/** True if currently broken (collider disabled / hole open). */
 	public boolean isBroken() { return broken; }

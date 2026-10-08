@@ -67,6 +67,10 @@ const BAND_HEIGHT := 0.45
 const BAND_STRIPE_H := 0.06     # each livery stripe inside the white strip
 const BAND_PROUD := 0.012       # in front of the glass plane, so it is applied TO the window and cannot z-fight
 const SHOP_GLASS := "MI_GlassShopfront"   # a shop window is clearer than a tower's glazing
+const BREAKABLE_SCRIPT := "res://src/main/java/com/openworld/world/Breakable.java"
+const PANE_HEALTH := 25.0      # one heavy round, or two light ones (PLAN.md 1g g)
+const PANE_RESTORE_S := 180.0  # a broken pane is back after three minutes (host-authoritative, replicated)
+const PANE_MIN_T := 0.08       # a pane's collider is at least this thick (a 6 mm pane is a box a shot can find)
 
 var _piece_cache := {}   # path -> Array of [Mesh, surface, Transform3D]
 var _materials := {}     # "<kit>/<name>" -> Material
@@ -457,6 +461,7 @@ func _build(b: Dictionary, variant: String) -> bool:
 	var shop_rows := _shopfront_rows(b)
 	var see_through: bool = bool(b.get("has_interior", false))
 	var band_panels := []       # [transform, glass AABB] of every shopfront panel that gets the strip
+	var panes := []             # open variants: [{xf, glass AABB, surfaces, piece path}] -- breakable shop windows
 	for p in pieces:
 		var path: String = p["path"]
 		var kit_res := _kit_res(path)
@@ -468,6 +473,7 @@ func _build(b: Dictionary, variant: String) -> bool:
 		var shop_window := see_through and shop_rows.has(str(p.get("row", "")))
 		var glass := AABB()
 		var has_glass := false
+		var pane_surfs := []
 		for s in surfs:
 			var mat := _kit_material(kit_res, s[3])
 			var mname := mat.resource_name if mat != null else ""
@@ -478,6 +484,11 @@ func _build(b: Dictionary, variant: String) -> bool:
 				glass = gb if not has_glass else glass.merge(gb)
 				has_glass = true
 				mat = _kit_named(SHOP_GLASS)
+				if open_variant:
+					# PLAN.md 1g g: in an ENTERABLE variant each shop window is its own breakable pane, not part of
+					# the merged shell (a shut building keeps its solid glass)
+					pane_surfs.append(s)
+					continue
 			var key := mat.resource_path if mat != null else "<none>"
 			if not tools.has(key):
 				var st := SurfaceTool.new()
@@ -486,7 +497,10 @@ func _build(b: Dictionary, variant: String) -> bool:
 				order.append(key)
 			(tools[key] as SurfaceTool).append_from(s[0], s[1], xf * (s[2] as Transform3D))
 		if shop_window and has_glass:
-			band_panels.append([xf, glass])
+			if open_variant:
+				panes.append({"xf": xf, "glass": glass, "surfs": pane_surfs, "path": path})
+			else:
+				band_panels.append([xf, glass])
 	# the fixed shopfront glazing is not a door: it is in BOTH variants, shut and open
 	var extra := []
 	for op in _openings(b):
@@ -616,16 +630,35 @@ func _build(b: Dictionary, variant: String) -> bool:
 		dcs.transform = (lf["xf"] as Transform3D) * Transform3D(Basis.IDENTITY, coff)
 		body.add_child(dcs)
 		dcs.owner = root
-	for bx in b["boxes"]:
-		var cs := CollisionShape3D.new()
-		cs.name = "Box%d" % k
-		k += 1
-		var shape := BoxShape3D.new()
-		shape.size = Vector3(bx["size"][0], bx["size"][1], bx["size"][2])
-		cs.shape = shape
-		cs.position = Vector3(bx["center"][0], bx["center"][1], bx["center"][2])
-		body.add_child(cs)
-		cs.owner = root
+	var cuts := []
+	for pn in panes:
+		# the hole goes through the wall's whole depth: the glass stands a few cm IN FRONT of the wall's box, so a cut
+		# only the pane's own thickness missed it and the window stayed a wall (probe_shop_glass)
+		var cut := _pane_box(pn)
+		var thin := 0 if cut.size.x < cut.size.z else 2
+		cut.position[thin] -= 0.6
+		cut.size[thin] += 1.2
+		cuts.append(cut)
+	for bx0 in b["boxes"]:
+		var pieces_of := [AABB(Vector3(bx0["center"][0], bx0["center"][1], bx0["center"][2])
+				- Vector3(bx0["size"][0], bx0["size"][1], bx0["size"][2]) / 2.0,
+				Vector3(bx0["size"][0], bx0["size"][1], bx0["size"][2]))]
+		for cut in cuts:
+			var next := []
+			for a in pieces_of:
+				next += _aabb_minus(a, cut)
+			pieces_of = next
+		for a in pieces_of:
+			var cs := CollisionShape3D.new()
+			cs.name = "Box%d" % k
+			k += 1
+			var shape := BoxShape3D.new()
+			shape.size = a.size
+			cs.shape = shape
+			cs.position = a.get_center()
+			body.add_child(cs)
+			cs.owner = root
+	_add_panes(root, panes, str(b.get("shop_band", "")), out_id)
 	var hi := 0
 	for h in b.get("hulls", []):
 		# a convex hull of a library piece (a ramp): its own mesh, placed as the layout says
@@ -1049,6 +1082,122 @@ func _surface_aabb(s: Array) -> AABB:
 		lo = lo.min(w)
 		hi = hi.max(w)
 	return AABB(lo, hi - lo)
+
+
+## A pane's box in the BUILDING frame: its glass AABB (piece frame) through the piece transform, at least
+## PANE_MIN_T thick, grown 2 cm across so the wall either side meets it with no slit.
+func _pane_box(pn: Dictionary) -> AABB:
+	var xf: Transform3D = pn["xf"]
+	var g: AABB = pn["glass"]
+	var lo := Vector3(INF, INF, INF)
+	var hi := -lo
+	for i in 8:
+		var w: Vector3 = xf * g.get_endpoint(i)
+		lo = lo.min(w)
+		hi = hi.max(w)
+	var box := AABB(lo, hi - lo)
+	for ax in 3:
+		if ax == 1:
+			continue
+		if box.size[ax] < PANE_MIN_T:
+			box.position[ax] -= (PANE_MIN_T - box.size[ax]) / 2.0
+			box.size[ax] = PANE_MIN_T
+		else:
+			box.position[ax] -= 0.02
+			box.size[ax] += 0.04
+	return box
+
+
+## a minus b, as up to six axis-aligned boxes (the parts of a outside b; a if they do not overlap)
+func _aabb_minus(a: AABB, b: AABB) -> Array:
+	if not a.intersects(b):
+		return [a]
+	var out := []
+	var rest := a
+	for ax in 3:
+		var r0: float = rest.position[ax]
+		var r1: float = rest.end[ax]
+		var c0: float = maxf(b.position[ax], r0)
+		var c1: float = minf(b.end[ax], r1)
+		if c0 - r0 > 1e-4:
+			var lowp := rest
+			lowp.size[ax] = c0 - r0
+			out.append(lowp)
+		if r1 - c1 > 1e-4:
+			var highp := rest
+			highp.position[ax] = c1
+			highp.size[ax] = r1 - c1
+			out.append(highp)
+		rest.position[ax] = c0
+		rest.size[ax] = c1 - c0
+	return out
+
+
+var _pane_meshes := {}
+## Each shop window of an enterable variant as a `world.Breakable` (PLAN.md 1g g): its own glass (and the 目隠し
+## strip on it) under one MeshInstance3D the Breakable hides when it breaks, and a box collider on the WORLD layer, so
+## until it breaks it stops bodies, bullets and grenades exactly as the wall did. The mesh is one per kit piece (and
+## strip livery), shared by every pane of that piece; the pane node carries the piece's transform.
+func _add_panes(root: Node3D, panes: Array, stripe: String, out_id: String) -> void:
+	if panes.is_empty():
+		return
+	var holder := Node3D.new()
+	holder.name = "Panes"
+	root.add_child(holder)
+	holder.owner = root
+	var script: Script = load(BREAKABLE_SCRIPT)
+	var i := 0
+	for pn in panes:
+		var key: String = str(pn["path"]).get_file().get_basename() + "_" + stripe
+		if not _pane_meshes.has(key):
+			var st := SurfaceTool.new()
+			var gst := SurfaceTool.new()
+			var any := false
+			for s in pn["surfs"]:
+				gst.append_from(s[0], s[1], s[2])
+				any = true
+			var m := ArrayMesh.new()
+			if any:
+				gst.index()
+				m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, gst.commit_to_arrays())
+				m.surface_set_material(m.get_surface_count() - 1, _kit_named(SHOP_GLASS))
+			for box in _shop_band_boxes(Transform3D.IDENTITY, pn["glass"], stripe):
+				var bm := BoxMesh.new()
+				bm.size = box["size"]
+				var bst := SurfaceTool.new()
+				bst.append_from(bm, 0, box["xf"])
+				m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, bst.commit_to_arrays())
+				m.surface_set_material(m.get_surface_count() - 1, box["mat"])
+			var mpath := "%s/Pane_%s_mesh.res" % [OUT_DIR, key.replace(".", "")]
+			ResourceSaver.save(m, mpath, ResourceSaver.FLAG_COMPRESS)
+			_pane_meshes[key] = load(mpath)
+		var pane := StaticBody3D.new()
+		pane.set_script(script)
+		pane.name = "Pane%d" % i
+		i += 1
+		pane.collision_layer = 1
+		pane.collision_mask = 0
+		pane.transform = pn["xf"]
+		pane.set("health", PANE_HEALTH)
+		pane.set("restore_delay", PANE_RESTORE_S)
+		pane.set("surface_type", "GLASS")
+		holder.add_child(pane)
+		pane.owner = root
+		pane.add_to_group("glass_pane", true)
+		var vis := MeshInstance3D.new()
+		vis.name = "IntactVisual"
+		vis.mesh = _pane_meshes[key]
+		pane.add_child(vis)
+		vis.owner = root
+		var g: AABB = pn["glass"]
+		var cs := CollisionShape3D.new()
+		cs.name = "Glass"
+		var shape := BoxShape3D.new()
+		shape.size = Vector3(maxf(g.size.x, PANE_MIN_T), maxf(g.size.y, PANE_MIN_T), maxf(g.size.z, PANE_MIN_T))
+		cs.shape = shape
+		cs.position = g.get_center()
+		pane.add_child(cs)
+		cs.owner = root
 
 
 ## The 目隠しシート across one panel: a white strip at eye height with two livery stripes through it. Its width,

@@ -20,5 +20,6 @@ public enum SurfaceType {
     METAL,    // machinery, vehicles, metal walls
     STONE,    // concrete, brick, rock
     WOOD,     // wooden surfaces, crates
-    DEFAULT   // fallback for anything without a HittableBody script
+    DEFAULT,  // fallback for anything without a HittableBody script
+    GLASS     // a breakable pane (PLAN.md 1g g); APPEND-ONLY: the ordinal rides MSG_SHOT_RESULT_BATCH
 }

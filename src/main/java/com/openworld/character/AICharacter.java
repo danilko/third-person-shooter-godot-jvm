@@ -661,9 +661,10 @@ public class AICharacter extends Character {
             if (com.openworld.world.SmokeCloud.blocksSight(aimRay.getGlobalPosition(), bone.getGlobalPosition())) continue;
             aimRay.setTargetPosition(aimRay.toLocal(bone.getGlobalPosition()));
             aimRay.forceRaycastUpdate();
-            if (aimRay.isColliding()
-                    && aimRay.getCollider() instanceof Node3D n
-                    && currentTarget.isAncestorOf(n)) {
+            Node3D seen = aimRay.isColliding() && aimRay.getCollider() instanceof Node3D c ? c : null;
+            if (seen != null && isIntactGlass(seen))
+                seen = seenPastGlass(aimRay.getCollisionPoint(), bone.getGlobalPosition(), (Node3D) aimRay.getCollider());
+            if (seen != null && currentTarget.isAncestorOf(seen)) {
                 cachedVisibleBone = bone;
                 cachedLoS = true;
                 return true;
@@ -671,6 +672,41 @@ public class AICharacter extends Character {
         }
         cachedLoS = false;
         return false;
+    }
+
+    /** An intact shop-window pane (world.Breakable in group glass_pane, PLAN.md 1g g): sight passes, bullets do not. */
+    /** Off (env OW_NO_GLASS_SIGHT) = a pane blocks sight like a wall: probe_shop_glass's control. */
+    public static final boolean SEE_THROUGH_GLASS = System.getenv("OW_NO_GLASS_SIGHT") == null;
+
+    private static boolean isIntactGlass(Node3D n) {
+        return SEE_THROUGH_GLASS && n instanceof com.openworld.world.Breakable b && !b.isBroken()
+                && b.isInGroup(new godot.core.StringName("glass_pane"));
+    }
+
+    /**
+     * What a sight line meets past a pane of glass it hit at {@code hit}: a query from just beyond the pane to
+     * {@code to}, on the aim ray's own mask, excluding that pane (and one more pane behind it). Null = nothing.
+     * The shooter's own body is behind the start, so it needs no exclusion.
+     */
+    private Node3D seenPastGlass(Vector3 hit, Vector3 to, Node3D pane) {
+        if (getViewport() == null || getViewport().getWorld3d() == null || !(pane instanceof godot.api.CollisionObject3D co))
+            return null;
+        var sp = getViewport().getWorld3d().getDirectSpaceState();
+        godot.core.VariantArray<godot.core.RID> ex = new godot.core.VariantArray<>(godot.core.RID.class);
+        ex.append(co.getRid());
+        Vector3 dir = to.minus(hit).normalized();
+        Vector3 from = hit.plus(dir.times(0.02));
+        for (int k = 0; k < 2; k++) {
+            var q = godot.api.PhysicsRayQueryParameters3D.create(from, to, aimRay.getCollisionMask(), ex);
+            var r = sp.intersectRay(q);
+            if (r == null || r.isEmpty()) return null;
+            java.lang.Object c = r.get("collider");
+            if (!(c instanceof Node3D n)) return null;
+            if (!isIntactGlass(n) || !(n instanceof godot.api.CollisionObject3D nco)) return n;
+            ex.append(nco.getRid());
+            from = ((Vector3) r.get("position")).plus(dir.times(0.02));
+        }
+        return null;
     }
 
     // ── Flashbang blindness (FLA1) ───────────────────────────────────────────
