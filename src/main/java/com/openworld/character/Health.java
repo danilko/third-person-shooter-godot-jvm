@@ -64,6 +64,9 @@ public class Health extends Node {
 
     private float currentHealth;
 
+    /** Sources already reported for a non-finite damage value (one warning each). */
+    private static final java.util.Set<String> NON_FINITE_REPORTED = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     /**
      * Scripted invulnerability (PLAN.md F1 — {@code ScriptCommand.invincible}): while true, damage is
      * dropped here and NOWHERE else, so every source — a bullet, a blast, a fall, a relayed client
@@ -190,6 +193,17 @@ public class Health extends Node {
     private void applyDamage(float damage, boolean headshot, String weaponName, Texture2D weaponIcon,
                              String attackerName, String attackerFaction, Vector3 attackerPos, String attackerId) {
         if (invulnerable) return;
+        // A non-finite number must never reach the health (PLAN.md 1a, user 2026-10-08: "run over by a car, stuck at
+        // health 0, no card"): Math.max(0, NaN) is NaN, the HUD prints (int) NaN = 0, and NaN <= 0 is FALSE, so the
+        // body never dies -- no characterDied, no respawn, and every later hit keeps it NaN. Drop it, and say where
+        // it came from, once per source.
+        if (!Float.isFinite(damage)) {
+            if (NON_FINITE_REPORTED.add(weaponName))
+                GD.pushWarning("Health: non-finite damage " + damage + " from '" + weaponName + "' dropped on "
+                        + (getOwner() != null ? getOwner().getName() : "?"));
+            return;
+        }
+        if (!Float.isFinite(currentHealth)) currentHealth = 0.0f;   // a value poisoned before this guard: it is dead
         currentHealth = Math.max(0.0f, currentHealth - damage);
         lastHurtMsec = godot.api.Time.getTicksMsec();
         hit.emit(damage);
@@ -340,6 +354,7 @@ public class Health extends Node {
      */
     @Register
     public void applyReplicatedHealth(float health) {
+        if (!Float.isFinite(health)) return;   // see applyDamage: a NaN health shows 0 and never dies
         float clamped = Math.max(0.0f, Math.min(maxHealth, health));
         if (clamped == currentHealth) return;
         if (clamped < currentHealth) lastHurtMsec = godot.api.Time.getTicksMsec();   // a replicated hit counts

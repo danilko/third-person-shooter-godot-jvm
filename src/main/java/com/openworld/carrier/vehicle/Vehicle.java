@@ -692,7 +692,8 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         if (cfg == null || cfg.vehicleCollisionMinSpeed <= 0) return;
         Vector3 vel = getLinearVelocity();
         double speed = Math.hypot(vel.getX(), vel.getZ());
-        if (speed < cfg.vehicleCollisionMinSpeed) return;
+        // NaN < min is false: a car whose velocity went non-finite would deal NaN damage (PLAN.md 1a)
+        if (!Double.isFinite(speed) || speed < cfg.vehicleCollisionMinSpeed) return;
         if (hullHalfWidth < 0.0) measureHull();
         Vector3 pos = getGlobalPosition();
         Basis basis = getGlobalBasis();
@@ -1655,6 +1656,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
 
     private void applyVehicleCollisionDamage(Character character, float speed, VehicleConfig cfg) {
         float damage = (speed - cfg.vehicleCollisionMinSpeed) * cfg.vehicleCollisionDamageScale;
+        if (!Float.isFinite(damage) || damage <= 0f) return;
         Node healthNode = character.getNodeOrNull("Health");
         if (!(healthNode instanceof Health health)) return;
 
