@@ -147,6 +147,8 @@ public class FarTraffic extends Node {
         TrafficSignals ts = TrafficSignals.get();
         List<Car> drop = new ArrayList<>();
         for (Car c : cars) {
+            // a lane whose piece streamed out this frame: drop the car before anything asks the freed node
+            if (!(c.lane instanceof Node ln) || !GD.isInstanceValid(ln)) { drop.add(c); continue; }
             double want = c.target;
             for (Car o : byLane.get(c.lane)) {
                 if (o == c || o.s <= c.s) continue;

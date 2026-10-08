@@ -89,6 +89,13 @@ ACCESS = [
     # the terminal, south to the locked gate in the airside fence (site_airport_fence.py GATE_GX)
     dict(name="kuko_service", site="airport_airfield", from_road="kuko_rotary", at=(1130.0, -1710.0),
          end=(1130.0, -1777.0), parking=None),
+    # the FISH MARKET's lane (PLAN.md 1b, 2026-10-08): the market stands outside the dike between its toe and the quay
+    # with no road. The dike road ring_kita has a T at x 567 where eki_minami_dori climbs onto it from the land side;
+    # this lane is that T's 4th arm, straight on toward the sea and then WEST along the dike's sea toe (z ~703, the
+    # reserve's north edge), where `island_dike.py raise` ramps it down off the crest -- 6.4 m, ~90 m at 7 % -- so it
+    # reaches the market's ground before its end. No car park: the market's own forecourt is the end.
+    dict(name="ichiba_michi", site="fish_market", from_road="ring_kita", at=(567.0, -672.0),
+         via=[(560.0, -703.0)], end=(440.0, -703.0), parking=None),
     dict(name="butsuryu_michi", site="logistics_yard", from_road="kichi_dori", at=(-280.0, -1230.0),
          end=(-280.0, -1440.0), parking="ParkingLot14"),     # its car park short of the runway band (z 1480)
 ]

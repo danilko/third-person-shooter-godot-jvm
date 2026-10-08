@@ -61,6 +61,42 @@ def run(a, b, yaw, out):
         out.append({"piece": FENCE, "at": [round(c[0], 2), round(c[1], 2)], "yaw": yaw})
 
 
+#: the FORECOURT drive (PLAN.md 1b, user 2026-10-08: "the gate has no forecourt drive to the HQ front"). Base local
+#: frame (+X north, +Z east). The HQ (part at local (70, 95), front door on its +Z face at Z ~104.4) stands just south
+#: of the gate's west lane, so the drive runs straight on from the gate down the strip between the HQ's front and the
+#: east fence, lined both sides (Parking_Line end to end), with a row of nose-in bays against the east fence (2.5 x 5 m,
+#: 駐車場法 guidance) and a 12 m aisle. The ground itself is the block's asphalt (island_ground.military_paint).
+DRIVE_HALF = 5.5                     # half the drive between its edge lines (two 4 m lanes + margin)
+DRIVE_END_X = 40.0                   # the drive's lines stop here (south of the HQ's front, before the parade ground)
+BAY_W, BAY_D = 2.5, 5.0
+BAY_X = (46.0, 88.5)                 # the bay row's span along local X (south..north)
+
+
+def forecourt(hw, hd, gz):
+    """Edge lines of the drive from the gate to DRIVE_END_X, a row of bays against the east fence, a few cars."""
+    out = []
+    top = hw - 7.0                                       # just inside the gate (its booth stands at hw - 3.5)
+    n = int((top - DRIVE_END_X) // 5.0)
+    for side in (-1.0, 1.0):
+        z = round(gz + side * DRIVE_HALF, 2)
+        for k in range(n):
+            out.append({"piece": "library:Parking_Line", "at": [round(top - 2.5 - 5.0 * k, 2), z], "yaw": 90.0,
+                        "collide": "none"})
+    fence_z = hd - 0.7
+    zc = fence_z - 0.9 - BAY_D / 2.0                      # the bays' centre line: noses 0.9 m off the fence
+    nb = int((BAY_X[1] - BAY_X[0]) // BAY_W)
+    for k in range(nb + 1):
+        out.append({"piece": "library:Parking_Line", "at": [round(BAY_X[0] + BAY_W * k, 2), round(zc, 2)],
+                    "collide": "none"})
+    for k in range(nb):
+        out.append({"piece": "library:Parking_Stop", "at": [round(BAY_X[0] + BAY_W * (k + 0.5), 2),
+                                                             round(zc + BAY_D / 2.0 - 0.6, 2)], "collide": "none"})
+    for k in (1, 2, 5, 9):                               # a few parked, nose to the fence (vehicle -Z = forward)
+        out.append({"vehicle": "KEC1" if k % 2 else "KET1", "faction": "military",
+                    "at": [round(BAY_X[0] + BAY_W * (k + 0.5), 2), round(zc, 2)], "yaw": 180.0})
+    return out
+
+
 def base():
     (bx0, bz0, bx1, bz1), (rx0, rz0, rx1, rz1), (px0, pz0, px1, pz1) = boxes()
     cx, cz = (bx0 + bx1) / 2.0, (bz0 + bz1) / 2.0
@@ -85,6 +121,7 @@ def base():
              {"piece": "library:Mil_Helipad", "at": [20, -70], "collide": "none"}]
     props += [{"vehicle": "CRT1", "faction": "military", "at": [x, -30], "yaw": 0.0} for x in (58, 70, 82)]
     props += [{"vehicle": "FIJ1", "faction": "military", "at": [apron_x, z], "yaw": 90.0} for z in (-60, -90)]
+    props += forecourt(hw, hd, gz)
     # no concrete apron squares (user, 2026-10-05: "the ground of these fenced bases should be asphalt, not white"): the
     # base's ground is the block's asphalt (island_ground.military_paint), and the jets stand on it
     # the fence: north edge, east edge (the gate's gap), west edge (the pier's gap); no south edge -- the runway is

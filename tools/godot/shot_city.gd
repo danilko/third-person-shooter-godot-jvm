@@ -170,6 +170,12 @@ func _run() -> void:
 		# frozen whole: its camera rigs rewrite the CURRENT camera every frame even with its own processing off
 		# (CLAUDE.md, the night-lights probe trap), and its movement would carry it off the viewpoint
 		player.process_mode = Node.PROCESS_MODE_DISABLED
+	# --fogs sets the fog and the cut by hand, so world.ViewDistance (which owns both in the game) stands down
+	var vd := root.get_node_or_null("ViewDistance")
+	if vd != null and _arg("fogs") != null:
+		vd.call("set_enabled_now", false)
+		await process_frame
+		await process_frame
 	cam = Camera3D.new()
 	cam.far = 4000.0
 	cam.fov = float(str(_arg("fov", ["70"])[0]))
@@ -210,4 +216,6 @@ func _run() -> void:
 			var path := "%s/%s%s.png" % [out, p[0], tag]
 			root.get_texture().get_image().save_png(path)
 			print("shot %s  cam %.1f,%.1f,%.1f -> %.1f,%.1f,%.1f" % [path, at.x, at.y, at.z, look.x, look.y, look.z])
+			if vd != null and fog == "":
+				print("view distance %.0f m, cut %.0f m, %d meshes" % [vd.call("distance_now"), vd.call("cull_now"), vd.call("tracked_now")])
 	quit(0)
