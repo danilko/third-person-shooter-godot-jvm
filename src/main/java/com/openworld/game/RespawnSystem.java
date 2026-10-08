@@ -6,6 +6,7 @@ import com.openworld.character.Player;
 import com.openworld.world.Places;
 import godot.annotation.Register;
 import godot.annotation.Script;
+import godot.annotation.Visible;
 import godot.api.CanvasLayer;
 import godot.api.ColorRect;
 import godot.api.Control;
@@ -51,11 +52,15 @@ public class RespawnSystem extends Node {
         return instance != null && GD.isInstanceValid(instance) ? instance : null;
     }
 
-    @godot.annotation.Visible public boolean enabled = true;
+    @Visible public boolean enabled = true;
 
     public boolean getEnabled() { return enabled; }
 
     public void setEnabled(boolean v) { enabled = v; }
+
+    /** Unseat a body that died in a vehicle before it is freed (PLAN.md 1i). Off = the old defect: the probe's control. */
+    @Visible
+    public boolean releaseSeat = true;
     public double cardSeconds = 4.0;
     /** A client waits at most this long (after its card) for the host's new body before fading in anyway. */
     public double clientWaitSeconds = 10.0;
@@ -319,6 +324,10 @@ public class RespawnSystem extends Node {
         // tell every peer the old body is gone BEFORE the new one with the same id is announced
         if (net != null) net.announceDespawn(j.id);
         if (dead != null) {
+            // a body that died SEATED (a seated corpse) leaves its car first, or the car keeps the dead player's
+            // controller and camera and the HUD stays in its vehicle situation after the respawn (PLAN.md 1i)
+            if (releaseSeat && dead.currentVehicleNode instanceof com.openworld.carrier.vehicle.Vehicle v)
+                v.releaseOccupant(dead);
             if (dead.getParent() != null) dead.getParent().removeChild(dead);
             dead.queueFree();
         }

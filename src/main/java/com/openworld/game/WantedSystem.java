@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The wanted level (PLAN.md W5, user decisions 2026-10-03): stars 0-6 per player, from HEAT that crimes add and that
+ * The wanted level (PLAN.md W5, user decisions 2026-10-03): stars 0-5 per player, from HEAT that crimes add and that
  * drains once the player has kept out of trouble for a while. The rules and the crime table are
  * {@link WantedRules} over {@code game/crimes.json}; this node only owns the per-player state and the seams.
  *

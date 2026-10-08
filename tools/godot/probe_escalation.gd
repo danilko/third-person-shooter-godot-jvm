@@ -2,10 +2,10 @@ extends SceneTree
 ## THE ENFORCEMENT ESCALATION (PLAN.md W6, user 2026-10-06: heavier units as the stars rise; vehicles that RAM;
 ## a light tank / tank with a main gun; snipers; light bars and sirens).
 ##
-##   stdbuf -oL godot --headless --path . --script tools/godot/probe_escalation.gd [-- --stars=6] [--control]
+##   stdbuf -oL godot --headless --path . --script tools/godot/probe_escalation.gd [-- --stars=5] [--control]
 ##   (--control: 2 stars -- none of the escalation may appear)
 ##
-## World.tscn, the player invulnerable at the safe house, held at N lethal stars for up to 120 s. Asserted at 6 stars:
+## World.tscn, the player invulnerable at the safe house, held at N lethal stars for up to 120 s. Asserted at 5 stars:
 ##   1. an armoured model (ARV1 / LTK1 / TNK1) is dispatched;
 ##   2. a car RAMS (drives straight at the player, not stopping to unload);
 ##   3. a main gun fires a shell;
@@ -27,7 +27,7 @@ func _check(ok: bool, what: String) -> void:
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
 	var control := "--control" in args
-	var stars := 2 if control else 6
+	var stars := 2 if control else 5
 	for a in args:
 		if a.begins_with("--stars="):
 			stars = int(a.substr(8))

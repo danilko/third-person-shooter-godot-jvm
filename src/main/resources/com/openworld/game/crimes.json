@@ -1,12 +1,11 @@
 {
- "note": "The crime table (PLAN.md W5). A row is a crime id -> heat added, the minimum stars it sets at once, whether a witness is needed, and `lethal`: once a lethal crime is on a player's record, police shoot on sight and no arrest is offered, until the heat is gone or the player is hospitalized. Adding a crime = one row here + one WantedSystem.report(id, ...) call. Stars come from heat by `stars_at` (thresholds for 1..6 stars). `police_weapons` is what responding police carry (the dispatch, PLAN.md W5): heavy weapons once the player is lethal-wanted (user, 2026-10-03).",
+ "note": "The crime table (PLAN.md W5). A row is a crime id -> heat added, the minimum stars it sets at once, whether a witness is needed, and `lethal`: once a lethal crime is on a player's record, police shoot on sight and no arrest is offered, until the heat is gone or the player is hospitalized. Adding a crime = one row here + one WantedSystem.report(id, ...) call. Stars come from heat by `stars_at` (thresholds for 1..5 stars). `police_weapons` is what responding police carry (the dispatch, PLAN.md W5): heavy weapons once the player is lethal-wanted (user, 2026-10-03).",
  "stars_at": [
   40,
   140,
   320,
   560,
-  860,
-  1250
+  900
  ],
  "calm_seconds": 12.0,
  "calm_per_star": 6.0,
@@ -92,17 +91,65 @@
  },
  "dispatch": {
   "tokens_note": "PLAN.md 1g b2/b3 (2026-10-07): tokens_by_stars = how many units may attack one player at once (the rest close in and hold, the token rotates every 4 s; 0 = no limit). regroup_seconds_by_stars = after half the units on a player have run dry (they walk back to a vehicle's spare ammo, item/ammo_supply.json, within supply_reach, else leave), no new unit is sent for this long: the escape window. 0 = no lull.",
-  "tokens_by_stars": [0, 2, 2, 3, 3, 4, 5],
-  "regroup_seconds_by_stars": [0, 15, 15, 14, 12, 10, 8],
+  "tokens_by_stars": [
+   0,
+   2,
+   2,
+   3,
+   4,
+   5
+  ],
+  "regroup_seconds_by_stars": [
+   0,
+   15,
+   15,
+   13,
+   10,
+   8
+  ],
   "supply_reach": 60.0,
-  "note": "The police dispatch (game.EnforcementDispatch, PLAN.md W5). Index = stars (0..6). Officers on foot appear between foot_min and foot_max metres from the wanted player out of view; patrol cars (POC1/MPC1, a crew of car_crew) on a lane between car_min and car_max and drive the road route to the player, the crew bailing out within arrive_dist. From shoot_at stars (1: police HUNT the player down, user 2026-10-07) police are hostile and shoot; there is no arrest by proximity -- a wanted player who goes down is arrested (RecoveryRules). Units are freed out of view past despawn_far, or once the stars are gone. While police can see the player the calm clock does not run (seen_reach).",
-  "bodies_note": "PLAN.md 1g c: who an officer IS. body = CharacterVisuals_<Body>, outfit = character/outfits.json, weight among the rows sent at that many stars (min_stars..max_stars, 0 = no upper bound). Fumiriya is the only male body; special forces (outfit special_force) from 5 stars.",
+  "note": "The police dispatch (game.EnforcementDispatch, PLAN.md W5). Index = stars (0..5). Officers on foot appear between foot_min and foot_max metres from the wanted player out of view; patrol cars (POC1/MPC1, a crew of car_crew) on a lane between car_min and car_max and drive the road route to the player, the crew bailing out within arrive_dist. From shoot_at stars (1: police HUNT the player down, user 2026-10-07) police are hostile and shoot; there is no arrest by proximity -- a wanted player who goes down is arrested (RecoveryRules). Units are freed out of view past despawn_far, or once the stars are gone. While police can see the player the calm clock does not run (seen_reach).",
+  "bodies_note": "PLAN.md 1g c: who an officer IS. body = CharacterVisuals_<Body>, outfit = character/outfits.json, weight among the rows sent at that many stars (min_stars..max_stars, 0 = no upper bound). Fumiriya is the only male body; special forces (outfit special_force) from 5 stars. extra_weapons: carried besides the star row's weapon (special forces' MEW1 knife, used in the reload / close-quarters fallback).",
   "bodies": [
-   {"body": "fumiriya", "outfit": "police", "weight": 3, "min_stars": 0, "max_stars": 4},
-   {"body": "shino", "outfit": "police", "weight": 1, "min_stars": 0, "max_stars": 4},
-   {"body": "shibu", "outfit": "police", "weight": 1, "min_stars": 0, "max_stars": 4},
-   {"body": "fumiriya", "outfit": "special_force", "weight": 3, "min_stars": 5},
-   {"body": "shibu", "outfit": "special_force", "weight": 1, "min_stars": 5}
+   {
+    "body": "fumiriya",
+    "outfit": "police",
+    "weight": 3,
+    "min_stars": 0,
+    "max_stars": 4
+   },
+   {
+    "body": "shino",
+    "outfit": "police",
+    "weight": 1,
+    "min_stars": 0,
+    "max_stars": 4
+   },
+   {
+    "body": "shibu",
+    "outfit": "police",
+    "weight": 1,
+    "min_stars": 0,
+    "max_stars": 4
+   },
+   {
+    "body": "fumiriya",
+    "outfit": "special_force",
+    "weight": 3,
+    "min_stars": 5,
+    "extra_weapons": [
+     "MEW1"
+    ]
+   },
+   {
+    "body": "shibu",
+    "outfit": "special_force",
+    "weight": 1,
+    "min_stars": 5,
+    "extra_weapons": [
+     "MEW1"
+    ]
+   }
   ],
   "shoot_at": 1,
   "foot_by_stars": [
@@ -111,14 +158,12 @@
    3,
    4,
    6,
-   8,
-   10
+   9
   ],
   "cars_by_stars": [
    0,
    0,
    1,
-   2,
    2,
    3,
    4
@@ -132,7 +177,7 @@
   "despawn_far": 180.0,
   "seen_reach": 60.0,
   "spawn_interval": 1.5,
-  "escalation_note": "PLAN.md W6 (user 2026-10-06): heavier units as the stars rise. Index = stars (0..6). weapons_by_stars: what a unit carries (1 star: the BAT1 police baton, hostile but melee only, PLAN.md 1g a, user 2026-10-07; firearms from 2) (the lethal list in police_weapons is added once lethal). vehicles_by_stars: catalog model ids sent (POC1/MPC1 patrol cars, ARV1 armoured riot vehicle, LTK1 wheeled light tank, TNK1 tank). snipers_by_stars: SNR1 units placed 90-160 m out on a clear line. helis_by_stars: police helicopters (HLC1) with a door gunner. ram_at: from this many stars a car on a call drives AT the player instead of stopping to unload. gun: the armour that fires a main gun, and how.",
+  "escalation_note": "PLAN.md W6 (user 2026-10-06): heavier units as the stars rise. Index = stars (0..5). weapons_by_stars: what a unit carries (1 star: the BAT1 police baton, hostile but melee only, PLAN.md 1g a, user 2026-10-07; firearms from 2) (the lethal list in police_weapons is added once lethal). vehicles_by_stars: catalog model ids sent (POC1/MPC1 patrol cars, ARV1 armoured riot vehicle, LTK1 wheeled light tank, TNK1 tank). snipers_by_stars: SNR1 units placed 90-160 m out on a clear line. helis_by_stars: police helicopters (HLC1) with a door gunner. ram_at: from this many stars a car on a call drives AT the player instead of stopping to unload. gun: the armour that fires a main gun, and how.",
   "weapons_by_stars": [
    [],
    [
@@ -154,11 +199,7 @@
    [
     "ASR1",
     "ASR2",
-    "SHG1"
-   ],
-   [
-    "ASR1",
-    "ASR2",
+    "SHG1",
     "ATL1"
    ]
   ],
@@ -176,18 +217,13 @@
    ],
    [
     "POC1",
-    "ARV1"
-   ],
-   [
     "ARV1",
-    "LTK1",
-    "POC1",
     "POC1"
    ],
    [
+    "ARV1",
     "LTK1",
     "TNK1",
-    "ARV1",
     "POC1"
    ]
   ],
@@ -197,7 +233,6 @@
    0,
    0,
    1,
-   2,
    2
   ],
   "helis_by_stars": [
@@ -205,9 +240,8 @@
    0,
    0,
    0,
-   0,
    1,
-   2
+   1
   ],
   "ram_at": 4,
   "gun": {

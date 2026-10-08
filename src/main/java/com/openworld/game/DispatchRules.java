@@ -82,8 +82,13 @@ public final class DispatchRules {
     // ── BODIES (PLAN.md 1g c): who a unit IS -- which body and which uniform ──
 
     /** One row of a force's body table: a body (CharacterVisuals_<Body>), its uniform (character/outfits.json), a
-     *  weight, and the stars it is sent at (inclusive; max 0 = no upper bound). */
-    public record BodyPick(String body, String outfit, double weight, int minStars, int maxStars) {
+     *  weight, the stars it is sent at (inclusive; max 0 = no upper bound), and weapons it carries besides its
+     *  star row's ({@code extra_weapons}: special forces' knife, PLAN.md 1i). */
+    public record BodyPick(String body, String outfit, double weight, int minStars, int maxStars,
+                           List<String> extraWeapons) {
+        public BodyPick(String body, String outfit, double weight, int minStars, int maxStars) {
+            this(body, outfit, weight, minStars, maxStars, List.of());
+        }
         boolean sentAt(int stars) { return stars >= minStars && (maxStars <= 0 || stars <= maxStars); }
     }
 
@@ -101,8 +106,11 @@ public final class DispatchRules {
             Object body = r.get("body");
             if (body == null) continue;
             Object outfit = r.get("outfit");
+            List<String> extra = new ArrayList<>();
+            if (r.get("extra_weapons") instanceof List<?> xs) for (Object x : xs) extra.add(String.valueOf(x));
             out.add(new BodyPick(String.valueOf(body), outfit == null ? "" : String.valueOf(outfit),
-                    num(r, "weight", 1.0), (int) num(r, "min_stars", 0), (int) num(r, "max_stars", 0)));
+                    num(r, "weight", 1.0), (int) num(r, "min_stars", 0), (int) num(r, "max_stars", 0),
+                    List.copyOf(extra)));
         }
         return out;
     }

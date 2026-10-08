@@ -1,37 +1,133 @@
 {
- "note": "Uniforms (PLAN.md 1g c, user 2026-10-07): an outfit replaces a body's CLOTH surfaces (every VRoid material whose name ends in _CLOTH) with a flat material, keyed by the part in its name (Tops, Bottoms, Onepice, Accessory, Shoes; `cloth` = any other). A value is an [r, g, b] colour (sRGB 0..1) for a PLACEHOLDER flat material, or a res:// path to a material an artist made, which is used as it is. The forces that wear them are data too: crimes.json dispatch.bodies (police, by stars) and gangs.json gangs.<id>.bodies. character.Outfits applies them. Replace a placeholder by pointing its part at a .tres.",
+ "note": "Uniforms (PLAN.md 1g c, user 2026-10-07): an outfit replaces a body's CLOTH surfaces (every VRoid material whose name ends in _CLOTH) with a flat material, keyed by the part in its name (Tops, Bottoms, Onepice, Accessory, Shoes; `cloth` = any other). A value is an [r, g, b] colour (sRGB 0..1) for a PLACEHOLDER flat material, or a res:// path to a material an artist made, which is used as it is. The forces that wear them are data too: crimes.json dispatch.bodies (police, by stars) and gangs.json gangs.<id>.bodies. character.Outfits applies them. Replace a placeholder by pointing its part at a .tres. Black is SPECIAL FORCES only (user 2026-10-08): a gang wears its nameplate colour (gang_a 黒鉄会 a magenta sukajan with gold, gang_b blue over white), never black.",
  "outfits": {
   "police": {
-   "Tops": [0.66, 0.74, 0.86],
-   "Onepice": [0.16, 0.20, 0.34],
-   "Bottoms": [0.13, 0.16, 0.28],
-   "Accessory": [0.10, 0.12, 0.20],
-   "Shoes": [0.05, 0.05, 0.06],
-   "cloth": [0.16, 0.20, 0.34]
+   "Tops": [
+    0.66,
+    0.74,
+    0.86
+   ],
+   "Onepice": [
+    0.16,
+    0.2,
+    0.34
+   ],
+   "Bottoms": [
+    0.13,
+    0.16,
+    0.28
+   ],
+   "Accessory": [
+    0.1,
+    0.12,
+    0.2
+   ],
+   "Shoes": [
+    0.05,
+    0.05,
+    0.06
+   ],
+   "cloth": [
+    0.16,
+    0.2,
+    0.34
+   ]
   },
   "special_force": {
-   "Tops": [0.12, 0.14, 0.18],
-   "Onepice": [0.12, 0.14, 0.18],
-   "Bottoms": [0.10, 0.11, 0.14],
-   "Accessory": [0.30, 0.33, 0.30],
-   "Shoes": [0.04, 0.04, 0.04],
-   "cloth": [0.12, 0.14, 0.18]
+   "Tops": [
+    0.12,
+    0.14,
+    0.18
+   ],
+   "Onepice": [
+    0.12,
+    0.14,
+    0.18
+   ],
+   "Bottoms": [
+    0.1,
+    0.11,
+    0.14
+   ],
+   "Accessory": [
+    0.3,
+    0.33,
+    0.3
+   ],
+   "Shoes": [
+    0.04,
+    0.04,
+    0.04
+   ],
+   "cloth": [
+    0.12,
+    0.14,
+    0.18
+   ]
   },
   "gang_a": {
-   "Tops": [0.06, 0.06, 0.07],
-   "Onepice": [0.06, 0.06, 0.07],
-   "Bottoms": [0.09, 0.09, 0.10],
-   "Accessory": [0.62, 0.50, 0.18],
-   "Shoes": [0.30, 0.08, 0.06],
-   "cloth": [0.06, 0.06, 0.07]
+   "Tops": [
+    0.5,
+    0.12,
+    0.44
+   ],
+   "Onepice": [
+    0.5,
+    0.12,
+    0.44
+   ],
+   "Bottoms": [
+    0.55,
+    0.48,
+    0.36
+   ],
+   "Accessory": [
+    0.85,
+    0.68,
+    0.2
+   ],
+   "Shoes": [
+    0.88,
+    0.86,
+    0.82
+   ],
+   "cloth": [
+    0.5,
+    0.12,
+    0.44
+   ]
   },
   "gang_b": {
-   "Tops": [0.14, 0.42, 0.62],
-   "Onepice": [0.14, 0.42, 0.62],
-   "Bottoms": [0.85, 0.85, 0.82],
-   "Accessory": [0.95, 0.80, 0.20],
-   "Shoes": [0.85, 0.85, 0.82],
-   "cloth": [0.14, 0.42, 0.62]
+   "Tops": [
+    0.14,
+    0.42,
+    0.62
+   ],
+   "Onepice": [
+    0.14,
+    0.42,
+    0.62
+   ],
+   "Bottoms": [
+    0.85,
+    0.85,
+    0.82
+   ],
+   "Accessory": [
+    0.95,
+    0.8,
+    0.2
+   ],
+   "Shoes": [
+    0.85,
+    0.85,
+    0.82
+   ],
+   "cloth": [
+    0.14,
+    0.42,
+    0.62
+   ]
   }
  }
 }

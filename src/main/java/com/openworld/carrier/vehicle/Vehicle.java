@@ -2270,6 +2270,22 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     /** Executes the unseat locally — same puppet awareness as {@link #tryEnter}. */
     public void tryExit() { tryExit(0); }
 
+    /**
+     * Unseat {@code c} from whichever seat holds it, driver or passenger (PLAN.md 1i, 2026-10-08): the one call before
+     * a seated body is freed (a respawn, a despawn). Without it the car kept the dead player's PlayerController and
+     * camera -- WASD still drove it after the respawn -- and the HUD never heard vehicleExited. False if not seated here.
+     */
+    public boolean releaseOccupant(Character c) {
+        if (c == null) return false;
+        for (int i = 0; i < seatOccupants.length; i++) {
+            if (seatOccupants[i] == c) {
+                tryExit(i);
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Seat-aware exit — placement mirrors the seat's side; passengers skip the driver-only teardown. */
     public void tryExit(int seatIndex) {
         if (seatIndex < 0 || seatIndex >= seatOccupants.length) return;

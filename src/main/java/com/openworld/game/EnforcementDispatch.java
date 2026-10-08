@@ -1375,6 +1375,7 @@ public class EnforcementDispatch extends Node {
             if (com.openworld.character.Outfits.apply(mount != null ? mount : ai, look.outfit()) > 0)
                 dressed.merge(look.body() + ":" + look.outfit(), 1, Integer::sum);
         }
+        if (look != null) for (String x : look.extraWeapons()) WeaponGrant.grant(ai, x, this);
         if (weapon != null && !weapon.isEmpty()) WeaponGrant.grant(ai, weapon, this);
         if (getNodeOrNull("/root/NetworkManager") instanceof NetworkManager net) net.announceSpawn(ai);
         return ai;

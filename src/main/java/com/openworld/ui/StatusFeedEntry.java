@@ -35,6 +35,8 @@ public class StatusFeedEntry extends FeedEntry {
     public void _ready() {
         super._ready();
         setCustomMinimumSize(new Vector2(0f, 24f));
+        // right-aligned like the kill lines: both share the one top-right column (HUDManager.feedTop)
+        setAlignment(godot.api.BoxContainer.AlignmentMode.END);
 
         if (pendingIcon != null) {
             TextureRect icon = new TextureRect();

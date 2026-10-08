@@ -61,7 +61,7 @@ public final class GangRules {
     public int starsFor(double heat) {
         int s = 0;
         for (double t : starsAt) if (heat >= t) s++;
-        return s;
+        return Math.min(WantedRules.MAX_STARS, s);
     }
 
     /** One player's standing with one gang. */

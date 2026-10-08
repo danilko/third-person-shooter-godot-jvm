@@ -34,7 +34,7 @@ func _panels() -> Dictionary:
 		"health": hud.get_node("FootHUD/Health"), "minimap": hud.get_node("Minimap"),
 		"weapon": hud.get_node("WeaponHUD"), "slots": hud.get_node("WeaponSlotsUI"),
 		"speed": hud.get_node("VehicleHUD/Speed"), "killfeed": hud.get_node("Feed/VBoxContainer"),
-		"notices": hud.get_node("StatusFeed/VBoxContainer"),
+		"clock": hud.get_node("GameClock"), "stars": hud.get_node("WantedStars"),
 	}
 	for k in rects:
 		var c: Control = rects[k]
@@ -128,6 +128,11 @@ func _initialize() -> void:
 		absf((bx["weapon"] as Rect2).size.x - (bx["slots"] as Rect2).size.x)]
 	_check("each corner's stacked boxes are one width", widths.size() == 2 and widths.max() <= 1.0, str(widths))
 	_check("the inventory column comes up to full on a switch", shown > 0.9, "alpha %.2f" % shown)
+	_check("ONE feed: no separate status column (user 2026-10-08)", hud.get_node_or_null("StatusFeed") == null)
+	var kf: Control = hud.get_node("Feed/VBoxContainer")
+	var below := kf.get_global_rect().position.y >= (hud.get_node("GameClock") as Control).get_global_rect().end.y \
+		and kf.get_global_rect().position.y >= (hud.get_node("WantedStars") as Control).get_global_rect().end.y
+	_check("the feed starts below the clock and both star rows", below, str(kf.get_global_rect()))
 	_check("nothing overlaps (with the column up)", _overlaps(foot).is_empty(), "%s / %s" % [_overlaps(foot), foot.keys()])
 	var heights := {}
 	for r in hud.get_node("WeaponSlotsUI/Slots").get_children():
@@ -147,7 +152,7 @@ func _initialize() -> void:
 				off.append("%s %.1fx%.1f" % [r.get_node("Icon/NameLabel").text, ts.x * k, ts.y * k])
 	_check("every silhouette at the common height (or the full width, if long)", off.is_empty(), str(off))
 	var wtext: String = hud.get_node("WeaponHUD").call("text_now")
-	_check("the weapon panel: name, magazine, reserve", wtext == "ASR-1 30 / 60", wtext)
+	_check("the weapon panel: name, magazine, reserve", wtext == "ASR-1 30 / 90", wtext)
 	wc.call("on_set_weapon", 4)
 	await _wait(0.8)
 	var ktext: String = hud.get_node("WeaponHUD").call("text_now")
@@ -157,7 +162,7 @@ func _initialize() -> void:
 	_check("the column settles back to its quiet resting level", absf(float(slots.call("shown_now")) - idle) < 0.02,
 		"alpha %.2f (idle %.2f)" % [float(slots.call("shown_now")), idle])
 	_check("and stays on screen (the loadout is always readable)", idle > 0.3 and slots.is_visible_in_tree())
-	var corners := {"health": Vector2(0, 1), "minimap": Vector2(0, 1), "weapon": Vector2(1, 1), "killfeed": Vector2(1, 0), "notices": Vector2(0, 0)}
+	var corners := {"health": Vector2(0, 1), "minimap": Vector2(0, 1), "weapon": Vector2(1, 1), "killfeed": Vector2(1, 0), "clock": Vector2(1, 0), "stars": Vector2(1, 0)}
 	var vp := (hud.get_node("FootHUD") as Control).get_viewport_rect().size
 	var wrong := []
 	for k in corners:

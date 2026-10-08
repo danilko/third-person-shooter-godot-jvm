@@ -114,8 +114,8 @@ public class HUDManager extends CanvasLayer {
   private Node            player;
   private String          playerCharacterId = "";
   private Crosshair       crosshair;
-  private Feed            feed;          // bottom-right kill feed
-  private Feed            statusFeed;    // top-center transient toasts (pickups, mission events)
+  private Feed            feed;          // the one feed, top-right under the clock and stars: kills + notices
+  private Feed            statusFeed;    // = feed (status lines go in the same column)
   private WeaponSlotsUI   weaponSlotsUI;
   private WeaponHUD       weaponHud;
   private DamageIndicator damageIndicator;
@@ -152,6 +152,11 @@ public class HUDManager extends CanvasLayer {
 	characterHUDs.remove(characterId);
   }
 
+  /** Where the one feed starts: under the clock and both star rows (WantedStars' second row is the gang's). */
+  public static float feedTop() {
+	return GameClock.MARGIN + (GameClock.H - WantedStars.STAR) * 0.5f + 2f * WantedStars.STAR + 6f + 10f;
+  }
+
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   @Register
@@ -178,23 +183,15 @@ public class HUDManager extends CanvasLayer {
 	  ws.setName(new godot.core.StringName("WantedStars"));
 	  addChild(ws);
 	}
+	// ONE feed (user, 2026-10-08): kill lines and status lines (pickups, missions, radio) share the top-right column,
+	// BELOW the clock and both star rows (police, then the worst gang), so nothing there overlaps
 	if (feed != null && feed.getNodeOrNull("VBoxContainer") instanceof Control kv) {
-	  kv.setOffset(godot.core.Side.TOP, GameClock.MARGIN + GameClock.H + 8f);
-	  kv.setOffset(godot.core.Side.BOTTOM, GameClock.MARGIN + GameClock.H + 30f);
+	  float top = feedTop();
+	  kv.setOffset(godot.core.Side.TOP, top);
+	  kv.setOffset(godot.core.Side.BOTTOM, top + 22f);
+	  feed.maxEntries = Math.max(feed.maxEntries, 6);
 	}
-	Node statusFeedNode = getNodeOrNull("StatusFeed");
-	if (statusFeedNode instanceof Feed sf) {
-	  statusFeed = sf;
-	  // StatusFeed instances the same Feed scene as the top-right kill feed, so move its row
-	  // container to the top-LEFT here (avoids a fragile per-instance .tscn override of an
-	  // instanced sub-scene's child): pickups and mission toasts there, kills on the right,
-	  // the minimap and health bottom-left, the weapon or speedometer bottom-right.
-	  Node vbox = statusFeed.getNodeOrNull("VBoxContainer");
-	  if (vbox instanceof Control vb) {
-		vb.setAnchorsPreset(Control.LayoutPreset.PRESET_TOP_LEFT, false);
-		vb.setPosition(new Vector2(20f, 20f), false);
-	  }
-	}
+	statusFeed = feed;
 
 	Node busNode = getNodeOrNull("/root/EventBus");
 	if (busNode instanceof EventBus bus) {
@@ -415,6 +412,10 @@ public class HUDManager extends CanvasLayer {
   /** The region the local player is in, or "" (probe readout). */
   @Register
   public String regionNow() { return currentRegion; }
+
+  /** The HUD's situation (probe readout: ON_FOOT, VEHICLE_DRIVE, ...). */
+  @Register
+  public String situationNow() { return currentSituation == null ? "" : currentSituation.name(); }
 
   private static String regionLabel(String id) {
 	return id.isEmpty() ? "" : java.lang.Character.toUpperCase(id.charAt(0)) + id.substring(1).replace('_', ' ');

@@ -28,13 +28,15 @@ public class WantedStars extends Control {
     @Override
     public void _ready() {
         setMouseFilter(Control.MouseFilter.IGNORE);
-        float w = 6 * STAR + 5 * GAP;
+        int n = com.openworld.game.WantedRules.MAX_STARS;
+        float w = n * STAR + (n - 1) * GAP;
         setAnchor(godot.core.Side.LEFT, 1f, false, true);
         setAnchor(godot.core.Side.RIGHT, 1f, false, true);
         setOffset(godot.core.Side.RIGHT, -GameClock.W - GameClock.MARGIN - 10f);
         setOffset(godot.core.Side.LEFT, -GameClock.W - GameClock.MARGIN - 10f - w);
         setOffset(godot.core.Side.TOP, GameClock.MARGIN + (GameClock.H - STAR) * 0.5f);
-        setOffset(godot.core.Side.BOTTOM, GameClock.MARGIN + (GameClock.H + STAR) * 0.5f);
+        // two rows tall (police, then the worst gang), so the rect is what is drawn and the feed can sit below it
+        setOffset(godot.core.Side.BOTTOM, GameClock.MARGIN + (GameClock.H - STAR) * 0.5f + 2f * STAR + 6f);
     }
 
     @Register
@@ -76,9 +78,9 @@ public class WantedStars extends Control {
         boolean off = flash > 0 && ((int) (flash * 6)) % 2 == 0;
         // the police row; under it the gang the player stands worst with, in that gang's colour (they are separate:
         // police stars reset at a hospital or a cell, a gang's do not)
-        if (stars > 0) row(0f, 6, stars, off, new Color(1f, 0.85f, 0.25f, 1f));
+        if (stars > 0) row(0f, com.openworld.game.WantedRules.MAX_STARS, stars, off, new Color(1f, 0.85f, 0.25f, 1f));
         if (gangStars > 0) {
-            int max = 5;
+            int max = com.openworld.game.WantedRules.MAX_STARS;
             row(STAR + 6f, max, gangStars, off, com.openworld.character.Faction.color(gang));
         }
     }

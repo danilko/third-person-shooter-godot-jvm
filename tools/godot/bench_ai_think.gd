@@ -3,7 +3,7 @@ extends SceneTree
 ## AIController.think_budget ON (decisions every 2nd / 4th tick, staggered) and OFF (every tick), alternated so a
 ## drift in the scene does not read as a difference.
 ##
-##   stdbuf -oL godot --headless --path . --script tools/godot/bench_ai_think.gd [-- --world=island] [--stars=6]
+##   stdbuf -oL godot --headless --path . --script tools/godot/bench_ai_think.gd [-- --world=island] [--stars=5]
 ##        [--secs=6] [--rounds=3]
 ##
 ## The player is invulnerable and police/enemy are neutral (as probe_enforcement), so the units keep fighting.
@@ -50,7 +50,7 @@ func _initialize() -> void:
 		var kv := a.trim_prefix("--").split("=")
 		args[kv[0]] = kv[1] if kv.size() > 1 else "1"
 	var island: bool = args.get("world", "") == "island"
-	var stars: int = int(args.get("stars", "6"))
+	var stars: int = int(args.get("stars", "5"))
 	var secs: float = float(args.get("secs", "6"))
 	var rounds: int = int(args.get("rounds", "3"))
 	var world: Node = (load(ISLAND if island else DEBUG) as PackedScene).instantiate()

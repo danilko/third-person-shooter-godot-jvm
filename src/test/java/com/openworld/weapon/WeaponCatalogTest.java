@@ -117,7 +117,7 @@ class WeaponCatalogTest {
 
     /**
      * Every weapon with a model or a primitive has a generated icon (blender/tools/render_weapon_icons.py) that
-     * its scene uses, at the catalog's frame size, white, centred, inside the padding, and at the catalog's
+     * its scene uses, at the catalog's frame size, white, centred (or left-aligned, `align`), inside the padding, and at the catalog's
      * scale: with `scale` "uniform" each silhouette is as wide as its weapon's declared length x pixels_per_metre.
      */
     @Test
@@ -151,8 +151,12 @@ class WeaponCatalogTest {
             }
             assertTrue(maxX >= 0, r.id() + ": empty icon");
             assertTrue(minX >= pad - 1 && minY >= pad - 1 && maxX <= w - pad && maxY <= h - pad, r.id() + ": content enters the padding");
-            assertTrue(Math.abs((minX + maxX) - (w - 1)) <= 2 && Math.abs((minY + maxY) - (h - 1)) <= 2,
-                    r.id() + ": not centred (" + minX + ".." + maxX + ", " + minY + ".." + maxY + ")");
+            // vertically centred; horizontally centred, or with `align` "left" the muzzle on the left padding edge
+            boolean left = cat.matches("(?s).*\"align\"\\s*:\\s*\"left\".*");
+            boolean xOk = left ? minX <= pad + 1 : Math.abs((minX + maxX) - (w - 1)) <= 2;
+            assertTrue(xOk && Math.abs((minY + maxY) - (h - 1)) <= 2,
+                    r.id() + ": not " + (left ? "left-aligned" : "centred") + " (" + minX + ".." + maxX + ", "
+                    + minY + ".." + maxY + ")");
             if (uniform) {
                 // One scale for every weapon: the silhouette is as wide as the weapon is long at pixels_per_metre.
                 double length = declaredLength(models, r.id());

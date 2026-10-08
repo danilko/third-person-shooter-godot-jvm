@@ -1037,10 +1037,8 @@ public class GameManager extends Node {
                 // SEATED character (e.g. a despawned AI driver whose despawn arrives before its car's)
                 // must unseat it first, or the vehicle's `occupant` dangles → Vehicle._physicsProcess
                 // dereferences a freed node (`get_global_transform "!is_inside_tree"` → use-after-free).
-                if (node instanceof Character ch && ch.currentVehicleNode instanceof Vehicle seat
-                        && seat.getOccupant() == ch) {
-                    seat.tryExit();
-                }
+                if (node instanceof Character ch && ch.currentVehicleNode instanceof Vehicle seat)
+                    seat.releaseOccupant(ch);   // driver or passenger
                 // Out of the tree NOW, not at the end of the frame: a respawned player is announced with the SAME
                 // characterId right after its despawn (RespawnSystem), and a body still in "characters" made
                 // spawnReplicatedCharacter skip the new one as a duplicate.

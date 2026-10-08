@@ -9,14 +9,14 @@ import java.util.Map;
 /**
  * The wanted level's rules (PLAN.md W5) -- engine-free, so they are unit-tested ({@code WantedRulesTest}).
  *
- * <p>A crime adds HEAT; heat decides the STARS (0-6) through {@code starsAt}, and a crime may also set a floor of
+ * <p>A crime adds HEAT; heat decides the STARS (0-5, WantedRules.MAX_STARS -- police and gangs alike) through {@code starsAt}, and a crime may also set a floor of
  * stars at once (killing a policeman is three stars whatever the heat). After a CALM period with no new crime
  * ({@code calmSeconds + calmPerStar * stars}) the heat drains at {@code decayPerSecond}; the floor drains with it.
  * The table is DATA ({@code game/crimes.json}): a new crime is one row there plus one report call at its seam.
  */
 public final class WantedRules {
 
-    public static final int MAX_STARS = 6;
+    public static final int MAX_STARS = 5;
 
     /** One row of the crime table. */
     public record Crime(String id, double heat, int minStars, boolean witness, boolean lethal) {}
@@ -72,7 +72,7 @@ public final class WantedRules {
         return o instanceof Number n ? n.doubleValue() : 0.0;
     }
 
-    /** Stars for a heat (0..6). */
+    /** Stars for a heat (0..MAX_STARS). */
     public int starsFor(double heat) {
         int s = 0;
         for (double t : starsAt) if (heat >= t) s++;

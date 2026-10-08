@@ -25,11 +25,11 @@ class RecoveryRulesTest {
     void theBillsClimbHospitalThenArrestThenRansom() throws Exception {
         RecoveryRules r = rules();
         int h = r.fee(RecoveryRules.Outcome.HOSPITALIZED, 0);
-        int a1 = r.fee(RecoveryRules.Outcome.ARRESTED, 1), a6 = r.fee(RecoveryRules.Outcome.ARRESTED, 6);
+        int a1 = r.fee(RecoveryRules.Outcome.ARRESTED, 1), a5 = r.fee(RecoveryRules.Outcome.ARRESTED, 5);
         assertTrue(h > 0);
-        assertEquals((r.hospital + r.policePerStar) * 6, a6, "the arrest bill is per star");
+        assertEquals((r.hospital + r.policePerStar) * 5, a5, "the arrest bill is per star");
         assertTrue(a1 > h);
-        assertTrue(r.ransom(1) > a6, "the cheapest ransom is dearer than the worst arrest");
+        assertTrue(r.ransom(1) > a5, "the cheapest ransom is dearer than the worst arrest");
         assertTrue(r.ransom(5) > r.ransom(1));
         assertEquals(0, r.fee(RecoveryRules.Outcome.ABDUCTED, 3), "a ransom is the price of leaving, not of waking");
     }

@@ -16,7 +16,7 @@ class WantedRulesTest {
     @Test
     void theShippedTableParsesAndEveryRowIsUsable() throws Exception {
         WantedRules r = rules();
-        assertEquals(6, r.starsAt.length);
+        assertEquals(WantedRules.MAX_STARS, r.starsAt.length);
         for (int i = 1; i < r.starsAt.length; i++) assertTrue(r.starsAt[i] > r.starsAt[i - 1], "thresholds rise");
         for (String id : new String[] {"gunfire", "assault", "murder", "assault_police", "kill_police",
                 "car_theft", "train_attack", "bank_attack", "attack_vip", "threaten_clerk", "rob_store"}) {
@@ -35,7 +35,7 @@ class WantedRulesTest {
         WantedRules.State t = new WantedRules.State();
         r.report(t, "train_attack", false, 0.0);
         assertEquals(4, r.starsFor(t.heat));
-        assertEquals(6, r.starsFor(1e9));
+        assertEquals(WantedRules.MAX_STARS, r.starsFor(1e9));
     }
 
     @Test

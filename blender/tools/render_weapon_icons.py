@@ -128,7 +128,23 @@ def render_icon(wid, spec):
     natural = "right" if right else "left"
     if spec.get("muzzle", natural) != natural:
         a = a[:, ::-1]
+    if spec.get("align", "center") == "left":
+        a = align_left(a, spec["padding"])
     return a, length, height, placeholder
+
+
+def align_left(a, pad):
+    """Move the silhouette sideways so its leftmost covered column (the muzzle) sits on the left padding edge
+    (user 2026-10-08: short weapons floated mid-slot). Vertical placement is unchanged."""
+    cols = np.nonzero(a.max(axis=0) > 0.02)[0]
+    if cols.size == 0:
+        return a
+    shift = int(cols.min()) - pad
+    if shift <= 0:
+        return a
+    out = np.zeros_like(a)
+    out[:, :a.shape[1] - shift] = a[:, shift:]
+    return out
 
 
 def save_rgba(path, rgb, alpha):
@@ -159,6 +175,7 @@ def main():
     for k in ("width", "height", "padding", "pixels_per_metre"):
         if k in opts: spec[k] = int(opts[k])
     if "scale" in opts: spec["scale"] = opts["scale"]
+    if "align" in opts: spec["align"] = opts["align"]
     if "out" in opts:
         spec["dir"] = os.path.abspath(opts["out"])
         spec["review_sheet"] = os.path.join(spec["dir"], "review", "sheet.png")

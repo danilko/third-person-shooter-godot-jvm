@@ -834,10 +834,15 @@ public class AICharacter extends Character {
         if (weaponController == null) { cachedBestWeapon = 0; return 0; }
         int bestIndex = -1;
         float bestDamage = -1f;
-        for (int i = 1; i < weaponController.getSlotCount(); i++) {
-            if (!weaponController.hasAmmoForWeapon(i)) continue;
-            WeaponItem s = weaponController.getWeaponItem(i);
-            if (s != null && s.damage > bestDamage) { bestDamage = s.damage; bestIndex = i; }
+        // a ranged weapon with ammo first; a carried melee weapon (special forces' knife) only when none has any --
+        // its close-quarters use is startMeleeFallback's, never the default pick
+        for (int pass = 0; pass < 2 && bestIndex < 0; pass++) {
+            for (int i = 1; i < weaponController.getSlotCount(); i++) {
+                if (!weaponController.hasAmmoForWeapon(i)) continue;
+                WeaponItem s = weaponController.getWeaponItem(i);
+                if (s == null || (pass == 0 && s.getWeaponType() == WeaponType.MELEE)) continue;
+                if (s.damage > bestDamage) { bestDamage = s.damage; bestIndex = i; }
+            }
         }
         cachedBestWeapon = bestIndex >= 0 ? bestIndex : 0;
         return cachedBestWeapon;
