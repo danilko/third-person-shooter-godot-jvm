@@ -118,8 +118,13 @@ public class GrenadeProjectile extends RigidBody3D implements Detonatable, Cosme
             flight = new GrenadeFlight(getGlobalPosition(), launchVelocity, ex);
         }
         if (stuck) return;                          // a stuck charge waits for its detonator
+        Vector3 before = getGlobalPosition();
         flight.step(getWorld3d().getDirectSpaceState(), delta, gravity());
         setGlobalPosition(flight.position);
+        if (flight.position.getY() < before.getY()) {          // dropping into water: a splash on the surface
+            Vector3 w = com.openworld.world.Splash.crossing(getTree(), before, flight.position);
+            if (w != null) com.openworld.world.Splash.at(this, w, 0.6, com.openworld.audio.Sound.SPLASH_SMALL, -2f);
+        }
         if (kindOfEffect() == GrenadeEffect.REMOTE) {
             // Sticky: it stops on the first surface it touches (GTA's sticky bomb) and has no fuse.
             if (flight.contacts > 0) stuck = true;

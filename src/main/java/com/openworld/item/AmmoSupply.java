@@ -140,7 +140,7 @@ public class AmmoSupply extends Area3D {
 
     private void showPrompt(boolean on) {
         if (getNodeOrNull("/root/EventBus") instanceof com.openworld.game.EventBus bus)
-            bus.pickupInteractChanged.emit(on, on ? (stock > 0 ? "RESTOCK AMMO x" + stock + " (E)" : "AMMO EMPTY") : "");
+            bus.interactPrompt(this, on, on ? (stock > 0 ? "RESTOCK AMMO x" + stock + " (E)" : "AMMO EMPTY") : "");
     }
 
     /** Does a character standing at {@code world} reach this supply? */

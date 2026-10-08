@@ -549,6 +549,6 @@ public class Pickup extends Node3D {
 
   private void emitInteractPrompt(boolean inRange) {
     EventBus bus = getEventBus();
-    if (bus != null) bus.pickupInteractChanged.emit(inRange, inRange ? "Pick up: " + getInteractLabel() : "");
+    if (bus != null) bus.interactPrompt(this, inRange, inRange ? "Pick up: " + getInteractLabel() : "");
   }
 }

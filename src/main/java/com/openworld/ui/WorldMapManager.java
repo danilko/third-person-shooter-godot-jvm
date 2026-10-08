@@ -266,7 +266,7 @@ public class WorldMapManager extends Control {
         Input.setMouseMode(Input.MouseMode.VISIBLE);
         player.inputBlocked = true;
         setVisible(true);
-        com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_OPEN);
+        com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_CLICK);
         queueRedraw();
     }
 
@@ -275,7 +275,7 @@ public class WorldMapManager extends Control {
         if (player != null) player.inputBlocked = false;
         Input.setMouseMode(Input.MouseMode.CAPTURED);
         setVisible(false);
-        com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_CLOSE);
+        com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_CLICK);
     }
 
     @Register

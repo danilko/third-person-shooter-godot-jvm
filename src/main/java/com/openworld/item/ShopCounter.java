@@ -104,7 +104,7 @@ public class ShopCounter extends Area3D {
 
     private void showPrompt(boolean on) {
         if (getNodeOrNull("/root/EventBus") instanceof com.openworld.game.EventBus bus)
-            bus.pickupInteractChanged.emit(on, on ? title + " (E)" : "");
+            bus.interactPrompt(this, on, on ? title + " (E)" : "");
     }
 
     public List<String> items() { return items; }

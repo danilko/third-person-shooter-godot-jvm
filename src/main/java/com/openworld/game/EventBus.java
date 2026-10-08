@@ -90,6 +90,19 @@ public class EventBus extends Node {
             new Signal2<>(this, new StringName("pickup_interact_changed"));
 
     /**
+     * The interact prompt, keyed by the node that offers it, so the HUD can hold several at once and
+     * one source leaving range never hides another's (PLAN.md P2b "prompt arbitration"). Emit through
+     * {@link #interactPrompt}. {@link #pickupInteractChanged} is the legacy unkeyed form (source 0).
+     */
+    public final Signal3<Node, Boolean, String> interactPromptChanged =
+            new Signal3<>(this, new StringName("interact_prompt_changed"));
+
+    /** Offer ({@code inRange}) or withdraw the interact prompt of {@code source}. */
+    public void interactPrompt(Node source, boolean inRange, String label) {
+        interactPromptChanged.emit(source, inRange, inRange && label != null ? label : "");
+    }
+
+    /**
      * Emitted by HUDManager when the active player's ammo state changes.
      * Payload: magazine (current loaded rounds), reserve (unloaded backup rounds).
      */

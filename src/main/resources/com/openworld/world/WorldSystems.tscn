@@ -10,6 +10,8 @@
 [ext_resource type="PackedScene" path="res://assets/vfx/explosion/effects/ground/vfx_ground_explosion_01.tscn" id="10_expl"]
 [ext_resource type="PackedScene" uid="uid://menumgr001" path="res://src/main/resources/com/openworld/ui/MenuManager.tscn" id="8_kfoa7"]
 [ext_resource type="PackedScene" uid="uid://fg0ucxit12ax" path="res://src/main/resources/com/openworld/ui/HUDManager.tscn" id="9_nmpqt"]
+[ext_resource type="Texture2D" path="res://assets/vfx/splash/splash_drop.png" id="11_spld"]
+[ext_resource type="Texture2D" path="res://assets/vfx/splash/splash_ring.png" id="12_splr"]
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_flesh"]
 direction = Vector3(0, 1, 0)
@@ -69,6 +71,150 @@ albedo_color = Color(1, 0.9882353, 0.8392157, 1)
 material = SubResource("StandardMaterial3D_kfoa7")
 size = Vector3(0.01, 0.01, 0.8)
 
+[sub_resource type="Gradient" id="Gradient_spark"]
+offsets = PackedFloat32Array(0, 0.35, 1)
+colors = PackedColorArray(1, 0.97, 0.8, 1, 1, 0.62, 0.18, 1, 0.9, 0.25, 0.05, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture_spark"]
+gradient = SubResource("Gradient_spark")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_spark"]
+direction = Vector3(0, 1, 0)
+spread = 50.0
+initial_velocity_min = 4.0
+initial_velocity_max = 9.0
+gravity = Vector3(0, -9.8, 0)
+damping_min = 2.0
+damping_max = 4.0
+scale_min = 0.6
+scale_max = 1.2
+color_ramp = SubResource("GradientTexture_spark")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_spark"]
+transparency = 1
+blend_mode = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_spark"]
+material = SubResource("StandardMaterial3D_spark")
+size = Vector2(0.012, 0.09)
+
+[sub_resource type="Gradient" id="Gradient_wood"]
+colors = PackedColorArray(0.46, 0.31, 0.17, 1, 0.38, 0.26, 0.15, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture_wood"]
+gradient = SubResource("Gradient_wood")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_wood"]
+direction = Vector3(0, 1, 0)
+spread = 38.0
+initial_velocity_min = 1.5
+initial_velocity_max = 3.5
+gravity = Vector3(0, -9.8, 0)
+damping_min = 0.5
+damping_max = 1.5
+scale_min = 0.5
+scale_max = 1.3
+color_ramp = SubResource("GradientTexture_wood")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wood"]
+transparency = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_wood"]
+material = SubResource("StandardMaterial3D_wood")
+size = Vector2(0.012, 0.05)
+
+[sub_resource type="Gradient" id="Gradient_glass"]
+colors = PackedColorArray(0.86, 0.94, 1, 0.9, 0.8, 0.9, 0.95, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture_glass"]
+gradient = SubResource("Gradient_glass")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_glass"]
+direction = Vector3(0, 1, 0)
+spread = 65.0
+initial_velocity_min = 1.0
+initial_velocity_max = 3.5
+gravity = Vector3(0, -9.8, 0)
+angle_min = -180.0
+angle_max = 180.0
+scale_min = 0.4
+scale_max = 1.2
+color_ramp = SubResource("GradientTexture_glass")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_glass"]
+transparency = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_glass"]
+material = SubResource("StandardMaterial3D_glass")
+size = Vector2(0.025, 0.025)
+
+[sub_resource type="Gradient" id="Gradient_splash"]
+colors = PackedColorArray(0.92, 0.97, 1, 0.95, 0.85, 0.93, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture_splash"]
+gradient = SubResource("Gradient_splash")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_splash"]
+emission_shape = 1
+emission_sphere_radius = 0.15
+direction = Vector3(0, 1, 0)
+spread = 22.0
+initial_velocity_min = 2.2
+initial_velocity_max = 5.0
+gravity = Vector3(0, -9.8, 0)
+scale_min = 0.5
+scale_max = 1.4
+color_ramp = SubResource("GradientTexture_splash")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_splash"]
+transparency = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("11_spld")
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_splash"]
+material = SubResource("StandardMaterial3D_splash")
+size = Vector2(0.09, 0.09)
+
+[sub_resource type="Curve" id="Curve_ring"]
+_data = [Vector2(0, 0.15), 0.0, 1.6, 0, 0, Vector2(1, 1), 0.2, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_ring"]
+curve = SubResource("Curve_ring")
+
+[sub_resource type="Gradient" id="Gradient_ring"]
+colors = PackedColorArray(0.95, 0.98, 1, 0.8, 0.9, 0.96, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture_ring"]
+gradient = SubResource("Gradient_ring")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_ring"]
+gravity = Vector3(0, 0, 0)
+scale_curve = SubResource("CurveTexture_ring")
+color_ramp = SubResource("GradientTexture_ring")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ring"]
+transparency = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("12_splr")
+
+[sub_resource type="QuadMesh" id="QuadMesh_ring"]
+material = SubResource("StandardMaterial3D_ring")
+size = Vector2(1.8, 1.8)
+orientation = 1
+
 [node name="WorldSystems" type="Node" unique_id=1713208280]
 
 [node name="ParticleManager" type="Node" parent="." unique_id=105500717]
@@ -97,6 +243,64 @@ one_shot = true
 explosiveness = 0.95
 process_material = SubResource("ParticleProcessMaterial_hs4nr")
 draw_pass_1 = SubResource("QuadMesh_dust")
+
+[node name="METAL" type="Node" parent="ParticleManager" unique_id=1774100201]
+
+[node name="1" type="GPUParticles3D" parent="ParticleManager/METAL" unique_id=1774100202]
+emitting = false
+amount = 10
+lifetime = 0.3
+one_shot = true
+explosiveness = 1.0
+transform_align = 3
+process_material = SubResource("ParticleProcessMaterial_spark")
+draw_pass_1 = SubResource("QuadMesh_spark")
+
+[node name="WOOD" type="Node" parent="ParticleManager" unique_id=1774100203]
+
+[node name="1" type="GPUParticles3D" parent="ParticleManager/WOOD" unique_id=1774100204]
+emitting = false
+amount = 8
+lifetime = 0.6
+one_shot = true
+explosiveness = 0.95
+transform_align = 3
+process_material = SubResource("ParticleProcessMaterial_wood")
+draw_pass_1 = SubResource("QuadMesh_wood")
+
+[node name="GLASS" type="Node" parent="ParticleManager" unique_id=1774100205]
+
+[node name="1" type="GPUParticles3D" parent="ParticleManager/GLASS" unique_id=1774100206]
+emitting = false
+amount = 16
+lifetime = 0.7
+one_shot = true
+explosiveness = 0.95
+process_material = SubResource("ParticleProcessMaterial_glass")
+draw_pass_1 = SubResource("QuadMesh_glass")
+
+[node name="WATER" type="Node" parent="ParticleManager" unique_id=1774100207]
+
+[node name="1" type="GPUParticles3D" parent="ParticleManager/WATER" unique_id=1774100208]
+emitting = false
+amount = 22
+lifetime = 0.9
+one_shot = true
+explosiveness = 0.9
+local_coords = true
+process_material = SubResource("ParticleProcessMaterial_splash")
+draw_pass_1 = SubResource("QuadMesh_splash")
+
+[node name="Ring" type="GPUParticles3D" parent="ParticleManager/WATER/1" unique_id=1774100209]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, 0)
+emitting = false
+amount = 1
+lifetime = 1.1
+one_shot = true
+explosiveness = 1.0
+local_coords = true
+process_material = SubResource("ParticleProcessMaterial_ring")
+draw_pass_1 = SubResource("QuadMesh_ring")
 
 [node name="ImpactManager" type="Node" parent="." unique_id=1201546686]
 script = ExtResource("3_imct")

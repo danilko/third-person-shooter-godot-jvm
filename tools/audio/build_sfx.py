@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the game's non-weapon sounds (com.openworld.audio.Sound) from the CC0 source libraries.
 
-    python3 tools/audio/build_sfx.py [--src /data/danilko/game_assets/audio] [--only footstep_concrete,ui_click]
+    python3 tools/audio/build_sfx.py [--src /data/danilko/game_assets/audio] [--only door_slide,ui_click]
 
 Every Sound with variants is <file>_<n>.wav, n = 1..variants (Sounds picks one at random each play). Each output is
 cut from one take (or LAYERED from several, `layers`), loudness-normalised to its row's target (max momentary LUFS,
@@ -43,12 +43,6 @@ def k5(prefix, n=5, ext="ogg"):
 # file -> (target LUFS, max seconds, pitch, [variants]). A variant: a path, or [(path, offset s, gain dB), ...].
 SPECS = {
     # characters
-    "sfx/footstep_concrete": (-30, 0.45, 1.0, k5(f"{IMP}/footstep_concrete")),
-    "sfx/footstep_grass": (-31, 0.45, 1.0, k5(f"{IMP}/footstep_grass")),
-    "sfx/footstep_wood": (-30, 0.45, 1.0, k5(f"{IMP}/footstep_wood")),
-    "sfx/footstep_metal": (-30, 0.45, 1.0, k5(f"{IMP}/impactTin_medium")),
-    "sfx/footstep_snow": (-31, 0.45, 1.0, k5(f"{IMP}/footstep_snow")),
-    "sfx/land": (-24, 0.5, 1.0, k5(f"{IMP}/impactSoft_heavy")),
     # bullet impacts per SurfaceType (FLESH, METAL, STONE, WOOD, DEFAULT -> STONE, GLASS)
     "sfx/impact_flesh": (-24, 0.35, 1.0, k5(f"{IMP}/impactPunch_medium")),
     "sfx/impact_metal": (-22, 0.6, 1.0, k5(f"{IMP}/impactMetal_light")),
@@ -72,7 +66,8 @@ SPECS = {
     # doors
     "sfx/door_open": (-25, 1.0, 1.0, [f"{RPG}/doorOpen_1.ogg", f"{RPG}/doorOpen_2.ogg"]),
     "sfx/door_close": (-23, 1.0, 1.0, [f"{RPG}/doorClose_{i}.ogg" for i in range(1, 5)]),
-    "sfx/door_slide": (-27, 0.8, 0.85, k5(f"{SCI}/doorOpen", 3)),
+    "sfx/door_slide": (-22,   # a 0.29 s take: the 400 ms window under-reads it, so +3 dB to sit at door_open's level
+                        0.8, 0.85, k5(f"{SCI}/doorOpen", 3)),
     # weapons
     "sfx/dry_fire": (-26, 0.25, 1.0, [f"{RAW}/Walther PPQ/X_18.wav", f"{RAW}/Tikka/W_13.wav",
                                       f"{RAW}/Ruger 10.22/Q_13.wav"]),
@@ -81,8 +76,6 @@ SPECS = {
     # UI (2D)
     "ui/click": (-26, 0.25, 1.0, [f"{K}/ui-audio/Audio/click{i}.ogg" for i in (1, 2, 3)]),
     "ui/back": (-26, 0.3, 1.0, [f"{UI}/back_001.ogg"]),
-    "ui/open": (-25, 0.4, 1.0, [f"{UI}/open_001.ogg"]),
-    "ui/close": (-25, 0.4, 1.0, [f"{UI}/close_001.ogg"]),
     "ui/confirm": (-24, 0.6, 1.0, [f"{UI}/confirmation_001.ogg"]),
     "ui/error": (-24, 0.5, 1.0, [f"{UI}/error_001.ogg"]),
     "ui/waypoint": (-24, 0.4, 1.0, [f"{UI}/select_001.ogg"]),

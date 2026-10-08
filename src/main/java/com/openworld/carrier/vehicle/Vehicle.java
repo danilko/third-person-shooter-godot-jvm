@@ -2511,7 +2511,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             // Carries its own key hint: vehicles use "use_carrier" (F), while the HUD's
             // default "[ E ]" prefix is the pickup "interact" action.
             String text = !inRange ? "" : (isAiOccupied() ? "[ F ]  Carjack" : "[ F ]  Enter vehicle");
-            bus.pickupInteractChanged.emit(inRange, text);
+            bus.interactPrompt(this, inRange, text);
         }
     }
 

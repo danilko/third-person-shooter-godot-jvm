@@ -18,8 +18,12 @@ const DOOR   := "res://src/main/java/com/openworld/world/Door.java"
 const DECALS := "res://src/main/java/com/openworld/world/manager/DecalManager.java"
 const CAR    := "res://src/main/resources/com/openworld/vehicle/SPC1.tscn"
 const HELPER := "res://src/main/java/com/openworld/debug/VehicleProbeHelper.java"
+const SYSTEMS := "res://src/main/resources/com/openworld/world/WorldSystems.tscn"
+const FOOT_HUD := "res://src/main/resources/com/openworld/ui/FootHUD.tscn"
+const WATER  := "res://src/main/java/com/openworld/world/WaterVolume.java"
+const TRACER := "res://src/main/java/com/openworld/world/manager/BulletTracerManager.java"
 ## Sounds that may have no file yet (README "Wired in code" says missing).
-const ALLOWED_MISSING := ["SIREN"]
+const ALLOWED_MISSING := ["SIREN", "SPLASH", "SPLASH_SMALL", "SWIM_STROKE"]   # splash/swim: SHORTLIST (freesound)
 
 var fails := 0
 var checks := 0
@@ -76,6 +80,12 @@ func _initialize() -> void:
 	tmpl.size = Vector3(0.1, 0.1, 0.1)
 	dm.add_child(tmpl)
 	world.add_child(dm)
+	# the shipped particle pools, lifted out of WorldSystems.tscn (its HUD and menus are not wanted here)
+	var ws: Node = (load(SYSTEMS) as PackedScene).instantiate()
+	var pm: Node = ws.get_node("ParticleManager")
+	ws.remove_child(pm)
+	ws.free()
+	world.add_child(pm)
 	await _tick(3)
 	var p: Node3D = (load(PLAYER) as PackedScene).instantiate() as Node3D
 	world.add_child(p)
@@ -83,17 +93,13 @@ func _initialize() -> void:
 	await _tick(60)
 	var wc: Node = p.get_node("WeaponController")
 
-	print("=== footsteps and landing ===")
-	var f0 := _plays("FOOTSTEP_CONCRETE")
-	var s0 := int(p.call("footsteps_now"))
+	print("=== no footsteps (removed 2026-10-08): walking on land is silent and splashes nothing ===")
+	var k0 := int(p.call("strokes_now"))
 	await _press("forward", 150)
-	var f1 := _plays("FOOTSTEP_CONCRETE")
-	_check("walking 2.5 s plays concrete footsteps", f1 - f0 >= 3, "%d played, body counted %d" % [f1 - f0, int(p.call("footsteps_now")) - s0])
+	_check("walking on land makes no stroke / splash", int(p.call("strokes_now")) == k0)
 	await _tick(30)
-	var l0 := _plays("LAND")
-	p.global_position += Vector3(0, 4.0, 0)
+	p.global_position += Vector3(0, 4.0, 0)          # the old landing drop, kept so later cases stand where they did
 	await _tick(90)
-	_check("a 4 m drop lands with a thud", _plays("LAND") == l0 + 1, "LAND +%d" % (_plays("LAND") - l0))
 
 	print("=== melee contact ===")
 	var t: Node3D = (load(AI) as PackedScene).instantiate() as Node3D
@@ -177,7 +183,12 @@ func _initialize() -> void:
 	var helper: Node = load(HELPER).new()
 	world.add_child(helper)
 	var im: Node = world.get_child(1)
+	var mi0 := _plays("IMPACT_METAL")
+	var mk0 := int(pm.call("bursts_now", "METAL"))
 	helper.call("kind_hit", im, car, 5.0, "BULLET")
+	_check("a bullet on a car rings metal and throws sparks", _plays("IMPACT_METAL") == mi0 + 1
+		and int(pm.call("bursts_now", "METAL")) == mk0 + 1,
+		"IMPACT_METAL +%d, sparks +%d" % [_plays("IMPACT_METAL") - mi0, int(pm.call("bursts_now", "METAL")) - mk0])
 	helper.call("kind_hit", im, car, 5.0, "BLADE")
 	helper.call("kind_hit", im, car, 5.0, "BLUNT")
 	await _tick(2)
@@ -194,6 +205,77 @@ func _initialize() -> void:
 	await _tick(1)
 	var after: Vector3 = (marks[0] as Node3D).global_position - car.global_position
 	_check("  ... and move with it", before.distance_to(after) < 0.01, "%.3f m" % before.distance_to(after))
+
+	print("=== impact particles per surface ===")
+	for st in ["FLESH", "DEFAULT", "METAL", "WOOD", "GLASS", "WATER"]:
+		_check("%s has its own particle pool" % st, bool(pm.call("has_pool_now", st)))
+	var g0 := int(pm.call("bursts_now", "GLASS"))
+	var d0b := int(pm.call("bursts_now", "DEFAULT"))
+	pm.call("burst_now", "GLASS", Vector3(0, 1, 3), Vector3(0, 0, -1))
+	pm.call("burst_now", "STONE", Vector3(0, 1, 3), Vector3(0, 0, -1))
+	_check("glass throws shards, stone falls back to dust", int(pm.call("bursts_now", "GLASS")) == g0 + 1
+		and int(pm.call("bursts_now", "DEFAULT")) == d0b + 1)
+
+	print("=== water splashes ===")
+	var wv: Area3D = load(WATER).new()
+	var wcs := CollisionShape3D.new()
+	var wbox := BoxShape3D.new()
+	wbox.size = Vector3(30, 3, 30)
+	wcs.shape = wbox
+	wv.add_child(wcs)
+	wv.collision_mask = 0xFFFF
+	world.add_child(wv)
+	wv.position = Vector3(-60, 1.5, 0)                 # surface at y 3, the floor 3 m under it
+	_box(Vector3(30, 1, 30), Vector3(-60, -0.5, 0))
+	var tracer: Node = load(TRACER).new()
+	world.add_child(tracer)
+	await _tick(2)
+	var w0 := int(pm.call("bursts_now", "WATER"))
+	tracer.call("spawn_tracer", Vector3(-60, 6, -8), Vector3(-60, 0.2, 4))
+	_check("a shot into the water splashes on the surface", int(pm.call("bursts_now", "WATER")) == w0 + 1,
+		"+%d" % (int(pm.call("bursts_now", "WATER")) - w0))
+	tracer.call("spawn_tracer", Vector3(-60, 6, -8), Vector3(-60, 3.5, 4))
+	tracer.call("spawn_tracer", Vector3(0, 1, -8), Vector3(0, 0.5, 4))
+	_check("  ... a shot over the water or on land does not", int(pm.call("bursts_now", "WATER")) == w0 + 1)
+	p.global_position = Vector3(-60, 8, 0)
+	var sp0 := int(p.call("splashes_now"))
+	await _tick(90)
+	_check("a body dropping in splashes once", int(p.call("splashes_now")) == sp0 + 1,
+		"+%d, WATER bursts +%d" % [int(p.call("splashes_now")) - sp0, int(pm.call("bursts_now", "WATER")) - w0])
+	var st0 := int(p.call("strokes_now"))
+	await _press("forward", 180)
+	_check("swimming splashes a stroke every few metres", int(p.call("strokes_now")) >= st0 + 2,
+		"+%d strokes" % (int(p.call("strokes_now")) - st0))
+	p.global_position = Vector3(0, 1.2, 0)
+	await _tick(30)
+
+	print("=== interact prompts: one source leaving never hides another ===")
+	var foot: Control = (load(FOOT_HUD) as PackedScene).instantiate() as Control
+	root.add_child(foot)
+	await _tick(2)
+	var bus: Node = root.get_node("EventBus")
+	var a := Node.new(); world.add_child(a)
+	var b := Node.new(); world.add_child(b)
+	var c := Node.new(); world.add_child(c)
+	bus.emit_signal("interact_prompt_changed", a, true, "Door (E)")
+	bus.emit_signal("interact_prompt_changed", b, true, "[ F ]  Enter vehicle")
+	_check("the newest prompt shows", String(foot.call("prompt_text_now")).contains("Enter vehicle"),
+		String(foot.call("prompt_text_now")))
+	bus.emit_signal("interact_prompt_changed", b, false, "")
+	_check("  ... the older one comes back when it leaves", String(foot.call("prompt_text_now")).contains("Door"),
+		String(foot.call("prompt_text_now")))
+	bus.emit_signal("interact_prompt_changed", b, true, "[ F ]  Enter vehicle")
+	bus.emit_signal("interact_prompt_changed", a, false, "")
+	_check("  ... and one leaving does not hide the other", String(foot.call("prompt_text_now")).contains("Enter vehicle"),
+		String(foot.call("prompt_text_now")))
+	bus.emit_signal("interact_prompt_changed", b, false, "")
+	_check("  ... none left: hidden", String(foot.call("prompt_text_now")) == "" and int(foot.call("prompt_count_now")) == 0)
+	bus.emit_signal("interact_prompt_changed", c, true, "Pick up: SNR-1")
+	c.free()
+	await _tick(45)
+	_check("a source freed without withdrawing drops out", String(foot.call("prompt_text_now")) == "",
+		String(foot.call("prompt_text_now")))
+	foot.queue_free()
 
 	print("")
 	print("RESULT %s (%d checks, %d failures)" % ["PASS" if fails == 0 else "FAIL", checks, fails])

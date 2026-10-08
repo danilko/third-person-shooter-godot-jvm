@@ -164,7 +164,7 @@ public class WeaponRadialMenu extends Control {
     selected = -1;
     select(getWeaponController().getWeapon(), false);      // start on the weapon in hand
     show();
-    com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_OPEN);
+    com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_CLICK);
     getViewport().warpMouse(menuCentre());                  // neutral: the first flick picks, not the old cursor
     animationPlayer.play("Zoom");
   }

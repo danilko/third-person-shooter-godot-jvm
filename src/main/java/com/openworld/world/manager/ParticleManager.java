@@ -81,18 +81,37 @@ public class ParticleManager extends Node {
      * One burst at {@code worldPosition}, its local +Y (the emitter's direction) along {@code normal} -- the spray
      * leaves the surface it hit (a body's blood back toward the shooter, dust off the wall). Null normal = up.
      */
-    public void spawn(SurfaceType type, Vector3 worldPosition, Vector3 normal) {
+    public void spawn(SurfaceType type, Vector3 worldPosition, Vector3 normal) { spawn(type, worldPosition, normal, 1.0); }
+
+    /**
+     * As {@link #spawn(SurfaceType, Vector3, Vector3)}, the effect scaled by {@code scale} (a splash by how hard the
+     * water was hit). Only an emitter in LOCAL coordinates scales; the WATER pool's are. Child emitters of the
+     * template (a splash's ripple ring) restart with it.
+     */
+    public void spawn(SurfaceType type, Vector3 worldPosition, Vector3 normal, double scale) {
         ObjectPool<GPUParticles3D> pool = resolve(type);
         if (pool == null || pool.available() == 0) return;
+        bursts.merge(pools.get(type) == pool ? type : (pools.get(SurfaceType.DEFAULT) == pool ? SurfaceType.DEFAULT
+                : SurfaceType.FLESH), 1, Integer::sum);
         GPUParticles3D p = pool.acquire();
         Vector3 up = normal != null && normal.lengthSquared() > 1e-6 ? normal.normalized() : Vector3.Companion.getUP();
         Vector3 ref = Math.abs(up.getY()) < 0.9 ? Vector3.Companion.getUP() : Vector3.Companion.getFORWARD();
         Vector3 right = ref.cross(up).normalized();
-        p.setGlobalTransform(new godot.core.Transform3D(new godot.core.Basis(right, up, right.cross(up)), worldPosition));
+        double k = scale > 0 ? scale : 1.0;
+        p.setGlobalTransform(new godot.core.Transform3D(new godot.core.Basis(right.times(k), up.times(k),
+                right.cross(up).times(k)), worldPosition));
         p.restart();
         p.setEmitting(true);
+        for (int i = 0; i < p.getChildCount(); i++)
+            if (p.getChild(i) instanceof GPUParticles3D sub) { sub.restart(); sub.setEmitting(true); }
         pool.release(p);
     }
+
+    /** Bursts emitted per POOL actually used (a type with no pool counts under its fallback); probe readout. */
+    private final Map<SurfaceType, Integer> bursts = new EnumMap<>(SurfaceType.class);
+    @Register public int burstsNow(String type) { return bursts.getOrDefault(SurfaceType.valueOf(type), 0); }
+    /** Whether {@code type} has a pool of its own (a container with a template). */
+    @Register public boolean hasPoolNow(String type) { return pools.containsKey(SurfaceType.valueOf(type)); }
 
     /** One burst by surface name (probe / picture hook: shot_impacts.gd). */
     @Register public void burstNow(String type, Vector3 at, Vector3 normal) {

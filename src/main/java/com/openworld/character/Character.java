@@ -713,7 +713,7 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     @Override
     public void _physicsProcess(double delta) {
         updateSpatialCell(delta);
-        audio.tick(this, delta);   // footsteps + landing: owner, AI and puppet alike (before the authority return)
+        audio.tick(this, delta);   // swim strokes / wading splashes: owner, AI and puppet alike (before the authority return)
         UserCommand cmd;
         if (controller != null) {
             if (!controller.isAuthority()) return; // non-authority: state arrives via MSG_SNAPSHOT — see NetworkController
@@ -1050,10 +1050,26 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
      * the swim flag and the MovementController's swim physics; the actual SWIM ⇄ UPRIGHT stance
      * switch happens on the authority body in {@link #applyInput} (and replicates from there).
      */
+    /** Splashes this body made entering water (probe readout). */
+    private int splashes;
+    @Register public int splashesNow() { return splashes; }
+
     public void setInWater(boolean value, double surfaceY) {
+        boolean entering = value && !inWater;
         inWater = value;
         if (value) {
             waterSurfaceY = surfaceY;
+            if (entering && currentVehicleNode == null) {
+                // a splash where the body meets the water, by how fast it was falling (a step off a quay is
+                // small, a dive from a bridge big); a puppet has no velocity of its own, so it splashes mid-size
+                Vector3 p = getGlobalPosition();
+                double fall = Math.max(0.0, -getVelocity().getY());
+                double scale = Math.min(2.2, 0.6 + fall / 6.0);
+                com.openworld.world.Splash.at(this, new Vector3(p.getX(), surfaceY, p.getZ()), scale,
+                        fall > 2.0 ? com.openworld.audio.Sound.SPLASH : com.openworld.audio.Sound.SPLASH_SMALL,
+                        (float) Math.min(4.0, -6.0 + fall));
+                splashes++;
+            }
         } else {
             // Left the volume entirely — stop swim physics. The per-frame decision in applyInput
             // owns the SWIM stance while inside (it may be UPRIGHT in shallow water).
@@ -1522,12 +1538,11 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     }
 
     /** The controller currently driving this body — null only before _ready() resolves it. */
-    /** Footsteps and landing sounds (CharacterAudio). */
+    /** Swim strokes and wading splashes (CharacterAudio; footsteps were removed 2026-10-08). */
     public final CharacterAudio audio = new CharacterAudio();
 
-    /** Footsteps / landings this body has played (probe readouts). */
-    @Register public int footstepsNow() { return audio.steps(); }
-    @Register public int landingsNow() { return audio.landings(); }
+    /** Swim strokes / wading splashes this body made (probe readout). */
+    @Register public int strokesNow() { return audio.strokes(); }
 
     /** A puppet's floor state, written from the owner's snapshot (a puppet never runs move_and_slide). */
     public boolean replicatedAirborne = false;

@@ -72,7 +72,7 @@ public class ShopMenu extends Control {
         layer.addChild(m);
         counter.getTree().getRoot().addChild(layer);
         open = m;
-        com.openworld.audio.Sounds.ui(counter, com.openworld.audio.Sound.UI_OPEN);
+        com.openworld.audio.Sounds.ui(counter, com.openworld.audio.Sound.UI_CLICK);
         openedFrame = godot.api.Engine.INSTANCE.getProcessFrames();
     }
 
@@ -137,7 +137,7 @@ public class ShopMenu extends Control {
 
     public void close() {
         closedFrame = godot.api.Engine.INSTANCE.getProcessFrames();
-        if (open == this) com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_CLOSE);
+        if (open == this) com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_CLICK);
         block(false);
         if (open == this) open = null;
         if (layer != null && GD.isInstanceValid(layer)) layer.queueFree();

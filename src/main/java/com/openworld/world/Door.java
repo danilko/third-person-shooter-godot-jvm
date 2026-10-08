@@ -308,7 +308,7 @@ public class Door extends Breakable {
         boolean slide = isSlide() || this instanceof TicketGate;
         com.openworld.audio.Sound s = slide ? com.openworld.audio.Sound.DOOR_SLIDE
                 : opening ? com.openworld.audio.Sound.DOOR_OPEN : com.openworld.audio.Sound.DOOR_CLOSE;
-        com.openworld.audio.Sounds.play3D(this, s, at, 3f, 0.06f, slide && !opening ? -4f : 0f);
+        com.openworld.audio.Sounds.play3D(this, s, at, 3f, 0.06f, 0f);   // a slide as loud as a hinged door (user)
     }
 
     /** Whether this door is ticking right now (probe readout for R14). */
@@ -336,7 +336,7 @@ public class Door extends Breakable {
     private void emitPrompt(boolean inRange) {
         EventBus bus = getEventBus();
         if (bus == null) return;
-        bus.pickupInteractChanged.emit(inRange, inRange ? (locked ? "Locked" : "Door (E)") : "");
+        bus.interactPrompt(this, inRange, inRange ? (locked ? "Locked" : "Door (E)") : "");
     }
 
     private EventBus getEventBus() {

@@ -63,9 +63,19 @@ public class BulletTracerManager extends Node3D {
         }
     }
 
+    @Register
     public void spawnTracer(Vector3 from, Vector3 to) {
         float length = (float) to.minus(from).length();
         if (length < 0.05f) return;
+        // a shot going down through a water surface splashes there (every peer draws its tracers; the water is an
+        // Area3D, so the trace itself goes on to the bottom)
+        if (from.getY() > to.getY() && getTree() != null) {
+            Vector3 w = com.openworld.world.Splash.crossing(getTree(), from, to);
+            if (w != null && com.openworld.world.Splash.at(this, w, 0.45, null, 0f)) {
+                if (getTree().getFirstNodeInGroup(new godot.core.StringName("impact_manager")) instanceof ImpactManager im)
+                    im.impactSound(com.openworld.world.SurfaceType.WATER, w);
+            }
+        }
 
         MeshInstance3D tracer = acquire();
         if (tracer == null) return;

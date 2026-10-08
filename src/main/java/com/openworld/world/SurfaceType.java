@@ -21,5 +21,6 @@ public enum SurfaceType {
     STONE,    // concrete, brick, rock
     WOOD,     // wooden surfaces, crates
     DEFAULT,  // fallback for anything without a HittableBody script
-    GLASS     // a breakable pane (PLAN.md 1g g); APPEND-ONLY: the ordinal rides MSG_SHOT_RESULT_BATCH
+    GLASS,    // a breakable pane (PLAN.md 1g g); APPEND-ONLY: the ordinal rides MSG_SHOT_RESULT_BATCH
+    WATER     // a water surface (a WaterVolume crossed): a splash, no mark; never a collider, the shot is traced through
 }

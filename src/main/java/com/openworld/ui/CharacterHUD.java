@@ -86,6 +86,9 @@ public class CharacterHUD extends Control {
       bus.pickupInteractChanged.connectUnsafe(
           MethodCallable.createUnsafe(this, "onPickupInteractChanged"),
           godot.api.Object.ConnectFlags.DEFAULT);
+      bus.interactPromptChanged.connectUnsafe(
+          MethodCallable.createUnsafe(this, "onInteractPromptChanged"),
+          godot.api.Object.ConnectFlags.DEFAULT);
       bus.playerOxygenChanged.connectUnsafe(
           MethodCallable.createUnsafe(this, "onOxygenChanged"),
           godot.api.Object.ConnectFlags.DEFAULT);
@@ -143,9 +146,66 @@ public class CharacterHUD extends Control {
     });
   }
 
-  /** Receive EventBus.pickupInteractChanged — show/hide the "Press E to pick up" prompt. */
+  /**
+   * Every prompt on offer, by the instance id of the node offering it, in the order they were offered. The HUD shows
+   * the NEWEST; one source withdrawing never hides another's (a door's "out of range" used to hide a car's "Enter
+   * vehicle" in the same frame). Source 0 is the legacy unkeyed signal.
+   */
+  private final java.util.LinkedHashMap<Long, String> prompts = new java.util.LinkedHashMap<>();
+  private final java.util.HashMap<Long, Node> promptSources = new java.util.HashMap<>();
+  private double promptPrune;
+
+  /** Receive the legacy unkeyed EventBus.pickupInteractChanged (source 0). */
   @Register
-  public void onPickupInteractChanged(boolean inRange, String label) {
+  public void onPickupInteractChanged(boolean inRange, String label) { setPrompt(0L, null, inRange, label); }
+
+  /** Receive EventBus.interactPromptChanged: {@code source} offers or withdraws its prompt. */
+  @Register
+  public void onInteractPromptChanged(Node source, boolean inRange, String label) {
+    setPrompt(source == null ? 0L : source.getInstanceId(), source, inRange, label);
+  }
+
+  private void setPrompt(long id, Node source, boolean inRange, String label) {
+    if (inRange) {
+      prompts.put(id, label == null ? "" : label);   // a re-offer updates in place, no reorder
+      if (source != null) promptSources.put(id, source);
+    } else {
+      prompts.remove(id);
+      promptSources.remove(id);
+    }
+    refreshPrompt();
+  }
+
+  /** The prompts on offer, newest last (probe readout). */
+  @Register public int promptCountNow() { return prompts.size(); }
+  /** The label the prompt shows now ("" when hidden; probe readout). */
+  @Register public String promptTextNow() {
+    return interactPromptLabel != null && interactPromptLabel.isVisible() ? interactPromptLabel.getText() : "";
+  }
+
+  @Register
+  @Override
+  public void _process(double delta) {
+    // a source freed without withdrawing its prompt (a pickup taken by a peer, a car despawned) must not leave it up
+    if (prompts.isEmpty() || (promptPrune -= delta) > 0) return;
+    promptPrune = 0.5;
+    boolean changed = prompts.keySet().removeIf(id -> {
+      if (id == 0L) return false;
+      Node n = promptSources.get(id);
+      boolean gone = n == null || !GD.isInstanceValid(n) || !n.isInsideTree();
+      if (gone) promptSources.remove(id);
+      return gone;
+    });
+    if (changed) refreshPrompt();
+  }
+
+  private void refreshPrompt() {
+    String newest = null;
+    for (String v : prompts.values()) newest = v;
+    showPrompt(newest != null, newest == null ? "" : newest);
+  }
+
+  private void showPrompt(boolean inRange, String label) {
     if (interactPromptLabel == null) return;
     if (inRange) {
       // Labels may carry their own key hint ("[ F ]  Enter vehicle", "Door (E)"); with none it is the interact

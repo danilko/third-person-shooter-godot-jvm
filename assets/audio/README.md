@@ -37,7 +37,7 @@ missing: `SHORTLIST.md`.
 ## Wired in code (`SoundTest` checks this table lists every `Sound`)
 
 A `Sound` with N takes is `<file>_1` .. `<file>_N` (one picked per play). Everything except `hit_marker` and
-`siren` is BUILT by `python3 tools/audio/build_sfx.py` (its `SPECS` table: source takes, layers, loudness), then
+`siren` (and the three water sounds, still missing) is BUILT by `python3 tools/audio/build_sfx.py` (its `SPECS` table: source takes, layers, loudness), then
 `godot --headless --path . --import`. **None of it was auditioned by ear** (2026-10-08): the picks are by name and
 waveform; listen in game and change the row. Gate: `tools/godot/probe_sfx.gd`.
 
@@ -46,29 +46,24 @@ waveform; listen in game and change the row. Gate: `tools/godot/probe_sfx.gd`.
 | `glass_shatter` | `GLASS_SHATTER` | a window breaking: car (crash, bullet, blast, melee), shop pane (PaneSet, Breakable), train window; 3D, 3 takes | built: Kenney Impact Sounds `impactGlass_*` layered (no CC0 shatter yet; SHORTLIST has real ones) |
 | `hit_marker` | `HIT_MARKER` | the local player's hit confirmed (HitMarker), 2D, short tick | shipped |
 | `siren` | `SIREN` | an emergency vehicle on a call (Vehicle.refreshEmergency), 3D, LOOPING (import with loop on) | missing |
-| `sfx/footstep_concrete` | `FOOTSTEP_CONCRETE` | a footstep on roads, floors, platforms, the urban ground, rock (CharacterAudio), 5 takes | Kenney Impact Sounds |
-| `sfx/footstep_grass` | `FOOTSTEP_GRASS` | a footstep on Terrain3D grass / soil / seabed paint | Kenney Impact Sounds |
-| `sfx/footstep_wood` | `FOOTSTEP_WOOD` | a footstep on a WOOD HittableBody | Kenney Impact Sounds |
-| `sfx/footstep_metal` | `FOOTSTEP_METAL` | a footstep on a METAL HittableBody or a vehicle | Kenney `impactTin_medium` |
-| `sfx/footstep_snow` | `FOOTSTEP_SNOW` | a footstep on Terrain3D sand (the crunchy take) | Kenney Impact Sounds |
-| `sfx/land` | `LAND` | landing from a fall faster than 3 m/s, louder the harder | Kenney `impactSoft_heavy` |
 | `sfx/impact_flesh` | `IMPACT_FLESH` | a bullet into a body (ImpactManager, by SurfaceType) | Kenney `impactPunch_medium` |
 | `sfx/impact_metal` | `IMPACT_METAL` | a bullet into metal (vehicles, machinery) | Kenney `impactMetal_light` |
 | `sfx/impact_stone` | `IMPACT_STONE` | a bullet into stone / concrete / anything untagged | Kenney `impactPlate_light` |
 | `sfx/impact_wood` | `IMPACT_WOOD` | a bullet into wood | Kenney `impactWood_light` |
 | `sfx/impact_glass` | `IMPACT_GLASS` | a bullet into glass that does not break | Kenney `impactGlass_light` |
+| `sfx/splash` | `SPLASH` | a body dropping into water faster than 2 m/s (Character.setInWater, world.Splash), 3D | missing (SHORTLIST: Water Jump Mono) |
+| `sfx/splash_small` | `SPLASH_SMALL` | a bullet or a grenade into water, a gentle entry, a wading step (world.Splash) | missing (SHORTLIST: Small Puddle Splash) |
+| `sfx/swim_stroke` | `SWIM_STROKE` | a swimmer's stroke every 1.6 m (CharacterAudio) | missing (SHORTLIST: Person Swimming) |
 | `sfx/melee_hit_flesh` | `MELEE_HIT_FLESH` | a melee blow landing on a body (MeleeItem) | Kenney `impactPunch_heavy` |
 | `sfx/melee_hit_hard` | `MELEE_HIT_HARD` | a melee blow on a car, a wall, anything not a body | Still North Medieval Weapon Impacts |
 | `sfx/explosion` | `EXPLOSION` | every explosion (ExplosionManager.playBlast), every peer | Kenney Sci-fi `explosionCrunch` + `lowFrequency_explosion` layered |
 | `sfx/door_open` | `DOOR_OPEN` | a hinged door starting to open (world.Door) | Kenney RPG Audio `doorOpen` |
 | `sfx/door_close` | `DOOR_CLOSE` | a hinged door shutting | Kenney RPG Audio `doorClose` |
-| `sfx/door_slide` | `DOOR_SLIDE` | an automatic sliding door or a ticket-gate flap, both ways | Kenney Sci-fi `doorOpen`, pitched down |
+| `sfx/door_slide` | `DOOR_SLIDE` | an automatic sliding door or a ticket-gate flap, both ways, at the hinged door's level (user, 2026-10-08) | Kenney Sci-fi `doorOpen`, pitched down |
 | `sfx/dry_fire` | `DRY_FIRE` | fire pressed on an empty gun with no reserve (WeaponController) | Still North Raw: Walther PPQ, Tikka, Ruger 10/22 dry fire |
 | `sfx/weapon_draw` | `WEAPON_DRAW` | a firearm raised at the end of a switch | Still North Raw: Tikka, Arisaka, PPSh safety off |
-| `ui/click` | `UI_CLICK` | a menu row, a wheel card, a pause button | Kenney UI Audio `click` |
+| `ui/click` | `UI_CLICK` | a menu row, a wheel card, a pause button; also a store menu, the map, the weapon wheel and the pause menu opening / closing (their own open/close sounds were removed, user 2026-10-08) | Kenney UI Audio `click` |
 | `ui/back` | `UI_BACK` | the map waypoint cleared | Kenney Interface Sounds `back_001` |
-| `ui/open` | `UI_OPEN` | a store menu, the map, the weapon wheel, the pause menu opening | Kenney Interface Sounds `open_001` |
-| `ui/close` | `UI_CLOSE` | a store menu / the map closing | Kenney Interface Sounds `close_001` |
 | `ui/confirm` | `UI_CONFIRM` | a store row taken | Kenney Interface Sounds `confirmation_001` |
 | `ui/error` | `UI_ERROR` | (not played yet: a refused purchase) | Kenney Interface Sounds `error_001` |
 | `ui/waypoint` | `UI_WAYPOINT` | a map waypoint set | Kenney Interface Sounds `select_001` |
@@ -84,7 +79,7 @@ Weapons
   stick and detonator click (the blast itself is `EXPLOSION`)
 - Holster, scope in/out, pickup, SNR1 bolt cycle after a shot, a melee draw (Still North medieval dagger / katana
   draw + sheath are ready)
-- Ricochet, whiz-by, a bullet into water (no `SurfaceType` for water yet)
+- Ricochet, whiz-by
 
 Vehicles
 - Engine loop (idle/rev, pitched by rpm) per class: car, kei, truck, motorcycle, boat, plane
@@ -93,7 +88,7 @@ Vehicles
 - Wreck burning loop and vehicle explosion; street pole / bollard knocked down
 
 Characters
-- Jump, fall damage, swim strokes, splash
+- Jump, fall damage. FOOTSTEPS and the LANDING thud were built and REMOVED (user, 2026-10-08: rarely heard, two engine calls per body per tick)
 - Pain, death (keep generic, no voice lines)
 
 World

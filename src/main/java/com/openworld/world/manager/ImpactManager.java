@@ -248,6 +248,7 @@ public class ImpactManager extends Node {
             case METAL -> com.openworld.audio.Sound.IMPACT_METAL;
             case WOOD -> com.openworld.audio.Sound.IMPACT_WOOD;
             case GLASS -> com.openworld.audio.Sound.IMPACT_GLASS;
+            case WATER -> com.openworld.audio.Sound.SPLASH_SMALL;
             default -> com.openworld.audio.Sound.IMPACT_STONE;
         };
         Node parent = getTree().getCurrentScene() != null ? getTree().getCurrentScene() : this;
@@ -293,6 +294,16 @@ public class ImpactManager extends Node {
         return null;
     }
 
+    /**
+     * Things that are metal by WHAT they are, with no HittableBody to say so: a vehicle (car, boat, aircraft), a train
+     * car, a street pole's collider (BreakableProps' "Poles" body). Sparks, a metal impact sound and a tinted hole.
+     */
+    private static boolean isMetal(Node n) {
+        if (n instanceof com.openworld.carrier.vehicle.Vehicle) return true;
+        if (n instanceof godot.api.AnimatableBody3D a && a.isInGroup(new godot.core.StringName("train_car"))) return true;
+        return n instanceof godot.api.StaticBody3D && n.getParent() instanceof com.openworld.world.BreakableProps;
+    }
+
     private static HitContext resolveHitContext(Node hitNode) {
         if (hitNode == null) return new HitContext(null, null, SurfaceType.DEFAULT, null, null, null);
         // A world item's collider belongs to its PickupBody, and the ITEM is that body's CHILD --
@@ -324,6 +335,8 @@ public class ImpactManager extends Node {
                     character = c;
                 } else if (current instanceof HittableBody hb) {
                     surface = hb.resolveSurfaceType();
+                } else if (wheel == null && isMetal(current)) {   // a tyre is rubber: dust
+                    surface = SurfaceType.METAL;
                 }
             } else if (character == null && current instanceof Character c) {
                 character = c;

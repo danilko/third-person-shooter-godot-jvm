@@ -18,20 +18,17 @@ public enum Sound {
      *  ウーウー; an ambulance's ピーポー can be a second file later). 3D, on the car. */
     SIREN("siren"),
 
-    // characters (CharacterAudio): a step per stride by the floor's surface, and a landing
-    FOOTSTEP_CONCRETE("sfx/footstep_concrete", 5),
-    FOOTSTEP_GRASS("sfx/footstep_grass", 5),
-    FOOTSTEP_WOOD("sfx/footstep_wood", 5),
-    FOOTSTEP_METAL("sfx/footstep_metal", 5),
-    FOOTSTEP_SNOW("sfx/footstep_snow", 5),
-    LAND("sfx/land", 5),
-
     // a bullet meeting a surface (ImpactManager, by SurfaceType)
     IMPACT_FLESH("sfx/impact_flesh", 5),
     IMPACT_METAL("sfx/impact_metal", 5),
     IMPACT_STONE("sfx/impact_stone", 5),
     IMPACT_WOOD("sfx/impact_wood", 5),
     IMPACT_GLASS("sfx/impact_glass", 5),
+
+    // water (world.Splash): a body or a car entering, a swim stroke, a wading step or a bullet into the water
+    SPLASH("sfx/splash", 3),
+    SPLASH_SMALL("sfx/splash_small", 4),
+    SWIM_STROKE("sfx/swim_stroke", 4),
 
     // a melee blow landing (MeleeItem): on a body, on anything else
     MELEE_HIT_FLESH("sfx/melee_hit_flesh", 5),
@@ -52,8 +49,6 @@ public enum Sound {
     // UI (2D)
     UI_CLICK("ui/click", 3),
     UI_BACK("ui/back"),
-    UI_OPEN("ui/open"),
-    UI_CLOSE("ui/close"),
     UI_CONFIRM("ui/confirm"),
     UI_ERROR("ui/error"),
     UI_WAYPOINT("ui/waypoint"),
