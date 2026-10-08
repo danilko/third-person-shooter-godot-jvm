@@ -1,7 +1,6 @@
 extends SceneTree
 ## Scans a square of World.tscn for spots where the first WORLD collider straight down is more than 0.5 m under the
 ## terrain surface (a hole a body falls through). Streams the spot in first. -- --at=x,z --half=m --step=m
-## -- --at=x,z --half=m --step=m
 
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
