@@ -92,6 +92,7 @@ public class ImpactManager extends Node {
 
         DecalManager dm = getDecalManager();
         if (dm != null && info.hitNormal != null) dm.spawn(info.hitPoint, info.hitNormal);
+        if (kind == com.openworld.world.DamageKind.BULLET) impactSound(ctx.surface, info.hitPoint);   // melee: MeleeItem
 
         if (SHOT_TRACE && attackerId != null && !attackerId.isEmpty()) traceHit(info, ctx, damage);
         if (ctx.healthOwner != null) {
@@ -169,14 +170,46 @@ public class ImpactManager extends Node {
         if (pm != null) pm.spawn(surface != null ? surface : SurfaceType.DEFAULT, point);
         DecalManager dm = getDecalManager();
         if (dm != null && normal != null) dm.spawn(point, normal);
+        impactSound(surface, point);
     }
 
-    public void processVisualHit(HitInfo info) {
+    /** A bullet's impact visuals and sound, no damage (a peer's prediction). */
+    public void processVisualHit(HitInfo info) { processVisualHit(info, true); }
+
+    /** {@code bulletSound} false: a melee blow, whose weapon plays its own contact sound (MeleeItem). */
+    public void processVisualHit(HitInfo info, boolean bulletSound) {
         HitContext ctx = resolveHitContext(info.hitNode);
         ParticleManager pm = getParticleManager();
         if (pm != null) pm.spawn(ctx.surface, info.hitPoint);
         DecalManager dm = getDecalManager();
         if (dm != null && info.hitNormal != null) dm.spawn(info.hitPoint, info.hitNormal);
+        if (bulletSound) impactSound(ctx.surface, info.hitPoint);
+    }
+
+    /** Impact sounds are heard this far from the camera; past it a bullet lands silently (the shot itself is heard). */
+    public static final double IMPACT_SOUND_RANGE = 70.0;
+    /** At most this many impact sounds start in one frame: a shotgun's eight pellets read as one hit, not eight. */
+    public static final int IMPACT_SOUNDS_PER_FRAME = 3;
+    private long impactFrame = -1;
+    private int impactSoundsThisFrame;
+
+    /** One bullet impact sound by surface at {@code at} (audio.Sound IMPACT_*), within range and the frame budget. */
+    public void impactSound(SurfaceType surface, godot.core.Vector3 at) {
+        if (at == null || !isInsideTree()) return;
+        long f = godot.api.Engine.INSTANCE.getProcessFrames();
+        if (f != impactFrame) { impactFrame = f; impactSoundsThisFrame = 0; }
+        if (impactSoundsThisFrame >= IMPACT_SOUNDS_PER_FRAME) return;
+        var cam = getViewport() == null ? null : getViewport().getCamera3d();
+        if (cam != null && cam.getGlobalPosition().distanceTo(at) > IMPACT_SOUND_RANGE) return;
+        impactSoundsThisFrame++;
+        com.openworld.audio.Sound s = switch (surface == null ? SurfaceType.DEFAULT : surface) {
+            case FLESH -> com.openworld.audio.Sound.IMPACT_FLESH;
+            case METAL -> com.openworld.audio.Sound.IMPACT_METAL;
+            case WOOD -> com.openworld.audio.Sound.IMPACT_WOOD;
+            case GLASS -> com.openworld.audio.Sound.IMPACT_GLASS;
+            default -> com.openworld.audio.Sound.IMPACT_STONE;
+        };
+        com.openworld.audio.Sounds.play3D(this, s, at, 4f, 0.12f);
     }
 
     // ── Hit context resolution ────────────────────────────────────────────────

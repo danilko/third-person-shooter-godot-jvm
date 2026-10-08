@@ -110,7 +110,9 @@ func _run() -> void:
 
 func _counters(n: Node) -> Array:
 	var out: Array = []
-	if n.has_method("stock_now"):
+	# a ShopCounter only (item.AmmoSupply, behind every police vehicle, answers stock_now too)
+	if n.has_method("stock_now") and n.get_script() != null \
+			and String((n.get_script() as Script).resource_path).ends_with("ShopCounter.java"):
 		out.append(n)
 	for c in n.get_children():
 		out.append_array(_counters(c))

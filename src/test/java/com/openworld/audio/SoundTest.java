@@ -32,7 +32,7 @@ class SoundTest {
         int b = readme.indexOf("\n## ", a + 1);
         String table = readme.substring(a, b < 0 ? readme.length() : b);
         Set<String> listed = new TreeSet<>();
-        Matcher m = Pattern.compile("^\\| `([a-z0-9_]+)` \\| `([A-Z0-9_]+)` \\|", Pattern.MULTILINE).matcher(table);
+        Matcher m = Pattern.compile("^\\| `([a-z0-9_/]+)` \\| `([A-Z0-9_]+)` \\|", Pattern.MULTILINE).matcher(table);
         while (m.find()) {
             listed.add(m.group(1));
             assertEquals(Sound.valueOf(m.group(2)).file, m.group(1), "README row names the wrong enum");
@@ -44,7 +44,8 @@ class SoundTest {
         List<String> missing = new ArrayList<>();
         for (Sound s : Sound.values()) {
             boolean there = false;
-            for (String ext : Sound.EXTENSIONS) there |= Files.exists(AUDIO.resolve(s.file + ext));
+            for (int i = 1; i <= s.variants; i++)
+                for (String ext : Sound.EXTENSIONS) there |= Files.exists(AUDIO.resolve(s.variantFile(i) + ext));
             if (!there) missing.add(s.file);
         }
         System.out.println("[SoundTest] wired sounds with no file yet: " + missing);

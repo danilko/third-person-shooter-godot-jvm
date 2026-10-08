@@ -134,6 +134,7 @@ public class WeaponRadialMenu extends Control {
 
   private void select(int idx, boolean switchWeapon) {
     if (idx == selected) return;
+    if (selected >= 0 && idx >= 0) com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_CLICK);
     selected = idx;
     for (WeaponRadialMenuItem card : cards) card.setHighlighted(card.index == idx);
     if (switchWeapon && character != null) character.setWeapon(idx);
@@ -163,6 +164,7 @@ public class WeaponRadialMenu extends Control {
     selected = -1;
     select(getWeaponController().getWeapon(), false);      // start on the weapon in hand
     show();
+    com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_OPEN);
     getViewport().warpMouse(menuCentre());                  // neutral: the first flick picks, not the old cursor
     animationPlayer.play("Zoom");
   }

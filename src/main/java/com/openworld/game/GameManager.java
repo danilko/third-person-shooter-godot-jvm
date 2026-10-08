@@ -1365,4 +1365,13 @@ public class GameManager extends Node {
         GD.print("GameManager: " + currentState + " → " + next);
         currentState = next;
     }
+
+    /** Every audio.Sound and how many takes of it loaded ("NAME:takes,..."); probe readout (probe_sfx.gd). */
+    @Register public String soundReportNow() { return com.openworld.audio.Sounds.report(); }
+
+    /** How many times audio.Sound {@code name} has started playing; probe readout. */
+    @Register public int soundPlaysNow(String name) {
+        try { return com.openworld.audio.Sounds.played(com.openworld.audio.Sound.valueOf(name)); }
+        catch (IllegalArgumentException e) { return -1; }
+    }
 }

@@ -141,6 +141,7 @@ public class MenuManager extends CanvasLayer {
             getTree().setPause(true);
             Input.INSTANCE.setMouseMode(Input.MouseMode.VISIBLE);
             if (pauseMenu != null) pauseMenu.show();
+            com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_OPEN);
         }
     }
 }

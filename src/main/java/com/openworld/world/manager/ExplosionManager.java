@@ -143,6 +143,9 @@ public class ExplosionManager extends Node {
      */
     public void playBlast(Vector3 center, PackedScene vfx, float damageRadius, float multiplier) {
         com.openworld.net.NetStats.increment("explosion_vfx");   // N4: one per blast on every peer, never two
+        // the bang, on every peer with the effect; a big blast is heard across the district
+        com.openworld.audio.Sounds.play3D(this, com.openworld.audio.Sound.EXPLOSION, center,
+                (float) Math.max(25.0, 4.0 * damageRadius), 0.08f);
         PackedScene scene = vfx != null ? vfx : explosionScene;
         if (scene == null) return;
         Pool p = pools.computeIfAbsent(scene, k -> new Pool());

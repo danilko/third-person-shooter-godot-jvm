@@ -24,12 +24,14 @@ public class PauseMenu extends Control {
 
     @Register
     public void onResumePressed() {
+        com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_CLICK);
         MenuManager mm = menuManager();
         if (mm != null) mm.resume();
     }
 
     @Register
     public void onRestartPressed() {
+        com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_CLICK);
         MenuManager mm = menuManager();
         if (mm != null) mm.restart();
     }

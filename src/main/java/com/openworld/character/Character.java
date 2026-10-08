@@ -713,6 +713,7 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     @Override
     public void _physicsProcess(double delta) {
         updateSpatialCell(delta);
+        audio.tick(this, delta);   // footsteps + landing: owner, AI and puppet alike (before the authority return)
         UserCommand cmd;
         if (controller != null) {
             if (!controller.isAuthority()) return; // non-authority: state arrives via MSG_SNAPSHOT — see NetworkController
@@ -1521,6 +1522,13 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     }
 
     /** The controller currently driving this body — null only before _ready() resolves it. */
+    /** Footsteps and landing sounds (CharacterAudio). */
+    public final CharacterAudio audio = new CharacterAudio();
+
+    /** Footsteps / landings this body has played (probe readouts). */
+    @Register public int footstepsNow() { return audio.steps(); }
+    @Register public int landingsNow() { return audio.landings(); }
+
     /** A puppet's floor state, written from the owner's snapshot (a puppet never runs move_and_slide). */
     public boolean replicatedAirborne = false;
 

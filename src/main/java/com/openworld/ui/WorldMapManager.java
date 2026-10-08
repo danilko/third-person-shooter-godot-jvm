@@ -189,12 +189,14 @@ public class WorldMapManager extends Control {
                                 world = new Vector3(c[0], world.getY(), c[1]);
                             }
                             player.setWaypoint(hit == null ? world : hit.go());
+                            com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_WAYPOINT);
                         }
                     }
                     dragging = false;
                 }
             } else if (mb.isPressed() && b == godot.core.MouseButton.RIGHT) {
                 player.clearWaypoint();   // right-click clears the destination
+                com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_BACK);
             } else if (mb.isPressed() && (b == godot.core.MouseButton.WHEEL_UP || b == godot.core.MouseButton.WHEEL_DOWN)) {
                 zoomAbout(mb.getPosition(), b == godot.core.MouseButton.WHEEL_UP ? 1f / zoomStep : zoomStep);
             }
@@ -264,6 +266,7 @@ public class WorldMapManager extends Control {
         Input.setMouseMode(Input.MouseMode.VISIBLE);
         player.inputBlocked = true;
         setVisible(true);
+        com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_OPEN);
         queueRedraw();
     }
 
@@ -272,6 +275,7 @@ public class WorldMapManager extends Control {
         if (player != null) player.inputBlocked = false;
         Input.setMouseMode(Input.MouseMode.CAPTURED);
         setVisible(false);
+        com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_CLOSE);
     }
 
     @Register

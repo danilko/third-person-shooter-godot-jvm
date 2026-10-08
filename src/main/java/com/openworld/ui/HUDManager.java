@@ -209,6 +209,10 @@ public class HUDManager extends CanvasLayer {
 	  bus.characterEliminated.connectUnsafe(
 		  MethodCallable.createUnsafe(this, "onCharacterEliminated"),
 		  Object.ConnectFlags.DEFAULT);
+	  // mission stingers (every peer: a client's mission events are mirrored by GameManager)
+	  bus.missionStarted.connectUnsafe(MethodCallable.createUnsafe(this, "onMissionStartedSting"), Object.ConnectFlags.DEFAULT);
+	  bus.missionCompleted.connectUnsafe(MethodCallable.createUnsafe(this, "onMissionCompletedSting"), Object.ConnectFlags.DEFAULT);
+	  bus.missionFailed.connectUnsafe(MethodCallable.createUnsafe(this, "onMissionFailedSting"), Object.ConnectFlags.DEFAULT);
 
 	  // C2 — multi-character HUD wiring: route per-character events to whichever
 	  // widget (if any) is registered for that characterId via registerCharacterHUD().
@@ -761,4 +765,19 @@ public class HUDManager extends CanvasLayer {
 	godot.api.Object loaded = GD.load(DEFEATED_ENTRY_SCENE_PATH);
 	return (loaded instanceof PackedScene ps) ? ps : null;
   }
+
+	// ── Mission stingers (audio.Sound MISSION_*) ────────────────────────────────
+
+	@Register public void onMissionStartedSting(String id, String name) { sting(com.openworld.audio.Sound.MISSION_START); }
+	@Register public void onMissionCompletedSting(String id, String name, String variant) { sting(com.openworld.audio.Sound.MISSION_COMPLETE); }
+	@Register public void onMissionFailedSting(String id, String reason) { sting(com.openworld.audio.Sound.MISSION_FAIL); }
+
+	/** Stingers played so far (probe readout). */
+	private int stings;
+	@Register public int stingsNow() { return stings; }
+
+	private void sting(com.openworld.audio.Sound s) {
+		stings++;
+		com.openworld.audio.Sounds.ui(this, s);
+	}
 }

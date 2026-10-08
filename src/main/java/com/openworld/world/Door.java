@@ -276,13 +276,39 @@ public class Door extends Breakable {
             openYaw = closedYaw + swingSign * Math.toRadians(openAngleDeg);
         }
         if (progress != target) {
+            float before = progress;
             float step = (float) (openSpeed * delta);
             if (target > progress) progress = Math.min(target, progress + step);
             else progress = Math.max(target, progress - step);
             applyOpening();
+            if (before == 0.0f) doorSound(true);                 // starts to open
+            else if (progress == 0.0f) doorSound(false);         // shut
         }
         // asleep once settled, unless the E key must be polled or a restore is pending
         if (progress == target && !(localPlayerInSensor && !autoOpen) && !restorePending()) setPhysicsProcess(false);
+    }
+
+    /** Sounds played by doors (probe readout). */
+    private static int doorSounds;
+    private static long lastSoundFrame = -1000;
+    private static Vector3 lastSoundAt;
+    @Register public int doorSoundsNow() { return doorSounds; }
+
+    /** Opening / shutting sound: a hinged leaf creaks open and thuds shut, a sliding or gate leaf hums both ways.
+     *  A double door's two leaves are two Doors: a second sound within 3 m in the next 15 physics frames is dropped. */
+    private void doorSound(boolean opening) {
+        Vector3 at = getGlobalPosition();
+        long now = godot.api.Engine.INSTANCE.getPhysicsFrames();
+        if (lastSoundAt != null && now - lastSoundFrame < 15 && lastSoundAt.distanceTo(at) < 3.0) return;
+        var cam = getViewport() == null ? null : getViewport().getCamera3d();
+        if (cam == null || cam.getGlobalPosition().distanceTo(at) > 40.0) return;
+        lastSoundFrame = now;
+        lastSoundAt = at;
+        doorSounds++;
+        boolean slide = isSlide() || this instanceof TicketGate;
+        com.openworld.audio.Sound s = slide ? com.openworld.audio.Sound.DOOR_SLIDE
+                : opening ? com.openworld.audio.Sound.DOOR_OPEN : com.openworld.audio.Sound.DOOR_CLOSE;
+        com.openworld.audio.Sounds.play3D(this, s, at, 3f, 0.06f, slide && !opening ? -4f : 0f);
     }
 
     /** Whether this door is ticking right now (probe readout for R14). */

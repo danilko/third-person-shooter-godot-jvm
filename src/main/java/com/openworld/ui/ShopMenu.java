@@ -72,6 +72,7 @@ public class ShopMenu extends Control {
         layer.addChild(m);
         counter.getTree().getRoot().addChild(layer);
         open = m;
+        com.openworld.audio.Sounds.ui(counter, com.openworld.audio.Sound.UI_OPEN);
         openedFrame = godot.api.Engine.INSTANCE.getProcessFrames();
     }
 
@@ -136,6 +137,7 @@ public class ShopMenu extends Control {
 
     public void close() {
         closedFrame = godot.api.Engine.INSTANCE.getProcessFrames();
+        if (open == this) com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_CLOSE);
         block(false);
         if (open == this) open = null;
         if (layer != null && GD.isInstanceValid(layer)) layer.queueFree();
@@ -157,11 +159,13 @@ public class ShopMenu extends Control {
 
     private void move(int d) {
         selected = Math.floorMod(selected + d, ids.size());
+        com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_CLICK);
         queueRedraw();
     }
 
     private void buySelected() {
         counter.buy(buyer, ids.get(selected));
+        com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_CONFIRM);
         bought++;
         queueRedraw();
     }
@@ -172,7 +176,7 @@ public class ShopMenu extends Control {
         int row = -1;
         if (e instanceof InputEventMouseMotion mm) row = rowAt(mm.getPosition());
         else if (e instanceof InputEventMouseButton mb) row = rowAt(mb.getPosition());
-        if (row >= 0 && row != selected) { selected = row; queueRedraw(); }
+        if (row >= 0 && row != selected) { selected = row; com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_CLICK); queueRedraw(); }
         if (row >= 0 && e instanceof InputEventMouseButton mb && mb.isPressed()
                 && mb.getButtonIndex() == godot.core.MouseButton.LEFT) buySelected();
     }

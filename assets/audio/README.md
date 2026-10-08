@@ -36,24 +36,55 @@ missing: `SHORTLIST.md`.
 
 ## Wired in code (`SoundTest` checks this table lists every `Sound`)
 
-| file | `Sound` | what plays it | status |
+A `Sound` with N takes is `<file>_1` .. `<file>_N` (one picked per play). Everything except `hit_marker` and
+`siren` is BUILT by `python3 tools/audio/build_sfx.py` (its `SPECS` table: source takes, layers, loudness), then
+`godot --headless --path . --import`. **None of it was auditioned by ear** (2026-10-08): the picks are by name and
+waveform; listen in game and change the row. Gate: `tools/godot/probe_sfx.gd`.
+
+| file | `Sound` | what plays it | source (all CC0) |
 |---|---|---|---|
-| `glass_shatter` | `GLASS_SHATTER` | a car window breaking (crash, bullet, blast, melee), 3D at the pane | missing |
+| `glass_shatter` | `GLASS_SHATTER` | a window breaking: car (crash, bullet, blast, melee), shop pane (PaneSet, Breakable), train window; 3D, 3 takes | built: Kenney Impact Sounds `impactGlass_*` layered (no CC0 shatter yet; SHORTLIST has real ones) |
 | `hit_marker` | `HIT_MARKER` | the local player's hit confirmed (HitMarker), 2D, short tick | shipped |
 | `siren` | `SIREN` | an emergency vehicle on a call (Vehicle.refreshEmergency), 3D, LOOPING (import with loop on) | missing |
+| `sfx/footstep_concrete` | `FOOTSTEP_CONCRETE` | a footstep on roads, floors, platforms, the urban ground, rock (CharacterAudio), 5 takes | Kenney Impact Sounds |
+| `sfx/footstep_grass` | `FOOTSTEP_GRASS` | a footstep on Terrain3D grass / soil / seabed paint | Kenney Impact Sounds |
+| `sfx/footstep_wood` | `FOOTSTEP_WOOD` | a footstep on a WOOD HittableBody | Kenney Impact Sounds |
+| `sfx/footstep_metal` | `FOOTSTEP_METAL` | a footstep on a METAL HittableBody or a vehicle | Kenney `impactTin_medium` |
+| `sfx/footstep_snow` | `FOOTSTEP_SNOW` | a footstep on Terrain3D sand (the crunchy take) | Kenney Impact Sounds |
+| `sfx/land` | `LAND` | landing from a fall faster than 3 m/s, louder the harder | Kenney `impactSoft_heavy` |
+| `sfx/impact_flesh` | `IMPACT_FLESH` | a bullet into a body (ImpactManager, by SurfaceType) | Kenney `impactPunch_medium` |
+| `sfx/impact_metal` | `IMPACT_METAL` | a bullet into metal (vehicles, machinery) | Kenney `impactMetal_light` |
+| `sfx/impact_stone` | `IMPACT_STONE` | a bullet into stone / concrete / anything untagged | Kenney `impactPlate_light` |
+| `sfx/impact_wood` | `IMPACT_WOOD` | a bullet into wood | Kenney `impactWood_light` |
+| `sfx/impact_glass` | `IMPACT_GLASS` | a bullet into glass that does not break | Kenney `impactGlass_light` |
+| `sfx/melee_hit_flesh` | `MELEE_HIT_FLESH` | a melee blow landing on a body (MeleeItem) | Kenney `impactPunch_heavy` |
+| `sfx/melee_hit_hard` | `MELEE_HIT_HARD` | a melee blow on a car, a wall, anything not a body | Still North Medieval Weapon Impacts |
+| `sfx/explosion` | `EXPLOSION` | every explosion (ExplosionManager.playBlast), every peer | Kenney Sci-fi `explosionCrunch` + `lowFrequency_explosion` layered |
+| `sfx/door_open` | `DOOR_OPEN` | a hinged door starting to open (world.Door) | Kenney RPG Audio `doorOpen` |
+| `sfx/door_close` | `DOOR_CLOSE` | a hinged door shutting | Kenney RPG Audio `doorClose` |
+| `sfx/door_slide` | `DOOR_SLIDE` | an automatic sliding door or a ticket-gate flap, both ways | Kenney Sci-fi `doorOpen`, pitched down |
+| `sfx/dry_fire` | `DRY_FIRE` | fire pressed on an empty gun with no reserve (WeaponController) | Still North Raw: Walther PPQ, Tikka, Ruger 10/22 dry fire |
+| `sfx/weapon_draw` | `WEAPON_DRAW` | a firearm raised at the end of a switch | Still North Raw: Tikka, Arisaka, PPSh safety off |
+| `ui/click` | `UI_CLICK` | a menu row, a wheel card, a pause button | Kenney UI Audio `click` |
+| `ui/back` | `UI_BACK` | the map waypoint cleared | Kenney Interface Sounds `back_001` |
+| `ui/open` | `UI_OPEN` | a store menu, the map, the weapon wheel, the pause menu opening | Kenney Interface Sounds `open_001` |
+| `ui/close` | `UI_CLOSE` | a store menu / the map closing | Kenney Interface Sounds `close_001` |
+| `ui/confirm` | `UI_CONFIRM` | a store row taken | Kenney Interface Sounds `confirmation_001` |
+| `ui/error` | `UI_ERROR` | (not played yet: a refused purchase) | Kenney Interface Sounds `error_001` |
+| `ui/waypoint` | `UI_WAYPOINT` | a map waypoint set | Kenney Interface Sounds `select_001` |
+| `ui/mission_start` | `MISSION_START` | a mission started (HUDManager, every peer) | Kenney Music Jingles `jingles_STEEL00` |
+| `ui/mission_complete` | `MISSION_COMPLETE` | a mission completed | Kenney Music Jingles `jingles_STEEL07` |
+| `ui/mission_fail` | `MISSION_FAIL` | a mission failed | Kenney Music Jingles `jingles_STEEL09` |
 
 ## Not wired, no file (each needs a `Sound` entry, a call site, and a file)
 
 Weapons
-- ATL1 launcher: fire, reload; rocket flight loop
-- Throwables (FRG1, PIB1, FLA1, SMO1, REC1): throw, bounce, pin; frag / pipe-bomb explosion, flashbang
-  bang + ringing, smoke hiss, remote-charge stick and detonator click
-- Melee hits: flesh, hard surface (swings shipped). Ready in the source libraries: Kenney `impactPunch_*`, Still North
-  Weapon Impacts (metal clash, haft on haft)
-- Dry fire (empty click), weapon switch / draw, holster, scope in/out, pickup, SNR1 bolt cycle after a shot. Ready
-  in Still North Raw: every gun's dry fire, safety, slide/bolt takes; medieval dagger / katana draw + sheath
-- Bullet impacts per `SurfaceType` (flesh, concrete, metal, glass, wood, water), ricochet, whiz-by
-- Explosions (the Binbun3D explosion scenes carry an `AudioStreamPlayer3D` with no stream)
+- ATL1 launcher: fire, reload; rocket flight loop (Kenney Sci-fi `thrusterFire`)
+- Throwables (FRG1, PIB1, FLA1, SMO1, REC1): throw, bounce, pin; flashbang ringing, smoke hiss, remote-charge
+  stick and detonator click (the blast itself is `EXPLOSION`)
+- Holster, scope in/out, pickup, SNR1 bolt cycle after a shot, a melee draw (Still North medieval dagger / katana
+  draw + sheath are ready)
+- Ricochet, whiz-by, a bullet into water (no `SurfaceType` for water yet)
 
 Vehicles
 - Engine loop (idle/rev, pitched by rpm) per class: car, kei, truck, motorcycle, boat, plane
@@ -62,14 +93,14 @@ Vehicles
 - Wreck burning loop and vehicle explosion; street pole / bollard knocked down
 
 Characters
-- Footsteps per surface, jump, land, fall damage, swim strokes, splash
+- Jump, fall damage, swim strokes, splash
 - Pain, death (keep generic, no voice lines)
 
 World
-- Doors: hinged open/close, automatic sliding door, ticket gate flaps, lift doors + arrival chime
+- Lift doors + arrival chime
 - 踏切 (level crossing) bell, pedestrian signal chime
 - Ambient loops: city traffic, harbour/sea, wind, rain; night insects
-- Trains (when the train runtime exists): pass-by, brakes, doors, platform announcement chime
+- Trains: pass-by, brakes, doors, platform announcement chime
 
 UI
-- Menu click / back, map open / waypoint set, mission start / complete / fail, pickup notice
+- Pickup notice, a refused purchase (`UI_ERROR` exists, not played), the radio chatter line

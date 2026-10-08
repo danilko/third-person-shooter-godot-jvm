@@ -433,7 +433,8 @@ public class MeleeItem extends WeaponItem {
       TraceHit wall = trace(ray, chest, dir, range);
       if (wall != null && wall.node != null && ImpactManager.resolveTarget(wall.node) == null) {
         surfaceStruck = true;
-        im.processVisualHit(new HitInfo(wall.node, wall.point, wall.normal));
+        im.processVisualHit(new HitInfo(wall.node, wall.point, wall.normal), false);
+        com.openworld.audio.Sounds.play3D(im, com.openworld.audio.Sound.MELEE_HIT_HARD, wall.point, 6f, 0.1f);
       }
     }
   }
@@ -463,8 +464,13 @@ public class MeleeItem extends WeaponItem {
       im.processHit(info, st.damage, getDisplayName(), weaponIcon,
           resolveAttackerName(), resolveAttackerFaction(), resolveAttackerPosition(), resolveAttackerId(), damageKind());
     } else {
-      im.processVisualHit(info);
+      im.processVisualHit(info, false);
       com.openworld.net.NetStats.increment("melee_predicted_hits");   // a client's own prediction (N2)
+    }
+    if (feel || authoritative) {   // the blow's contact sound, once per target per swing (each target connects once)
+      boolean body = ImpactManager.resolveTarget(info.hitNode) instanceof com.openworld.character.Character;
+      com.openworld.audio.Sounds.play3D(im, body ? com.openworld.audio.Sound.MELEE_HIT_FLESH
+          : com.openworld.audio.Sound.MELEE_HIT_HARD, info.hitPoint, 6f, 0.1f);
     }
     if (!feel || connected) return;
     connected = true;

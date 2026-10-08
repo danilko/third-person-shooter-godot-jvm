@@ -860,6 +860,15 @@ public class WeaponController extends Node {
     isDeathDrop = true;
   }
 
+  /** A handling sound at the hands (dry fire, a draw), within earshot of the camera only. */
+  private void weaponSound(com.openworld.audio.Sound s, float volumeDb) {
+    if (!(getParent() instanceof godot.api.Node3D body) || !body.isInsideTree()) return;
+    var cam = getViewport() == null ? null : getViewport().getCamera3d();
+    Vector3 at = body.getGlobalPosition().plus(new Vector3(0, 1.2, 0));
+    if (cam == null || cam.getGlobalPosition().distanceTo(at) > 25.0) return;
+    com.openworld.audio.Sounds.play3D(body, s, at, 2f, 0.05f, volumeDb);
+  }
+
   // ── Signal handlers ───────────────────────────────────────────────────────
 
   @Register
@@ -874,7 +883,12 @@ public class WeaponController extends Node {
     if (fireTimer.getTimeLeft() > 0) { rememberBlockedPress(); return; }
     WeaponItem w = getCurrentWeaponItem();
     if (w == null) return;
-    if (!w.isInfiniteAmmo && w.getMagazine() == 0) { onWeaponReload(); return; }
+    if (!w.isInfiniteAmmo && w.getMagazine() == 0) {
+      // empty AND dry: the trigger clicks (the reload below does nothing with no reserve)
+      if (freshPress && w.getReserve() == 0 && !isWeaponReloading()) weaponSound(com.openworld.audio.Sound.DRY_FIRE, 0f);
+      onWeaponReload();
+      return;
+    }
     if (!w.canUse()) { rememberBlockedPress(); return; }
     // Held, not dropped: the body brings the weapon onto the aim within a frame or two
     // (MovementController.keepAimWithinReach), and a press eaten by a turn reads as a dead trigger.
@@ -1137,6 +1151,7 @@ public class WeaponController extends Node {
       // 1/switchSpeed) so the switch feels snappy — the deploy (transitionTimer) is the switch cost.
       startFireLock(DRAW_SETTLE_SECONDS, WeaponState.SETTLING);
       animationController.onWeaponEquip(next.weaponPoseIndex());
+      if (next instanceof FirearmItem) weaponSound(com.openworld.audio.Sound.WEAPON_DRAW, -2f);
       ammoChanged.emit(next.getMagazine(), next.getReserve());
     }
     if (wasArmed != isArmed()) emitArmedStateChanged(isArmed());
