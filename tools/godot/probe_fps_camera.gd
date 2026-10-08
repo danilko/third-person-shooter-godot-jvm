@@ -30,6 +30,7 @@ const SAMPLES := 90
 ## behind it once it has, and must be within SETTLE_M by SETTLE_FRAMES.
 const ARRIVED_FRAME := 10
 const ARRIVED_LAG_M := 0.12
+const REF_TRAVEL_M := 0.33   # the reference body's crouch travel the 0.12 m was measured on
 const SETTLE_M := 0.02
 const SETTLE_FRAMES := 20
 
@@ -139,7 +140,9 @@ func _initialize() -> void:
 	p.set("is_fps_mode", true)
 	Input.action_press("aim")
 	Input.action_press("forward")
-	for i in range(20):
+	# 60 frames, not 20: pressing aim moves the mount itself (combat pose, the head look-at), and the 6/s baseline
+	# is still travelling that after 20 frames, which read as "the eye travels further than the bone"
+	for i in range(60):
 		await physics_frame
 
 	var raw: Array = []
@@ -229,6 +232,7 @@ func _initialize() -> void:
 			Input.action_release("crouch")
 		var arrived := 0.0
 		var settled := -1
+		var start: Vector3 = mesh_root.to_local(mount.global_position)
 		for i in range(60):
 			await physics_frame
 			var lag: float = (mesh_root.to_local(mount.global_position)
@@ -237,10 +241,14 @@ func _initialize() -> void:
 				arrived = lag
 			if settled < 0 and i > ARRIVED_FRAME and lag < SETTLE_M:
 				settled = i
-		print("   %-11s: lag at frame %d %6.3f m (limit %.2f), within %.2f m at frame %s (limit %d)"
-			% [label, ARRIVED_FRAME, arrived, ARRIVED_LAG_M, SETTLE_M,
+		# the limit scales with how far THIS body's eye travels (0.12 m was measured on Godot-chan's 0.33 m crouch;
+		# Shino's travels further), so the rule -- the view has caught up most of the way -- is the same on every body
+		var travel: float = (mesh_root.to_local(mount.global_position) - start).length()
+		var limit: float = ARRIVED_LAG_M * maxf(1.0, travel / REF_TRAVEL_M)
+		print("   %-11s: lag at frame %d %6.3f m (limit %.3f for %.3f m of travel), within %.2f m at frame %s (limit %d)"
+			% [label, ARRIVED_FRAME, arrived, limit, travel, SETTLE_M,
 			   settled if settled >= 0 else "never", SETTLE_FRAMES])
-		if arrived > ARRIVED_LAG_M:
+		if arrived > limit:
 			print("   FAIL: the body has arrived and the view has not")
 			fails += 1
 		elif settled < 0 or settled > SETTLE_FRAMES:
