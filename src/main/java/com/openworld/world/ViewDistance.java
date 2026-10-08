@@ -59,7 +59,7 @@ public class ViewDistance extends Node {
 
     @Export public boolean enabled = System.getenv("OW_NO_VIEW_DISTANCE") == null;
     /** D at street level (m): the depth fog is opaque here and nothing past it is drawn. */
-    @Export public double streetDistance = 500.0;
+    @Export public double streetDistance = envDouble("OW_VIEW_DISTANCE", 500.0);
     /** Width of the depth-fog band before D (clear -> opaque). */
     @Export public double band = 150.0;
     /** Height above ground (m) that still counts as street level. */
@@ -310,6 +310,16 @@ public class ViewDistance extends Node {
         Node root = getTree() != null ? getTree().getRoot() : null;
         Node n = root != null ? root.findChild("Sky3D", true, false) : null;
         return n instanceof WorldEnvironment we ? we : null;
+    }
+
+    /** A measurement override (`OW_VIEW_DISTANCE=350`), else the default. */
+    private static double envDouble(String key, double dflt) {
+        try {
+            String v = System.getenv(key);
+            return v == null ? dflt : Double.parseDouble(v);
+        } catch (NumberFormatException e) {
+            return dflt;
+        }
     }
 
     /** The view distance in force (m), for other systems' own ranges. */

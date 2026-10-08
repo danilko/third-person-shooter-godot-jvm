@@ -96,6 +96,25 @@ ACCESS = [
     # reaches the market's ground before its end. No car park: the market's own forecourt is the end.
     dict(name="ichiba_michi", site="fish_market", from_road="ring_kita", at=(567.0, -672.0),
          via=[(560.0, -703.0)], end=(440.0, -703.0), parking=None),
+    # BEACH ACCESS over the dike (PLAN.md item 4, user 2026-10-08: "connect to the car parking just like the north east
+    # top"). The dike IS the raised ring road, so cars already cross it on top and nothing needs an opening or a 陸閘;
+    # what was missing is a way DOWN its sea face to the sand. Each lane is a T off the dike road, turns along the
+    # dike's sea toe (where `island_dike.py raise` ramps it down off the crest, like ichiba_michi) and ends in a
+    # beach car park on the flat strip between the toe and the sand; its footways are the pedestrian way down.
+    # They replace island_reshape.DIKE_ACCESS's six points: "lighthouse" is todai_michi above, "farm" and
+    # "residential_ne" share the north lane, "suburb" moved with the suburb fill (its old point is open sea now).
+    #  * the FERRIS-WHEEL PARK (the "city" point): off ring_kita__13's west leg, north along the toe at x 893
+    dict(name="kanransha_michi", site="waterfront_park", from_road="ring_kita", at=(945.0, -899.0),
+         via=[(893.0, -899.0)], end=(893.0, -790.0), parking="ParkingLot14"),
+    #  * the NORTH COAST beach (farm + residential north-east): west along the toe from x 840 to the farm's beach
+    dict(name="kitahama_michi", site="north_beach", from_road="ring_kita", at=(852.0, 1541.0),
+         via=[(845.0, 1598.0)], end=(705.0, 1628.0), parking="ParkingLot14"),
+    #  * the WEST residential beach: south along the toe at x -1235 from ring_kita__12
+    dict(name="nishihama_michi", site="west_beach", from_road="ring_kita", at=(-1188.0, -682.0),
+         via=[(-1235.0, -690.0)], end=(-1235.0, -795.0), parking="ParkingLot14"),
+    #  * the SUBURB beach behind the suburb fill: south off ring_kita__10, west along z 1145
+    dict(name="kogaihama_michi", site="suburb_beach", from_road="ring_kita", at=(1065.0, -1085.0),
+         via=[(1065.0, -1145.0)], end=(895.0, -1145.0), parking="ParkingLot14"),
     dict(name="butsuryu_michi", site="logistics_yard", from_road="kichi_dori", at=(-280.0, -1230.0),
          end=(-280.0, -1440.0), parking="ParkingLot14"),     # its car park short of the runway band (z 1480)
 ]
