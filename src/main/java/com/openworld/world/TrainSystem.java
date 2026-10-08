@@ -72,6 +72,57 @@ public class TrainSystem extends Node3D {
 
     public static TrainSystem get() { return instance; }
 
+    /** A car window a shot struck: break it (every peer, cosmetic) and ask whether it was already broken. */
+    public record WindowHit(TrainSet set, int car, int window, AnimatableBody3D body) {
+        public boolean broken() {
+            java.util.BitSet b = set.brokenWindows.get(car);
+            return b != null && b.get(window);
+        }
+
+        public void breakIt(Vector3 at) {
+            if (broken()) return;
+            set.brokenWindows.computeIfAbsent(car, k -> new java.util.BitSet()).set(window);
+            if (car < set.cars.size()) {
+                Car c = set.cars.get(car);
+                if (window < c.windows.size() && GD.isInstanceValid(c.windows.get(window))) c.windows.get(window).setVisible(false);
+            }
+            if (instance != null && instance.getTree() != null) {
+                if (instance.getTree().getFirstNodeInGroup(new StringName("particle_manager"))
+                        instanceof com.openworld.world.manager.ParticleManager pm) pm.spawn(SurfaceType.GLASS, at);
+                if (instance.getTree().getCurrentScene() != null)
+                    com.openworld.audio.Sounds.play3D(instance.getTree().getCurrentScene(),
+                            com.openworld.audio.Sound.GLASS_SHATTER, at, 6f, 0.1f);
+            }
+        }
+    }
+
+    /** The window of a train car at {@code point} when {@code collider} is a car body and the point is on (within
+     *  0.35 m of) a window's glass; else null. */
+    public WindowHit windowAt(Node collider, Vector3 point) {
+        if (!(collider instanceof AnimatableBody3D b) || !b.isInGroup(new StringName("train_car"))) return null;
+        for (TrainSet set : sets) {
+            for (int i = 0; i < set.cars.size(); i++) {
+                Car c = set.cars.get(i);
+                if (c.body != b) continue;
+                int w = TrainWindows.windowAt(c.model, c.winKey, point, 0.35);
+                return w < 0 ? null : new WindowHit(set, i, w, b);
+            }
+        }
+        return null;
+    }
+
+    /** Probe readout: windows broken over every set. */
+    @Register public int brokenWindowsNow() {
+        int n = 0;
+        for (TrainSet s0 : sets) for (java.util.BitSet bs : s0.brokenWindows.values()) n += bs.cardinality();
+        return n;
+    }
+
+    /** Probe readout: windows the first car of set {@code i} has (0 = no glass found). */
+    @Register public int windowCountNow(int i) {
+        return i >= 0 && i < sets.size() && !sets.get(i).cars.isEmpty() ? sets.get(i).cars.get(0).windows.size() : 0;
+    }
+
     /** The control knob: off is the world before trains ran. */
     @Visible public boolean enabled = true;
     /** The control knob for the doors: off, no door ever opens (the boarding probe's control). */
@@ -153,6 +204,8 @@ public class TrainSystem extends Node3D {
 
     /** One train set on one track. */
     static final class TrainSet {
+        /** Broken windows per car index (cosmetic, local per peer; kept while the cars are rebuilt with the camera). */
+        final Map<Integer, java.util.BitSet> brokenWindows = new HashMap<>();
         /** The set's id: its first track's id and its place among the sets sharing that circuit ("<track>#<k>"). */
         String id;
         /** The tracks it runs: one (a shuttle) or a line's two (a circuit: out on one, back on the other). */
@@ -206,6 +259,10 @@ public class TrainSystem extends Node3D {
         List<godot.api.Label3D> screens = new ArrayList<>();
         String screenText = "";
         com.openworld.character.Health health;
+        /** Its windows, one node each (TrainWindows); the model key ("Tc" / "M") they were split from. */
+        List<godot.api.MeshInstance3D> windows = new ArrayList<>();
+        String winKey = "";
+        Node3D model;
     }
 
     /** A destroyed set's cars, left standing burnt where they died until the set comes back. */
@@ -931,6 +988,12 @@ public class TrainSystem extends Node3D {
                 mesh.setName(new StringName("Model"));
                 if (flip) mesh.setRotation(new Vector3(0, Math.PI, 0));
                 body.addChild(mesh);
+                car.model = mesh;
+                car.winKey = tc ? "Tc" : "M";
+                car.windows = TrainWindows.attach(mesh, car.winKey);
+                java.util.BitSet bw = set.brokenWindows.get(i);
+                if (bw != null) for (int w = bw.nextSetBit(0); w >= 0; w = bw.nextSetBit(w + 1))
+                    if (w < car.windows.size()) car.windows.get(w).setVisible(false);
             }
             for (int k = 0; k < proto.doorBoxes.size(); k++) {
                 Door dr = new Door();

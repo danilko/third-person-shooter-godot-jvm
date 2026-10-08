@@ -123,6 +123,9 @@ public class ImpactManager extends Node {
         // Destructible world geometry (breakable glass/wall — PLAN.md I2). Host-authoritative:
         // Breakable.applyDamage ignores the hit on a non-server peer and replicates the break itself.
         if (ctx.breakable != null) ctx.breakable.applyDamage(damage, attackerPos);
+        // a building's window (world.PaneSet): any hit breaks it -- a melee blow included (the car's glass rule)
+        com.openworld.world.GlassPanes.Pane pane = com.openworld.world.GlassPanes.paneOf(info.hitNode);
+        if (pane != null && damage > 0f) pane.hit(info.hitPoint);
     }
 
     /**
@@ -239,7 +242,9 @@ public class ImpactManager extends Node {
             // reaching the Vehicle (which owns the Health) — capture it for tire damage.
             if (wheel == null && current instanceof com.openworld.carrier.vehicle.VehicleWheel vw) wheel = vw;
             if (surface == SurfaceType.DEFAULT) {
-                if (current instanceof Character c) {
+                if (current instanceof godot.api.StaticBody3D sb && current.getParent() instanceof com.openworld.world.PaneSet) {
+                    surface = SurfaceType.GLASS;
+                } else if (current instanceof Character c) {
                     surface = SurfaceType.FLESH;
                     character = c;
                 } else if (current instanceof HittableBody hb) {

@@ -664,6 +664,9 @@ public class AICharacter extends Character {
             Node3D seen = aimRay.isColliding() && aimRay.getCollider() instanceof Node3D c ? c : null;
             if (seen != null && isIntactGlass(seen))
                 seen = seenPastGlass(aimRay.getCollisionPoint(), bone.getGlobalPosition(), (Node3D) aimRay.getCollider());
+            else if (seen != null && SEE_THROUGH_GLASS && com.openworld.world.TrainSystem.get() != null
+                    && com.openworld.world.TrainSystem.get().windowAt(seen, aimRay.getCollisionPoint()) != null)
+                seen = seenPastGlass(aimRay.getCollisionPoint(), bone.getGlobalPosition(), seen);   // into a train car
             if (seen != null && currentTarget.isAncestorOf(seen)) {
                 cachedVisibleBone = bone;
                 cachedLoS = true;
@@ -679,8 +682,9 @@ public class AICharacter extends Character {
     public static final boolean SEE_THROUGH_GLASS = System.getenv("OW_NO_GLASS_SIGHT") == null;
 
     private static boolean isIntactGlass(Node3D n) {
-        return SEE_THROUGH_GLASS && n instanceof com.openworld.world.Breakable b && !b.isBroken()
-                && b.isInGroup(new godot.core.StringName("glass_pane"));
+        if (!SEE_THROUGH_GLASS) return false;
+        com.openworld.world.GlassPanes.Pane p = com.openworld.world.GlassPanes.paneOf(n);
+        return p != null && !p.broken();
     }
 
     /**

@@ -57,6 +57,8 @@ func _run() -> void:
 				sensor.global_transform = xf
 				d.set("sensor_path", NodePath(str(sensor.name)))
 			tried += 1
+			if tried % 10 == 1:
+				print("  ... %s door %d (%s) t=%.1f s" % [id, tried, d.name, Time.get_ticks_msec() / 1000.0])
 			var closed: Vector3 = d.position
 			var want: float = (d.get("slide_offset") as Vector3).length()
 			# stand 0.8 m in front of the doorway, on the side the leaf is hung (local +Z), feet on the floor

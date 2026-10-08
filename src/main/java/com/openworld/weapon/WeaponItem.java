@@ -522,6 +522,27 @@ public class WeaponItem extends Pickup implements WeaponAction {
     return new TraceHit(hit.get("collider") instanceof Node nd ? nd : null, point, normal);
   }
 
+  /**
+   * Probe-only: one round of {@code damage} traced from {@code origin} along {@code dir} the way a shot is (the trace
+   * plus the glass rule, as the authority), with this weapon's holder's aim ray. Returns "<collider path>|<distance>"
+   * or "none" (probe_shop_glass, probe_train_glass).
+   */
+  @Register
+  public String probeShot(Vector3 origin, Vector3 dir, float damage) {
+    RayCast3D ray = null;
+    for (Node n = getParent(); n != null && ray == null; n = n.getParent())
+      if (n instanceof com.openworld.character.Character c) ray = c.aimRay;
+    if (ray == null) return "no ray";
+    Vector3 d = dir.normalized();
+    TraceHit h = throughGlass(ray, origin, d, trace(ray, origin, d, 500f), true, damage);
+    if (h == null) return "none";
+    return (h.node != null ? h.node.getPath().getPath() : "?") + "|" + String.format(java.util.Locale.ROOT, "%.2f",
+        h.point.minus(origin).length());
+  }
+
+  /** How far a round that entered a train car's window may cross its inside (the car is ~2.9 m wide). */
+  private static final double TRAIN_ACROSS = 3.2;
+
   /** Control knob for probes: off = a car's windows are steel, as before they could break (the hull stops every shot). */
   @Visible public boolean shootThroughGlass = true;
 
@@ -537,6 +558,39 @@ public class WeaponItem extends Pickup implements WeaponAction {
   protected TraceHit throughGlass(RayCast3D ray, Vector3 origin, Vector3 dir, TraceHit hit, boolean authority,
                                   float damage) {
     if (!shootThroughGlass || hit == null || hit.node == null || ray == null || ray.getWorld3d() == null) return hit;
+    // A BUILDING's window (world.GlassPanes): the car's rule. Any round breaks it; a light one stops in it, a heavy
+    // one (PANE_PIERCE_AT) carries on at full damage; a broken one lets everything through. Up to three panes deep.
+    for (int k = 0; k < 3; k++) {
+      com.openworld.world.GlassPanes.Pane pane = com.openworld.world.GlassPanes.paneOf(hit.node);
+      if (pane == null) break;
+      if (!pane.broken()) {
+        if (authority) pane.hit(hit.point);
+        if (damage < com.openworld.carrier.vehicle.VehicleDamageRules.PANE_PIERCE_AT) return hit;   // stopped in it
+      }
+      godot.api.PhysicsDirectSpaceState3D space0 = ray.getWorld3d().getDirectSpaceState();
+      if (space0 == null) return hit;
+      Vector3 from0 = hit.point.plus(dir.times(0.02));
+      float left0 = Math.max(0f, (float) (from0.minus(origin).length()));
+      TraceHit past = query(space0, ray, origin, from0, origin.plus(dir.times(Math.max(left0 + 0.1f, 2000f))), pane.rid());
+      if (past == null) return null;
+      hit = past;
+    }
+    // A TRAIN's window (world.TrainWindows): the same rule; past it the round crosses the car's inside (a rider
+    // stands there) and stops in the far wall unless it meets someone first.
+    com.openworld.world.TrainSystem trains = com.openworld.world.TrainSystem.get();
+    com.openworld.world.TrainSystem.WindowHit win = trains != null ? trains.windowAt(hit.node, hit.point) : null;
+    if (win != null) {
+      if (!win.broken()) {
+        win.breakIt(hit.point);
+        if (damage < com.openworld.carrier.vehicle.VehicleDamageRules.PANE_PIERCE_AT) return hit;
+      }
+      godot.api.PhysicsDirectSpaceState3D space1 = ray.getWorld3d().getDirectSpaceState();
+      if (space1 == null) return hit;
+      Vector3 from1 = hit.point.plus(dir.times(0.02));
+      Vector3 far1 = from1.plus(dir.times(TRAIN_ACROSS));
+      TraceHit inside = query(space1, ray, origin, from1, far1, win.body().getRid());
+      return inside != null ? inside : new TraceHit(win.body(), far1, dir.times(-1.0));
+    }
     com.openworld.carrier.vehicle.Vehicle car = null;
     for (Node n = hit.node; n != null && car == null; n = n.getParent()) {
       if (n instanceof com.openworld.carrier.vehicle.Vehicle v) car = v;

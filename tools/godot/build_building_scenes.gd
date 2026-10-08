@@ -67,8 +67,6 @@ const BAND_HEIGHT := 0.45
 const BAND_STRIPE_H := 0.06     # each livery stripe inside the white strip
 const BAND_PROUD := 0.012       # in front of the glass plane, so it is applied TO the window and cannot z-fight
 const SHOP_GLASS := "MI_GlassShopfront"   # a shop window is clearer than a tower's glazing
-const BREAKABLE_SCRIPT := "res://src/main/java/com/openworld/world/Breakable.java"
-const PANE_HEALTH := 25.0      # one heavy round, or two light ones (PLAN.md 1g g)
 const PANE_RESTORE_S := 180.0  # a broken pane is back after three minutes (host-authoritative, replicated)
 const PANE_MIN_T := 0.08       # a pane's collider is at least this thick (a 6 mm pane is a box a shot can find)
 
@@ -489,6 +487,26 @@ func _build(b: Dictionary, variant: String) -> bool:
 					# the merged shell (a shut building keeps its solid glass)
 					pane_surfs.append(s)
 					continue
+			if open_variant and mname == "MI_GlassClear" and _glass_kit(path):
+				# a library / interiors / station piece's clear glass (user 2026-10-07: stations and gang places too):
+				# every connected island of it -- one window, one glass wall -- is its own breakable pane
+				var gkey0 := mat.resource_path if mat != null else "<none>"
+				# EVERY island of clear glass is its own pane, interior glass included (user 2026-10-07: "interior glass
+				# can be breakable too ... each glass a separate piece"); only a lens-sized one stays in the shell
+				for isl in _glass_islands(s):
+					if isl["small"]:
+						# a lamp lens, a gauge: stays in the shell
+						if not tools.has(gkey0):
+							tools[gkey0] = SurfaceTool.new()
+							mats[gkey0] = mat
+							order.append(gkey0)
+						var sm0 := ArrayMesh.new()
+						sm0.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, isl["arrays"])
+						(tools[gkey0] as SurfaceTool).append_from(sm0, 0, xf)
+						continue
+					panes.append({"xf": xf, "glass": isl["aabb"], "arrays": isl["arrays"], "mat": mat,
+							"path": path, "key": "%s_%d_%d" % [path.get_file().get_basename(), surfs.find(s), isl["i"]]})
+				continue
 			var key := mat.resource_path if mat != null else "<none>"
 			if not tools.has(key):
 				var st := SurfaceTool.new()
@@ -721,6 +739,9 @@ func _build(b: Dictionary, variant: String) -> bool:
 			var tpos: Array = tp["pos"]
 			var txf := Transform3D(Basis(Vector3.UP, deg_to_rad(float(tp["yaw"]))), Vector3(tpos[0], tpos[1], tpos[2]))
 			for sf in _surfaces(tp["path"]):
+				if open_variant and _glass_kit(tp["path"]) and sf[3] != null \
+						and _kit_material(_kit_res(tp["path"]), sf[3]).resource_name == "MI_GlassClear":
+					continue
 				var st3 := SurfaceTool.new()
 				st3.append_from(sf[0], sf[1], txf * (sf[2] as Transform3D))
 				for v in st3.commit().get_faces():
@@ -748,6 +769,9 @@ func _build(b: Dictionary, variant: String) -> bool:
 				var ppos: Array = pp["pos"]
 				var pxf := Transform3D(Basis(Vector3.UP, deg_to_rad(float(pp["yaw"]))), Vector3(ppos[0], ppos[1], ppos[2]))
 				for sf in _surfaces(pp["path"]):
+					if open_variant and _glass_kit(pp["path"]) and sf[3] != null \
+							and _kit_material(_kit_res(pp["path"]), sf[3]).resource_name == "MI_GlassClear":
+						continue                     # a breakable pane: it carries its own collider
 					var fx: Transform3D = pxf * (sf[2] as Transform3D)
 					var st2 := SurfaceTool.new()
 					st2.append_from(sf[0], sf[1], fx)
@@ -1133,6 +1157,90 @@ func _aabb_minus(a: AABB, b: AABB) -> Array:
 	return out
 
 
+const GLASS_KITS := ["library", "interiors", "stations", "shops"]
+const ISLAND_MIN_AREA := 0.05   # m2: a glass island smaller than this (a lamp lens, a gauge) stays in the shell
+const PANESET_SCRIPT := "res://src/main/java/com/openworld/world/PaneSet.java"
+
+func _glass_kit(path: String) -> bool:
+	for k in GLASS_KITS:
+		if path.find("/kits/%s/" % k) >= 0:
+			return true
+	return false
+
+
+## The connected islands of one glass surface (piece frame), each {i, aabb, arrays} with arrays non-indexed
+## [VERTEX, NORMAL, TEX_UV]. Vertices are welded by position (1 mm) so a window's two triangles are one island.
+func _glass_islands(s: Array) -> Array:
+	var arr := (s[0] as Mesh).surface_get_arrays(s[1])
+	var vin: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+	var nin = arr[Mesh.ARRAY_NORMAL]
+	var uin = arr[Mesh.ARRAY_TEX_UV]
+	var idx = arr[Mesh.ARRAY_INDEX]
+	var sxf: Transform3D = s[2]
+	var tris := PackedInt32Array()
+	if idx == null or (idx as PackedInt32Array).is_empty():
+		for k in vin.size():
+			tris.append(k)
+	else:
+		tris = idx
+	var weld := {}
+	var parent := PackedInt32Array()
+	parent.resize(vin.size())
+	for k in vin.size():
+		var w: Vector3 = sxf * vin[k]
+		var key := Vector3i(roundi(w.x * 1000.0), roundi(w.y * 1000.0), roundi(w.z * 1000.0))
+		parent[k] = weld.get(key, k)
+		if not weld.has(key):
+			weld[key] = k
+	var find := func(x: int) -> int:
+		while parent[x] != x:
+			parent[x] = parent[parent[x]]
+			x = parent[x]
+		return x
+	for t in range(0, tris.size() - 2, 3):
+		var a: int = find.call(tris[t])
+		for e in [tris[t + 1], tris[t + 2]]:
+			var b: int = find.call(e)
+			if a != b:
+				parent[b] = a
+	var groups := {}
+	for t in range(0, tris.size() - 2, 3):
+		var r: int = find.call(tris[t])
+		if not groups.has(r):
+			groups[r] = []
+		groups[r].append(t)
+	var out := []
+	var n := 0
+	for r in groups:
+		var v := PackedVector3Array()
+		var nn := PackedVector3Array()
+		var uu := PackedVector2Array()
+		var area := 0.0
+		for t in groups[r]:
+			var p := []
+			for c in 3:
+				var k: int = tris[t + c]
+				var w: Vector3 = sxf * vin[k]
+				p.append(w)
+				v.append(w)
+				nn.append((sxf.basis * (nin[k] if nin != null else Vector3.UP)).normalized())
+				uu.append(uin[k] if uin != null else Vector2.ZERO)
+			area += 0.5 * ((p[1] - p[0]).cross(p[2] - p[0])).length()
+		var lo := Vector3(INF, INF, INF)
+		var hi := -lo
+		for q in v:
+			lo = lo.min(q)
+			hi = hi.max(q)
+		var a2 := []
+		a2.resize(Mesh.ARRAY_MAX)
+		a2[Mesh.ARRAY_VERTEX] = v
+		a2[Mesh.ARRAY_NORMAL] = nn
+		a2[Mesh.ARRAY_TEX_UV] = uu
+		out.append({"i": n, "aabb": AABB(lo, hi - lo), "arrays": a2, "small": area < ISLAND_MIN_AREA})
+		n += 1
+	return out
+
+
 var _pane_meshes := {}
 ## Each shop window of an enterable variant as a `world.Breakable` (PLAN.md 1g g): its own glass (and the 目隠し
 ## strip on it) under one MeshInstance3D the Breakable hides when it breaks, and a box collider on the WORLD layer, so
@@ -1141,14 +1249,24 @@ var _pane_meshes := {}
 func _add_panes(root: Node3D, panes: Array, stripe: String, out_id: String) -> void:
 	if panes.is_empty():
 		return
+	# ONE script for the building's windows (world.PaneSet); each pane is a plain StaticBody3D, because a department
+	# store has a thousand windows and a JVM-scripted node each would hitch the cell streaming it in
 	var holder := Node3D.new()
+	holder.set_script(load(PANESET_SCRIPT))
 	holder.name = "Panes"
+	holder.set("restore_delay", PANE_RESTORE_S)
 	root.add_child(holder)
 	holder.owner = root
-	var script: Script = load(BREAKABLE_SCRIPT)
 	var i := 0
 	for pn in panes:
 		var key: String = str(pn["path"]).get_file().get_basename() + "_" + stripe
+		if pn.has("arrays"):
+			# an island's mesh is EMBEDDED in the scene (a few hundred bytes each; a file per island was 2343 files)
+			key = "isl_" + str(pn["key"])
+			var im2 := ArrayMesh.new()
+			im2.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, pn["arrays"])
+			im2.surface_set_material(0, pn["mat"])
+			_pane_meshes[key] = im2
 		if not _pane_meshes.has(key):
 			var st := SurfaceTool.new()
 			var gst := SurfaceTool.new()
@@ -1172,15 +1290,11 @@ func _add_panes(root: Node3D, panes: Array, stripe: String, out_id: String) -> v
 			ResourceSaver.save(m, mpath, ResourceSaver.FLAG_COMPRESS)
 			_pane_meshes[key] = load(mpath)
 		var pane := StaticBody3D.new()
-		pane.set_script(script)
 		pane.name = "Pane%d" % i
 		i += 1
 		pane.collision_layer = 1
 		pane.collision_mask = 0
 		pane.transform = pn["xf"]
-		pane.set("health", PANE_HEALTH)
-		pane.set("restore_delay", PANE_RESTORE_S)
-		pane.set("surface_type", "GLASS")
 		holder.add_child(pane)
 		pane.owner = root
 		pane.add_to_group("glass_pane", true)

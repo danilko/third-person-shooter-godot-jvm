@@ -2894,6 +2894,12 @@ public class NetworkManager extends Node {
      */
     public void sendBaselineBreakables(int targetPeerId) {
         if (!isServer() || getTree() == null) return;
+        for (Node node : getTree().getNodesInGroup(new StringName(com.openworld.world.PaneSet.GROUP))) {
+            if (node instanceof com.openworld.world.PaneSet set)
+                for (String key : set.brokenKeys())
+                    sendWorldEventTo(targetPeerId, com.openworld.game.GameManager.WORLD_EVENT_BREAKABLE, key, 1f,
+                            java.util.List.of());
+        }
         for (Node node : getTree().getNodesInGroup(
                 new StringName(com.openworld.world.Breakable.BREAKABLE_GROUP))) {
             if (node instanceof com.openworld.world.Breakable b && b.isBroken()) {

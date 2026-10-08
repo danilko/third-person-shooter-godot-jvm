@@ -11480,22 +11480,36 @@ route's legs are not clear (`wayClear`), and never sends anyone to a null door. 
 doors island-wide). Gate: probe_breach (default and `--stars=3`), and the fragile spawn case passes too.
 Re-run `island_buildings.py places` after any building change.
 
-## Shop windows break, and AI sees through them (PLAN.md 1g g, 2026-10-07)
+## Glass breaks like a car's: shops, stations, mission and gang buildings, trains (PLAN.md 1g g, 2026-10-07)
 
-In an ENTERABLE variant (`_Shop` / `_Open`; the shut building keeps its solid glass, user decision) every shop window
-of a downtown-kit shop (KonbiniS/L, FamilyRestaurant, GasKiosk, Supermarket) is its own `world.Breakable`
-(`build_building_scenes.gd _add_panes`): `Panes/Pane<n>` on the WORLD layer (so it stops bodies, bullets and grenades
-exactly as the wall did), the piece's glass and its 目隠し strip as `IntactVisual` (one mesh per kit piece + livery,
-`Pane_<piece>_<stripe>_mesh.res`), a box collider, `health` 25, `restore_delay` 180 s, `surface_type` GLASS
-(`SurfaceType.GLASS`, appended: the ordinal rides MSG_SHOT_RESULT_BATCH), in group `glass_pane`; it plays
-`Sound.GLASS_SHATTER` on break. The wall's collision box is cut through its WHOLE depth at each pane (`_aabb_minus`):
-the glass stands a few cm in front of the wall's box, so a pane-thick cut missed it and the window stayed a wall. AI
-sight passes an intact pane (`AICharacter.seenPastGlass`, re-queried past up to two panes on the aim ray's mask), so a
-hostile outside sees a player inside, fires, and the glass breaks. Breaks are host-authoritative and replicated by the
-existing `WORLD_EVENT_BREAKABLE` (the id is the node path, deterministic per cell). Gate
-`tools/godot/probe_shop_glass.gd` (DebugWorld's konbini: a pane stops a ray, a 40-damage hit opens it, restore closes
-it, a hostile shoots the window out in ~2.5 s); `OW_NO_GLASS_SIGHT=1 ... -- --control` (no glass sight: it never
-fires). Not covered yet: glass modelled into library/interiors pieces (mission buildings, stations), train windows.
+**One rule for every window** (user: "update the glass behaviour like car"), the car's own
+(`VehicleDamageRules.PANE_PIERCE_AT` 20): ordinary glass gives ONE hit of protection -- a light round, a melee blow, a
+crash (a car above 3 m/s, `Vehicle.crashedPanes`) or a blast (`GlassPanes.blast`, from `ExplosionManager`) breaks it and
+stops there; a round of 20+ breaks it and carries on at full damage; a broken window lets everything through. The bullet
+half is `WeaponItem.throughGlass` (cars, then building panes up to three deep, then train windows); AI sight passes an
+intact window (`AICharacter.seenPastGlass`).
+- **Buildings** (`build_building_scenes.gd`, ENTERABLE variants only -- `_Shop` / `_Open`; a shut building keeps its
+  glass solid, user decision): every connected island of `MI_GlassClear` in a library / interiors / stations / shops
+  piece is its own pane, INTERIOR glass included, one piece per window (user: "each glass a separate piece"; an artist
+  separating glass in Blender keeps it separate here for free), plus the downtown kit's shop windows with their 目隠し
+  strip. A pane is a PLAIN StaticBody3D (WORLD layer, `IntactVisual` mesh embedded in the scene, `Glass` box) under ONE
+  `world.PaneSet` script per building (`Panes` node) -- the DepartmentStore has 1266 windows and a JVM-scripted node
+  each would hitch its cell. The wall's collision box is cut through its whole depth at each pane (`_aabb_minus`), the
+  trimesh collider skips the glass. Islands under 0.05 m2 stay in the shell. Breaks are host-authoritative, replicated
+  by `WORLD_EVENT_BREAKABLE` keyed `<PaneSet path>#<index>` (`PaneSet.applyRemote`) with a late-join baseline; a pane
+  is whole again after 180 s. Cost: DepartmentStore_Shop is a 3 MB text scene (164 ms parse on the loader thread, 15 ms
+  instantiate). Counts: konbini S/L 17/28, family restaurant 30, supermarket 26, police station 42, Central 480.
+  Gang places with see-through glass: AdultServices, SecureMansion, WarehouseYard; GangOffice / PortCompound /
+  Scrapyard placeholders have only opaque `MI_Window` (art), Pachinko is shut.
+- **Trains** (`world.TrainWindows`): each EMU1 car's `M_Train_glass` surface is split ONCE per model into its
+  window islands (11 per car), the surface hidden and every window its own `Win<n>` node; the car keeps its box
+  collider and `TrainSystem.windowAt` says whether a hit point is on a window. Past a window the round crosses the car's
+  inside (3.2 m) and stops in the far wall unless it meets someone. Broken windows are kept per set (cars are rebuilt
+  with the camera) and are cosmetic, local per peer. Door-leaf glass is not split.
+- Gates: `tools/godot/probe_shop_glass.gd` (DebugWorld konbini: a pane stops a ray, a hit opens it, restore closes it,
+  heavy round carries on / light stops, a hostile shoots the window out; `OW_NO_GLASS_SIGHT=1 ... -- --control`),
+  `tools/godot/probe_train_glass.gd` (heavy/light/open window on a real car), `probe_station_paid` per station.
+  `WeaponItem.probe_shot` is the probe readout (one round through the real trace + glass rule).
 
 ## Armour, a helicopter that can be shot down, rotors on their hubs (2026-10-07, user-reported)
 

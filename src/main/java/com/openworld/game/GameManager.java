@@ -196,6 +196,7 @@ public class GameManager extends Node {
         com.openworld.carrier.vehicle.VehicleDamageModel.clearCaches();
         com.openworld.character.ToonLook.clear();
         com.openworld.character.Outfits.clear();
+        com.openworld.world.TrainWindows.clear();
         com.openworld.ui.IconFit.clear();
         com.openworld.util.RayExclusions.clear();
         WaypointStore.clearAll();   // I5 — hygiene + clean restart (Vector3 values, but clear anyway)
@@ -1293,6 +1294,7 @@ public class GameManager extends Node {
      * to bring a late-joiner up to date on already-broken pieces.
      */
     private void applyBreakableState(String breakableId, float value) {
+        if (com.openworld.world.PaneSet.applyRemote(this, breakableId, value)) return;   // a window: "<set path>#<i>"
         com.openworld.world.Breakable b = findBreakableById(breakableId);
         if (b == null) return;
         if (value >= 0.5f) b.breakNow(false); else b.restore(false);

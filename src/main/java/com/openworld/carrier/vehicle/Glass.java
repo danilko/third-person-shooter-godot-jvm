@@ -45,7 +45,7 @@ public final class Glass {
     }
 
     /** A broken window: nothing is drawn where it was. */
-    static Material hidden() {
+    public static Material hidden() {
         if (hidden == null) {
             Shader sh = new Shader();
             sh.setCode("shader_type spatial;\nrender_mode unshaded, depth_draw_never, cull_disabled;\n"

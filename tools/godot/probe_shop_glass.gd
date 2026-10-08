@@ -77,10 +77,41 @@ func _initialize() -> void:
 	var through := hit.is_empty() or ((hit["position"] as Vector3) - at).dot(front) < -0.5
 	_check(through, "a 40-damage hit breaks it and the window is open (nothing in the window's plane)")
 	_check(not vis.visible, "the broken pane's glass is hidden")
-	pane.call("restore_now")
+	pane.get_parent().call("restore_now", pane.get_index())
 	for i in 3:
 		await physics_frame
 	_check(vis.visible and not _ray(outside, inside).is_empty(), "restored: glass back, the window closed again")
+
+	# the car's glass rule (WeaponItem.throughGlass): a heavy round breaks a pane and carries on, a light one stops in it
+	var shooter: CharacterBody3D = world.get_node("Characters/Player")
+	helper.call("give_weapon", shooter, "ASR1")
+	for i in 20:
+		await physics_frame
+	var gun: Node = null
+	for n in shooter.find_children("*", "", true, false):
+		if n.has_method("probe_shot"):
+			gun = n
+	var others := []
+	for p in panes:
+		if p != pane:
+			others.append(p)
+	if gun != null and others.size() >= 2:
+		var pa: Vector3 = (others[0] as Node3D).get_node("Glass").global_position
+		var r: String = gun.call("probe_shot", pa + front * 4.0, -front, 30.0)
+		var da := float(r.split("|")[1]) if r.contains("|") else 99.0
+		_check(bool(others[0].get_parent().call("pane_broken_now", others[0].get_index())) and da > 4.3,
+				"a heavy round breaks a pane and carries on into the shop (%s)" % r)
+		var pb: Vector3 = (others[1] as Node3D).get_node("Glass").global_position
+		r = gun.call("probe_shot", pb + front * 4.0, -front, 10.0)
+		var db := float(r.split("|")[1]) if r.contains("|") else 99.0
+		_check(bool(others[1].get_parent().call("pane_broken_now", others[1].get_index())) and db < 4.3,
+				"a light round breaks a pane and stops in it (%s)" % r)
+		for o in others.slice(0, 2):
+			o.get_parent().call("restore_now", o.get_index())
+	else:
+		_check(false, "an armed shooter and two more panes")
+	for i in 3:
+		await physics_frame
 
 	# a hostile outside sees a player inside through intact glass, and shoots the glass out
 	var player: CharacterBody3D = world.get_node("Characters/Player")
@@ -103,7 +134,7 @@ func _initialize() -> void:
 			await physics_frame
 		t += 0.5
 		for p in panes:
-			if bool(p.call("broken_now")):
+			if bool(p.get_parent().call("pane_broken_now", p.get_index())):
 				broken_at = t
 		if broken_at >= 0:
 			break

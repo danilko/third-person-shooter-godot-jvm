@@ -405,6 +405,11 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     public void _physicsProcess(double delta) {
         updateSpatialCell(delta);
         watchDriverDefeat();
+        if (!crashedPanes.isEmpty()) {
+            for (com.openworld.world.GlassPanes.Pane bp : crashedPanes)
+                if (GD.isInstanceValid(bp.set())) bp.hit(getGlobalPosition());
+            crashedPanes.clear();
+        }
         // a dummy that is hit (a bullet, a blast, a ram) is made real at once: it must react like a car
         if (dummyMode && getNodeOrNull("Health") instanceof Health hh) {
             float hp = hh.getCurrentHealth();
@@ -1575,6 +1580,10 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
      * or landing on the ground, not a crash, and is skipped - the wheels are rays, so the hull only touches the
      * ground when something has gone wrong, and a hard landing is the suspension's business.
      */
+    /** A car this fast breaks a building's window it drives into (m/s). */
+    private static final double PANE_CRASH_SPEED = 3.0;
+    private final java.util.List<com.openworld.world.GlassPanes.Pane> crashedPanes = new java.util.ArrayList<>();
+
     private void feedCrash(PhysicsDirectBodyState3D state, int count) {
         double mass = Math.max(1.0, getMass());
         double dv = 0.0;
@@ -1584,6 +1593,12 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         for (int i = 0; i < count; i++) {
             Vector3 impulse = state.getContactImpulse(i);
             double d = impulse.length() / mass;
+            // a car driven into a building's window breaks it (the car's own glass rule, world.GlassPanes)
+            if (state.getContactColliderObject(i) instanceof Node pn
+                    && state.getLinearVelocity().length() > PANE_CRASH_SPEED) {
+                com.openworld.world.GlassPanes.Pane bp = com.openworld.world.GlassPanes.paneOf(pn);
+                if (bp != null && !bp.broken()) crashedPanes.add(bp);
+            }
             if (d < 0.05 || state.getContactLocalNormal(i).dot(up) > 0.7) continue;
             if (CRASH_TRACE && d > bestD) {
                 bestD = d;
