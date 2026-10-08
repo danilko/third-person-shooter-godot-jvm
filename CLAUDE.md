@@ -11157,6 +11157,13 @@ User: the chase stopped at buildings and every unit carried small arms. All of i
     distance). Readout `interior_nav_now` ("units switched,regions attached"); `EnforcementDispatch.interior_nav` off
     is the control.
   * Seen: units die in their own crossfire in a police station corridor. Not addressed.
+  * **Stations were navmesh ISLANDS until 2026-10-08** (units never reached a player in one). Two bake defects: the
+    footprint apron stood at the building ORIGIN, which for a station is the track bed (7.8 m over an elevated hub's
+    street), so it cut every stairwell with a floor in mid-air; and the 0.175 m cell with a 0.35 m radius eroded the
+    ticket-gate lanes shut. A station's apron now sits at its street (the lowest walkable floor at the footprint
+    edge, from a first bake) and interior nav is cell 0.1 / radius 0.3 (`InteriorNav.CELL` must equal the bake's).
+    Central 122 components -> one of 8967 polygons. Gate `tools/godot/check_building_nav.gd` (every station's largest
+    component >= 85%; `--all` reports the other types, whose walkable roofs are islands by design).
 - `escalation_now` readout: `models;rammers;shells;snipers;helis;heliShots;heliHits;breachRoutes;breachedIn;doorsForced`.
   Gate `tools/godot/probe_escalation.gd` (5 stars every piece; `--control` 2 stars none).
 - **Not built yet**: breakable building glass (shopfront panes are merged into the building mesh with a solid wall
