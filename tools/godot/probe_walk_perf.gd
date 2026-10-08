@@ -225,8 +225,11 @@ func _leg(label: String, path: Array, speed: float) -> void:
 	var ed := root.get_node_or_null("GameManager/EnforcementDispatch")
 	var zmc := root.get_node_or_null("ZoneManager")
 	if ed != null and zmc != null:
-		print("    enforcement units (foot,cars en route,cars arrived,arrests) %s; ambient traffic %d / budget %d" % [
+		print("    enforcement units (foot,cars en route,cars arrived,0,stuck given up,cars discarded) %s; ambient traffic %d / budget %d" % [
 				str(ed.call("units_now")), int(zmc.call("traffic_alive_now")), int(zmc.call("effective_traffic_budget_now"))])
+		var esc := str(ed.call("escalation_now")).split(";")
+		if esc.size() >= 9:
+			print("    breach: routes %s, units got inside %s, doors forced %s" % [esc[6], esc[7], esc[8]])
 		print("    traffic near the player over the leg: mean %.1f within 100 m, %.1f within 200 m; recycled (leaving) %d" % [
 				near_sum[0] / maxf(1.0, near_n), near_sum[1] / maxf(1.0, near_n), int(zmc.call("traffic_recycled_now"))])
 	if under_terrain > under0:
@@ -339,6 +342,14 @@ func _initialize() -> void:
 	await process_frame
 	await process_frame
 	cam.make_current()
+	if _arg("no-breach", false):
+		var gmb := root.get_node_or_null("GameManager")
+		var edb = gmb.get_node_or_null("EnforcementDispatch") if gmb != null else null
+		if edb != null:
+			edb.set("breaching", false)
+			print("CONTROL: units do not follow the player into buildings")
+		else:
+			print("CONTROL --no-breach NOT applied: no EnforcementDispatch")
 	if _arg("no-think", false):
 		# after the world's first frames: GameManager builds the dispatch in its _ready
 		var gm0 := root.get_node_or_null("GameManager")
@@ -358,6 +369,11 @@ func _initialize() -> void:
 	# into a downtown konbini (KonbiniS at (569.1, -322.0), its door facing +X at (579.0, -322.0))
 	await _leg("enter_konbini", [Vector3(605, g, -322.0), Vector3(579.5, g, -322.0), Vector3(575.0, g, -322.0),
 			Vector3(570.0, g, -320.0)], 2.0)
+	# STANDING INSIDE that konbini for 90 s (user 2026-10-07: indoors read faster in the morning because the units
+	# stayed outside; once they breach, the fight is in the room). Off the default list: --legs=stand_konbini.
+	# Compare with --no-breach (the units held outside).
+	if _arg("legs") != null and "stand_konbini" in str(_arg("legs")).split(","):
+		await _leg("stand_konbini", [Vector3(574.0, g, -320.0), Vector3(573.1, g, -320.0)], 0.01)
 	# round the Broadcast Centre (the site at (680, -365) that replaced Tokyo Tower)
 	await _leg("walk_tower", [Vector3(620, g, -300), Vector3(740, g, -300), Vector3(740, g, -430),
 			Vector3(620, g, -430)], 5.0)
