@@ -55,23 +55,83 @@ func _settle(seconds: float) -> void:
 			return
 
 
-## `--fogs=off;0,700,0.001;...` (PLAN.md 2b): per shot, one picture per Sky3D distance-fog setting --
-## `off`, or `start,end,density` (SkyDome fog_start / fog_end / fog_density, Sky3D.fog_enabled on).
+## `--fogs=off;0,700,0.001;sky:0,1000,0.0007+depth:550,700+far:700;...` (PLAN.md 2b): per shot, one picture
+## per variant. A variant is `off` or `+`-joined parts:
+##   `start,end,density` or `sky:start,end,density` -- Sky3D's screen fog (SkyDome fog_start/end/density);
+##   `depth:begin,end[,curve]` -- Godot's DEPTH fog on the Environment, fully opaque at `end`, coloured by the sky
+##     behind it (fog_aerial_perspective 1), the sky itself left clear (fog_sky_affect 0);
+##   `far:D` -- the camera's far plane (note: it also clips Sky3D's own fog layer, so the sky changes);
+##   `cull:D` -- every mesh outside the terrain and the sky gets visibility_range_end <= D + its own radius (its
+##     nearest point is then at least D away, i.e. fully fogged), which is what a `world.ViewDistance` would do; a
+##     mesh wider than CULL_MAX_R (a cell's lots, its HLOD) is left alone. A `cull` picture must match the same
+##     variant without it.
+var _ranges := {}
+const CULL_MAX_R := 150.0
+
+
+func _cull(d: float) -> void:
+	var stack: Array = [w]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		if n.name == "Sky3D" or n.get_class() == "Terrain3D":
+			continue
+		if n is GeometryInstance3D:
+			var g := n as GeometryInstance3D
+			var id := g.get_instance_id()
+			if not _ranges.has(id):
+				_ranges[id] = g.visibility_range_end
+			var orig: float = _ranges[id]
+			var r := g.get_aabb().size.length() * 0.5
+			if g is MultiMeshInstance3D or r > CULL_MAX_R:
+				r = INF
+			var e := d + r
+			g.visibility_range_end = e if d > 0.0 and r < INF and (orig <= 0.0 or orig > e) else orig
+		for c in n.get_children():
+			stack.append(c)
+
+
 func _set_fog(spec: String) -> void:
 	var sky := w.get_node_or_null("Sky3D")
 	var dome := w.get_node_or_null("Sky3D/SkyDome")
 	if sky == null or dome == null:
 		return
+	var env: Environment = sky.get("environment")
+	sky.set("fog_enabled", false)
+	if env != null:
+		env.fog_enabled = false
+	cam.far = 4000.0
+	_cull(0.0)
 	if spec == "off":
-		sky.set("fog_enabled", false)
 		return
-	var v := spec.split(",")
-	sky.set("fog_enabled", true)
-	dome.set("fog_visible", true)
-	dome.set("fog_start", float(v[0]))
-	dome.set("fog_end", float(v[1]))
-	if v.size() > 2:
-		dome.set("fog_density", float(v[2]))
+	for part in spec.split("+", false):
+		var kind := "sky"
+		var body := str(part)
+		if body.contains(":"):
+			kind = body.get_slice(":", 0)
+			body = body.get_slice(":", 1)
+		var v := body.split(",")
+		match kind:
+			"sky":
+				sky.set("fog_enabled", true)
+				dome.set("fog_visible", true)
+				dome.set("fog_start", float(v[0]))
+				dome.set("fog_end", float(v[1]))
+				if v.size() > 2:
+					dome.set("fog_density", float(v[2]))
+			"depth":
+				env.fog_enabled = true
+				env.fog_mode = Environment.FOG_MODE_DEPTH
+				env.fog_depth_begin = float(v[0])
+				env.fog_depth_end = float(v[1])
+				env.fog_depth_curve = float(v[2]) if v.size() > 2 else 1.0
+				env.fog_density = 1.0
+				env.fog_height_density = 0.0
+				env.fog_aerial_perspective = 1.0
+				env.fog_sky_affect = 0.0
+			"far":
+				cam.far = float(v[0])
+			"cull":
+				_cull(float(v[0]))
 
 
 func _initialize() -> void:
@@ -93,8 +153,13 @@ func _run() -> void:
 	if tod != null:
 		tod.set("game_time_enabled", false)
 		tod.set("current_time", float(str(_arg("time", ["12"])[0])))
+	# the clouds drift with the wind: freeze them so two variants of one shot differ only by the variant
 	root.add_child(w)
 	current_scene = w
+	for n in ["Sky3D", "Sky3D/SkyDome"]:
+		var s3 := w.get_node_or_null(n)
+		if s3 != null:
+			s3.set("wind_speed", 0.0)
 	var player := w.get_node_or_null("Characters/Player")
 	if player != null:
 		player.get_node("Health").set("max_health", 1000000.0)
@@ -137,7 +202,7 @@ func _run() -> void:
 		for fog in fogs:
 			var tag := ""
 			if fog != "":
-				tag = "_fog_" + str(fog).replace(",", "-")
+				tag = "_fog_" + str(fog).replace(",", "-").replace(":", "").replace("+", "_")
 				_set_fog(str(fog))
 				for i in 6:
 					await process_frame
