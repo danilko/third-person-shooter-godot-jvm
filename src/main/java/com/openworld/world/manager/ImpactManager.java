@@ -91,7 +91,7 @@ public class ImpactManager extends Node {
         if (pm != null) pm.spawn(ctx.surface, info.hitPoint, info.hitNormal);
 
         boolean bullet = kind == com.openworld.world.DamageKind.BULLET;
-        mark(ctx, info, kind);
+        mark(ctx, info, kind, damage);
         if (bullet) impactSound(ctx.surface, info.hitPoint);   // melee: MeleeItem
 
         if (SHOT_TRACE && attackerId != null && !attackerId.isEmpty()) traceHit(info, ctx, damage);
@@ -172,7 +172,7 @@ public class ImpactManager extends Node {
         if (normal != null && surface != SurfaceType.FLESH) {
             Node hit = colliderAt(point, normal);
             HitContext ctx = hit != null ? resolveHitContext(hit) : null;
-            if (ctx != null) mark(ctx, new HitInfo(hit, point, normal), com.openworld.world.DamageKind.BULLET);
+            if (ctx != null) mark(ctx, new HitInfo(hit, point, normal), com.openworld.world.DamageKind.BULLET, 0f);
             else {
                 DecalManager dm = getDecalManager();
                 if (dm != null) dm.spawn(point, normal, DecalManager.Mark.HOLE, surface, null, 0f);
@@ -190,7 +190,7 @@ public class ImpactManager extends Node {
         HitContext ctx = resolveHitContext(info.hitNode);
         ParticleManager pm = getParticleManager();
         if (pm != null) pm.spawn(ctx.surface, info.hitPoint, info.hitNormal);
-        mark(ctx, info, kind);
+        mark(ctx, info, kind, 0f);
         if (kind == com.openworld.world.DamageKind.BULLET) impactSound(ctx.surface, info.hitPoint);
     }
 
@@ -199,7 +199,16 @@ public class ImpactManager extends Node {
      * geometry a pooled world-space decal; on a car (not its tyre) a decal parented to the car so it rides with it; on
      * a character nothing (blood particles only).
      */
-    private void mark(HitContext ctx, HitInfo info, com.openworld.world.DamageKind kind) {
+    /**
+     * A bullet hole's size by the round's damage (the weapon's per-round damage before any target multiplier): one
+     * texture, sized by calibre -- an SMG / pistol / shotgun pellet small, a rifle medium, a hand cannon or a sniper
+     * large. 0 = unknown (a peer replaying a host-resolved shot): the template's size.
+     */
+    public static double calibreScale(float damage) {
+        return damage <= 0f ? 1.0 : Math.max(0.6, Math.min(1.8, 0.55 + damage / 90.0));
+    }
+
+    private void mark(HitContext ctx, HitInfo info, com.openworld.world.DamageKind kind, float damage) {
         DecalManager dm = getDecalManager();
         if (dm == null || info == null || info.hitNormal == null || ctx.character != null || ctx.wheel != null) return;
         DecalManager.Mark m = switch (kind == null ? com.openworld.world.DamageKind.BULLET : kind) {
@@ -208,10 +217,22 @@ public class ImpactManager extends Node {
             default -> null;
         };
         if (m == null) return;
-        godot.api.Node3D body = ctx.healthOwner instanceof com.openworld.carrier.vehicle.Vehicle v ? v : null;
+        godot.api.Node3D body = carrierOf(ctx.healthOwner);
         if (ctx.healthOwner != null && body == null) return;       // something else alive / moving: no mark
         if (body == null && info.hitNode instanceof godot.api.RigidBody3D) return;   // a loose prop: it would float
-        dm.spawn(info.hitPoint, info.hitNormal, m, ctx.surface, body, 0f);
+        float size = m == DecalManager.Mark.HOLE && dm.holeSize() > 0
+                ? (float) (dm.holeSize() * calibreScale(damage)) : 0f;
+        dm.spawn(info.hitPoint, info.hitNormal, m, ctx.surface, body, size);
+    }
+
+    /**
+     * The carrier a mark rides on: a vehicle (car, motorbike, boat, helicopter, plane) or a train car (its body is
+     * rebuilt with the camera, which takes its marks with it). Null for anything else that has Health.
+     */
+    static godot.api.Node3D carrierOf(Node healthOwner) {
+        if (healthOwner instanceof com.openworld.carrier.vehicle.Vehicle v) return v;
+        if (healthOwner instanceof godot.api.AnimatableBody3D a && a.isInGroup(new godot.core.StringName("train_car"))) return a;
+        return null;
     }
 
     /** The collider within 6 cm behind {@code point} along {@code -normal} (WORLD and VEHICLE), or null. */

@@ -149,6 +149,7 @@ public class ExplosionManager extends Node {
         com.openworld.audio.Sounds.play3D(soundParent, com.openworld.audio.Sound.EXPLOSION, center,
                 (float) Math.max(25.0, 4.0 * damageRadius), 0.08f);
         scorch(center, damageRadius);
+        scorchVehicles(center, damageRadius);
         PackedScene scene = vfx != null ? vfx : explosionScene;
         if (scene == null) return;
         Pool p = pools.computeIfAbsent(scene, k -> new Pool());
@@ -195,6 +196,31 @@ public class ExplosionManager extends Node {
         if (hit.get("collider") instanceof godot.api.RigidBody3D) return;
         float size = damageRadius > 0f ? (float) Math.max(1.5, Math.min(6.0, 0.8 * damageRadius)) : 3f;
         dm.spawn(at, n, DecalManager.Mark.SCORCH, com.openworld.world.SurfaceType.DEFAULT, null, size);
+    }
+
+    /**
+     * A blast close to a vehicle burns the side facing it: a scorch parented to the vehicle where a ray from the
+     * blast meets its hull, sized to the blast (0.35 x the radius, 0.8..2 m). Every peer, from the same centre.
+     */
+    private void scorchVehicles(Vector3 center, float damageRadius) {
+        if (damageRadius <= 0f || getTree() == null) return;
+        if (!(getTree().getFirstNodeInGroup(new godot.core.StringName("decal_manager")) instanceof DecalManager dm)) return;
+        var w = getViewport() == null ? null : getViewport().getWorld3d();
+        var space = w == null ? null : w.getDirectSpaceState();
+        if (space == null) return;
+        float size = (float) Math.max(0.8, Math.min(2.0, 0.35 * damageRadius));
+        for (Node node : getTree().getNodesInGroup("characters")) {
+            if (!(node instanceof com.openworld.carrier.vehicle.Vehicle v) || !v.isInsideTree()) continue;
+            if (distanceToBody(v, center) > 0.6 * damageRadius) continue;
+            Vector3 away = center.minus(v.getGlobalPosition());
+            Vector3 from = away.lengthSquared() > 1e-4 ? center.plus(away.normalized().times(1.5)) : center.plus(new Vector3(0, 3, 0));
+            var q = godot.api.PhysicsRayQueryParameters3D.create(from, v.getGlobalPosition(),
+                    com.openworld.util.CollisionLayers.VEHICLE, new godot.core.VariantArray<>(godot.core.RID.class));
+            var hit = space.intersectRay(q);
+            if (hit == null || hit.isEmpty() || hit.get("collider") != v
+                    || !(hit.get("position") instanceof Vector3 at) || !(hit.get("normal") instanceof Vector3 n)) continue;
+            dm.spawn(at, n, DecalManager.Mark.SCORCH, com.openworld.world.SurfaceType.METAL, v, size);
+        }
     }
 
     /** Pool one more instance of {@code scene}; null if its root is not a VfxEffect. */

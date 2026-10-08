@@ -205,6 +205,17 @@ func _initialize() -> void:
 	await _tick(1)
 	var after: Vector3 = (marks[0] as Node3D).global_position - car.global_position
 	_check("  ... and move with it", before.distance_to(after) < 0.01, "%.3f m" % before.distance_to(after))
+	helper.call("kind_hit", im, car, 22.0, "BULLET")
+	var small := float(dm.call("last_mark_size_now"))
+	helper.call("kind_hit", im, car, 150.0, "BULLET")
+	var big := float(dm.call("last_mark_size_now"))
+	_check("a hole is sized by calibre (an SMG round small, a sniper round large)", big > 1.5 * small,
+		"%.3f m vs %.3f m" % [small, big])
+	var a0 := int(dm.call("marks_attached_now"))
+	helper.call("blast", world.get_child(2), car.global_position + Vector3(2.6, 0.2, 0), 6.0, 1.0)
+	await _tick(2)
+	_check("a blast beside the car scorches its side", int(dm.call("marks_attached_now")) == a0 + 1,
+		"attached +%d" % (int(dm.call("marks_attached_now")) - a0))
 
 	print("=== impact particles per surface ===")
 	for st in ["FLESH", "DEFAULT", "METAL", "WOOD", "GLASS", "WATER"]:
@@ -237,6 +248,29 @@ func _initialize() -> void:
 	tracer.call("spawn_tracer", Vector3(-60, 6, -8), Vector3(-60, 3.5, 4))
 	tracer.call("spawn_tracer", Vector3(0, 1, -8), Vector3(0, 0.5, 4))
 	_check("  ... a shot over the water or on land does not", int(pm.call("bursts_now", "WATER")) == w0 + 1)
+	var crate := RigidBody3D.new()                      # a car-layer body dropped in: an entry splash, then a wake
+	crate.collision_layer = 16
+	crate.collision_mask = 1
+	var ccs := CollisionShape3D.new()
+	var cbox := BoxShape3D.new()
+	cbox.size = Vector3(2, 1.4, 4)
+	ccs.shape = cbox
+	crate.add_child(ccs)
+	world.add_child(crate)
+	crate.global_position = Vector3(-60, 9, 6)
+	var bs0 := int(wv.call("body_splashes_now"))
+	await _tick(80)
+	_check("a car-sized body falling in splashes", int(wv.call("body_splashes_now")) == bs0 + 1,
+		"+%d" % (int(wv.call("body_splashes_now")) - bs0))
+	crate.gravity_scale = 0.0
+	crate.global_position = Vector3(-66, 3.0, 6)
+	var wk0 := int(wv.call("wakes_now"))
+	for i in 60:
+		crate.linear_velocity = Vector3(9, 0, 0)
+		await physics_frame
+	_check("  ... and moving across the surface throws a bow wake", int(wv.call("wakes_now")) >= wk0 + 3,
+		"+%d" % (int(wv.call("wakes_now")) - wk0))
+	crate.queue_free()
 	p.global_position = Vector3(-60, 8, 0)
 	var sp0 := int(p.call("splashes_now"))
 	await _tick(90)

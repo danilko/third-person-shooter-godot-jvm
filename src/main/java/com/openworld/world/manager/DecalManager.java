@@ -164,14 +164,23 @@ public class DecalManager extends Node {
         } * (mark == Mark.SCORCH ? 1.0 : k);
         if (mark != Mark.SCORCH && size > 0f) w = size * k;
         // a scorch projects through a deep box so it lands on uneven ground; a hole or slash only a few cm deep
-        double depth = mark == Mark.SCORCH ? Math.max(1.0, w * 0.4) : 0.1;
+        // (on a car the scorch is shallow too, or it projects through the body onto the far side)
+        double depth = mark == Mark.SCORCH ? (attachTo != null ? 0.35 : Math.max(1.0, w * 0.4)) : 0.1;
+        lastSize = w;
         d.setSize(new Vector3(w, depth, w));
-        Vector3 at = hitPoint.plus(n.times(mark == Mark.SCORCH ? 0.1 : 0.005));
+        Vector3 at = hitPoint.plus(n.times(mark == Mark.SCORCH && attachTo == null ? 0.1 : 0.005));
         orient(d, n, at);
         d.rotateObjectLocal(Vector3.Companion.getUP(), (float) (Math.random() * Math.PI * 2));
         d.setVisible(true);
         spawned.merge(mark, 1, Integer::sum);
     }
+
+    /** The template's hole size (m), the size a bullet hole is scaled from by calibre. */
+    public double holeSize() { return baseSize == null ? 0.0 : baseSize.getX(); }
+
+    /** The size (m) of the last mark made (probe readout). */
+    @Register public double lastMarkSizeNow() { return lastSize; }
+    private double lastSize;
 
     /** Marks of {@code mark} made so far (probe readout, by name: "HOLE", "SLASH", "SCORCH"). */
     @Register public int marksSpawnedNow(String mark) {

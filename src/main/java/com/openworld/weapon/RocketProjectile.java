@@ -74,7 +74,16 @@ public class RocketProjectile extends RigidBody3D implements Detonatable, Cosmet
         // Maintain constant forward speed along current facing direction.
         // Using globalBasis.getZ() * -speed keeps thrust stable after any deflection.
         setLinearVelocity(getGlobalBasis().getZ().times(-speed));
+        // a rocket fired down into water splashes where it crosses the surface (it flies on to the bottom)
+        godot.core.Vector3 now = getGlobalPosition();
+        if (lastPos != null && now.getY() < lastPos.getY()) {
+            godot.core.Vector3 w = com.openworld.world.Splash.crossing(getTree(), lastPos, now);
+            if (w != null) com.openworld.world.Splash.at(this, w, 1.0, com.openworld.audio.Sound.SPLASH, 0f);
+        }
+        lastPos = now;
     }
+
+    private godot.core.Vector3 lastPos;
 
     // ── Signal callback ───────────────────────────────────────────────────────
 

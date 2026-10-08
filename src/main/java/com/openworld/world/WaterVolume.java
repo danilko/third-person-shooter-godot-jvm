@@ -59,6 +59,10 @@ public class WaterVolume extends Area3D {
   @Override
   public void _ready() {
 	addToGroup(new StringName(WATER_GROUP));
+	// the scenes author the mask for characters; vehicles (cars, boats, aircraft) and dropped items are watched too,
+	// for their splash and wake -- nothing else reacts to them here
+	setCollisionMask(getCollisionMask() | com.openworld.util.CollisionLayers.VEHICLE | com.openworld.util.CollisionLayers.PICKUP);
+	setPhysicsProcess(false);
 	// godot-jvm registers @Register methods under their snake_case names.
 	connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_body_entered"));
 	connect(new StringName("body_exited"), MethodCallable.createUnsafe(this, "on_body_exited"));
@@ -103,13 +107,89 @@ public class WaterVolume extends Area3D {
   @Register
   public void onBodyEntered(Node3D body) {
 	Character c = resolveCharacter(body);
-	if (c != null) c.setInWater(true, getSurfaceY());
+	if (c != null) { c.setInWater(true, getSurfaceY()); return; }
+	if (body instanceof godot.api.RigidBody3D rb) floaterEntered(rb);
   }
 
   @Register
   public void onBodyExited(Node3D body) {
 	Character c = resolveCharacter(body);
-	if (c != null) c.setInWater(false, 0.0);
+	if (c != null) { c.setInWater(false, 0.0); return; }
+	floaters.remove(body.getInstanceId());
+	if (floaters.isEmpty()) setPhysicsProcess(false);
+  }
+
+  // ── splashes and wakes of things that are not characters (world.Splash) ──────────────────────────────────────
+
+  /** A rigid body in the water (a car, a boat, an aircraft, a dropped item): its size, and when it may next wake. */
+  private static final class Floater {
+	final godot.api.RigidBody3D body; final double r; double nextWake;
+	Floater(godot.api.RigidBody3D b, double r) { body = b; this.r = r; }
+  }
+  private final java.util.HashMap<Long, Floater> floaters = new java.util.HashMap<>();
+  private double clock;
+  private int bodySplashes, wakes;
+  /** Splashes of non-character bodies entering / wake sprays so far (probe readouts). */
+  @Register public int bodySplashesNow() { return bodySplashes; }
+  @Register public int wakesNow() { return wakes; }
+
+  /** A wake spray at most this often per body (s), and only above this horizontal speed (m/s). */
+  public static final double WAKE_EVERY = 0.25, WAKE_SPEED = 3.0;
+
+  private void floaterEntered(godot.api.RigidBody3D rb) {
+	double r = halfSize(rb);
+	floaters.put(rb.getInstanceId(), new Floater(rb, r));
+	setPhysicsProcess(true);
+	Vector3 v = rb.getLinearVelocity();
+	double down = Math.max(0.0, -v.getY());
+	double flat = Math.hypot(v.getX(), v.getZ());
+	if (down < 1.5 && flat < WAKE_SPEED) return;              // set down in the water (a moored boat, a spawn): none
+	double scale = Math.max(0.3, Math.min(4.0, r * (0.35 + down / 10.0 + flat / 30.0)));
+	Vector3 p = rb.getGlobalPosition();
+	if (Splash.at(this, new Vector3(p.getX(), getSurfaceY(), p.getZ()), scale,
+			scale > 0.8 ? com.openworld.audio.Sound.SPLASH : com.openworld.audio.Sound.SPLASH_SMALL,
+			(float) Math.min(6.0, -6.0 + 3.0 * scale))) bodySplashes++;
+  }
+
+  /** Half the largest horizontal extent of the body's collision shapes (m), at least 0.2. */
+  private static double halfSize(godot.api.RigidBody3D rb) {
+	double r = 0.2;
+	for (Node ch : rb.getChildren()) {
+	  if (ch instanceof CollisionShape3D cs && cs.getShape() != null && cs.getShape().getDebugMesh() != null) {
+		godot.core.AABB a = cs.getShape().getDebugMesh().getAabb();
+		Vector3 sc = cs.getScale();
+		r = Math.max(r, 0.5 * Math.max(a.getSize().getX() * sc.getX(), a.getSize().getZ() * sc.getZ()));
+	  }
+	}
+	return r;
+  }
+
+  /**
+   * A body moving across the surface throws a spray at its bow, by speed: a boat under way, a car driving through
+   * shallow water. Only while it is AT the surface (a sunk car makes none).
+   */
+  @Register
+  @Override
+  public void _physicsProcess(double delta) {
+	clock += delta;
+	double sy = getSurfaceY();
+	java.util.Iterator<Floater> it = floaters.values().iterator();
+	while (it.hasNext()) {
+	  Floater f = it.next();
+	  if (!godot.global.GD.isInstanceValid(f.body) || !f.body.isInsideTree()) { it.remove(); continue; }
+	  if (clock < f.nextWake) continue;
+	  Vector3 v = f.body.getLinearVelocity();
+	  double flat = Math.hypot(v.getX(), v.getZ());
+	  if (flat < WAKE_SPEED) continue;
+	  Vector3 p = f.body.getGlobalPosition();
+	  if (p.getY() < sy - 1.5 * f.r || p.getY() > sy + 1.5) continue;    // under the water, or flying over it
+	  f.nextWake = clock + WAKE_EVERY;
+	  Vector3 dir = new Vector3(v.getX() / flat, 0, v.getZ() / flat);
+	  Vector3 bow = new Vector3(p.getX(), sy, p.getZ()).plus(dir.times(f.r * 0.8));
+	  double scale = Math.min(2.5, (0.25 + flat / 14.0) * Math.sqrt(f.r / 2.0));
+	  if (Splash.at(this, bow, scale, null, 0f)) wakes++;
+	}
+	if (floaters.isEmpty()) setPhysicsProcess(false);
   }
 
   /**
