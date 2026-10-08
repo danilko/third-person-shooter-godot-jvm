@@ -59,13 +59,20 @@ public class VfxEffect extends Node3D {
     private AnimationPlayer anim;
     private final List<GPUParticles3D> particles = new ArrayList<>();
 
+    private final java.util.Set<GPUParticles3D> subEmitterTargets = new java.util.HashSet<>();
+
     @Register
     @Override
     public void _ready() {
         particles.clear();
+        subEmitterTargets.clear();
         for (Node c : getChildren()) {
             if (c instanceof GPUParticles3D p) particles.add(p);
             else if (c instanceof AnimationPlayer a) anim = a;
+        }
+        for (GPUParticles3D p : particles) {
+            godot.core.NodePath sub = p.getSubEmitter();
+            if (sub != null && !sub.isEmpty() && p.getNodeOrNull(sub) instanceof GPUParticles3D t) subEmitterTargets.add(t);
         }
         applySpeedScale();
     }
@@ -73,7 +80,9 @@ public class VfxEffect extends Node3D {
     /** Restart the effect from its first frame. Safe to call while it is still playing. */
     @Register
     public void play() {
-        for (GPUParticles3D p : particles) p.restart();
+        // a sub-emitter target (BitsTrail) is fed by its parent's particles: restarting it would make it emit on its
+        // own, at the effect's origin, for as long as it is not one-shot -- a black smoke ball left at every blast
+        for (GPUParticles3D p : particles) if (!subEmitterTargets.contains(p)) p.restart();
         if (anim == null || !anim.hasAnimation(MAIN)) return;
         anim.stop();
         anim.play(MAIN);

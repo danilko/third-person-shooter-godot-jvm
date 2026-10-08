@@ -16,6 +16,8 @@ const IMPACT := "res://src/main/java/com/openworld/world/manager/ImpactManager.j
 const EXPLO  := "res://src/main/java/com/openworld/world/manager/ExplosionManager.java"
 const DOOR   := "res://src/main/java/com/openworld/world/Door.java"
 const DECALS := "res://src/main/java/com/openworld/world/manager/DecalManager.java"
+const CAR    := "res://src/main/resources/com/openworld/vehicle/SPC1.tscn"
+const HELPER := "res://src/main/java/com/openworld/debug/VehicleProbeHelper.java"
 ## Sounds that may have no file yet (README "Wired in code" says missing).
 const ALLOWED_MISSING := ["SIREN"]
 
@@ -110,7 +112,8 @@ func _initialize() -> void:
 		await _press("fire", 2)
 		await _tick(40)
 	_check("a punch on a body plays a flesh hit", _plays("MELEE_HIT_FLESH") > m0, "+%d" % (_plays("MELEE_HIT_FLESH") - m0))
-	_check("  ... and leaves no bullet hole", int(dm.call("decals_spawned_now")) == 0, "%d" % int(dm.call("decals_spawned_now")))
+	_check("  ... and leaves no mark", int(dm.call("decals_spawned_now")) == 0 and int(dm.call("marks_spawned_now", "SLASH")) == 0,
+		"holes %d slashes %d" % [int(dm.call("decals_spawned_now")), int(dm.call("marks_spawned_now", "SLASH"))])
 	t.queue_free()
 	await _tick(5)
 
@@ -136,7 +139,7 @@ func _initialize() -> void:
 	for c in dm.get_children():
 		if c is Decal and (c as Decal).visible and (c as Decal).texture_albedo != null:
 			shown = (c as Decal).texture_albedo.resource_path
-	_check("  ... and leaves a stone bullet hole", int(dm.call("decals_spawned_now")) == 1 and shown.ends_with("bullet_hole_stone.png"), shown)
+	_check("  ... and leaves a bullet hole", int(dm.call("decals_spawned_now")) == 1 and shown.ends_with("impact_hole.png"), shown)
 	await _tick(100)                       # the bolt cycle
 	gun.set("magazine", 0)
 	gun.set("reserve", 0)
@@ -163,6 +166,34 @@ func _initialize() -> void:
 	(world.get_child(2) as Node).call("spawn_explosion", p.global_position + Vector3(8, 0, 0))
 	await _tick(5)
 	_check("an explosion bangs", _plays("EXPLOSION") == e0 + 1, "+%d" % (_plays("EXPLOSION") - e0))
+	_check("  ... and scorches the ground under it", int(dm.call("marks_spawned_now", "SCORCH")) == 1,
+		"%d" % int(dm.call("marks_spawned_now", "SCORCH")))
+
+	print("=== marks on a car ride with it ===")
+	var car: Node3D = (load(CAR) as PackedScene).instantiate() as Node3D
+	world.add_child(car)
+	car.global_position = p.global_position + Vector3(0, 0.5, 10)
+	await _tick(30)
+	var helper: Node = load(HELPER).new()
+	world.add_child(helper)
+	var im: Node = world.get_child(1)
+	helper.call("kind_hit", im, car, 5.0, "BULLET")
+	helper.call("kind_hit", im, car, 5.0, "BLADE")
+	helper.call("kind_hit", im, car, 5.0, "BLUNT")
+	await _tick(2)
+	var marks := car.get_children().filter(func(c): return c is Decal and c.is_in_group("impact_mark"))
+	_check("a bullet and a blade mark the car, a blunt blow does not", marks.size() == 2 and int(dm.call("marks_attached_now")) == 2,
+		"%d on the car" % marks.size())
+	for i in 20:
+		helper.call("kind_hit", im, car, 1.0, "BULLET")
+	await _tick(2)
+	marks = car.get_children().filter(func(c): return c is Decal and c.is_in_group("impact_mark") and not c.is_queued_for_deletion())
+	_check("  ... capped per car", marks.size() <= 14, "%d kept" % marks.size())
+	var before: Vector3 = (marks[0] as Node3D).global_position - car.global_position
+	car.global_position += Vector3(5, 0, 0)
+	await _tick(1)
+	var after: Vector3 = (marks[0] as Node3D).global_position - car.global_position
+	_check("  ... and move with it", before.distance_to(after) < 0.01, "%.3f m" % before.distance_to(after))
 
 	print("")
 	print("RESULT %s (%d checks, %d failures)" % ["PASS" if fails == 0 else "FAIL", checks, fails])

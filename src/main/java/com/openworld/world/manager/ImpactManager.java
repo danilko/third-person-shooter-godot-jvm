@@ -88,12 +88,10 @@ public class ImpactManager extends Node {
         HitContext ctx = resolveHitContext(info.hitNode);
 
         ParticleManager pm = getParticleManager();
-        if (pm != null) pm.spawn(ctx.surface, info.hitPoint);
+        if (pm != null) pm.spawn(ctx.surface, info.hitPoint, info.hitNormal);
 
         boolean bullet = kind == com.openworld.world.DamageKind.BULLET;
-        DecalManager dm = getDecalManager();
-        // a hole only from a bullet, and never on something that moves (a body, a car: the decal stays in the world)
-        if (dm != null && bullet && ctx.healthOwner == null) dm.spawn(info.hitPoint, info.hitNormal, ctx.surface);
+        mark(ctx, info, kind);
         if (bullet) impactSound(ctx.surface, info.hitPoint);   // melee: MeleeItem
 
         if (SHOT_TRACE && attackerId != null && !attackerId.isEmpty()) traceHit(info, ctx, damage);
@@ -169,23 +167,64 @@ public class ImpactManager extends Node {
      */
     public void processVisualImpact(SurfaceType surface, godot.core.Vector3 point, godot.core.Vector3 normal) {
         ParticleManager pm = getParticleManager();
-        if (pm != null) pm.spawn(surface != null ? surface : SurfaceType.DEFAULT, point);
-        DecalManager dm = getDecalManager();
-        if (dm != null && normal != null) dm.spawn(point, normal, surface != null ? surface : SurfaceType.DEFAULT);
+        if (pm != null) pm.spawn(surface != null ? surface : SurfaceType.DEFAULT, point, normal);
+        // a peer has no collider: one short ray along the normal finds what was hit, so a car's hole rides the car
+        if (normal != null && surface != SurfaceType.FLESH) {
+            Node hit = colliderAt(point, normal);
+            HitContext ctx = hit != null ? resolveHitContext(hit) : null;
+            if (ctx != null) mark(ctx, new HitInfo(hit, point, normal), com.openworld.world.DamageKind.BULLET);
+            else {
+                DecalManager dm = getDecalManager();
+                if (dm != null) dm.spawn(point, normal, DecalManager.Mark.HOLE, surface, null, 0f);
+            }
+        }
         impactSound(surface, point);
     }
 
     /** A bullet's impact visuals and sound, no damage (a peer's prediction). */
-    public void processVisualHit(HitInfo info) { processVisualHit(info, true); }
+    public void processVisualHit(HitInfo info) { processVisualHit(info, com.openworld.world.DamageKind.BULLET); }
 
-    /** {@code bulletSound} false: a melee blow, whose weapon plays its own contact sound (MeleeItem). */
-    public void processVisualHit(HitInfo info, boolean bulletSound) {
+    /** A hit's visuals, no damage: particles and its mark by {@code kind}; the impact sound for a bullet only (a
+     *  melee weapon plays its own contact sound, MeleeItem). */
+    public void processVisualHit(HitInfo info, com.openworld.world.DamageKind kind) {
         HitContext ctx = resolveHitContext(info.hitNode);
         ParticleManager pm = getParticleManager();
-        if (pm != null) pm.spawn(ctx.surface, info.hitPoint);
+        if (pm != null) pm.spawn(ctx.surface, info.hitPoint, info.hitNormal);
+        mark(ctx, info, kind);
+        if (kind == com.openworld.world.DamageKind.BULLET) impactSound(ctx.surface, info.hitPoint);
+    }
+
+    /**
+     * The mark a hit leaves (DecalManager): a bullet a hole, a blade or an axe a slash, a blunt blow none. On static
+     * geometry a pooled world-space decal; on a car (not its tyre) a decal parented to the car so it rides with it; on
+     * a character nothing (blood particles only).
+     */
+    private void mark(HitContext ctx, HitInfo info, com.openworld.world.DamageKind kind) {
         DecalManager dm = getDecalManager();
-        if (dm != null && bulletSound && ctx.healthOwner == null) dm.spawn(info.hitPoint, info.hitNormal, ctx.surface);
-        if (bulletSound) impactSound(ctx.surface, info.hitPoint);
+        if (dm == null || info == null || info.hitNormal == null || ctx.character != null || ctx.wheel != null) return;
+        DecalManager.Mark m = switch (kind == null ? com.openworld.world.DamageKind.BULLET : kind) {
+            case BULLET -> DecalManager.Mark.HOLE;
+            case BLADE, HEAVY -> DecalManager.Mark.SLASH;
+            default -> null;
+        };
+        if (m == null) return;
+        godot.api.Node3D body = ctx.healthOwner instanceof com.openworld.carrier.vehicle.Vehicle v ? v : null;
+        if (ctx.healthOwner != null && body == null) return;       // something else alive / moving: no mark
+        if (body == null && info.hitNode instanceof godot.api.RigidBody3D) return;   // a loose prop: it would float
+        dm.spawn(info.hitPoint, info.hitNormal, m, ctx.surface, body, 0f);
+    }
+
+    /** The collider within 6 cm behind {@code point} along {@code -normal} (WORLD and VEHICLE), or null. */
+    private Node colliderAt(godot.core.Vector3 point, godot.core.Vector3 normal) {
+        var w = getViewport() == null ? null : getViewport().getWorld3d();
+        var space = w == null ? null : w.getDirectSpaceState();
+        if (space == null) return null;
+        godot.core.Vector3 n = normal.normalized();
+        var q = godot.api.PhysicsRayQueryParameters3D.create(point.plus(n.times(0.06)), point.minus(n.times(0.06)),
+                com.openworld.util.CollisionLayers.WORLD | com.openworld.util.CollisionLayers.VEHICLE,
+                new godot.core.VariantArray<>(godot.core.RID.class));
+        godot.core.Dictionary<Object, Object> hit = space.intersectRay(q);
+        return hit != null && !hit.isEmpty() && hit.get("collider") instanceof Node c ? c : null;
     }
 
     /** Impact sounds are heard this far from the camera; past it a bullet lands silently (the shot itself is heard). */
@@ -211,7 +250,8 @@ public class ImpactManager extends Node {
             case GLASS -> com.openworld.audio.Sound.IMPACT_GLASS;
             default -> com.openworld.audio.Sound.IMPACT_STONE;
         };
-        com.openworld.audio.Sounds.play3D(this, s, at, 4f, 0.12f);
+        Node parent = getTree().getCurrentScene() != null ? getTree().getCurrentScene() : this;
+        com.openworld.audio.Sounds.play3D(parent, s, at, 4f, 0.12f);
     }
 
     // ── Hit context resolution ────────────────────────────────────────────────

@@ -4,7 +4,7 @@
 [ext_resource type="Script" uid="uid://dossevkjauxr6" path="res://src/main/java/com/openworld/control/Controller.java" id="2_kfoa7"]
 [ext_resource type="Script" uid="uid://072r5nlh8oqs" path="res://src/main/java/com/openworld/world/manager/ImpactManager.java" id="3_imct"]
 [ext_resource type="Script" uid="uid://bqc4oycgaiob" path="res://src/main/java/com/openworld/world/manager/DecalManager.java" id="4_dcal"]
-[ext_resource type="Texture2D" path="res://assets/vfx/decals/bullet_hole_stone.png" id="5_m0gj3"]
+[ext_resource type="Texture2D" path="res://assets/vfx/decals/impact_hole.png" id="5_m0gj3"]
 [ext_resource type="Script" uid="uid://b4w0lx4s4hgbl" path="res://src/main/java/com/openworld/world/manager/BulletTracerManager.java" id="6_btrc"]
 [ext_resource type="Script" uid="uid://bud0imsvemb7b" path="res://src/main/java/com/openworld/world/manager/ExplosionManager.java" id="7_evfx"]
 [ext_resource type="PackedScene" path="res://assets/vfx/explosion/effects/ground/vfx_ground_explosion_01.tscn" id="10_expl"]
@@ -13,32 +13,53 @@
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_flesh"]
 direction = Vector3(0, 1, 0)
-initial_velocity_max = 4.0
-scale_min = 0.099999994
-scale_max = 0.29999998
-scale_over_velocity_max = 1.0
+spread = 28.0
+initial_velocity_min = 1.2
+initial_velocity_max = 3.2
+gravity = Vector3(0, -9.8, 0)
+damping_min = 1.0
+damping_max = 2.0
+scale_min = 0.4
+scale_max = 1.0
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_flesh"]
-albedo_color = Color(1, 0, 0, 1)
+shading_mode = 0
+albedo_color = Color(0.34, 0.02, 0.02, 1)
+billboard_mode = 3
+billboard_keep_scale = true
 
-[sub_resource type="BoxMesh" id="BoxMesh_flesh"]
+[sub_resource type="QuadMesh" id="BoxMesh_flesh"]
 material = SubResource("StandardMaterial3D_flesh")
-size = Vector3(0.5, 0.5, 0.5)
+size = Vector2(0.035, 0.035)
+
+[sub_resource type="Gradient" id="Gradient_dust"]
+colors = PackedColorArray(0.56, 0.53, 0.49, 0.75, 0.56, 0.53, 0.49, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture_dust"]
+gradient = SubResource("Gradient_dust")
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_hs4nr"]
 direction = Vector3(0, 1, 0)
-initial_velocity_max = 4.0
-scale_min = 0.099999994
-scale_max = 0.29999998
-scale_over_velocity_max = 1.0
+spread = 35.0
+initial_velocity_min = 0.8
+initial_velocity_max = 2.4
+gravity = Vector3(0, -4, 0)
+damping_min = 2.0
+damping_max = 3.0
+scale_min = 0.5
+scale_max = 1.4
+color_ramp = SubResource("GradientTexture_dust")
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tracer"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dust"]
+transparency = 1
 shading_mode = 0
-albedo_color = Color(1.685791, 1.5852925, 1.0005594, 1)
+vertex_color_use_as_albedo = true
+billboard_mode = 3
+billboard_keep_scale = true
 
-[sub_resource type="BoxMesh" id="BoxMesh_kfoa7"]
-material = SubResource("StandardMaterial3D_tracer")
-size = Vector3(0.1, 0.5, 0.2)
+[sub_resource type="QuadMesh" id="QuadMesh_dust"]
+material = SubResource("StandardMaterial3D_dust")
+size = Vector2(0.06, 0.06)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kfoa7"]
 shading_mode = 0
@@ -58,10 +79,10 @@ pool_size_per_type = 40
 
 [node name="1" type="GPUParticles3D" parent="ParticleManager/FLESH" unique_id=1407804374]
 emitting = false
-amount = 12
+amount = 14
+lifetime = 0.45
 one_shot = true
-speed_scale = 2.0
-explosiveness = 1.0
+explosiveness = 0.95
 process_material = SubResource("ParticleProcessMaterial_flesh")
 draw_pass_1 = SubResource("BoxMesh_flesh")
 
@@ -70,12 +91,12 @@ script = ExtResource("2_kfoa7")
 
 [node name="1" type="GPUParticles3D" parent="ParticleManager/DEFAULT" unique_id=1281880802]
 emitting = false
-amount = 5
+amount = 8
+lifetime = 0.5
 one_shot = true
-speed_scale = 2.0
-explosiveness = 1.0
+explosiveness = 0.95
 process_material = SubResource("ParticleProcessMaterial_hs4nr")
-draw_pass_1 = SubResource("BoxMesh_kfoa7")
+draw_pass_1 = SubResource("QuadMesh_dust")
 
 [node name="ImpactManager" type="Node" parent="." unique_id=1201546686]
 script = ExtResource("3_imct")
@@ -86,7 +107,7 @@ pool_size = 64
 decal_lifetime = 20.0
 
 [node name="1" type="Decal" parent="DecalManager" unique_id=1862829401]
-size = Vector3(0.1, 0.1, 0.1)
+size = Vector3(0.16, 0.1, 0.16)
 texture_albedo = ExtResource("5_m0gj3")
 
 [node name="BulletTracerManager" type="Node3D" parent="." unique_id=897467713]

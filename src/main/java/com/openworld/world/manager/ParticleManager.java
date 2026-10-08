@@ -75,13 +75,28 @@ public class ParticleManager extends Node {
      * Position and emit one burst at worldPosition for the given surface type.
      * Falls back to DEFAULT, then FLESH if no pool exists for the requested type.
      */
-    public void spawn(SurfaceType type, Vector3 worldPosition) {
+    public void spawn(SurfaceType type, Vector3 worldPosition) { spawn(type, worldPosition, null); }
+
+    /**
+     * One burst at {@code worldPosition}, its local +Y (the emitter's direction) along {@code normal} -- the spray
+     * leaves the surface it hit (a body's blood back toward the shooter, dust off the wall). Null normal = up.
+     */
+    public void spawn(SurfaceType type, Vector3 worldPosition, Vector3 normal) {
         ObjectPool<GPUParticles3D> pool = resolve(type);
         if (pool == null || pool.available() == 0) return;
         GPUParticles3D p = pool.acquire();
-        p.setGlobalPosition(worldPosition);
+        Vector3 up = normal != null && normal.lengthSquared() > 1e-6 ? normal.normalized() : Vector3.Companion.getUP();
+        Vector3 ref = Math.abs(up.getY()) < 0.9 ? Vector3.Companion.getUP() : Vector3.Companion.getFORWARD();
+        Vector3 right = ref.cross(up).normalized();
+        p.setGlobalTransform(new godot.core.Transform3D(new godot.core.Basis(right, up, right.cross(up)), worldPosition));
+        p.restart();
         p.setEmitting(true);
         pool.release(p);
+    }
+
+    /** One burst by surface name (probe / picture hook: shot_impacts.gd). */
+    @Register public void burstNow(String type, Vector3 at, Vector3 normal) {
+        spawn(com.openworld.world.SurfaceType.valueOf(type), at, normal);
     }
 
     private ObjectPool<GPUParticles3D> resolve(SurfaceType type) {

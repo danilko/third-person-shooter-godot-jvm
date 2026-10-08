@@ -144,8 +144,11 @@ public class ExplosionManager extends Node {
     public void playBlast(Vector3 center, PackedScene vfx, float damageRadius, float multiplier) {
         com.openworld.net.NetStats.increment("explosion_vfx");   // N4: one per blast on every peer, never two
         // the bang, on every peer with the effect; a big blast is heard across the district
-        com.openworld.audio.Sounds.play3D(this, com.openworld.audio.Sound.EXPLOSION, center,
+        // parented to the scene, not here: this node's children are the effect pool
+        Node soundParent = getTree().getCurrentScene() != null ? getTree().getCurrentScene() : getParent();
+        com.openworld.audio.Sounds.play3D(soundParent, com.openworld.audio.Sound.EXPLOSION, center,
                 (float) Math.max(25.0, 4.0 * damageRadius), 0.08f);
+        scorch(center, damageRadius);
         PackedScene scene = vfx != null ? vfx : explosionScene;
         if (scene == null) return;
         Pool p = pools.computeIfAbsent(scene, k -> new Pool());
@@ -169,6 +172,30 @@ public class ExplosionManager extends Node {
         fx.play();
     }
 
+
+    /** How far above the ground a blast still scorches it (an air burst leaves none). */
+    public static final double SCORCH_REACH = 2.5;
+
+    /**
+     * The blast's mark (CS's scorch): a burnt star on the ground or wall under the blast, sized to the damage radius
+     * (0.8 x, 1.5..6 m across; 3 m when the radius is unknown), kept DecalManager.scorchLifetime. Every peer draws its
+     * own from the same centre, like the effect. Static geometry only (a car under the blast is a wreck anyway).
+     */
+    private void scorch(Vector3 center, float damageRadius) {
+        if (!(getTree().getFirstNodeInGroup(new godot.core.StringName("decal_manager")) instanceof DecalManager dm)) return;
+        var w = getViewport() == null ? null : getViewport().getWorld3d();
+        var space = w == null ? null : w.getDirectSpaceState();
+        if (space == null) return;
+        var q = godot.api.PhysicsRayQueryParameters3D.create(center.plus(new Vector3(0, 0.5, 0)),
+                center.minus(new Vector3(0, SCORCH_REACH, 0)), com.openworld.util.CollisionLayers.WORLD,
+                new godot.core.VariantArray<>(godot.core.RID.class));
+        var hit = space.intersectRay(q);
+        if (hit == null || hit.isEmpty() || !(hit.get("position") instanceof Vector3 at)
+                || !(hit.get("normal") instanceof Vector3 n)) return;
+        if (hit.get("collider") instanceof godot.api.RigidBody3D) return;
+        float size = damageRadius > 0f ? (float) Math.max(1.5, Math.min(6.0, 0.8 * damageRadius)) : 3f;
+        dm.spawn(at, n, DecalManager.Mark.SCORCH, com.openworld.world.SurfaceType.DEFAULT, null, size);
+    }
 
     /** Pool one more instance of {@code scene}; null if its root is not a VfxEffect. */
     private VfxEffect grow(PackedScene scene, Pool p) {

@@ -26,6 +26,8 @@ beside it.
 | muzzle flash | each weapon scene's `Muzzle/MuzzleVFX` (rifles `muzzle_flash_01`, SMG/pistol `short_flash_01`, revolver/sniper/launcher `big_flash_01`, shotgun `wide_flash_01`) | `WeaponItem.playMuzzleFlash()` on every shot, owner and puppet |
 | smoke | `Vehicle.tscn` `DamageVfx/Smoke` (smoke_thin_01), `VehicleWreck.tscn` `Smoke` (smoke_big_01) | `SmokeVfx.setEmitting` from the vehicle's damage tier; a wreck stays on |
 | water | `World.tscn`, `DebugWorld.tscn` sea material | shader only |
+| impact marks | `decals/impact_hole.png` (bullet), `impact_slash.png` (blade / axe), `impact_scorch.png` (a blast on the ground): ONE texture per kind of hit, tinted per surface (`DecalManager.tintFor`); made once by `tools/vfx/make_impact_marks.py` (slash and scorch from Kenney's Particle Pack). Blunt blows leave none. On a car the mark is parented to the car (14 kept); on a character none | `ImpactManager.mark` → `DecalManager.spawn`; scorch from `ExplosionManager.scorch` (every peer) |
+| blood / dust bursts | `WorldSystems.tscn` `ParticleManager/FLESH` (14 dark-red 1.5-3.5 cm droplets, 0.45 s, gravity) and `DEFAULT` (8 fading grey dust motes), sprayed along the hit normal | `ParticleManager.spawn(type, point, normal)` |
 
 To use another variant, point the scene at a different file under `effects/`: every variant of a kind
 has the same node layout and the same script.
@@ -59,10 +61,16 @@ has the same node layout and the same script.
   `.blend1`/`.xcf`, preview images, a duplicate `placeholder.png`, and every texture/material no kept
   effect or water material references. The originals are on the itch.io pages in `LICENSE.txt`.
 
+- **`BitsTrail` is a sub-emitter target and must not emit on its own.** It was the one layer of every explosion
+  with neither `emitting = false` nor one-shot, so each pooled effect drew a black smoke ball at the world origin
+  forever, and `VfxEffect.play()` restarted it at every blast. All 14 scenes now say `emitting = false`, and `play()`
+  never restarts a sub-emitter target (its parent feeds it).
+
 ## Gates
 
 - `tools/godot/probe_vfx.gd` (headless): every effect on its Java script and no `.gd` left, flashes on −Z,
   a flash lights and goes dark with per-instance materials, every weapon's flash out of its barrel,
   `ExplosionManager` pooling and reuse, smoke on/off, and the game scenes' wiring.
+- `tools/godot/shot_impacts.gd -- <dir>` (needs a display): the marks and the blood / dust bursts on a wall and floor.
 - `tools/godot/shot_vfx.gd -- <dir>` (needs a display): screenshots of four weapons firing, a blast and both
   plumes beside a 1.49 m figure.
