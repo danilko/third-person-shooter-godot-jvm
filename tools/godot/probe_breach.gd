@@ -2,7 +2,9 @@ extends SceneTree
 ## UNITS FOLLOW THE PLAYER INTO A BUILDING (PLAN.md W6, user 2026-10-06: "they stop at the konbini and wait outside").
 ##
 ##   stdbuf -oL godot --headless --path . --script tools/godot/probe_breach.gd [-- --stars=N] [--control]
-##   [--place="Police Station"] [--deep=8] [--inner] [--secs=90] [--no-stop] [--no-interior-nav]
+##   [--place="Police Station"] [--deep=8] [--inner] [--secs=90] [--no-stop] [--no-interior-nav] [--at=x,y,z]
+##   (--at: stand the player at exactly that world point -- e.g. Central's F1 or a platform -- instead of --deep in
+##   from the place's door; --place still names the building the dispatch breaches.)
 ##   (--stars=N held for the run; --control: EnforcementDispatch.breaching off -- nobody plans a way in. User 2026-10-06:
 ##   units always get in, at every star level. --place: the place nearest the safe house of that name, the player put
 ##   --deep metres in from its door along the door->centre line; --no-stop runs the whole --secs and reports the REACH:
@@ -32,6 +34,8 @@ func _initialize() -> void:
 	var deep := 3.0
 	var secs := 90.0
 	var no_stop := "--no-stop" in args
+	var has_at := false
+	var at_pos := Vector3.ZERO
 	for a in args:
 		if a.begins_with("--stars="):
 			stars = int(a.substr(8))
@@ -41,6 +45,10 @@ func _initialize() -> void:
 			deep = float(a.substr(7))
 		elif a.begins_with("--secs="):
 			secs = float(a.substr(7))
+		elif a.begins_with("--at="):
+			var v := a.substr(5).split(",")
+			at_pos = Vector3(float(v[0]), float(v[1]), float(v[2]))
+			has_at = true
 	var doc: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(PLACES))
 	var home := Vector3.ZERO
 	for pl in doc["places"]:
@@ -57,6 +65,8 @@ func _initialize() -> void:
 	var at := Vector3(shop["at"][0], shop["at"][1], shop["at"][2])
 	var go := Vector3(shop["go"][0], shop["go"][1], shop["go"][2])
 	var inside := go + (at - go).normalized() * deep
+	if has_at:
+		inside = at_pos
 	var world: Node = (load(ISLAND) as PackedScene).instantiate()
 	var pz := world.get_node_or_null("PedZones")
 	if pz != null:
@@ -83,6 +93,15 @@ func _initialize() -> void:
 		if d < bb:
 			bb = d
 			best_b = n
+	if has_at:
+		best_b = null   # --at: the player stands exactly there (a station's F1, a platform), no door placement
+		var fl := (world as Node3D).get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(at_pos + Vector3(0, 1.0, 0), at_pos - Vector3(0, 3.0, 0), 1))
+		print("probe_breach: --at %s, floor under it: %s" % [at_pos, ("%.2f m, %s" % [(fl["position"] as Vector3).y, (fl["collider"] as Node).get_path()]) if not fl.is_empty() else "NONE"])
+		player.global_position = at_pos + Vector3(0, 0.3, 0)
+		player.get_node("MovementController").call("clear_motion")
+		for i in 60:
+			await physics_frame
+		print("probe_breach: the player stands at %s" % player.global_position)
 	if best_b != null and bb < 60.0:
 		var door: Node3D = null
 		var dd := 1e9
