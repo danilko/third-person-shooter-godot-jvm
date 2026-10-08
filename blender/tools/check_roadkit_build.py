@@ -50,8 +50,10 @@ def cli(*args):
     return json.loads(out)
 
 
-def committed(record, zones, prefix, ground, tmp):
-    d = cli("gltf", record, zones, tmp, prefix, "--ground", ground, "--gated")
+def committed(record, zones, prefix, ground, tmp, extra=()):
+    # `extra`: the flags the shipped build used (DebugRoads is built against DebugRail since 2026-09-28 --
+    # tools/debug_world_rebuild.sh; rebuilt without them every 踏切 read as a parity failure)
+    d = cli("gltf", record, zones, tmp, prefix, "--ground", ground, "--gated", *extra)
     built = [p["gltf"] for p in d["pieces"]]
     refs = [os.path.join(RES, p["piece"] + ".gltf") for p in d["pieces"]]
     missing = [r for r in refs if not os.path.exists(r)]
@@ -115,7 +117,10 @@ def styled(tmp):
 def main():
     with tempfile.TemporaryDirectory() as tmp:
         committed(os.path.join(PIECES, "DebugRoads.roads.json"), os.path.join(PIECES, "DebugRoads.zones.json"),
-                  "Roads_DebugRoads", os.path.join(PIECES, "DebugRoads.ground.json"), os.path.join(tmp, "debug"))
+                  "Roads_DebugRoads", os.path.join(PIECES, "DebugRoads.ground.json"), os.path.join(tmp, "debug"),
+                  ("--keep-clear-lanekits", os.path.join(PIECES, "Roads_DebugRail_"),
+                   "--avoid", os.path.join(PIECES, "DebugRail.roads.json"),
+                   "--avoid-ground", os.path.join(PIECES, "DebugRail.ground.json")))
         committed(os.path.join(PIECES, "RoadKitSample.roads.json"), os.path.join(PIECES, "RoadKitSample.zones.json"),
                   "Roads_RoadKitZones", "", os.path.join(tmp, "zones"))
         styled(os.path.join(tmp, "styled"))

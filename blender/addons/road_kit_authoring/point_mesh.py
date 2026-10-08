@@ -48,6 +48,8 @@ EDGE = (("Curb", "deck", "kerb", "rka_curb_ol", 0.0, "rka_curb_hl", "rka_curb_tl
         ("Sidewalk", "band", "footway", "rka_walk_cl", 0.0, "rka_walk_zl", "rka_walk_hl", ""),
         ("Barrier", "deck", "barrier", "rka_wall_c", 0.0, "rka_wall_z", "rka_wall_hw", "rka_wall_h"))
 PILLAR_MIN_HEIGHT = 0.5
+#: the footway's outer edge slopes 1:1 down this far (`_skirt`, PLAN.md 2h); 0 = the old vertical cut (the control)
+SKIRT_DROP = 1.0
 #: a kerb's half thickness stops at this, and from PLATFORM_KERB_FROM tall (x2 fully) it slides outward to stand flush
 #: at the edge line: a platform's face is vertical over the track, never battered into it
 KERB_HALF_MAX = 0.15
@@ -1606,6 +1608,39 @@ def gutter_strips(pts, kerb, sgn):
     return out
 
 
+def _skirt(objs, name, pts, values, sgn, style=None):
+    """The footway's OUTER edge turns DOWN (user, 2026-10-06: `kerb |----\\`): a 1:1 slope `SKIRT_DROP` deep in the
+    footway's material, with collision (it is part of the edge object, so it joins the walk proxy). A footway used to
+    end in a vertical cut its own thickness deep, and wherever the ground behind it lies lower (a falling block, a
+    verge, a seam between the stamp and the block fill) that showed as a floating slab edge or a gap a foot could
+    catch in. Where the ground is higher the skirt is simply buried. None on a footway PROFILE ASSET, and none where a barrier stands on the footway's
+    outer edge (a deck's parapet: the skirt would hang under the deck) or where the footway has no width."""
+    if SKIRT_DROP <= 0.0 or (style is not None and style.asset("footway") is not None):
+        return                       # a footway PROFILE ASSET is the artist's whole section, its edge included
+    ok = [float(v["rka_walk_hl"]) > 1e-6 and float(v["rka_wall_h"]) <= 0.0 for v in values]
+    if not any(ok):
+        return
+    lats = [_lateral(t) for t in poly_tangents(pts)]
+    sk = [dict(v, _sk_out=v["_fw_out"] + sgn * SKIRT_DROP, _sk_z=float(v["_fw_zo"]) - SKIRT_DROP) for v in values]
+    top = _offset_curve(pts, lats, values, "_fw_out", 0.0, "_fw_zo")
+    low = _offset_curve(pts, lats, sk, "_sk_out", 0.0, "_sk_z")
+    mat = style.material("footway") if style is not None else MAT[pk.SLOT_DEFAULT["footway"]]
+    tris = []
+    i = 0
+    while i < len(ok):
+        if not ok[i]:
+            i += 1
+            continue
+        j = i
+        while j + 1 < len(ok) and ok[j + 1]:
+            j += 1
+        if j > i:
+            tris += _face_up(_strip(top[i:j + 1], low[i:j + 1]))
+        i = j + 1
+    if tris:
+        _add(objs, name, mat, tris)
+
+
 def _edge_run(objs, name, pts, walk, kerb, wall, sgn, style=None, gutter=True):
     """`point_build.build_edge_run` without Blender: the same per-vertex values (`edge_run_values`, restated
     here because `point_build` imports bpy), the same three layers, each styled."""
@@ -1647,6 +1682,7 @@ def _edge_run(objs, name, pts, walk, kerb, wall, sgn, style=None, gutter=True):
                 _add(objs, name, mat, _face_up(_strip(inner, outer)))
             continue
         _layer(objs, name, style, slot, kind, oa, z, za, wa, ta, pts, values, flip=(sgn < 0.0))
+    _skirt(objs, name, pts, values, sgn, style)
     # The CAR WALL: where a barrier stands, a collision-only wall on its line, `CAR_WALL_HEIGHT` tall from its foot, that
     # only vehicle bodies collide with (`CollisionLayers.CAR_WALL`, set by the bake from the `-carwall` name). A car
     # pressed into a 1.15 m parapet at speed caught the wall's top edge with its hull and was thrown up it (measured on
@@ -1675,6 +1711,22 @@ def self_test():
     assert abs(up - 120.0) < 1e-6 and abs(down - 120.0) < 1e-6, (up, down)
     assert min(p[2] for t in deck for p in t) == 4.0 and max(p[2] for t in deck for p in t) == 5.0
     print("OK: an extruded layer is a CLOSED prism (top 120 m2 up, bottom 120 m2 down)")
+    # The footway's outer edge slopes down (PLAN.md 2h): 1:1, SKIRT_DROP deep, outboard of the footway, in the edge
+    # object (so in the walk proxy); none under a barrier. Control: SKIRT_DROP 0 builds no slope.
+    global SKIRT_DROP
+    epts = [(0.0, 0.0, 0.0), (10.0, 0.0, 0.0), (20.0, 0.0, 0.0)]
+    kb = [0.15] * 3
+    for drop, wall in ((1.0, 0.0), (0.0, 0.0), (1.0, 1.1)):
+        SKIRT_DROP, eo = drop, {}
+        _edge_run(eo, "t__edges_l", epts, [2.0] * 3, kb, [wall] * 3, 1.0, gutter=False)
+        zs = [p[2] for ts in eo["t__edges_l"].values() for t in ts for p in t]
+        ys = [p[1] for ts in eo["t__edges_l"].values() for t in ts for p in t if p[2] < -0.5]
+        if drop > 0.0 and wall == 0.0:
+            assert abs(min(zs) - (0.15 - 1.0)) < 1e-9 and ys and abs(max(ys) - (4.0 + 1.0)) < 1e-9, (min(zs), ys[:3])
+        else:
+            assert min(zs) > -0.5, (drop, wall, min(zs))
+    SKIRT_DROP = 1.0
+    print("OK: a footway's outer edge slopes 1:1 down 1 m (none under a barrier; none with SKIRT_DROP 0)")
     # A raised median: kerb stones at both edges and a footway fill between, solid to the road, no shared top plane.
     mv = [{"rka_med_h": 1.5, "rka_med_z": 0.15}] * 3
     fill, kerbs = raised_median([(0.0, 0.0, 0.0), (10.0, 0.0, 0.0), (20.0, 0.0, 0.0)], mv)
