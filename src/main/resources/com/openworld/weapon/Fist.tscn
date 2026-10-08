@@ -3,6 +3,7 @@
 [ext_resource type="Resource" path="res://src/main/resources/com/openworld/weapon/stats/Fist.tres" id="90_stats"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/MeleeAttackStep.java" id="step_script"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/FistItem.java" id="1_fist"]
+[ext_resource type="AudioStream" path="res://assets/audio/weapons/Fist_swing.wav" id="95_swing_audio"]
 
 [sub_resource type="Resource" id="MeleeAttackStep_Fist_0"]
 script = ExtResource("step_script")
@@ -33,4 +34,5 @@ script = ExtResource("1_fist")
 stats = ExtResource("90_stats")
 attack_steps = Array[ExtResource("step_script")]([SubResource("MeleeAttackStep_Fist_0"), SubResource("MeleeAttackStep_Fist_1")])
 weapon_archetype = "fist"
+fire_audio = ExtResource("95_swing_audio")
 
