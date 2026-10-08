@@ -985,10 +985,12 @@ see PLAN.md "Roads & Traffic v2".
 Since 3.2d cars also hold a CORNER SPEED, `sqrt(cornerLateralAccel·R)` braked for ahead of every bend on the
 lane (`VehicleAIController.cornerSpeedLimit`, 4 m/s²; see "The touge, driven and fixed").
 
-**Known noise:** instancing `Vehicle.tscn` from code logs a `CharacterInfo` ClassCastException
-(the scene-embedded sub-resource's JVM script binds late, so the setter receives a plain
-`Resource`) — harmless: every spawn path immediately overwrites `characterInfo` with a fresh
-instance per the shared-sub-resource identity rule.
+**Gone (2026-10-08): the `CharacterInfo` / `VehicleConfig` ClassCastException on instancing a car.** The BASE
+`Vehicle.tscn` embedded a JVM-scripted `CharacterInfo` and `VehicleConfig` sub-resource whose script bound late, so
+their setters received a plain `Resource` (3 + 3 per process in `run_net_debugworld.sh`). Every car scene replaces the
+whole config with its own `.tres` and `Vehicle._ready` builds a `CharacterInfo` when none is set, so both were dead
+weight and are removed from the base scene. Do not put a JVM-scripted sub-resource back into a base scene that
+inherited scenes override.
 
 ### Terrain & seam alignment (ground is NOT a flat plane)
 

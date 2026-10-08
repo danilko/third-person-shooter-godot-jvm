@@ -2,17 +2,12 @@
 
 [ext_resource type="Script" path="res://src/main/java/com/openworld/carrier/vehicle/Vehicle.java" id="1_v"]
 [ext_resource type="Script" uid="uid://bteuhlfvgdp3o" path="res://src/main/java/com/openworld/character/Health.java" id="2_h"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/carrier/vehicle/VehicleConfig.java" id="3_37ea8"]
-[ext_resource type="Script" uid="uid://df0ckptq6t15r" path="res://src/main/java/com/openworld/character/CharacterInfo.java" id="3_ci"]
-[ext_resource type="PackedScene" uid="uid://cvhwreck1a1b" path="res://src/main/resources/com/openworld/vehicle/VehicleWreck.tscn" id="4_rx71e"]
 [ext_resource type="PackedScene" uid="uid://ds0yoqtkt2t1n" path="res://src/main/resources/com/openworld/vehicle/VehicleWheel.tscn" id="5_p3n1p"]
 [ext_resource type="Script" uid="uid://d2o3rhv6eos0d" path="res://src/main/java/com/openworld/camera/VehicleCameraController.java" id="5_x00le"]
 [ext_resource type="Curve" uid="uid://cofnaffaigrhj" path="res://src/main/resources/com/openworld/vehicle/VehicleWheelFrontGrip.tres" id="6_i1sta"]
-[ext_resource type="Curve" uid="uid://cvaccel240crv" path="res://src/main/resources/com/openworld/vehicle/VehicleAccelCurve.tres" id="6_accel"]
 [ext_resource type="Script" uid="uid://dqhs0yfdyku6r" path="res://src/main/java/com/openworld/weapon/WeaponController.java" id="7_wc"]
 [ext_resource type="PackedScene" uid="uid://dxb5mxkmawr80" path="res://src/main/resources/com/openworld/ui/Nameplate.tscn" id="8_np"]
 [ext_resource type="PackedScene" path="res://assets/vfx/smoke/effects/smoke_thin/smoke_thin_vfx_01.tscn" id="20_smoke"]
-[ext_resource type="PackedScene" path="res://assets/vfx/explosion/effects/burst/vfx_burst_explosion_01.tscn" id="fx_blast"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_x00le"]
 friction = 0.0
@@ -42,22 +37,6 @@ color_ramp = SubResource("GradientTexture1D_dmgfire")
 material = SubResource("StandardMaterial3D_dmgpuff")
 size = Vector2(0.35, 0.35)
 
-[sub_resource type="Resource" id="Resource_x00le"]
-script = ExtResource("3_ci")
-display_name = "Vehicle"
-metadata/_custom_type_script = "uid://cplrp8cx4gus0"
-
-[sub_resource type="Resource" id="Resource_37ea8"]
-script = ExtResource("3_37ea8")
-suspension_samples = 3
-max_speed = 67.0
-acceleration = 10000.0
-z_traction = 0.02
-acceleration_curve = ExtResource("6_accel")
-wreck_scene = ExtResource("4_rx71e")
-metadata/_custom_type_script = "uid://cuac11don07ow"
-explosion_vfx = ExtResource("fx_blast")
-
 [sub_resource type="BoxShape3D" id="BoxShape3D_entrance"]
 size = Vector3(4, 2.5, 7)
 
@@ -72,8 +51,6 @@ continuous_cd = true
 physics_material_override = SubResource("PhysicsMaterial_x00le")
 linear_damp_mode = 1
 script = ExtResource("1_v")
-character_info = SubResource("Resource_x00le")
-vehicle_config = SubResource("Resource_37ea8")
 
 [node name="Health" type="Node" parent="." unique_id=450985]
 script = ExtResource("2_h")

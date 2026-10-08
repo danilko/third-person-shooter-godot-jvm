@@ -161,7 +161,10 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     @Register
     @Override
     public void _ready() {
-        if (characterInfo == null) characterInfo = new CharacterInfo();
+        if (characterInfo == null) {
+            characterInfo = new CharacterInfo();
+            characterInfo.displayName = "Vehicle";   // the base scene no longer embeds one (its JVM sub-resource bound late)
+        }
         // Privatize a scene-embedded (shared) CharacterInfo before stamping our id. The sub-resource
         // in Vehicle.tscn is shared by every instantiation unless copied; an empty characterId means
         // "scene-supplied" (code-spawned bodies stamp a UUID before addChild), so copy it into a fresh
