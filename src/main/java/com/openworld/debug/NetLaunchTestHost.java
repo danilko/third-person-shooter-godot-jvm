@@ -126,6 +126,8 @@ public class NetLaunchTestHost extends Node3D {
     @Register
     @Override
     public void _physicsProcess(double delta) {
+        // the test's own shots are crimes: police dispatched to them fire too and pollute every count (2026-10-08)
+        if (com.openworld.game.EnforcementDispatch.get() != null) com.openworld.game.EnforcementDispatch.get().enabled = false;
         clock += delta;
         if (clock > TIMEOUT_S) finish("TIMEOUT");
         switch (role) {
