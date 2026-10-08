@@ -232,6 +232,9 @@ public class AIController extends Controller {
     public boolean pursuitAway;
     /** Stand and cover the pursuit, weapon on them (a gang guard over a captive). */
     public boolean pursuitStand;
+    /** The approach SLOT (PLAN.md 1i): a world offset from the pursuit that this body closes on instead of the
+     *  pursuit itself, so a squad comes from several sides instead of single file. Zero = straight at the pursuit. */
+    public godot.core.Vector3 pursuitOffset = new godot.core.Vector3();
     /** BREACH waypoints (PLAN.md W6): walk straight to each in turn before closing on the pursuit -- outside a
      *  building's door, then through it. Popped as reached; empty = straight at the pursuit as before. */
     public final java.util.ArrayList<godot.core.Vector3> pursuitVia = new java.util.ArrayList<>();

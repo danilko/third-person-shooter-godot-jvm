@@ -116,6 +116,34 @@ public class EnforcementDispatch extends Node {
         final java.util.Set<Node> badDoors = new java.util.HashSet<>();
         Vector3 breachMark;
         double breachStill;
+        /** Its approach slot: a bearing round the player (radians, NaN = not chosen yet), PLAN.md 1i. */
+        double slot = Double.NaN;
+    }
+
+    /** Approach slots (PLAN.md 1i, user 2026-10-08: "all police line up and get stuck"): every unit closes on its own
+     *  point round the player -- on its own side (the bearing it came from), fanned out by SLOT_SPREAD per unit -- not
+     *  on the player point, so a squad arrives from several sides instead of single file. Off = the old approach. */
+    @godot.annotation.Visible public boolean approachSlots = true;
+    private static final double SLOT_RADIUS = 12.0, SLOT_RADIUS_MELEE = 1.6, SLOT_SPREAD = 0.45;
+    /** No two foot units appear closer than this (they used to share the same few footway points). */
+    private static final double SPAWN_SPACING = 6.0;
+    private int slotCounter;
+
+    private void setSlot(Unit u, AIController brain, Character p, boolean melee, boolean interior) {
+        if (!approachSlots || interior) { brain.pursuitOffset = new Vector3(); return; }
+        Vector3 pp = p.getGlobalPosition(), b = u.body.getGlobalPosition();
+        if (Double.isNaN(u.slot)) {
+            double base = Math.atan2(b.getX() - pp.getX(), b.getZ() - pp.getZ());
+            u.slot = base + ((slotCounter++ % 5) - 2) * SLOT_SPREAD;
+        }
+        double r = melee ? SLOT_RADIUS_MELEE : SLOT_RADIUS;
+        brain.pursuitOffset = new Vector3(Math.sin(u.slot) * r, 0, Math.cos(u.slot) * r);
+    }
+
+    /** Where this unit is headed: its slot, or the player. */
+    private static Vector3 slotGoal(AIController brain, Character p) {
+        Vector3 o = brain.pursuitOffset;
+        return o != null && o.lengthSquared() > 0.01 ? p.getGlobalPosition().plus(o) : p.getGlobalPosition();
     }
 
     /** An officer running a player down that has not closed in by {@link #STUCK_GAIN} for this long is given up:
@@ -380,12 +408,14 @@ public class EnforcementDispatch extends Node {
                 // the island, so the approach is ArrestState's (straight where the line is clear), weapon up
                 brain.setPursuit(p);
                 brain.pursuitAway = false;
-                brain.pursuitDirect = !interior && clearLine(u.body.getGlobalPosition(), p.getGlobalPosition());
+                setSlot(u, brain, p, melee, interior);
+                brain.pursuitDirect = !interior && clearLine(u.body.getGlobalPosition(), slotGoal(brain, p));
                 if (!inArrest) brain.forceState(ArrestState.INSTANCE);
             } else {
                 brain.setPursuit(p);
                 brain.pursuitAway = false;
-                brain.pursuitDirect = !interior && clearLine(u.body.getGlobalPosition(), p.getGlobalPosition());
+                setSlot(u, brain, p, melee, interior);
+                brain.pursuitDirect = !interior && clearLine(u.body.getGlobalPosition(), slotGoal(brain, p));
                 if (brain.getCurrentState() != ArrestState.INSTANCE) brain.forceState(ArrestState.INSTANCE);
             }
             double d = flat(u.body.getGlobalPosition(), p.getGlobalPosition());
@@ -1406,13 +1436,13 @@ public class EnforcementDispatch extends Node {
             double d = flat(q, player);
             if (d < min || d > max || inView(q)) continue;
             Vector3 g = ground(q.getX(), q.getZ(), q.getY());
-            if (g != null && Math.abs(g.getY() - q.getY()) < 1.0 && clearLine(g, player)) return g;
+            if (g != null && Math.abs(g.getY() - q.getY()) < 1.0 && spaced(g) && clearLine(g, player)) return g;
         }
         for (int k = 0; k < 16; k++) {
             double a = rng.nextDouble() * Math.PI * 2, d = min + rng.nextDouble() * (max - min);
             double x = player.getX() + Math.cos(a) * d, z = player.getZ() + Math.sin(a) * d;
             Vector3 g = ground(x, z, player.getY());
-            if (g == null || Math.abs(g.getY() - player.getY()) > 3.0 || inView(g) || !clearLine(g, player)) continue;
+            if (g == null || Math.abs(g.getY() - player.getY()) > 3.0 || inView(g) || !spaced(g) || !clearLine(g, player)) continue;
             return g;
         }
         // a player indoors (a shop, a cell) has no clear line from anywhere outside: an out-of-view spot on the
@@ -1423,9 +1453,16 @@ public class EnforcementDispatch extends Node {
             double d = flat(q, player);
             if (d < min || d > max || inView(q)) continue;
             Vector3 g = ground(q.getX(), q.getZ(), q.getY());
-            if (g != null && Math.abs(g.getY() - q.getY()) < 1.0) return g;
+            if (g != null && Math.abs(g.getY() - q.getY()) < 1.0 && spaced(g)) return g;
         }
         return null;
+    }
+
+    /** No live unit within SPAWN_SPACING of a spawn spot. */
+    private boolean spaced(Vector3 g) {
+        for (Unit u : units)
+            if (u.body != null && GD.isInstanceValid(u.body) && flat(u.body.getGlobalPosition(), g) < SPAWN_SPACING) return false;
+        return true;
     }
 
     /**

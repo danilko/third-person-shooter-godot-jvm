@@ -22,6 +22,9 @@ import godot.core.Vector3;
  */
 public class ArrestState implements AIState {
 
+    /** Within this of its approach slot a body closes on the pursuit itself. */
+    static final double SLOT_REACHED = 1.5;
+
     public static final ArrestState INSTANCE = new ArrestState();
     private ArrestState() {}
 
@@ -46,9 +49,18 @@ public class ArrestState implements AIState {
         Character p = ctrl.getPursuit();
         if (p == null || !p.isAlive()) return PatrolState.INSTANCE;
         Vector3 at = p.getGlobalPosition();
-        if (body.getNavAgent() != null && ctrl.shouldUpdateNav(at)) {
-            body.getNavAgent().setTargetPosition(at);
-            ctrl.recordNavTarget(new Vector3(at));
+        // this body's own approach slot round the pursuit (the dispatcher's), until it is there
+        Vector3 goal = at;
+        Vector3 off = ctrl.pursuitOffset;
+        if (off != null && off.lengthSquared() > 0.01 && ctrl.pursuitVia.isEmpty() && !ctrl.pursuitAway) {
+            Vector3 g = at.plus(off);
+            Vector3 dg = g.minus(body.getGlobalPosition());
+            dg.setY(0f);
+            if (dg.length() > SLOT_REACHED) goal = g;
+        }
+        if (body.getNavAgent() != null && ctrl.shouldUpdateNav(goal)) {
+            body.getNavAgent().setTargetPosition(goal);
+            ctrl.recordNavTarget(new Vector3(goal));
         }
         Vector3 d = at.minus(body.getGlobalPosition());
         d.setY(0f);
@@ -84,8 +96,10 @@ public class ArrestState implements AIState {
             return this;
         }
         cmd.movementType = dist > WALK_INSIDE ? MovementType.SPRINT : MovementType.WALK;
-        Vector3 dir = ctrl.pursuitDirect ? (d.length() > 0.001 ? d.normalized() : null)
-                : ScriptedMoveState.steerDirection(body, at);
+        Vector3 dg = goal.minus(body.getGlobalPosition());
+        dg.setY(0f);
+        Vector3 dir = ctrl.pursuitDirect ? (dg.length() > 0.001 ? dg.normalized() : null)
+                : ScriptedMoveState.steerDirection(body, goal);
         if (dir != null) {
             cmd.movementDirection.setX(dir.getX());
             cmd.movementDirection.setZ(dir.getZ());
