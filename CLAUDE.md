@@ -11001,7 +11001,11 @@ Gated since (probe_wanted_respawn, probe_shop_clerk, probe_weapon_counter PASS);
   (authority only). A new crime = one row + one `WantedSystem.report(id, where, playerId)` call. Seams today:
   `Health.applyDamage` (a player hurting / killing a civilian or a police officer) and `FirearmItem` (gunfire). A
   witnessed crime needs a living non-player character within `witness_radius`. `ui.WantedStars` draws six stars left
-  of the clock. Not replicated yet; no police dispatch, so nothing calls `arrest` yet.
+  of the clock. **Replicated (2026-10-08):** the host sends each player's SHOWN standing -- police stars, lethal, the
+  worst gang and its stars -- as `WORLD_EVENT_WANTED` (16) when it changes (checked 4x a second) and to a joining peer
+  (`WantedSystem.sendBaseline`); a client keeps the mirror and `WantedSystem.hudOf` answers from it (`WantedStars`
+  reads that). Heat, timers and the dispatch stay on the host. Gate: `run_net_debugworld.sh` coop "the host's wanted
+  stars reach the client's HUD".
 - **A shop clerk** (`world.ShopClerkSpot`, from a `MARK_clerk` in the shop's model once the builder supports it; props
   `surrender`, `weapons`, `responders`, `till`): aimed at or hurt, it rolls once by its id -- surrender (crouches) or
   fight (a heavy weapon, faction `vigilante`, the AIController brain). Threatening it is `threaten_clerk`; robbing the

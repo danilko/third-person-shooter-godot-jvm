@@ -30,8 +30,12 @@ import java.util.Map;
  * <p>LETHAL crimes (a robbery, a dead policeman) make police shoot the player on sight until the heat is gone
  * (`applyHostility`), and no arrest is offered meanwhile. Gangs are a separate standing: {@link GangSystem}.
  *
- * <p>The police dispatch and the arrest are {@link EnforcementDispatch}'s. Not done yet (PLAN.md W5): replication to
- * clients (a client's HUD shows no stars).
+ * <p>The police dispatch and the arrest are {@link EnforcementDispatch}'s.
+ *
+ * <p>REPLICATION (2026-10-08): the host sends each player's shown standing -- police stars, lethal, and the worst gang
+ * with its stars -- as {@link GameManager#WORLD_EVENT_WANTED} when it changes (checked 4x a second) and to a joining
+ * peer; a client keeps the mirror and {@link #hudOf} answers from it. Only what the HUD shows is sent: heat, timers
+ * and the dispatch stay on the host, which is the only peer that acts on them.
  */
 @Script(className = "WantedSystem")
 public class WantedSystem extends Node {
@@ -51,6 +55,13 @@ public class WantedSystem extends Node {
     private final List<Node> scratch = new ArrayList<>();
     private final FactionFlips flips = new FactionFlips();
     private double toggleIn;
+    private double syncIn;
+    /** What a player's HUD shows: police stars, lethal, worst gang ("" none), its stars. */
+    public record Shown(int stars, boolean lethal, String gang, int gangStars) {
+        static final Shown NONE = new Shown(0, false, "", 0);
+    }
+    /** Host: what was last sent per player. Client: the host's mirror. */
+    private final Map<String, Shown> shown = new HashMap<>();
 
     @Register
     @Override
@@ -68,6 +79,7 @@ public class WantedSystem extends Node {
     public void _exitTree() {
         if (instance == this) instance = null;
         states.clear();
+        shown.clear();
     }
 
     @Register
@@ -81,6 +93,70 @@ public class WantedSystem extends Node {
             toggleIn = 0.5;
             applyHostility();
         }
+        syncIn -= delta;
+        if (syncIn <= 0) {
+            syncIn = 0.25;
+            syncShown();
+        }
+    }
+
+    private com.openworld.net.NetworkManager net() {
+        return getNodeOrNull("/root/NetworkManager") instanceof com.openworld.net.NetworkManager n ? n : null;
+    }
+
+    private boolean isClient() {
+        com.openworld.net.NetworkManager n = net();
+        return n != null && n.isNetworked() && !n.isServer();
+    }
+
+    /** The live standing of a player (authority). */
+    private Shown liveOf(String id) {
+        GangSystem gangs = GangSystem.get();
+        String g = gangs != null ? gangs.worstGang(id) : "";
+        int gs = g.isEmpty() || gangs == null ? 0 : gangs.starsOf(id, g);
+        return new Shown(starsOf(id), isLethal(id), g, gs);
+    }
+
+    /** Host: send every player whose shown standing changed. */
+    private void syncShown() {
+        com.openworld.net.NetworkManager n = net();
+        if (n == null || !n.isNetworked() || !n.isServer()) return;
+        for (Player p : PlayerRegistry.getPlayers()) {
+            if (!GD.isInstanceValid(p) || p.getCharacterInfo() == null) continue;
+            String id = p.getCharacterInfo().characterId;
+            Shown now = liveOf(id);
+            if (now.equals(shown.getOrDefault(id, Shown.NONE))) continue;
+            shown.put(id, now);
+            n.broadcastWorldEvent(GameManager.WORLD_EVENT_WANTED, id, now.stars(), args(now));
+        }
+    }
+
+    private static List<String> args(Shown s) {
+        return List.of(s.lethal() ? "1" : "0", s.gang(), Integer.toString(s.gangStars()));
+    }
+
+    /** Host -> a joining peer: every player with any standing (nothing is sent when nobody is wanted). */
+    public void sendBaseline(int peerId) {
+        com.openworld.net.NetworkManager n = net();
+        if (n == null) return;
+        for (Map.Entry<String, Shown> e : shown.entrySet())
+            if (!e.getValue().equals(Shown.NONE))
+                n.sendWorldEventTo(peerId, GameManager.WORLD_EVENT_WANTED, e.getKey(), e.getValue().stars(), args(e.getValue()));
+    }
+
+    /** Client: the host's word on a player's standing. */
+    public void applyRemote(String id, float stars, List<String> args) {
+        String lethal = args.size() > 0 ? args.get(0) : "0";
+        String gang = args.size() > 1 ? args.get(1) : "";
+        int gs = 0;
+        try { gs = args.size() > 2 ? Integer.parseInt(args.get(2)) : 0; } catch (NumberFormatException ignored) { }
+        shown.put(id, new Shown(Math.round(stars), "1".equals(lethal), gang, gs));
+    }
+
+    /** What a player's HUD shows: live on the authority, the host's mirror on a client. */
+    public Shown hudOf(String id) {
+        if (id == null) return Shown.NONE;
+        return isClient() ? shown.getOrDefault(id, Shown.NONE) : liveOf(id);
     }
 
     /**
@@ -199,6 +275,8 @@ public class WantedSystem extends Node {
 
     // ── probe / console surface ──
     @Register public int starsNow(String playerId) { return starsOf(playerId); }
+    @Register public int hudStarsNow(String playerId) { return hudOf(playerId).stars(); }
+    @Register public int hudGangStarsNow(String playerId) { return hudOf(playerId).gangStars(); }
     @Register public boolean reportNow(String crimeId, String playerId) {
         Character who = findPlayer(playerId);
         return who != null && report(crimeId, who.getGlobalPosition(), playerId);

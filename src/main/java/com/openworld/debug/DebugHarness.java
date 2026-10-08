@@ -704,6 +704,9 @@ public class DebugHarness extends Node {
     private java.util.Set<String> coopHostCarried = new java.util.HashSet<>();
     private double coopHostSeenAt = -1;
     private boolean coopHostBought = false;
+    private boolean coopStarsSet, coopStarsCleared;
+    private int coopStarsMax;
+    private double coopDamageAt;
 
     /** Client: every catalog weapon any shop sells that the HOST's puppet here carries. */
     private java.util.Set<String> hostPuppetCarries() {
@@ -800,8 +803,29 @@ public class DebugHarness extends Node {
                     + " unix_ms=" + (long) (godot.api.Time.INSTANCE.getUnixTimeFromSystem() * 1000.0)
                     + " hps=" + com.openworld.world.GameTime.hoursPerSecond(getTree()));
         }
-        if (coopStep == 3 && coopT >= 20.5) {
+        // stars replication (2026-10-08): the host gives every remote player 2 stars for 4 s; the client (whose clock
+        // runs behind the host's by however late it joined) watches its HUD and only sends its self-damage once it saw
+        // the stars come AND go -- a wanted player who goes down would wake ARRESTED, not HOSPITALIZED
+        var ws = com.openworld.game.WantedSystem.get();
+        if (!client && !coopStarsSet && coopT >= 19.6 && ws != null) {
+            coopStarsSet = true;
+            for (Player p : PlayerRegistry.getPlayers())
+                if (p != me && p.getCharacterInfo() != null) ws.setStars(p.getCharacterInfo().characterId, 2, false);
+            GD.print("[coop] host set remote stars 2");
+        }
+        if (!client && coopStarsSet && !coopStarsCleared && coopT >= 23.6 && ws != null) {
+            coopStarsCleared = true;
+            for (Player p : PlayerRegistry.getPlayers())
+                if (p != me && p.getCharacterInfo() != null) ws.clear(p.getCharacterInfo().characterId);
+            GD.print("[coop] host cleared remote stars");
+        }
+        int hud = client && me != null && ws != null && me.getCharacterInfo() != null
+                ? ws.hudOf(me.getCharacterInfo().characterId).stars() : 0;
+        if (client && hud > coopStarsMax) coopStarsMax = hud;
+        if (coopStep == 3 && coopT >= 21.5 && (!client || (coopStarsMax > 0 && hud == 0) || coopT >= 40.0)) {
             coopStep = 4;
+            coopDamageAt = coopT;
+            if (client) GD.print("[coop] client hud stars=" + coopStarsMax + " cleared=" + (hud == 0));
             if (client && me != null && me.getNodeOrNull("Health") instanceof com.openworld.character.Health h) {
                 // a request is capped at 500 (DamageRequestPolicy); send enough to empty the bar
                 int n = (int) Math.ceil(h.maxHealth / 400.0) + 1;
@@ -809,7 +833,7 @@ public class DebugHarness extends Node {
                 GD.print("[coop] self damage sent x" + n);
             }
         }
-        if (coopStep == 4 && coopT >= 33.0) {
+        if (coopStep == 4 && coopT >= coopDamageAt + 11.5) {
             coopStep = 5;
             var rs = com.openworld.game.RespawnSystem.get();
             if (client) GD.print("[coop] respawn alive=" + (me != null && me.isAlive()) + " owned=" + (me != null)

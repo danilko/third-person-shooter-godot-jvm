@@ -294,8 +294,23 @@ public class WorldBounds extends Node3D {
         cancelAll(body);
         GD.print("WorldBounds: " + body.getName() + " was under the map at (" + Math.round(pos.getX()) + ", "
                 + Math.round(pos.getY()) + ", " + Math.round(pos.getZ()) + "): put back on the surface at y "
-                + String.format("%.1f", to.getY()));
+                + String.format("%.1f", to.getY()) + " [" + describe(body) + "]");
         return true;
+    }
+
+    /** What a rescued body is, for the log: a repeat rescue of one body says why it keeps going under. */
+    private static String describe(Node3D body) {
+        StringBuilder b = new StringBuilder(body.getClass().getSimpleName());
+        if (body instanceof com.openworld.character.Character ch) {
+            b.append(" id=").append(ch.getCharacterInfo() != null ? ch.getCharacterInfo().characterId : "?");
+            b.append(" dead=").append(ch instanceof com.openworld.character.AICharacter ai && ai.isDead()).append(" phys=").append(ch.isPhysicsProcessing());
+            b.append(" layer=").append(ch.getCollisionLayer()).append(" mask=").append(ch.getCollisionMask());
+            if (ch.getController() != null) b.append(" ctrl=").append(ch.getController().getClass().getSimpleName());
+            b.append(" vel=").append(ch.getVelocity());
+        } else if (body instanceof godot.api.PhysicsBody3D pb) {
+            b.append(" layer=").append(pb.getCollisionLayer());
+        }
+        return b.toString();
     }
 
     /** The place to stand at (x, z): the topmost collider within SURFACE_REACH over the terrain there, else the

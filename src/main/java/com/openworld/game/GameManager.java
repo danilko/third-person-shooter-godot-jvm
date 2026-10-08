@@ -404,6 +404,7 @@ public class GameManager extends Node {
                 net.sendBaselineBreakables(peerId);   // already-broken destructibles (I2)
                 net.sendBaselineRace(peerId);   // a race already in progress (R2)
                 net.sendTimeOfDay(peerId);
+                if (WantedSystem.get() != null) WantedSystem.get().sendBaseline(peerId);
             }
             return;
         }
@@ -423,6 +424,7 @@ public class GameManager extends Node {
             net.sendBaselineBreakables(peerId);   // already-broken destructibles (I2)
             net.sendBaselineRace(peerId);   // a race already in progress (R2)
             net.sendTimeOfDay(peerId);
+            if (WantedSystem.get() != null) WantedSystem.get().sendBaseline(peerId);
         }
         spawnPlayerBody(peerId, persistentPlayerId);
     }
@@ -1191,6 +1193,8 @@ public class GameManager extends Node {
 
     /** A dropped weapon left lying long enough was cleared by the host's {@link WorldJanitor} -- key = its pickupId. */
     public static final int WORLD_EVENT_PICKUP_CLEARED = 15;
+    /** A player's shown standing (key characterId, value police stars, args lethal / worst gang / its stars). */
+    public static final int WORLD_EVENT_WANTED = 16;
 
     /** Routes a decoded MSG_WORLD_EVENT to the owning system. Extend the switch as networked world state is added. */
     public void onWorldEvent(int eventType, String key, float value, java.util.List<String> args) {
@@ -1214,6 +1218,10 @@ public class GameManager extends Node {
             case WORLD_EVENT_PICKUP_CLEARED -> {
                 com.openworld.item.Pickup p = findPickupById(key);
                 if (p != null && !p.isTaken()) WorldJanitor.freePickup(p);
+            }
+            case WORLD_EVENT_WANTED -> {
+                WantedSystem w = WantedSystem.get();
+                if (w != null) w.applyRemote(key, value, args);
             }
             // case WORLD_EVENT_DOOR -> applyDoorState(key, value);
             default -> GD.print("GameManager: unhandled world event type " + eventType + " key=" + key);

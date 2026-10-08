@@ -47,14 +47,13 @@ public class WantedStars extends Control {
         int s = 0, gs = 0;
         String g = "";
         WantedSystem w = WantedSystem.get();
-        com.openworld.game.GangSystem gangs = com.openworld.game.GangSystem.get();
         for (Player p : PlayerRegistry.getPlayers()) {
             if (!p.isLocallyOwnedPlayer() || p.getCharacterInfo() == null) continue;
-            String id = p.getCharacterInfo().characterId;
-            if (w != null) s = w.starsOf(id);
-            if (gangs != null) {
-                g = gangs.worstGang(id);
-                gs = g.isEmpty() ? 0 : gangs.starsOf(id, g);
+            if (w != null) {
+                WantedSystem.Shown h = w.hudOf(p.getCharacterInfo().characterId);
+                s = h.stars();
+                g = h.gang();
+                gs = h.gangStars();
             }
             break;
         }
