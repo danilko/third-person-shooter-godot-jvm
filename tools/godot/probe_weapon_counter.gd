@@ -172,8 +172,18 @@ func _counter_cycle(counter: Area3D, p: CharacterBody3D, spawn: Node3D, weapon: 
 	_check("standing at the counter is seen", bool(counter.call("player_at_counter_now")))
 	var hud := _with_method(root, "prompt_key_now")
 	if hud != null:
+		# step off and back: the teleport above also took the player out of other prompts' ranges (a parked
+		# police car's ammo box), and their "out of range" can land after the counter's "in range" -- the HUD has
+		# one prompt and the last event wins
+		var at := p.global_position
+		p.global_position = at + Vector3(0, 0, 6)
+		await _tick(10)
+		p.global_position = at
+		p.velocity = Vector3.ZERO
+		await _tick(10)
 		_check("  ... the HUD prompt shows the E keycap", String(hud.call("prompt_key_now")) == "E",
-				"key '%s'" % String(hud.call("prompt_key_now")))
+				"key '%s', prompt '%s' visible %s, hud %s" % [String(hud.call("prompt_key_now")),
+				(hud.get_node("InteractPrompt") as Label).text, (hud.get_node("InteractPrompt") as Label).visible, hud.get_path()])
 	await _press("interact")
 	await _tick(2)
 	var menu := _menu(root)
