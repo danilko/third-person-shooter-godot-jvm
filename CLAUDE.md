@@ -2359,7 +2359,11 @@ On death, `Health` emits to `EventBus.characterEliminated(attacker, victim, weap
 **Firearm damage is CS 1.6's** (user 2026-10-08: "an assault rifle kills in 1-2 headshots in CS, here half a
 magazine"). It had been ~half (ASR1 20: two headshots, five chest hits). Now ASR1 36 (AK), ASR2 33 (M4A1), SMG1 22,
 PIS1 25, DUP1 28, SHG1 20 x 8 (M3), PIS2 55, REV1 70, SNR1 150, in `weapon/stats/<id>.tres`; the bone multipliers
-are unchanged, so one rifle headshot kills a 100 HP body (144), chest 3 hits, legs 6. The player has 1000 HP, so AI
+are unchanged, so chest 3 hits, legs 6. **Headshots (user, same day): two for most guns, ONE for the AK, the hand
+cannons and the sniper** -- `WeaponStats.headshot_scale` scales a head hit before the x4 (FirearmItem.resolvePellets):
+ASR1 144 (one-tap; the AK's identity), ASR2 0.7 -> 92 (CS's M4 against a helmet), SMG1 88, PIS1 0.9 -> 90, DUP1 0.85
+-> 95, a SHG1 pellet 80; PIS2 220, REV1 280, SNR1 600 one-tap. Gate `tools/godot/probe_headshots.gd` 14/14
+(`--control` = every scale 1, fails 3). The player has 1000 HP, so AI
 fire on the player rose with it. Glass `PANE_PIERCE_AT` went 20 -> 30 so pistols, SMGs and buckshot pellets still
 stop in a window and rifles still carry on.
 

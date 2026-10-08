@@ -95,7 +95,13 @@ public class FirearmItem extends WeaponItem {
 	pelletCount = s.pelletCount;
 	hipfireSpreadMultiplier = s.hipfireSpreadMultiplier;
 	standingSpeedFraction = s.standingSpeedFraction;
+	headshotScale = s.headshotScale;
   }
+
+  /** WeaponStats.headshotScale: a head hit is scaled by this before Health's x4. */
+  @Visible public float headshotScale = 1.0f;
+  public float getHeadshotScale() { return headshotScale; }
+  public void setHeadshotScale(float v) { headshotScale = v; }
 
   /** This weapon's accuracy numbers, for {@link Accuracy}. */
   public Accuracy.Tuning accuracyTuning() {
@@ -482,6 +488,7 @@ public class FirearmItem extends WeaponItem {
 		HitInfo info = new HitInfo(hit.node, hit.point, hit.normal);
 		if (applyDamage) {
 		  float dealt = hit.damage >= 0f ? hit.damage : damage;              // a window's armour took the rest
+		  if (headshotScale != 1f && "Physical Bone head_2".equals(hit.node.getName().toString())) dealt *= headshotScale;
 		  im.processHit(info, dealt, getDisplayName(), weaponIcon, resolveAttackerName(), resolveAttackerFaction(),
 						resolveAttackerPosition(), resolveAttackerId());
 		} else {

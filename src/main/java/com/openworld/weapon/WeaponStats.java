@@ -98,4 +98,10 @@ public class WeaponStats extends Resource {
     @Export public float standingSpeedFraction = 0.34f;
     public float getStandingSpeedFraction() { return standingSpeedFraction; }
     public void setStandingSpeedFraction(float v) { standingSpeedFraction = v; }
+
+    /** A head hit's damage is scaled by this before the body's x4 (1 = the full x4). How a rifle that should not
+     *  one-tap (ASR2, the M4) is told apart from one that does (ASR1, the AK): user 2026-10-08. */
+    @Export public float headshotScale = 1.0f;
+    public float getHeadshotScale() { return headshotScale; }
+    public void setHeadshotScale(float v) { headshotScale = v; }
 }
