@@ -677,6 +677,7 @@ func _build(b: Dictionary, variant: String) -> bool:
 			body.add_child(cs)
 			cs.owner = root
 	_add_panes(root, panes, str(b.get("shop_band", "")), out_id)
+	_add_ladders(root, b.get("ladders", []))
 	var hi := 0
 	for h in b.get("hulls", []):
 		# a convex hull of a library piece (a ramp): its own mesh, placed as the layout says
@@ -1239,6 +1240,69 @@ func _glass_islands(s: Array) -> Array:
 		out.append({"i": n, "aabb": AABB(lo, hi - lo), "arrays": a2, "small": area < ISLAND_MIN_AREA})
 		n += 1
 	return out
+
+
+const LADDER_SCRIPT := "res://src/main/java/com/openworld/world/Ladder.java"
+var _ladder_mesh: ArrayMesh = null
+
+## A world.Ladder per layout `ladders` entry (a station platform's track face): an Area3D whose -Z points INTO the
+## face, its volume from 0.2 m inside the face to 0.8 m out over the bed and up past the ledge, and a yellow rung mesh
+## 2 cm off the face (visual only: the train's gauge leaves ~6 cm there).
+func _add_ladders(root: Node3D, ladders: Array) -> void:
+	if ladders.is_empty():
+		return
+	var holder := Node3D.new()
+	holder.name = "Ladders"
+	root.add_child(holder)
+	holder.owner = root
+	var i := 0
+	for ld in ladders:
+		var top := float(ld["top"])
+		var area := Area3D.new()
+		area.set_script(load(LADDER_SCRIPT))
+		area.name = "Ladder%d" % i
+		i += 1
+		var p: Array = ld["pos"]
+		area.transform = Transform3D(Basis(Vector3.UP, float(ld["yaw"])), Vector3(p[0], p[1], p[2]))
+		area.set("top", top)
+		area.collision_layer = 0
+		area.collision_mask = 2
+		holder.add_child(area)
+		area.owner = root
+		var cs := CollisionShape3D.new()
+		cs.name = "Volume"
+		var box := BoxShape3D.new()
+		box.size = Vector3(0.8, top + 1.2, 1.0)
+		cs.shape = box
+		cs.position = Vector3(0.0, (top + 1.2) / 2.0, 0.3)
+		area.add_child(cs)
+		cs.owner = root
+		var mi := MeshInstance3D.new()
+		mi.name = "Rungs"
+		mi.mesh = _ladder_rungs(top)
+		area.add_child(mi)
+		mi.owner = root
+
+
+func _ladder_rungs(top: float) -> ArrayMesh:
+	if _ladder_mesh != null:
+		return _ladder_mesh
+	var st := SurfaceTool.new()
+	for sx in [-0.22, 0.22]:
+		var rail := BoxMesh.new()
+		rail.size = Vector3(0.03, top, 0.03)
+		st.append_from(rail, 0, Transform3D(Basis.IDENTITY, Vector3(sx, top / 2.0, 0.035)))
+	var y := 0.3
+	while y < top - 0.05:
+		var rung := BoxMesh.new()
+		rung.size = Vector3(0.44, 0.025, 0.025)
+		st.append_from(rung, 0, Transform3D(Basis.IDENTITY, Vector3(0.0, y, 0.035)))
+		y += 0.3
+	var m := ArrayMesh.new()
+	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, st.commit_to_arrays())
+	m.surface_set_material(0, _lib_material("MI_PaintYellow"))
+	_ladder_mesh = m
+	return m
 
 
 var _pane_meshes := {}

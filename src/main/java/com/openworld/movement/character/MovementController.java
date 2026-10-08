@@ -235,6 +235,32 @@ public class MovementController extends Node {
     else { swimVertical = 0.0; swimJumpTimer = 0.0; }
   }
 
+  // ── ladders (world.Ladder) ──
+  /** Climb speed on a ladder, m/s (CS 1.6's 200 u/s is 5 m/s; a calmer 2.5). */
+  public static final double LADDER_SPEED = 2.5;
+  /** Looking further down than this (degrees) while pushing into a ladder climbs DOWN (CS's rule). */
+  public static final double LADDER_DOWN_PITCH = 30.0;
+  private com.openworld.world.Ladder ladder;
+  private double ladderLetGo;
+
+  public void setLadder(com.openworld.world.Ladder l) { ladder = l; }
+
+  public void clearLadder(com.openworld.world.Ladder l) { if (ladder == l) ladder = null; }
+
+  /** True while the body is on a ladder (not let go). */
+  public boolean onLadder() { return ladder != null && GD.isInstanceValid(ladder) && ladderLetGo <= 0.0 && !swimming; }
+
+  @Register public boolean onLadderNow() { return onLadder(); }
+
+  /** Jump on a ladder: let go, pushed off its face, and do not grab it again for half a second. */
+  public void ladderJump() {
+    if (!onLadder()) return;
+    Vector3 out = ladder.outward();
+    velocity.setY(1.5);
+    player.setVelocity(new Vector3(out.getX() * 2.5, 1.5, out.getZ() * 2.5));
+    ladderLetGo = 0.5;
+  }
+
   @Register
   public void setSwimVertical(double value) {
     swimVertical = value;
@@ -321,8 +347,43 @@ public class MovementController extends Node {
       }
     }
 
+    // ── A LADDER (world.Ladder; CS 1.6's rule, user 2026-10-07) ─────────────────────────────────────────────
+    boolean climbing = ladder != null && GD.isInstanceValid(ladder) && !swimming && ladderLetGo <= 0.0;
+    if (ladderLetGo > 0.0) ladderLetGo -= delta;
+    if (climbing) {
+      Vector3 out = ladder.outward();
+      Vector3 along = new Vector3(-out.getZ(), 0, out.getX());
+      double side = normDir.getX() * along.getX() + normDir.getZ() * along.getZ();
+      // CS 1.6: FORWARD (along the view) climbs the way the view points -- up while looking level or up, down while
+      // looking down -- and BACK the opposite, whichever way the body faces; sideways slides along the ladder
+      double pitch = self != null ? self.controlRotation.pitch : 0.0;
+      double yaw = self != null ? Math.toRadians(self.controlRotation.yaw) : 0.0;
+      double fwd = normDir.getX() * -Math.sin(yaw) + normDir.getZ() * -Math.cos(yaw);
+      double up = Math.abs(fwd) > 0.3 ? Math.signum(fwd) * (pitch < -LADDER_DOWN_PITCH ? -1.0 : 1.0) : 0.0;
+      double feet = player.getGlobalPosition().getY();
+      if (up < 0 && onFloor) climbing = false;                   // at the foot, stepping back: plain walking again
+      else {
+        double vy = up * LADDER_SPEED;
+        double hx = along.getX() * side * LADDER_SPEED * 0.5, hz = along.getZ() * side * LADDER_SPEED * 0.5;
+        if (up > 0 && feet >= ladder.topY() - 0.15) {
+          // over the ledge: the push carries the body onto it
+          vy = Math.max(0.0, Math.min(vy, (ladder.topY() + 0.05 - feet) * 10.0));
+          hx -= out.getX() * LADDER_SPEED;
+          hz -= out.getZ() * LADDER_SPEED;
+        } else {
+          hx -= out.getX() * 0.3;                                 // keep against the face
+          hz -= out.getZ() * 0.3;
+        }
+        newX = hx;
+        newZ = hz;
+        velocity.setY(vy);
+      }
+    }
+
     // ── Vertical velocity (integrated on the internal Y, direct — no lerp) ─────
-    if (swimming && swimState != null) {
+    if (climbing) {
+      // set above: no gravity on a ladder
+    } else if (swimming && swimState != null) {
       // Vertical swim model. With no input a buoyancy spring drives the body toward the settle line
       // (surface − settleDepth) and holds it there, so it settles AT the water line instead of
       // popping out the top (the surface-bob flicker). Manual ascend/dive use their own (faster)
@@ -387,14 +448,14 @@ public class MovementController extends Node {
       double excess = (ySlid - before.getY()) - slope;
       if (Math.abs(excess) > STEP_LIP_MIN && Math.abs(excess) <= stepHeight + 0.05) absorbStep(excess);
     }
-    if (!swimming && stepUpLedge(newX, newZ, delta)) {
+    if (!swimming && !climbing && stepUpLedge(newX, newZ, delta)) {
       velocity.setY(0.0);
       absorbStep(player.getGlobalPosition().getY() - ySlid);
     }
 
     // Fall damage: compare velocity just before landing to the configured threshold.
     // Skipped while swimming — water cushions the entry/landing.
-    if (!swimming && fallDamageThreshold > 0 && !wasOnFloor && player.isOnFloor()
+    if (!swimming && !climbing && fallDamageThreshold > 0 && !wasOnFloor && player.isOnFloor()
             && appliedVelocityY < -fallDamageThreshold) {
       float fallSpeed = -appliedVelocityY;
       float damage = (fallSpeed - fallDamageThreshold) * fallDamageScale;

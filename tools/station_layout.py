@@ -1029,12 +1029,36 @@ def layout(st: Station):
                        "outer": eh_span(st)[1] + eh_outer(st) if st.form == "elevated_hub" else 0.0,
                        "rail_wall": [eh_span(st)[1] + v for v in eh_band(st)[2:]] if st.form == "elevated_hub"
                        else []}}
+    out["ladders"] = ladders(st)
     LB.place_props(props(st), out, KITS)
     out["boxes"] = LB.merge_boxes(out["boxes"])
     xs = [abs(b["center"][0]) + b["size"][0] / 2 for b in out["boxes"]]
     zs = [abs(b["center"][2]) + b["size"][2] / 2 for b in out["boxes"]]
     out["footprint_m"] = [round(2 * max(xs), 3), round(2 * max(zs), 3)]
     out["height_m"] = round(max(b["center"][1] + b["size"][1] / 2 for b in out["boxes"]), 3)
+    return out
+
+
+LADDER_INSET = 2.0                 # a platform-end ladder's centre, in from the platform's end
+
+
+def ladders(st: Station):
+    """A vertical ladder (world.Ladder, user 2026-10-07: "a vertical stair at the platform ... like early CS 1.6") on
+    every TRACK-FACING edge of every platform, LADDER_INSET in from both ends: somebody on the track bed climbs back
+    onto the platform. Scene-local: {pos (on the bed, at the edge), yaw (its -Z points INTO the platform face), top}."""
+    half = st.length / 2.0
+    out = []
+    for c0, c1, faces in platforms(st):
+        cs = [ln.c for ln in st.lanes if ln.line in faces]
+        edges = []
+        if any(c > c1 for c in cs):
+            edges.append((c1, math.pi))          # track on +c: the platform lies at -c, Godot +Z: -Z must face +Z
+        if any(c < c0 for c in cs):
+            edges.append((c0, 0.0))              # track on -c: the platform at Godot -Z
+        for c_edge, yaw in edges:
+            for sg in (-1.0, 1.0):
+                x, h, z = to_godot_local(sg * (half - LADDER_INSET), c_edge, 0.0)
+                out.append({"pos": [round(x, 3), 0.0, round(z, 3)], "yaw": yaw, "top": PLATFORM_H})
     return out
 
 

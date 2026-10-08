@@ -11511,6 +11511,20 @@ intact window (`AICharacter.seenPastGlass`).
   `tools/godot/probe_train_glass.gd` (heavy/light/open window on a real car), `probe_station_paid` per station.
   `WeaponItem.probe_shot` is the probe readout (one round through the real trace + glass rule).
 
+## Platform ladders, CS 1.6 style (user 2026-10-07)
+
+Somebody on the track bed climbs back onto the platform by a vertical ladder: `world.Ladder` (an Area3D, mask
+CHARACTER, `top` = the ledge over its origin, its -Z INTO the face) on every TRACK-FACING edge of every platform,
+`LADDER_INSET` 2 m in from both ends (`tools/station_layout.py ladders` -> layout `ladders` -> `build_building_scenes.gd
+_add_ladders`, a yellow rung mesh 2-5 cm off the face, inside the ~6 cm the train's gauge leaves). Inside its volume
+`MovementController`'s ladder branch replaces gravity, CS 1.6's rule: FORWARD along the view climbs the way the view
+points (up while level or up, down below `LADDER_DOWN_PITCH` 30 deg), BACK the reverse, sideways slides along it, at
+`LADDER_SPEED` 2.5 m/s; over the ledge the push carries the body onto it; at the foot stepping back is plain walking;
+jump lets go (pushed off, no re-grab for 0.5 s; `Character.applyInput` -> `MovementController.ladderJump`). No
+animation. AI uses the same branch (it moves toward the ladder; its nav does not path to ladders yet). A ladder also
+lets a fare-dodger onto the platform, as in life. Gate `tools/godot/probe_ladder.gd [-- --control]` (DebugWorld
+station A: up onto the platform, down looking down, jump lets go; control: no ladder, stays on the bed).
+
 ## Armour, a helicopter that can be shot down, rotors on their hubs (2026-10-07, user-reported)
 
 - **Armour is per model, ONE damage rule** (early-GTA, user 2026-10-07: a rifle hurts a tank too, just slowly;

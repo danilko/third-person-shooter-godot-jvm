@@ -826,7 +826,10 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         // ── Jump (single ground jump only) ─────────────────────────────────
         // First stand up if crouched/crawling, otherwise launch a ground jump.
         // No jumping while swimming.
-        if (input.jump && isOnFloor() && currentStanceName != StanceName.SWIM) {
+        MovementController lmc = movementController();
+        if (input.jump && lmc != null && lmc.onLadder()) {
+            lmc.ladderJump();                      // jump on a ladder lets go of it (world.Ladder)
+        } else if (input.jump && isOnFloor() && currentStanceName != StanceName.SWIM) {
             if (!isStanceBlocked(StanceName.UPRIGHT)) {
                 if (currentStanceName != StanceName.UPRIGHT) {
                     setStance(StanceName.UPRIGHT);
