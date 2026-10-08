@@ -43,7 +43,6 @@ waveform; listen in game and change the row. Gate: `tools/godot/probe_sfx.gd`.
 
 | file | `Sound` | what plays it | source (all CC0) |
 |---|---|---|---|
-| `glass_shatter` | `GLASS_SHATTER` | a window breaking: car (crash, bullet, blast, melee), shop pane (PaneSet, Breakable), train window; 3D, 3 takes | built: Kenney Impact Sounds `impactGlass_*` layered (no CC0 shatter yet; SHORTLIST has real ones) |
 | `hit_marker` | `HIT_MARKER` | the local player's hit confirmed (HitMarker), 2D, short tick | shipped |
 | `siren` | `SIREN` | an emergency vehicle on a call (Vehicle.refreshEmergency), 3D, LOOPING (import with loop on) | missing |
 | `sfx/impact_flesh` | `IMPACT_FLESH` | a bullet into a body (ImpactManager, by SurfaceType) | Kenney `impactPunch_medium` |
@@ -80,6 +79,7 @@ Weapons
 - Holster, scope in/out, pickup, SNR1 bolt cycle after a shot, a melee draw (Still North medieval dagger / katana
   draw + sheath are ready)
 - Ricochet, whiz-by
+- Glass shatter (car crash, shop / train window): the layered Kenney placeholder was REMOVED (user, 2026-10-08: awkward); a real CC0 shatter is on SHORTLIST
 
 Vehicles
 - Engine loop (idle/rev, pitched by rpm) per class: car, kei, truck, motorcycle, boat, plane

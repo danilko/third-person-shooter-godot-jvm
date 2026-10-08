@@ -89,9 +89,6 @@ public class TrainSystem extends Node3D {
             if (instance != null && instance.getTree() != null) {
                 if (instance.getTree().getFirstNodeInGroup(new StringName("particle_manager"))
                         instanceof com.openworld.world.manager.ParticleManager pm) pm.spawn(SurfaceType.GLASS, at);
-                if (instance.getTree().getCurrentScene() != null)
-                    com.openworld.audio.Sounds.play3D(instance.getTree().getCurrentScene(),
-                            com.openworld.audio.Sound.GLASS_SHATTER, at, 6f, 0.1f);
             }
         }
     }

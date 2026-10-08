@@ -74,9 +74,7 @@ public class PaneSet extends Node3D {
             if (pane.getNodeOrNull("Glass") instanceof Node3D g) at = g.getGlobalPosition();
             ParticleManager pm = particles();
             if (pm != null) pm.spawn(SurfaceType.GLASS, at);
-            if (getTree() != null && getTree().getCurrentScene() != null)
-                com.openworld.audio.Sounds.play3D(getTree().getCurrentScene(), com.openworld.audio.Sound.GLASS_SHATTER,
-                        at, 6f, 0.1f);
+            // no shatter sound for now (user, 2026-10-08: the layered placeholder read as awkward)
         }
         if (broadcast) {
             if (restoreDelay > 0f) {

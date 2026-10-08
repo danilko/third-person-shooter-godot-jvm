@@ -55,12 +55,6 @@ SPECS = {
     "sfx/melee_hit_hard": (-18, 0.6, 1.0, [f"{MED}/Weapon Impacts/Mace Spear Haft.wav",
                                             f"{MED}/Weapon Impacts/Axe Spear Haft on Haft.wav",
                                             f"{MED}/Weapon Impacts/Mace Axe Blade and Haft.wav"]),
-    # glass: no CC0 shatter in the libraries, so several heavy glass hits layered (SHORTLIST.md has real ones)
-    "glass_shatter": (-15, 1.2, 1.0, [[(f"{IMP}/impactGlass_heavy_00{i % 5}.ogg", 0.0, 0),
-                                        (f"{IMP}/impactGlass_heavy_00{(i + 1) % 5}.ogg", 0.035, -3),
-                                        (f"{IMP}/impactGlass_medium_00{(i + 2) % 5}.ogg", 0.09, -5),
-                                        (f"{IMP}/impactGlass_light_00{(i + 3) % 5}.ogg", 0.16, -7),
-                                        (f"{IMP}/impactGlass_light_00{(i + 4) % 5}.ogg", 0.27, -10)] for i in range(3)]),
     # explosions: a crunch over a sub-bass boom
     "sfx/explosion": (-9, 2.0, 1.0, [[(f"{SCI}/explosionCrunch_00{i}.ogg", 0.0, 0),
                                       (f"{SCI}/lowFrequency_explosion_00{i % 2}.ogg", 0.0, 2)] for i in range(4)]),

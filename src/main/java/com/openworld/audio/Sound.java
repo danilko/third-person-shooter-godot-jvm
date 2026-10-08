@@ -10,8 +10,6 @@ package com.openworld.audio;
  * {@code reload_audio}).
  */
 public enum Sound {
-    /** A window shattering (car, shop, train: a crash, a bullet, a blast, a melee blow). 3D, at the pane. */
-    GLASS_SHATTER("glass_shatter", 3),
     /** The local player's damage was confirmed (HitMarker). 2D. */
     HIT_MARKER("hit_marker"),
     /** An emergency vehicle on a call (Vehicle.refreshEmergency): a LOOPING Japanese siren (police: the wailing

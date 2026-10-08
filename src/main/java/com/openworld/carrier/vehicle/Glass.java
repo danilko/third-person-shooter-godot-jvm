@@ -12,7 +12,7 @@ import java.util.Random;
  * What a car window looks and sounds like when it cracks and shatters (VehicleDamageModel's panes). Everything here
  * is built in code, once, and shared by every car in the game: one cracked copy per glass material, one invisible
  * material for a broken window, one shard mesh, one crack texture. So a broken window costs no extra draw call and
- * no extra texture. The shatter SOUND is a file, {@code assets/audio/glass_shatter} (audio.Sound.GLASS_SHATTER).
+ * no extra texture. No shatter SOUND for now (user, 2026-10-08: the layered placeholder read as awkward on a crash).
  */
 public final class Glass {
     private Glass() {}
@@ -133,8 +133,6 @@ public final class Glass {
         scene.addChild(p);
         p.setGlobalPosition(at);
         p.setEmitting(true);
-
-        com.openworld.audio.Sounds.play3D(scene, com.openworld.audio.Sound.GLASS_SHATTER, at, 6f, 0.1f);
 
         SceneTreeTimer t = scene.getTree().createTimer(2.2, false, true, false);
         t.connect(new StringName("timeout"), MethodCallable.createUnsafe(p, "queue_free"));
