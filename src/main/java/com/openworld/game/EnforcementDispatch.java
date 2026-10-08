@@ -114,6 +114,7 @@ public class EnforcementDispatch extends Node {
     /** A shooting unit hands over to the combat FSM inside ENGAGE_IN of its player, and back to the approach past
      *  ENGAGE_OUT (hysteresis, so it does not flip at one distance). */
     private static final double ENGAGE_IN = 25.0, ENGAGE_OUT = 35.0;
+    private static final double MELEE_ENGAGE_IN = 3.0, MELEE_ENGAGE_OUT = 6.0;
     /** A player moving faster than this (a car) cannot be closed on by a runner: that is not "stuck" (measured: 100-160
      *  officers a leg retired and re-spawned while the perf probe drove the player at 20 m/s). */
     private static final double OUTRUN_SPEED = 5.0;
@@ -341,7 +342,11 @@ public class EnforcementDispatch extends Node {
                     || (ws != null && ws.policeShoot(u.playerId));
             double dp = flat(u.body.getGlobalPosition(), p.getGlobalPosition());
             boolean inArrest = brain.getCurrentState() == ArrestState.INSTANCE;
-            if (shoot && (dp <= ENGAGE_IN || (!inArrest && dp <= ENGAGE_OUT))) {
+            // a melee unit (the 1-star baton, PLAN.md 1g a) keeps the approach until it is at arm's length: the FSM's
+            // chase stood baton officers 22 m off for good (it leans on the navmesh, as above)
+            boolean melee = u.body.isMeleeEngagement();
+            double engIn = melee ? MELEE_ENGAGE_IN : ENGAGE_IN, engOut = melee ? MELEE_ENGAGE_OUT : ENGAGE_OUT;
+            if (shoot && (dp <= engIn || (!inArrest && dp <= engOut))) {
                 // close enough: the combat FSM fights (chase / attack / suppress / search)
                 brain.setPursuit(null);
                 if (inArrest) brain.forceState(ChaseState.INSTANCE);
@@ -1192,6 +1197,31 @@ public class EnforcementDispatch extends Node {
     public int guardsNow() {
         int n = 0;
         for (Unit u : units) if (u.guard && GD.isInstanceValid(u.body) && !u.body.isDead() && u.retiredFor == 0) n++;
+        return n;
+    }
+
+    /** The weapon ids live units of {@code side} carry, comma separated, one per slot holding a weapon other than the
+     *  fist (probe readout for the weapons-by-stars rows, PLAN.md 1g a). */
+    @Register
+    public String unitWeaponsNow(String side) {
+        StringBuilder b = new StringBuilder();
+        for (Unit u : units) {
+            if (!side.equals(u.side) || !GD.isInstanceValid(u.body) || u.body.isDead() || u.body.weaponController == null)
+                continue;
+            var wc = u.body.weaponController;
+            for (int i = 1; i < wc.getSlotCount(); i++) {
+                var w = wc.getWeaponItem(i);
+                if (w != null) b.append(b.length() > 0 ? "," : "").append(w.weaponId);
+            }
+        }
+        return b.toString();
+    }
+
+    /** Melee fallbacks started by every live unit (a target in reach while the gun reloads, PLAN.md 1g b). */
+    @Register
+    public int meleeFallbacksNow() {
+        int n = 0;
+        for (Unit u : units) if (GD.isInstanceValid(u.body)) n += u.body.meleeFallbacks;
         return n;
     }
 

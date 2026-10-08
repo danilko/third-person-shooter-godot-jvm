@@ -23,6 +23,9 @@ public class AttackState implements AIState {
      * absorbs that jitter; closing back in (rather than strafing) keeps it inside.
      */
     private static final float MELEE_CHASE_HYSTERESIS = 1.5f;
+    /** Within this plan distance a reloading unit strikes instead (PLAN.md 1g b). */
+    private static final float MELEE_FALLBACK_REACH = 1.8f;
+    private static final double MELEE_FALLBACK_SECONDS = 2.0;
 
     @Override
     public void enter(AICharacter body, AIController ctrl) {
@@ -149,6 +152,14 @@ public class AttackState implements AIState {
         cmd.aimTargetPosition = ctrl.getCurrentAimTarget();
 
         // ── Weapon selection ──────────────────────────────────────────────────
+        // An AI does not stand reloading with the target in arm's reach: it strikes with its melee weapon or fists
+        // instead (PLAN.md 1g b), then goes back to the gun and reloads. Out of ammo altogether it already fights with
+        // the fists (selectBestWeapon falls back to slot 0).
+        if (body.weaponController != null
+                && body.weaponController.isWeaponReloading() && hDist < MELEE_FALLBACK_REACH
+                && !isMelee) {
+            body.startMeleeFallback(MELEE_FALLBACK_SECONDS);
+        }
         int bestWeapon = body.selectBestWeapon();
         if (bestWeapon < 0) return RefillAmmoState.INSTANCE;
         if (body.weaponController != null && bestWeapon != body.weaponController.getWeapon()) {

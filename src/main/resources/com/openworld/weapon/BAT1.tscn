@@ -1,0 +1,67 @@
+[gd_scene format=3 uid="uid://dbat1baton001"]
+
+[ext_resource type="Texture2D" path="res://assets/ui/weapons/BAT1.png" id="91_icon"]
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/weapon/stats/BAT1.tres" id="90_stats"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/MeleeAttackStep.java" id="step_script"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/MeleeItem.java" id="1_melee"]
+[ext_resource type="PackedScene" path="res://assets/weapons/BAT1.glb" id="5_model"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_bat1_body"]
+size = Vector3(0.08, 0.14, 0.61)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_bat1_pickup"]
+size = Vector3(0.5, 0.5, 0.7)
+
+[sub_resource type="Resource" id="MeleeAttackStep_BAT1_0"]
+script = ExtResource("step_script")
+animation = "attack_swing_mw2"
+damage = 25.0
+range = 1.9
+radius = 0.35
+windup = 0.048
+active = 0.07
+recovery = 0.32
+hitstop = 0.05
+camera_kick = 1.4
+
+[sub_resource type="Resource" id="MeleeAttackStep_BAT1_1"]
+script = ExtResource("step_script")
+animation = "attack_chop_mw2"
+damage = 40.0
+range = 2.0
+radius = 0.4
+windup = 0.174
+active = 0.08
+recovery = 0.45
+hitstop = 0.08
+camera_kick = 2.2
+
+[node name="BAT1" type="Node3D" unique_id=300400001]
+script = ExtResource("1_melee")
+stats = ExtResource("90_stats")
+attack_steps = Array[ExtResource("step_script")]([SubResource("MeleeAttackStep_BAT1_0"), SubResource("MeleeAttackStep_BAT1_1")])
+weapon_id = "BAT1"
+weapon_name = "BAT-1"
+slot_type = 2
+weapon_archetype = "melee"
+weapon_icon = ExtResource("91_icon")
+hold_socket = "SocketMelee"
+holster_sockets = PackedStringArray("ShortWeaponHolsterMaker1", "ShortWeaponHolsterMaker2", "ShortWeaponHolsterMaker3", "ShortWeaponHolsterMaker4")
+require_interact = true
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=300400002]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.054, -0.241)
+shape = SubResource("BoxShape3D_bat1_body")
+
+[node name="PickupArea" type="Area3D" parent="." unique_id=300400003]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D2" type="CollisionShape3D" parent="PickupArea" unique_id=300400004]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.054, -0.241)
+shape = SubResource("BoxShape3D_bat1_pickup")
+
+[node name="Model" parent="." unique_id=300400006 instance=ExtResource("5_model")]
+
+[connection signal="body_entered" from="PickupArea" to="." method="on_body_entered"]
+[connection signal="body_exited" from="PickupArea" to="." method="on_body_exited"]

@@ -754,7 +754,32 @@ public class AICharacter extends Character {
 
     // ── Weapon / ammo ─────────────────────────────────────────────────────────
 
+    /** Until this time (engine ms) the unit fights with its melee weapon (or fists) instead of its best weapon:
+     *  set by AttackState when a target is in arm's reach while the gun reloads (PLAN.md 1g b). */
+    public long meleeFallbackUntilMs = 0;
+
+    /** Fight hand-to-hand for {@code seconds} (the gun's reload was cancelled by the switch; it reloads again after). */
+    public void startMeleeFallback(double seconds) {
+        meleeFallbackUntilMs = godot.api.Time.getTicksMsec() + (long) (seconds * 1000.0);
+        meleeFallbacks++;
+    }
+
+    public int meleeFallbacks;
+
+    private int meleeSlot() {
+        for (int i = 1; i < weaponController.getSlotCount(); i++) {
+            WeaponItem s = weaponController.getWeaponItem(i);
+            if (s != null && s.getWeaponType() == WeaponType.MELEE) return i;
+        }
+        return 0;
+    }
+
     public int selectBestWeapon() {
+        if (meleeFallbackUntilMs > 0 && weaponController != null) {
+            if (godot.api.Time.getTicksMsec() < meleeFallbackUntilMs) return meleeSlot();
+            meleeFallbackUntilMs = 0;
+            cachedBestWeapon = -1;
+        }
         if (cachedBestWeapon >= 0) return cachedBestWeapon;
         if (weaponController == null) { cachedBestWeapon = 0; return 0; }
         int bestIndex = -1;

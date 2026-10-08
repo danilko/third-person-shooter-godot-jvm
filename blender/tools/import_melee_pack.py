@@ -3,7 +3,8 @@ to the weapon standard, as assets/weapons/<id>.blend + textures/. Run once, with
 assets/weapons/MeleeWeaponsPack/; the pack is then deleted (CREDITS.md names the source), so this file is the
 record of exactly what was done to each model.
 
-    blender --background --factory-startup --python blender/tools/import_melee_pack.py
+    blender --background --factory-startup --python blender/tools/import_melee_pack.py [-- --only=BAT1]
+    (MELEE_PACK=<dir> points at an unpacked pack elsewhere)
 
 For each model (all measured first, see the table below): the FBX's object transform is applied, the model is
 turned so its tip/head points down Blender +Y (Godot -Z) with its edge (or hook, or blade face) DOWN, scaled to its
@@ -13,12 +14,13 @@ normal map, the DirectX-convention normal maps (Spade, Machete) green-flipped to
 height maps are dropped: glTF has no height channel. Then `build_weapon.py` verifies and exports the .glb.
 """
 import os
+import sys
 
 import bpy
 from mathutils import Matrix, Vector
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-PACK = os.path.join(ROOT, "assets", "weapons", "MeleeWeaponsPack")
+PACK = os.environ.get("MELEE_PACK", os.path.join(ROOT, "assets", "weapons", "MeleeWeaponsPack"))
 OUT = os.path.join(ROOT, "assets", "weapons")
 TEX = os.path.join(OUT, "textures")
 TEX_PX = 1024
@@ -35,6 +37,9 @@ MODELS = [
     ("MEW5", "Dagger",       (+1, 2), (+1, 0), ( 0.0, 0.0, 0.005), 0.225),      # handle -0.037..+0.047; double edged
     ("MEW6", "Katana",       (+1, 2), (+1, 1), ( 0.0, -0.002, -0.335), 1.079),  # tsuba at -0.25; edge -Y (convex side)
     ("MEW7", "Machete",      (+1, 0), (+1, 2), ( 0.0, 0.0, -0.005), 0.515),     # handle -0.058..+0.06; edge -Z
+    # 2026-10-07: shaft along Z -0.298..+0.290, side handle along -X at Z 0.12..0.17. Held as a club by the
+    # short end (fist between the side handle and the butt), long end forward, side handle hanging DOWN.
+    ("BAT1", "PoliceBaton",  (-1, 2), (+1, 0), ( 0.0, 0.0, 0.228), 0.61),      # PR-24 side-handle baton, 24 in
 ]
 
 
@@ -133,5 +138,8 @@ def conform(wid, folder, tip, up, grip, length):
 
 
 os.makedirs(TEX, exist_ok=True)
+# -- --only=BAT1[,..] conforms only those rows (the rest were done long ago and their pack is gone)
+ONLY = next((a.split("=", 1)[1].split(",") for a in sys.argv if a.startswith("--only=")), None)
 for row in MODELS:
-    conform(*row)
+    if ONLY is None or row[0] in ONLY:
+        conform(*row)

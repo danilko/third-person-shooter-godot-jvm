@@ -50,7 +50,8 @@ class DispatchRulesTest {
     @org.junit.jupiter.api.Test
     void policeEscalateWithTheStars() throws Exception {
         DispatchRules r = DispatchRules.parse(read("crimes.json"), "dispatch");
-        org.junit.jupiter.api.Assertions.assertTrue(r.weaponsFor(1).contains("PIS1"));
+        org.junit.jupiter.api.Assertions.assertEquals(java.util.List.of("BAT1"), r.weaponsFor(1), "a baton at one star");
+        org.junit.jupiter.api.Assertions.assertTrue(r.weaponsFor(2).contains("PIS1"), "firearms from two stars");
         org.junit.jupiter.api.Assertions.assertTrue(r.weaponsFor(6).contains("ATL1"), "rockets at the top");
         org.junit.jupiter.api.Assertions.assertTrue(r.vehiclesFor(6).contains("TNK1"), "a tank at 6 stars");
         org.junit.jupiter.api.Assertions.assertTrue(r.vehiclesFor(5).contains("LTK1"), "a light tank at 5 stars");

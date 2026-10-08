@@ -1099,6 +1099,9 @@ public class WeaponController extends Node {
     if (slotIndex == activeSlotIndex) { sockets.showWeapon(activeSlotIndex); return false; }
 
     pendingSlotIndex = slotIndex;
+    // a switch CANCELS a running reload (CS): left running, the reload completed on whatever weapon was raised next
+    // and moved ITS ammo for free
+    if (reloadTimer != null && reloadTimer.getTimeLeft() > 0) reloadTimer.stop();
     if (slotIndex > 0) setHolstered(false); // a real weapon coming out is a draw (puppets included)
     sockets.showWeapon(activeSlotIndex);   // keep the OLD weapon up through the holster phase
     transitionTimer.setWaitTime(1.0 / weapons[pendingSlotIndex].getSwitchSpeed());

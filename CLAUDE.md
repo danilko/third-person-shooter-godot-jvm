@@ -11396,6 +11396,24 @@ checks its "Wired in code" table against the enum. Licence rule as for art: CC0 
   them onto the stairs; also `EnforcementDispatch.underCover`: a heli shot never hits a target with WORLD geometry
   within 30 m straight above. `probe_train_fit --stations` PASS with the new roofs.
 
+## A baton at one star, full loads, and a strike while reloading (PLAN.md 1g a/b, 2026-10-07, user-asked)
+
+- **BAT1, the police baton** (警棒; a PR-24 side-handle baton, 0.61 m): the CC0 melee pack's `PoliceBaton`, conformed
+  by `import_melee_pack.py -- --only=BAT1` (`MELEE_PACK=<dir>` names the unpacked pack), held as a club by the short
+  end, side handle hanging down. A plain `MeleeItem` (BLUNT), chain `attack_swing_mw2` 25 -> `attack_chop_mw2` 40.
+  `crimes.json` `weapons_by_stars[1]` = BAT1: at one star police are hostile but melee only; firearms from two.
+- **A melee unit keeps the dispatch's straight approach until 3 m** (`MELEE_ENGAGE_IN/OUT` 3/6 against a gun's 25/35):
+  handed to the FSM at 25 m, baton officers stood 22 m off for the whole 90 s case.
+- **No unlimited ammo** (user decision): units carry each weapon's normal full load, and the base reserves were raised
+  to CS's buy-menu loads (PIS1 15+90, PIS2 7+35, REV1 6+36, DUP1 30+120, SMG1 30+120, SHG1 6+32, ASR1/2 30+90,
+  SNR1 5+30), which the player gets too. Out of ammo an AI fights with its fists (selectBestWeapon's slot-0 fallback).
+- **A reloading AI with its target within 1.8 m strikes instead** (`AICharacter.startMeleeFallback`, 2 s, its melee
+  slot else the fists), then goes back to the gun. **A weapon switch now CANCELS a running reload** (CS): before, the
+  reload finished on whatever weapon was raised next and refilled ITS magazine for free.
+- Gates: `probe_enforcement.gd` (one star: only BAT1, the player downed and ARRESTED in 6 s; four stars: firearms),
+  `DispatchRulesTest`, `probe_weapon_scale` / `_sockets` / `probe_melee`. Readouts `unit_weapons_now(side)`,
+  `melee_fallbacks_now`.
+
 ## Armour, a helicopter that can be shot down, rotors on their hubs (2026-10-07, user-reported)
 
 - **Armour is per model, ONE damage rule** (early-GTA, user 2026-10-07: a rifle hurts a tank too, just slowly;

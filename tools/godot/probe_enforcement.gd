@@ -76,6 +76,7 @@ func _initialize() -> void:
 	ws.call("set_stars_now", pid, 1, false)
 	var seen_foot := 0
 	var hostile1 := false
+	var weapons1 := {}
 	var respawns0 := int(rs.call("respawns_now"))
 	var t := 0.0
 	while t < 90.0:
@@ -85,6 +86,8 @@ func _initialize() -> void:
 			ws.call("set_stars_now", pid, 1, false)   # hold the star until the player is down
 		var u := _units(ed)
 		seen_foot = max(seen_foot, u[0])
+		for w in String(ed.call("unit_weapons_now", "police")).split(",", false):
+			weapons1[w] = true
 		hostile1 = hostile1 or bool(fm.call("hostile_now", "police", "player"))
 		if int(t * 2) % 10 == 0:
 			print("    t=%.1f player %s | %s" % [t, (str(player.global_position.round()) if is_instance_valid(player) else "gone"), String(ed.call("debug_units_now"))])
@@ -97,6 +100,7 @@ func _initialize() -> void:
 	else:
 		_check(seen_foot >= 1, "one star sends officers on foot (%d)" % seen_foot)
 		_check(hostile1, "at one star police are already hostile (they hunt the player down)")
+		_check(weapons1.size() == 1 and weapons1.has("BAT1"), "at one star police carry only the BAT1 baton (%s)" % [weapons1.keys()])
 		_check(int(rs.call("respawns_now")) > respawns0 and reason == "ARRESTED", "the player, put down while wanted, woke ARRESTED (%s, %.1f s)" % [reason, t])
 	await _tick(60 * 6)   # the arrest card and the respawn
 	player = _player()
@@ -116,6 +120,7 @@ func _initialize() -> void:
 	var hp1 := float(player.get_node("Health").call("health_now"))
 	ws.call("set_stars_now", pid, 4, false)
 	var peak := PackedInt32Array([0, 0, 0, 0])
+	var weapons4 := {}
 	var min_budget := budget0
 	t = 0.0
 	while t < 90.0:
@@ -125,6 +130,8 @@ func _initialize() -> void:
 		var u := _units(ed)
 		for i in 3:
 			peak[i] = max(peak[i], u[i])
+		for w in String(ed.call("unit_weapons_now", "police")).split(",", false):
+			weapons4[w] = true
 		min_budget = min(min_budget, int(zm.call("effective_traffic_budget_now")))
 		if int(t * 2) % 10 == 0:
 			print("    4* t=%.1f player %s | %s" % [t, (str(player.global_position.round()) if is_instance_valid(player) else "gone"), String(ed.call("debug_units_now"))])
@@ -141,6 +148,7 @@ func _initialize() -> void:
 		_check(hostile, "at four stars police are hostile to players")
 		_check(peak[0] >= 3, "four stars brings more officers (%d)" % peak[0])
 		_check(hurt, "they fight: the player was hurt")
+		_check(weapons4.has("SMG1") or weapons4.has("ASR2") or weapons4.has("SHG1"), "at four stars police carry firearms (%s)" % [weapons4.keys()])
 		if island:
 			_check(peak[2] >= 1, "a patrol car drove the road route to the player and its crew got out (%d)" % peak[2])
 		_check(budget0 <= 0 or min_budget < budget0, "the ambient traffic budget shrank while they were out (%d -> %d)" % [budget0, min_budget])
