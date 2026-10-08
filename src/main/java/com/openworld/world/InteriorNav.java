@@ -25,7 +25,7 @@ import java.util.Map;
  *   <li>Every enterable building ({@code _Shop} / {@code _Open}: exactly the variants that carry {@link Door}s) gets a
  *   {@link NavigationRegion3D} child the first time one of its doors is ready ({@link #attach}); a shut building
  *   gets nothing.</li>
- *   <li>The regions join ONE separate navigation map at the fine 0.175 m cell interiors need (a 1.1 m konbini aisle
+ *   <li>The regions join ONE separate navigation map at the fine 0.1 m cell interiors need (a 1.1 m konbini aisle
  *   closes at the street map's 0.5 m), so the street map, its cell and its road-piece seams are untouched.
  *   Buildings never overlap, so one interior map holds them all.</li>
  *   <li>A unit's NavigationAgent3D is switched onto this map only while it stands inside a building that has a
@@ -36,7 +36,7 @@ public final class InteriorNav {
     private InteriorNav() {}
 
     public static final String DIR = "res://src/main/resources/com/openworld/world/buildings/nav/";
-    public static final float CELL = 0.175f, CELL_HEIGHT = 0.1f;
+    public static final float CELL = 0.1f, CELL_HEIGHT = 0.1f;   // 0.175 rounded a ticket-gate lane shut (2026-10-08)
     private static final StringName REGION = new StringName("InteriorNav");
 
     private static RID map;

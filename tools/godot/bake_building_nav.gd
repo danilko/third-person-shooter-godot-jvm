@@ -6,7 +6,7 @@ extends SceneTree
 ## Door_* marker's inside point is ON the mesh, and the cost of a path query across it.
 ##
 ##   godot --headless --path . --script tools/godot/bake_building_nav.gd -- --scenes=KonbiniL_Shop,PoliceStation_Shop
-##       [--cell=0.175] [--radius=0.35] [--height=1.8] [--save=<dir>]   (--save writes <Type>_nav.res there, for the runtime test)
+##       [--cell=0.1] [--radius=0.3] [--height=1.8] [--save=<dir>]   (--save writes <Type>_nav.res there, for the runtime test)
 ##   ... -- --all --write   THE BUILD STEP: every enterable type (a _Shop or _Open scene) baked from its _Shop
 ##                          variant (else _Open) into buildings/nav/<Type>_nav.res, which world.InteriorNav loads.
 ##                          Re-run after build_building_scenes.gd changes a building.
@@ -23,8 +23,8 @@ func _arg(n: String, d: String) -> String:
 
 
 func _initialize() -> void:
-	var cell := float(_arg("cell", "0.175"))
-	var radius := float(_arg("radius", "0.35"))
+	var cell := float(_arg("cell", "0.1"))   # = InteriorNav.CELL; 0.175 closed the station gate lanes (2026-10-08)
+	var radius := float(_arg("radius", "0.3"))   # a 0.35 capsule passes a 0.7 m lane; 0.35 here erodes it shut
 	var save := _arg("save", "")
 	var names := _arg("scenes", "KonbiniS_Shop,KonbiniL_Shop").split(",")
 	var write := "--write" in OS.get_cmdline_user_args()
@@ -82,7 +82,12 @@ func _initialize() -> void:
 		box.size = Vector3(hi.x - lo.x + 2 * APRON, 0.1, hi.z - lo.z + 2 * APRON)
 		acs.shape = box
 		apron.add_child(acs)
-		apron.position = Vector3((lo.x + hi.x) * 0.5, -0.07, (lo.z + hi.z) * 0.5)
+		# the apron is the STREET round the building. A station's origin is its track bed (an elevated hub's street is
+		# 7.84 m below it, a ground hub's entry stairs come down to its street), so there the street is the lowest
+		# collider; an apron left at the origin cut every elevated stairwell with a floor in mid-air (2026-10-08:
+		# Central's platforms and concourse were separate navmesh islands)
+		var street_y := _street_y(b, lo, hi) if nm.begins_with("Station_") else 0.0
+		apron.position = Vector3((lo.x + hi.x) * 0.5, street_y - 0.07, (lo.z + hi.z) * 0.5)
 		b.add_child(apron)
 		await physics_frame
 		var nm_res := NavigationMesh.new()
@@ -179,3 +184,28 @@ func _initialize() -> void:
 		b.queue_free()
 		await process_frame
 	quit(0)
+
+
+## A station's street height: bake it once with no apron and take the lowest walkable floor within EDGE m of the
+## footprint's edge -- an entrance floor (an elevated hub's F1 hall, a ground hub's entry stair foot) reaches the edge;
+## a plinth or a foundation is not walkable, so the lowest COLLIDER is not the street (it read 1.6 m low at Central).
+const EDGE := 1.5
+func _street_y(b: Node3D, lo: Vector3, hi: Vector3) -> float:
+	var nm_res := NavigationMesh.new()
+	nm_res.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
+	nm_res.cell_size = 0.25
+	nm_res.cell_height = 0.1
+	nm_res.agent_radius = 0.35
+	nm_res.agent_height = 1.8
+	nm_res.agent_max_climb = 0.5
+	nm_res.filter_baking_aabb = AABB(lo - Vector3(1, 1, 1), (hi - lo) + Vector3(2, 2, 2))
+	var src := NavigationMeshSourceGeometryData3D.new()
+	NavigationServer3D.parse_source_geometry_data(nm_res, src, b)
+	NavigationServer3D.bake_from_source_geometry_data(nm_res, src)
+	var best := INF
+	for v in nm_res.get_vertices():
+		var edge := minf(minf(v.x - lo.x, hi.x - v.x), minf(v.z - lo.z, hi.z - v.z))
+		if edge < EDGE + 0.4:
+			best = minf(best, v.y)
+	return 0.0 if best == INF else best - 0.1   # a navmesh vertex sits a cell over its floor
+
