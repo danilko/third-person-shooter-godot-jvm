@@ -840,7 +840,68 @@ public class DebugHarness extends Node {
                     + " pos=" + (me != null ? me.getGlobalPosition() : "-") + " respawns=" + (rs != null ? rs.respawnsNow() : -1)
                     + " card=" + (rs != null ? rs.cardTextNow() : ""));
             else GD.print("[coop] host players=" + PlayerRegistry.getPlayers().size());
+            coopSeatAt = coopT;
         }
+        // die seated (PLAN.md 1i, 2026-10-08): the respawned client walks to the parked car, takes a seat through the
+        // host's seat request, dies there; the host must unseat the corpse before the respawn, on BOTH peers
+        if (coopStep == 5 && coopT >= coopSeatAt + 3.0) {
+            coopStep = 6;
+            com.openworld.carrier.vehicle.Vehicle car = coopCar();
+            if (client && me != null && car != null) {
+                Vector3 side = car.getGlobalTransform().getBasis().getColumn(0).normalized();
+                me.setGlobalPosition(car.getGlobalPosition().plus(side.times(-2.6)).plus(new Vector3(0, 0.3, 0)));
+                GD.print("[coop] beside car " + car.getName());
+            } else if (client) { GD.print("[coop] no car (me=" + (me != null) + ")");
+            }
+        }
+        if (coopStep == 6 && coopT >= coopSeatAt + 5.0) {
+            coopStep = 7;
+            com.openworld.carrier.vehicle.Vehicle car = coopCar();
+            if (client && me != null && car != null) car.requestEnter(me);
+        }
+        if (coopStep == 7 && coopT >= coopSeatAt + 7.5) {
+            coopStep = 8;
+            if (client && me != null) {
+                GD.print("[coop] seated=" + (me.currentVehicleNode != null) + " hud=" + coopHud());
+                if (me.getNodeOrNull("Health") instanceof com.openworld.character.Health h) {
+                    int n = (int) Math.ceil(h.maxHealth / 400.0) + 1;
+                    for (int i = 0; i < n; i++) h.takeDamage(null, 400f, "fall");
+                }
+            }
+        }
+        if (coopStep == 8 && coopT >= coopSeatAt + 20.0) {
+            coopStep = 9;
+            // riders = Players seated in ANY car (the client's car on the client, every car on the host)
+            int riders = 0;
+            for (Node n : getTree().getNodesInGroup(new StringName("characters")))
+                if (n instanceof com.openworld.carrier.vehicle.Vehicle v)
+                    for (int i = 0; i < v.getSeatCount(); i++) if (v.getSeatOccupant(i) instanceof Player) riders++;
+            if (client) GD.print("[coop] seated respawn alive=" + (me != null && me.isAlive()) + " owned=" + (me != null)
+                    + " inCar=" + (me != null && me.currentVehicleNode != null) + " riders=" + riders + " hud=" + coopHud());
+            else GD.print("[coop] host car riders=" + riders);
+        }
+    }
+
+    private double coopSeatAt = 1e9;
+    private com.openworld.carrier.vehicle.Vehicle coopCarRef;
+
+    private com.openworld.carrier.vehicle.Vehicle coopCar() {
+        if (coopCarRef != null && GD.isInstanceValid(coopCarRef)) return coopCarRef;
+        Player me = localPlayer();
+        if (me == null) return null;
+        double best = 1e18;
+        for (Node n : getTree().getNodesInGroup(new StringName("characters"))) {
+            if (!(n instanceof com.openworld.carrier.vehicle.Vehicle v) || v.getOccupant() != null || !v.hasFreeSeat()) continue;
+            if (v.isInGroup(new StringName(com.openworld.carrier.vehicle.Vehicle.STREAMED_GROUP))) continue;
+            double d = v.getGlobalPosition().distanceTo(me.getGlobalPosition());
+            if (d < best) { best = d; coopCarRef = v; }
+        }
+        return coopCarRef;
+    }
+
+    private String coopHud() {
+        Node h = getTree().getRoot().findChild("HUDManager", true, false);
+        return h instanceof com.openworld.ui.HUDManager hm ? hm.situationNow() : "?";
     }
 
     @Register

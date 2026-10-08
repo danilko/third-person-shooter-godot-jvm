@@ -26,7 +26,7 @@ run_pair "$OUT/walk" --hold-action=left --hold-action=forward
 # its snapshots split into more MTU frames — the load that made the client's limiter drop ~20 packets/s.
 run_pair "$OUT/tour" --idle --auto-walk
 # Phase C (2026-10-06): the client buys at a real shop counter, then dies; the host must respawn it; both print the clock.
-SECS_SAVE=$SECS; SECS=40
+SECS_SAVE=$SECS; SECS=62
 run_pair "$OUT/coop" --coop-test --coop-test
 SECS=$SECS_SAVE
 echo "logs in $OUT"
@@ -108,6 +108,17 @@ if hc_ and cc_:
     check("coop: the client's clock matches the host's", diff < 2.0, f"{diff:.2f} game min apart")
 else:
     check("coop: both peers printed the clock", False, f"host={hc_} client={cc_}")
+print("  -- coop: die seated, then the respawn")
+m = re.search(r"\[coop\] seated=(\w+) hud=(\S*)", cclient)
+check("coop: the client took a seat in the parked car", m is not None and m.group(1) == "true", m.group(0) if m else "no line")
+m = re.search(r"\[coop\] seated respawn alive=(\w+) owned=(\w+) inCar=(\w+) riders=(\d+) hud=(\S*)", cclient)
+check("coop: after a seated death the client is respawned on foot", m is not None and m.group(1) == "true"
+      and m.group(2) == "true" and m.group(3) == "false" and m.group(5) == "ON_FOOT", m.group(0) if m else "no line")
+check("coop: no car on the client holds a player", m is not None and m.group(4) == "0", m.group(0) if m else "")
+m = re.search(r"\[coop\] host car riders=(\d+)", chost)
+check("coop: no car on the host holds a player", m is not None and m.group(1) == "0", m.group(0) if m else "no line")
+check("coop: the host ran two respawns", chost.count("RespawnSystem: HOSPITALIZED -> respawned") >= 2,
+      str(chost.count("RespawnSystem: HOSPITALIZED -> respawned")))
 for name, text in (("host", chost), ("client", cclient)):
     n = len(re.findall(r"java\.lang\.\w+Exception", text)) - len(re.findall(KNOWN_NOISE, text))
     check(f"coop: no JVM exception on the {name}", n == 0, f"{n}")
