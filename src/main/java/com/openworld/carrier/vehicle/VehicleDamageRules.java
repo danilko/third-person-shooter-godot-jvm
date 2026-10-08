@@ -51,7 +51,7 @@ public final class VehicleDamageRules {
      * ARMOURED glass (a special vehicle's {@code VehicleConfig.glassArmor} > 0) is a pool of weapon damage instead:
      * rounds stop in it until it is used up, and the round that uses it up carries on with what it had left.
      */
-    public static final double PANE_PIERCE_AT = 20.0;
+    public static final double PANE_PIERCE_AT = 30.0;   // PIS1 25, SMG1 22, a SHG1 pellet 20 stop; the rifles (33/36) and up carry on
 
     public static int paneStateFor(double damage, double armor) {
         if (armor <= 0.0) return damage > 0.0 ? OFF : OK;          // ordinary glass: one hit breaks it

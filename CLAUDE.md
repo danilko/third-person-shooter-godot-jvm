@@ -2356,6 +2356,13 @@ Damage multipliers are resolved by bone name in `Health.getDamageMultiplier()`:
 
 On death, `Health` emits to `EventBus.characterEliminated(attacker, victim, weapon, headshot)`.
 
+**Firearm damage is CS 1.6's** (user 2026-10-08: "an assault rifle kills in 1-2 headshots in CS, here half a
+magazine"). It had been ~half (ASR1 20: two headshots, five chest hits). Now ASR1 36 (AK), ASR2 33 (M4A1), SMG1 22,
+PIS1 25, DUP1 28, SHG1 20 x 8 (M3), PIS2 55, REV1 70, SNR1 150, in `weapon/stats/<id>.tres`; the bone multipliers
+are unchanged, so one rifle headshot kills a 100 HP body (144), chest 3 hits, legs 6. The player has 1000 HP, so AI
+fire on the player rose with it. Glass `PANE_PIERCE_AT` went 20 -> 30 so pistols, SMGs and buckshot pellets still
+stop in a window and rifles still carry on.
+
 ### Effects are Binbun3D packs driven from Java (`assets/vfx/`, `com.openworld.vfx`, 2026-09-18)
 
 Explosions, muzzle flashes, smoke and the sea shader come from four CC0 Binbun3D packs, re-organised into
@@ -6959,7 +6966,7 @@ rule (3-letter type code + series). DebugWorld parks all three behind `VehicleRo
   rules `VehicleDamageRules.paneStateFor / carriedThrough`). Ordinary glass (every car, `VehicleConfig.glassArmor` 0):
   a pistol / SMG round, a melee blow (`MeleeItem.smashGlass` -> `strikePane`), a crash (`crashPanes`) or a blast
   (`ExplosionManager.applyToRigidBody` -> `blastPanes`, quadratic falloff inside the radius) breaks it and stops
-  there; after that everything goes through the opening. A round of at least `PANE_PIERCE_AT` 20 (rifles, PIS2, REV1,
+  there; after that everything goes through the opening. A round of at least `PANE_PIERCE_AT` 30 (rifles, PIS2, REV1,
   SNR1) breaks it and carries on at FULL damage; a shotgun at close range puts its first pellet into the glass and the
   rest through. Blast damage reaches the occupants as characters, as before. `glassArmor` > 0 is kept for a future
   SPECIAL armoured vehicle only (none ships): a pool of weapon damage, the round that uses it up carries the rest on
@@ -11497,9 +11504,9 @@ Re-run `island_buildings.py places` after any building change.
 ## Glass breaks like a car's: shops, stations, mission and gang buildings, trains (PLAN.md 1g g, 2026-10-07)
 
 **One rule for every window** (user: "update the glass behaviour like car"), the car's own
-(`VehicleDamageRules.PANE_PIERCE_AT` 20): ordinary glass gives ONE hit of protection -- a light round, a melee blow, a
+(`VehicleDamageRules.PANE_PIERCE_AT` 30): ordinary glass gives ONE hit of protection -- a light round, a melee blow, a
 crash (a car above 3 m/s, `Vehicle.crashedPanes`) or a blast (`GlassPanes.blast`, from `ExplosionManager`) breaks it and
-stops there; a round of 20+ breaks it and carries on at full damage; a broken window lets everything through. The bullet
+stops there; a round of 30+ breaks it and carries on at full damage; a broken window lets everything through. The bullet
 half is `WeaponItem.throughGlass` (cars, then building panes up to three deep, then train windows); AI sight passes an
 intact window (`AICharacter.seenPastGlass`).
 - **Buildings** (`build_building_scenes.gd`, ENTERABLE variants only -- `_Shop` / `_Open`; a shut building keeps its

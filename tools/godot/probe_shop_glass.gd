@@ -97,7 +97,7 @@ func _initialize() -> void:
 			others.append(p)
 	if gun != null and others.size() >= 2:
 		var pa: Vector3 = (others[0] as Node3D).get_node("Glass").global_position
-		var r: String = gun.call("probe_shot", pa + front * 4.0, -front, 30.0)
+		var r: String = gun.call("probe_shot", pa + front * 4.0, -front, 36.0)
 		var da := float(r.split("|")[1]) if r.contains("|") else 99.0
 		_check(bool(others[0].get_parent().call("pane_broken_now", others[0].get_index())) and da > 4.3,
 				"a heavy round breaks a pane and carries on into the shop (%s)" % r)

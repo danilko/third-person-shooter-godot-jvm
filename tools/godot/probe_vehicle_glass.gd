@@ -13,7 +13,7 @@ const AI := "res://src/main/resources/com/openworld/character/AICharacter.tscn"
 const ASR1 := "res://src/main/resources/com/openworld/weapon/ASR1.tscn"
 const IMPACT := "res://src/main/java/com/openworld/world/manager/ImpactManager.java"
 const EXPLOSION := "res://src/main/java/com/openworld/world/manager/ExplosionManager.java"
-const PIERCE_AT := 20.0     # VehicleDamageRules.PANE_PIERCE_AT
+const PIERCE_AT := 30.0     # VehicleDamageRules.PANE_PIERCE_AT
 const HELPER := "res://src/main/java/com/openworld/debug/VehicleProbeHelper.java"
 const SENS := 0.07
 var p: Node3D
@@ -88,10 +88,10 @@ func _run() -> void:
 	var helper: Node = load(HELPER).new()
 	world.add_child(helper)
 	var cases := [
-		["pistol rounds (10)", 10.0, 1],
-		["rifle round (20)", 20.0, 1],
+		["pistol rounds (25)", 25.0, 1],
+		["rifle round (36)", 36.0, 1],
 		["sniper round (150)", 150.0, 1],
-		["shotgun pull (8 x 15)", 15.0, 8],
+		["shotgun pull (8 x 20)", 20.0, 8],
 	]
 	p = (load(PLAYER) as PackedScene).instantiate()
 	world.add_child(p)

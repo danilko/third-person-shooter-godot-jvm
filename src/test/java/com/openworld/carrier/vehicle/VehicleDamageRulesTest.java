@@ -132,12 +132,13 @@ class VehicleDamageRulesTest {
 
     @Test
     void ordinaryGlassStopsOneLightRoundAndArmourIsAPool() {
-        // ordinary glass: a pistol round (10) or an SMG round stops in it and breaks it
-        assertEquals(0.0, carriedThrough(0, 0, 10), 1e-9);
+        // ordinary glass: a pistol round (25) or an SMG round (22) stops in it and breaks it
+        assertEquals(0.0, carriedThrough(0, 0, 25), 1e-9);
+        assertEquals(0.0, carriedThrough(0, 0, 22), 1e-9);
         assertEquals(OFF, paneStateFor(10, 0));
         assertEquals(OFF, paneStateFor(1, 0));                  // a melee blow, a crash: broken too
-        // a rifle round (20) and up go straight through at full damage
-        assertEquals(20.0, carriedThrough(0, 0, 20), 1e-9);
+        // a rifle round (33 / 36) and up go straight through at full damage
+        assertEquals(33.0, carriedThrough(0, 0, 33), 1e-9);
         assertEquals(150.0, carriedThrough(0, 0, 150), 1e-9);
         // armoured glass (40): pistol rounds chip it, the fourth uses it up, a sniper round carries 110
         assertEquals(0.0, carriedThrough(0, 40, 10), 1e-9);

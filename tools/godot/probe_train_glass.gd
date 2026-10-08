@@ -69,7 +69,7 @@ func _initialize() -> void:
 	var b0 := int(tr.call("broken_windows_now"))
 	# a heavy round through window 0: it breaks and the round goes on into the car (past the window's own plane)
 	var w0 := _window(car, 0)
-	var r: String = gun.call("probe_shot", w0[0] + w0[1] * 4.0, -w0[1], 30.0)
+	var r: String = gun.call("probe_shot", w0[0] + w0[1] * 4.0, -w0[1], 36.0)
 	var d0 := float(r.split("|")[1]) if r.contains("|") else 99.0
 	print("  heavy round: %s" % r)
 	_check(int(tr.call("broken_windows_now")) == b0 + 1, "a heavy round breaks the window")
