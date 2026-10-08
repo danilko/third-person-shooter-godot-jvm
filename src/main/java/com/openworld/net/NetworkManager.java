@@ -1904,6 +1904,18 @@ public class NetworkManager extends Node {
             com.openworld.net.NetStats.increment("shop_request_rejected_not_owner");
             return;
         }
+        if (com.openworld.item.AmmoSupply.ITEM.equals(r.itemId())) {
+            // a vehicle's spare ammunition (PLAN.md 1g b3): the supply the buyer stands at; the refill reaches every
+            // peer, the owner included, as WORLD_EVENT_AMMO_REFILL
+            for (Node n : getTree().getNodesInGroup(new StringName(com.openworld.item.AmmoSupply.GROUP))) {
+                if (n instanceof com.openworld.item.AmmoSupply a && a.reaches(c.getGlobalPosition())) {
+                    com.openworld.net.NetStats.increment(a.restock(c) ? "ammo_supply_accepted" : "ammo_supply_refused");
+                    return;
+                }
+            }
+            com.openworld.net.NetStats.increment("ammo_supply_rejected_not_at_supply");
+            return;
+        }
         for (Node n : getTree().getNodesInGroup(new StringName(com.openworld.item.ShopCounter.GROUP))) {
             if (n instanceof com.openworld.item.ShopCounter sc && sc.sells(r.itemId())
                     && sc.holds(c.getGlobalPosition(), 1.5)) {

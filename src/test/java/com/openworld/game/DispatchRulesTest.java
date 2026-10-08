@@ -72,4 +72,29 @@ class DispatchRulesTest {
         org.junit.jupiter.api.Assertions.assertTrue(r.rams(4));
         org.junit.jupiter.api.Assertions.assertTrue(r.vehiclesFor(5).isEmpty(), "gangs drive civilian cars");
     }
+
+    @org.junit.jupiter.api.Test
+    void attackTokensGoToTheNearestAndRotate() {
+        double[] dist = {30, 10, 20, 5};
+        double[] none = {-1, -1, -1, -1}, rest = {0, 0, 0, 0};
+        boolean[] g = DispatchRules.tokenHolders(dist, none, rest, 2, 4.0);
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new boolean[] {false, true, false, true}, g, "the two nearest");
+        // a holder keeps its token though someone is nearer; a resting unit is skipped
+        double[] held = {1.0, -1, -1, -1}, rest2 = {0, 0, 0, 1.0};
+        g = DispatchRules.tokenHolders(dist, held, rest2, 2, 4.0);
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new boolean[] {true, true, false, false}, g);
+        // no limit: everyone attacks
+        g = DispatchRules.tokenHolders(dist, none, rest, 0, 4.0);
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new boolean[] {true, true, true, true}, g);
+    }
+
+    @org.junit.jupiter.api.Test
+    void tokensAndRegroupAreData() throws Exception {
+        DispatchRules r = DispatchRules.parse(read("crimes.json"), "dispatch");
+        org.junit.jupiter.api.Assertions.assertTrue(r.tokensFor(6) > r.tokensFor(1) && r.tokensFor(1) > 0);
+        org.junit.jupiter.api.Assertions.assertTrue(r.regroupFor(2) > 0 && r.regroupFor(6) < r.regroupFor(2),
+                "a shorter lull at the top: relief is already on its way");
+        DispatchRules h = DispatchRules.parse(read("gangs.json"), "hunters");
+        org.junit.jupiter.api.Assertions.assertTrue(h.tokensFor(5) > 0);
+    }
 }

@@ -163,6 +163,8 @@ public class EventBus extends Node {
     /** A train set was destroyed (world.TrainSystem) -- its track id. Fires on every peer (the host decides, a client
      *  hears it through WORLD_EVENT_TRAIN_DESTROYED); a mission can wait for it. */
     public final Signal1<String> trainDestroyed = new Signal1<>(this, new StringName("train_destroyed"));
+    /** Enforcement radio chatter the local player overhears (a unit out of ammo falling back, a regroup), PLAN.md 1g b3. */
+    public final Signal1<String> radioChatter = new Signal1<>(this, new StringName("radio_chatter"));
 
     /**
      * Emitted by Character once after _ready() completes (deferred, mirrors

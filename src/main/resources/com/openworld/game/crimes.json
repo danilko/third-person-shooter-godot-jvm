@@ -91,6 +91,10 @@
   ]
  },
  "dispatch": {
+  "tokens_note": "PLAN.md 1g b2/b3 (2026-10-07): tokens_by_stars = how many units may attack one player at once (the rest close in and hold, the token rotates every 4 s; 0 = no limit). regroup_seconds_by_stars = after half the units on a player have run dry (they walk back to a vehicle's spare ammo, item/ammo_supply.json, within supply_reach, else leave), no new unit is sent for this long: the escape window. 0 = no lull.",
+  "tokens_by_stars": [0, 2, 2, 3, 3, 4, 5],
+  "regroup_seconds_by_stars": [0, 15, 15, 14, 12, 10, 8],
+  "supply_reach": 60.0,
   "note": "The police dispatch (game.EnforcementDispatch, PLAN.md W5). Index = stars (0..6). Officers on foot appear between foot_min and foot_max metres from the wanted player out of view; patrol cars (POC1/MPC1, a crew of car_crew) on a lane between car_min and car_max and drive the road route to the player, the crew bailing out within arrive_dist. From shoot_at stars (1: police HUNT the player down, user 2026-10-07) police are hostile and shoot; there is no arrest by proximity -- a wanted player who goes down is arrested (RecoveryRules). Units are freed out of view past despawn_far, or once the stars are gone. While police can see the player the calm clock does not run (seen_reach).",
   "shoot_at": 1,
   "foot_by_stars": [

@@ -230,6 +230,9 @@ public class HUDManager extends CanvasLayer {
 
 	  // C1 — mission status banner: surfaces start/complete/fail events that were
 	  // previously only visible via GD.print in the console.
+	  bus.radioChatter.connectUnsafe(
+		  MethodCallable.createUnsafe(this, "onRadioChatter"),
+		  Object.ConnectFlags.DEFAULT);
 	  bus.missionStarted.connectUnsafe(
 		  MethodCallable.createUnsafe(this, "onMissionStarted"),
 		  Object.ConnectFlags.DEFAULT);
@@ -677,6 +680,11 @@ public class HUDManager extends CanvasLayer {
   public void onWeaponPickedUp(String characterId, String weaponName, Texture2D weaponIcon) {
 	if (!playerCharacterId.isEmpty() && !playerCharacterId.equals(characterId)) return;
 	pushStatus("Picked up " + weaponName, weaponIcon);
+  }
+
+  @Register
+  public void onRadioChatter(String text) {
+	pushStatus(text, null);
   }
 
   @Register

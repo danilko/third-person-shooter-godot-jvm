@@ -11414,6 +11414,21 @@ checks its "Wired in code" table against the enum. Licence rule as for art: CC0 
   `DispatchRulesTest`, `probe_weapon_scale` / `_sockets` / `probe_melee`. Readouts `unit_weapons_now(side)`,
   `melee_fallbacks_now`.
 
+## Attack tokens, spare ammo in police vehicles, the regroup lull (PLAN.md 1g b2/b3, 2026-10-07)
+
+- **Tokens**: per player and side only `tokens_by_stars` units (crimes.json / gangs.json) attack at once
+  (`AICharacter.attackHeld` stops AttackState firing); the nearest get them, held 4 s then 1.5 s rest (rotation;
+  `DispatchRules.tokenHolders`). Snipers, guards, seated and approaching units are outside the pool.
+- **Dry units**: out of every firearm round and > 4 m from the player, a unit radios out (`EventBus.radioChatter`, a
+  HUD status line) and walks to the nearest `item.AmmoSupply` within `supply_reach` 60 m -- a box behind any vehicle
+  listed in `item/ammo_supply.json` (POC1, MPC1, ARV1, LTK1, TNK1, HLC1; `stock` restocks each) -- stands
+  `restock_seconds` and returns full; with none in reach (or the car taken by a player) it leaves. A PLAYER restocks
+  there with interact (client: `MSG_SHOP_REQUEST` item `ammo_supply`).
+- **Regroup lull**: once half a player's units on a side ran dry, no new unit is spawned for `regroup_seconds_by_stars`
+  and cars already en route stop where they are until it ends; not started while armour or a helicopter is on the
+  player. `attack_tokens` / `dry_retreat` (`@Visible`) are the controls. Gate `tools/godot/probe_ammo_supply.gd
+  [-- --world=island] [-- --control]` 11/11.
+
 ## Armour, a helicopter that can be shot down, rotors on their hubs (2026-10-07, user-reported)
 
 - **Armour is per model, ONE damage rule** (early-GTA, user 2026-10-07: a rifle hurts a tank too, just slowly;

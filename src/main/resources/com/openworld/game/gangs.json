@@ -42,6 +42,10 @@
   }
  },
  "hunters": {
+  "tokens_note": "PLAN.md 1g b2/b3 (2026-10-07): tokens_by_stars = how many units may attack one player at once (the rest close in and hold, the token rotates every 4 s; 0 = no limit). regroup_seconds_by_stars = after half the units on a player have run dry (they walk back to a vehicle's spare ammo, item/ammo_supply.json, within supply_reach, else leave), no new unit is sent for this long: the escape window. 0 = no lull.",
+  "tokens_by_stars": [0, 0, 0, 2, 3, 4],
+  "regroup_seconds_by_stars": [0, 0, 0, 15, 12, 10],
+  "supply_reach": 60.0,
   "note": "A gang hunting a player at chase_at stars or more (game.EnforcementDispatch). Index = the player's stars with that gang. Same spawn rules as the police dispatch; gang members always shoot. From ram_at stars their cars drive AT the player; units always follow the player into a building through its door (PLAN.md W6).",
   "foot_by_stars": [
    0,

@@ -64,6 +64,9 @@ public final class DispatchRules {
         if (m.get("snipers_by_stars") != null) r.snipersByStars = ints(m.get("snipers_by_stars"));
         if (m.get("helis_by_stars") != null) r.helisByStars = ints(m.get("helis_by_stars"));
         r.ramAt = (int) num(m, "ram_at", 0);
+        if (m.get("tokens_by_stars") != null) r.tokensByStars = ints(m.get("tokens_by_stars"));
+        if (m.get("regroup_seconds_by_stars") != null) r.regroupByStars = ints(m.get("regroup_seconds_by_stars"));
+        r.supplyReach = num(m, "supply_reach", 60.0);
         if (m.get("gun") instanceof Map<?, ?> g0) {
             Map<String, Object> g = (Map<String, Object>) g0;
             if (g.get("vehicles") instanceof List<?> l) for (Object o : l) r.gunVehicles.add(String.valueOf(o));
@@ -98,6 +101,40 @@ public final class DispatchRules {
     public List<String> vehiclesFor(int stars) { return rowAt(vehiclesByStars, stars); }
 
     public int snipersFor(int stars) { return at(snipersByStars, stars); }
+
+    /** Attack tokens (PLAN.md 1g b2): how many of a side's units may attack one player at once; 0 = no limit. */
+    public int[] tokensByStars = {0};
+    /** The regroup lull (1g b3): seconds no new unit is sent after half a squad ran dry; 0 = no lull. */
+    public int[] regroupByStars = {0};
+    /** How far a unit out of ammo walks back to a vehicle's spare ammunition (else it leaves the fight). */
+    public double supplyReach = 60.0;
+
+    public int tokensFor(int stars) { return at(tokensByStars, stars); }
+
+    public int regroupFor(int stars) { return at(regroupByStars, stars); }
+
+    /**
+     * Who holds an attack token this tick. {@code held[i]} = seconds unit i has held one (negative = none),
+     * {@code rest[i]} = seconds it must still wait after giving one back, {@code dist[i]} = its distance to the player.
+     * A holder keeps its token until {@code holdMax}; free tokens go to the nearest units that are not resting, so
+     * the attackers rotate. {@code n <= 0} = everyone attacks.
+     */
+    public static boolean[] tokenHolders(double[] dist, double[] held, double[] rest, int n, double holdMax) {
+        boolean[] out = new boolean[dist.length];
+        if (n <= 0) { java.util.Arrays.fill(out, true); return out; }
+        int given = 0;
+        for (int i = 0; i < dist.length && given < n; i++)
+            if (held[i] >= 0 && held[i] < holdMax) { out[i] = true; given++; }
+        while (given < n) {
+            int best = -1;
+            for (int i = 0; i < dist.length; i++)
+                if (!out[i] && rest[i] <= 0 && !(held[i] >= holdMax) && (best < 0 || dist[i] < dist[best])) best = i;
+            if (best < 0) break;
+            out[best] = true;
+            given++;
+        }
+        return out;
+    }
 
     public int helisFor(int stars) { return at(helisByStars, stars); }
 

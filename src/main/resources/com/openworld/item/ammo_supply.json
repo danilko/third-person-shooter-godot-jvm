@@ -1,0 +1,13 @@
+{
+  "note": "Which vehicles carry spare ammunition at their rear (item.AmmoSupply, PLAN.md 1g b3, user 2026-10-07): a police car's trunk, an armoured vehicle's or a tank's stowage. ANY character may restock there -- a unit out of ammo walks back to it (EnforcementDispatch), and a player who has taken (or just stands at) such a vehicle presses interact. Keyed by the vehicle's catalog id (its scene's file stem). `stock` = how many restocks the vehicle holds before it is empty; a restock fills every weapon the character carries (WeaponController.fillWeaponAmmo). `restock_seconds` = how long a unit stands at the trunk. `reach` = how far from the trunk's centre a character may stand.",
+  "reach": 2.2,
+  "restock_seconds": 2.0,
+  "vehicles": {
+    "POC1": {"stock": 4},
+    "MPC1": {"stock": 2},
+    "ARV1": {"stock": 10},
+    "LTK1": {"stock": 12},
+    "TNK1": {"stock": 12},
+    "HLC1": {"stock": 4}
+  }
+}

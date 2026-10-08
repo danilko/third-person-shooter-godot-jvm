@@ -95,6 +95,17 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     // ── Shared DEFAULTS (one instance, never mutated) ─────────────────────────
     private static final VehicleConfig DEFAULTS = new VehicleConfig();
 
+    /** Spare ammunition at the rear, or null (PLAN.md 1g b3). */
+    public com.openworld.item.AmmoSupply ammoSupply;
+
+    /** The catalog id: the scene's file stem ("POC1", "TNK1" ...), or "" for a vehicle built in code. */
+    public String modelId() {
+        String p = getSceneFilePath();
+        if (p == null || p.isEmpty()) return "";
+        int s = p.lastIndexOf('/'), d = p.lastIndexOf('.');
+        return p.substring(s + 1, d > s ? d : p.length());
+    }
+
     /** Returns the active config, falling back to DEFAULTS when none is assigned. */
     public VehicleConfig getConfig() {
         return vehicleConfig != null ? vehicleConfig : DEFAULTS;
@@ -194,6 +205,8 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         }
 
         VehicleConfig cfg = getConfig();
+        // spare ammunition at the rear, for any vehicle item/ammo_supply.json lists (police cars, armour, tanks)
+        ammoSupply = com.openworld.item.AmmoSupply.attachTo(this, modelId(), cfg.hullHalfLength);
         // Register the vehicle's kill-feed icon under the same damage-source keys it
         // stamps onto eliminations, so a vehicle kill resolves its icon on every peer
         // (the registry is local-only; textures never cross the wire — see IconRegistry).

@@ -758,6 +758,10 @@ public class AICharacter extends Character {
      *  set by AttackState when a target is in arm's reach while the gun reloads (PLAN.md 1g b). */
     public long meleeFallbackUntilMs = 0;
 
+    /** Held back from attacking: the dispatch has not given this unit an attack TOKEN (PLAN.md 1g b2). It still
+     *  closes in, strafes and aims; it does not fire or swing. Always false outside the dispatch. */
+    public boolean attackHeld = false;
+
     /** Fight hand-to-hand for {@code seconds} (the gun's reload was cancelled by the switch; it reloads again after). */
     public void startMeleeFallback(double seconds) {
         meleeFallbackUntilMs = godot.api.Time.getTicksMsec() + (long) (seconds * 1000.0);

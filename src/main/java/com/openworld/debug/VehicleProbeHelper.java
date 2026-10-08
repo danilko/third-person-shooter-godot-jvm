@@ -245,4 +245,33 @@ public class VehicleProbeHelper extends Node {
         c.handbrake = pitchUp;
         if (car.getController() != c) car.attachController(c);
     }
+
+    /** Give {@code c} catalog weapon {@code id} through the ordinary grant path (a probe arming a body). */
+    @Register
+    public boolean giveWeapon(Node c, String id) {
+        return c instanceof com.openworld.character.Character ch
+                && com.openworld.item.WeaponGrant.grant(ch, id, c) != null;
+    }
+
+    /** {@code c}'s rounds left over every firearm it carries (magazine + reserve). */
+    @Register
+    public int roundsOf(Node c) {
+        if (!(c.getNodeOrNull("WeaponController") instanceof com.openworld.weapon.WeaponController wc)) return 0;
+        int n = 0;
+        for (int i = 1; i < wc.getSlotCount(); i++) {
+            var w = wc.getWeaponItem(i);
+            if (w != null && !w.isInfiniteAmmo) n += w.getMagazine() + w.getReserve();
+        }
+        return n;
+    }
+
+    /** Empty every firearm {@code c} carries. */
+    @Register
+    public void drainAmmo(Node c) {
+        if (!(c.getNodeOrNull("WeaponController") instanceof com.openworld.weapon.WeaponController wc)) return;
+        for (int i = 1; i < wc.getSlotCount(); i++) {
+            var w = wc.getWeaponItem(i);
+            if (w != null && !w.isInfiniteAmmo) { w.setMagazine(0); w.setReserve(0); }
+        }
+    }
 }

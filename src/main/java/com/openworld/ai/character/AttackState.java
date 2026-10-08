@@ -175,7 +175,7 @@ public class AttackState implements AIState {
         // Default shootStillDuration = 0 means the still phase is never entered:
         // the AI fires at full weapon rate while strafing (CS/GTA style).
         if (!ctrl.isStillPhase()) ctrl.advanceAttackTimer(-delta);
-        if (ctrl.isAttackReady() && !ctrl.isStillPhase()) {
+        if (ctrl.isAttackReady() && !ctrl.isStillPhase() && !body.attackHeld) {
             double fireRate = (body.weaponController != null
                     && body.weaponController.getCurrentWeaponItem() != null)
                     ? body.weaponController.getCurrentWeaponItem().getFireRate() : 0.0;

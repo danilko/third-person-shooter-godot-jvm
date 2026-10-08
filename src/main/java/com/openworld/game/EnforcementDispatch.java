@@ -83,6 +83,11 @@ public class EnforcementDispatch extends Node {
     @Export public boolean breaching = true;
     /** Interior navmeshes for breaching units (world.InteriorNav); off = the straight-line breach (the control). */
     @godot.annotation.Visible public boolean interiorNav = true;
+    /** Attack tokens (PLAN.md 1g b2): only tokens_by_stars units attack one player at once. Off = everyone attacks. */
+    @godot.annotation.Visible public boolean attackTokens = true;
+    /** Out of ammo (1g b3): walk back to a vehicle's spare ammunition or leave, and the regroup lull. Off = a dry unit
+     *  fights on with its fists. */
+    @godot.annotation.Visible public boolean dryRetreat = true;
     public boolean getInteriorNav() { return interiorNav; }
     public void setInteriorNav(boolean v) { interiorNav = v; com.openworld.world.InteriorNav.enabled = v; }
     /** Foot units spawned per side per spawn tick, at most. */
@@ -98,6 +103,11 @@ public class EnforcementDispatch extends Node {
         double closest = Double.MAX_VALUE, sinceCloser;
         /** A sniper (PLAN.md W6): placed at range on a clear line, holds there and shoots; never closes in. */
         boolean sniper;
+        /** Attack token: seconds held (negative = none), seconds it must wait after giving one back (1g b2). */
+        double tokenHeld = -1, tokenRest;
+        /** Walking back to restock at this vehicle's spare ammunition, and how long it has stood there (1g b3). */
+        com.openworld.item.AmmoSupply restockAt;
+        double restockFor;
         /** The building it is breaching (its player is inside), or null. */
         Node breachOf;
         /** The door marker this unit is breaching through: units are spread over a building's doors. */
@@ -143,6 +153,8 @@ public class EnforcementDispatch extends Node {
         double gunIn = 2.0;
         /** Seconds it has spent within 30 m of an on-foot player while ramming (the crew bails out after a while). */
         double closeFor;
+        /** Stopped by the regroup lull (1g b3); released when it ends. */
+        boolean lullHeld;
     }
 
     private final List<Unit> units = new ArrayList<>();
@@ -164,6 +176,14 @@ public class EnforcementDispatch extends Node {
     private int heliShots, heliHits;
     private final Map<String, AISquad> squads = new HashMap<>();
     private final Random rng = new Random(0x5EED);
+    /** Seconds since start, in dispatch ticks (the lull's clock). */
+    private double clock;
+    /** Per player|side: no new unit before this clock time (the regroup lull, 1g b3), and units gone dry since the last
+     *  lull. */
+    private final Map<String, Double> lullUntil = new HashMap<>();
+    private final Map<String, Integer> dryCount = new HashMap<>();
+    private int dryRetreats, dryRestocks, restocksDone, lulls, tokenHolds;
+    private double radioIn;
     private double tickIn, spawnIn;
 
     @Register
@@ -217,7 +237,9 @@ public class EnforcementDispatch extends Node {
         }
 
         measurePlayerSpeeds(players);
+        clock += TICK;
         tickUnits(players, demand, ws, police);
+        assignTokens(players, demand, police);
         tickCars(players, demand, police, hunters);
         tickHelis(players, demand);
         arrestsAndSight(players, ws, police);
@@ -285,6 +307,7 @@ public class EnforcementDispatch extends Node {
                 continue;
             }
             brain.pursuitStand = false;
+            if (dryRetreat && handleDry(u, p, brain, stars, r)) continue;
             // BREACH (PLAN.md W6): the player is inside a building -- follow them in, at ANY star level (user: always
             // get in, so the behaviour is consistent): through the building's door nearest this unit, straight (no
             // navmesh indoors), forcing a locked one
@@ -381,6 +404,214 @@ public class EnforcementDispatch extends Node {
         }
     }
 
+    // ── out of ammo, and attack tokens (PLAN.md 1g b2/b3) ─────────────────────
+
+    /** Within this distance of its player a dry unit fights on with fists / baton rather than leaving. */
+    private static final double DRY_MELEE = 4.0;
+    /** An attack token is held this long, then given back and not taken again for TOKEN_REST (rotation). */
+    private static final double TOKEN_HOLD = 4.0, TOKEN_REST = 1.5;
+
+    /** Does the unit carry a firearm (anything not melee and not infinite)? */
+    private static boolean carriesFirearm(AICharacter b) {
+        if (b.weaponController == null) return false;
+        for (int i = 1; i < b.weaponController.getSlotCount(); i++) {
+            var w = b.weaponController.getWeaponItem(i);
+            if (w != null && !w.isInfiniteAmmo && w.getWeaponType() != com.openworld.weapon.WeaponType.MELEE) return true;
+        }
+        return false;
+    }
+
+    /** A unit that carries a firearm and has no round left in any of them. */
+    private static boolean isDry(AICharacter b) {
+        if (!carriesFirearm(b)) return false;
+        for (int i = 1; i < b.weaponController.getSlotCount(); i++) {
+            var w = b.weaponController.getWeaponItem(i);
+            if (w != null && !w.isInfiniteAmmo && w.getWeaponType() != com.openworld.weapon.WeaponType.MELEE
+                    && (w.getMagazine() > 0 || w.getReserve() > 0)) return false;
+        }
+        return true;
+    }
+
+    /**
+     * Out of ammo (1g b3). Returns true when this tick's steering is decided here. A dry unit within DRY_MELEE of its
+     * player fights on (fists / baton, the FSM); otherwise it radios out and walks back to the nearest vehicle's spare
+     * ammunition within supply_reach (a police car's trunk, an armoured vehicle's stowage -- the player's own stolen
+     * one too), stands there restock_seconds and comes back full; with none in reach it leaves the fight. Either way
+     * it counts toward the squad's regroup lull.
+     */
+    private boolean handleDry(Unit u, Player p, AIController brain, int stars, DispatchRules r) {
+        AICharacter b = u.body;
+        if (u.restockAt != null) {
+            var a = u.restockAt;
+            if (!GD.isInstanceValid(a) || !a.isInsideTree() || a.stock <= 0 || supplyTaken(a)) {
+                u.restockAt = null;            // the car was destroyed, emptied or taken: leave instead
+                retireDry(u, p, stars, r);
+                return true;
+            }
+            b.attackHeld = true;
+            brain.setPursuit(p);
+            brain.pursuitAway = false;
+            if (a.reaches(b.getGlobalPosition())) {
+                brain.pursuitVia.clear();
+                brain.pursuitStand = true;
+                u.restockFor += TICK;
+                if (u.restockFor >= com.openworld.item.AmmoSupply.restockSeconds()) {
+                    if (a.restock(b)) restocksDone++;
+                    u.restockAt = null;
+                    u.restockFor = 0;
+                    brain.pursuitStand = false;
+                    b.attackHeld = false;
+                    u.closest = Double.MAX_VALUE;
+                    u.sinceCloser = 0;
+                    return false;
+                }
+            } else {
+                brain.pursuitStand = false;
+                brain.pursuitDirect = true;
+                brain.pursuitVia.clear();
+                brain.pursuitVia.add(a.getGlobalPosition());
+                u.sinceCloser = 0;             // walking to the car is not "stuck"
+            }
+            if (brain.getCurrentState() != ArrestState.INSTANCE) brain.forceState(ArrestState.INSTANCE);
+            return true;
+        }
+        if (!isDry(b) || p == null || flat(b.getGlobalPosition(), p.getGlobalPosition()) <= DRY_MELEE) return false;
+        countDry(u, stars, r);
+        com.openworld.item.AmmoSupply a = com.openworld.item.AmmoSupply.nearest(this, b.getGlobalPosition(), r.supplyReach);
+        if (a != null && !supplyTaken(a)) {
+            u.restockAt = a;
+            u.restockFor = 0;
+            dryRestocks++;
+            radio(p, u.side, "out of ammo, back to the car");
+            return true;
+        }
+        retireDry(u, p, stars, r);
+        return true;
+    }
+
+    /** A supply on a vehicle a player is in: not somewhere a unit walks up to. */
+    private static boolean supplyTaken(com.openworld.item.AmmoSupply a) {
+        return a.getParent() instanceof Vehicle v && v.getOccupant() instanceof Player;
+    }
+
+    private void retireDry(Unit u, Player p, int stars, DispatchRules r) {
+        u.retiredFor = TICK;
+        release(u, p);
+        dryRetreats++;
+        radio(p, u.side, "out of ammo, falling back");
+    }
+
+    /** Count a unit gone dry; past half of the units on this player, hold the next wave (the regroup lull). The lull is
+     *  not started while armour or a helicopter is still on the player (they are the high-star pressure). */
+    private void countDry(Unit u, int stars, DispatchRules r) {
+        String key = u.playerId + "|" + u.side;
+        int n = dryCount.merge(key, 1, Integer::sum);
+        int live = 0;
+        for (Unit o : units)
+            if (key.equals(o.playerId + "|" + o.side) && GD.isInstanceValid(o.body) && !o.body.isDead() && o.retiredFor == 0) live++;
+        int secs = r.regroupFor(stars);
+        if (secs <= 0 || n * 2 < Math.max(2, live)) return;
+        for (Heli h : helis) if (u.playerId.equals(h.playerId) && GD.isInstanceValid(h.h) && h.retiredFor == 0) return;
+        for (Car c : cars) if (u.playerId.equals(c.playerId) && c.gun && GD.isInstanceValid(c.car)) return;
+        lullUntil.put(key, clock + secs);
+        dryCount.put(key, 0);
+        lulls++;
+        radioIn = 0;
+        radio(null, u.side, "units regrouping -- " + secs + " s");
+    }
+
+    /** One line of radio chatter to the local player, at most every 4 s. */
+    private void radio(Player p, String side, String what) {
+        if (clock < radioIn) return;
+        radioIn = clock + 4.0;
+        String who = POLICE.equals(side) ? "POLICE RADIO" : side.toUpperCase(java.util.Locale.ROOT) + " RADIO";
+        if (getNodeOrNull("/root/EventBus") instanceof com.openworld.game.EventBus bus)
+            bus.radioChatter.emit(who + ": " + what);
+    }
+
+    /** Hand out attack tokens per player and side: the nearest units in the fight attack, the rest hold (1g b2). */
+    private void assignTokens(Map<String, Player> players, Map<String, Map<String, Integer>> demand, DispatchRules police) {
+        Map<String, List<Unit>> groups = new HashMap<>();
+        for (Unit u : units) {
+            if (!GD.isInstanceValid(u.body) || u.body.isDead()) continue;
+            boolean candidate = attackTokens && !u.sniper && !u.guard && u.retiredFor == 0 && u.restockAt == null
+                    && u.body.currentVehicleNode == null && u.body.aiController() != null
+                    && u.body.aiController().getCurrentState() != ArrestState.INSTANCE;
+            if (!candidate) {
+                if (u.restockAt == null) u.body.attackHeld = false;
+                u.tokenHeld = -1;
+                continue;
+            }
+            groups.computeIfAbsent(u.playerId + "|" + u.side, k -> new ArrayList<>()).add(u);
+        }
+        for (Map.Entry<String, List<Unit>> e : groups.entrySet()) {
+            List<Unit> g = e.getValue();
+            Unit first = g.get(0);
+            Player p = players.get(first.playerId);
+            Integer stars = demand.getOrDefault(first.playerId, Map.of()).get(first.side);
+            DispatchRules r = POLICE.equals(first.side) ? police
+                    : GangSystem.get() != null ? GangSystem.get().hunterRules() : null;
+            int n = r == null || stars == null ? 0 : r.tokensFor(stars);
+            double[] dist = new double[g.size()], held = new double[g.size()], rest = new double[g.size()];
+            for (int i = 0; i < g.size(); i++) {
+                Unit u = g.get(i);
+                if (u.tokenHeld >= TOKEN_HOLD) { u.tokenHeld = -1; u.tokenRest = TOKEN_REST; }   // give it back
+                u.tokenRest = Math.max(0, u.tokenRest - TICK);
+                dist[i] = p != null ? flat(u.body.getGlobalPosition(), p.getGlobalPosition()) : 0;
+                held[i] = u.tokenHeld;
+                rest[i] = u.tokenRest;
+            }
+            boolean[] give = DispatchRules.tokenHolders(dist, held, rest, n, TOKEN_HOLD);
+            for (int i = 0; i < g.size(); i++) {
+                Unit u = g.get(i);
+                if (give[i]) u.tokenHeld = Math.max(0, u.tokenHeld) + TICK;
+                else u.tokenHeld = -1;
+                u.body.attackHeld = !give[i];
+                if (!give[i]) tokenHolds++;
+            }
+        }
+    }
+
+    /** Units of {@code side} attacking (holding a token) right now. */
+    @Register
+    public int attackersNow(String side) {
+        int n = 0;
+        for (Unit u : units)
+            if (side.equals(u.side) && GD.isInstanceValid(u.body) && !u.body.isDead() && u.retiredFor == 0
+                    && u.restockAt == null && !u.body.attackHeld && u.body.currentVehicleNode == null
+                    && u.body.aiController() != null && u.body.aiController().getCurrentState() != ArrestState.INSTANCE)
+                n++;
+        return n;
+    }
+
+    /** "dryRetreats,dryRestocks,restocksDone,lulls,tokenHolds" (probe readout). */
+    @Register
+    public String dryNow() {
+        return dryRetreats + "," + dryRestocks + "," + restocksDone + "," + lulls + "," + tokenHolds;
+    }
+
+    /** Seconds left of the regroup lull on {@code playerId}'s {@code side} (0 = none). */
+    @Register
+    public double lullLeftNow(String playerId, String side) {
+        return Math.max(0, lullUntil.getOrDefault(playerId + "|" + side, -1.0) - clock);
+    }
+
+    /** Empty every firearm of every live unit of {@code side} (probe: start the dry case). */
+    @Register
+    public void drainUnitAmmoNow(String side) {
+        for (Unit u : units) {
+            if (!side.equals(u.side) || !GD.isInstanceValid(u.body) || u.body.weaponController == null) continue;
+            var wc = u.body.weaponController;
+            for (int i = 1; i < wc.getSlotCount(); i++) {
+                var w = wc.getWeaponItem(i);
+                if (w != null && !w.isInfiniteAmmo && w.getWeaponType() != com.openworld.weapon.WeaponType.MELEE) {
+                    w.setMagazine(0);
+                    w.setReserve(0);
+                }
+            }
+        }
+    }
+
     /** Stand down: walk away from the player (ArrestState's away mode, straight, not by the navmesh), and be freed
      *  once out of view (tickUnits). */
     private void release(Unit u, Player p) {
@@ -420,6 +651,22 @@ public class EnforcementDispatch extends Node {
             if (c.gun && wanted && r != null && p != null && p.isAlive()) fireMainGun(c, p, r);
             if (!c.arrived) {
                 VehicleAIController ctrl = c.car.getController() instanceof VehicleAIController v ? v : null;
+                // the regroup lull (1g b3): a car sent before it started stops where it is and waits it out, or its
+                // crew would arrive inside the player's escape window. A gun vehicle (armour) keeps coming: the lull
+                // is not started while one is on the player, and one sent later is not held.
+                boolean lullNow = clock < lullUntil.getOrDefault(c.playerId + "|" + c.side, -1.0);
+                if (lullNow && !c.gun && ctrl != null && wanted) {
+                    ctrl.ramTarget = null;
+                    ctrl.holdStop = true;
+                    c.lullHeld = true;
+                    c.age -= TICK;                 // waiting is not "lost"
+                    continue;
+                }
+                if (c.lullHeld) {
+                    c.lullHeld = false;
+                    if (ctrl != null) ctrl.holdStop = false;
+                    c.replanIn = 0;
+                }
                 // RAM (PLAN.md W6): from ram_at stars the car drives AT the player within its ram range instead of
                 // stopping 35 m out to unload. Its crew gets out only once the player is on foot and close for a
                 // while (a gun vehicle never unloads: it keeps ramming and firing).
@@ -557,6 +804,8 @@ public class EnforcementDispatch extends Node {
             // it is a live body until it is freed, and replacing it at once churned 100+ spawns a leg (perf probe)
         }
         for (Car c : cars) if (pid.equals(c.playerId) && side.equals(c.side) && !c.arrived) carsEnRoute++;
+        // the regroup lull (1g b3): half the units ran dry, the next wave is held back -- the player's escape window
+        if (clock < lullUntil.getOrDefault(pid + "|" + side, -1.0)) return;
         for (int i = DispatchRules.toSpawn(r.carsFor(stars), carsEnRoute, 1); i > 0; i--) spawnCar(p, side, r, ws, stars);
         int snipers = 0;
         for (Unit u : units) if (u.sniper && pid.equals(u.playerId) && side.equals(u.side) && GD.isInstanceValid(u.body)
