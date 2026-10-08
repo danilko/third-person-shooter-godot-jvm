@@ -1,5 +1,6 @@
 extends SceneTree
-## Scratch: scan a square for places where the first collider down is far below the terrain surface (a hole).
+## Scans a square of World.tscn for spots where the first WORLD collider straight down is more than 0.5 m under the
+## terrain surface (a hole a body falls through). Streams the spot in first. -- --at=x,z --half=m --step=m
 ## -- --at=x,z --half=m --step=m
 
 func _initialize() -> void:
