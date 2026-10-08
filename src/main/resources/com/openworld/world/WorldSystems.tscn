@@ -4,7 +4,7 @@
 [ext_resource type="Script" uid="uid://dossevkjauxr6" path="res://src/main/java/com/openworld/control/Controller.java" id="2_kfoa7"]
 [ext_resource type="Script" uid="uid://072r5nlh8oqs" path="res://src/main/java/com/openworld/world/manager/ImpactManager.java" id="3_imct"]
 [ext_resource type="Script" uid="uid://bqc4oycgaiob" path="res://src/main/java/com/openworld/world/manager/DecalManager.java" id="4_dcal"]
-[ext_resource type="Texture2D" uid="uid://bwnu26014m3dy" path="res://icon.svg" id="5_m0gj3"]
+[ext_resource type="Texture2D" path="res://assets/vfx/decals/bullet_hole_stone.png" id="5_m0gj3"]
 [ext_resource type="Script" uid="uid://b4w0lx4s4hgbl" path="res://src/main/java/com/openworld/world/manager/BulletTracerManager.java" id="6_btrc"]
 [ext_resource type="Script" uid="uid://bud0imsvemb7b" path="res://src/main/java/com/openworld/world/manager/ExplosionManager.java" id="7_evfx"]
 [ext_resource type="PackedScene" path="res://assets/vfx/explosion/effects/ground/vfx_ground_explosion_01.tscn" id="10_expl"]
@@ -82,8 +82,8 @@ script = ExtResource("3_imct")
 
 [node name="DecalManager" type="Node" parent="." unique_id=854225497]
 script = ExtResource("4_dcal")
-pool_size = 40
-decal_lifetime = 5.0
+pool_size = 64
+decal_lifetime = 20.0
 
 [node name="1" type="Decal" parent="DecalManager" unique_id=1862829401]
 size = Vector3(0.1, 0.1, 0.1)

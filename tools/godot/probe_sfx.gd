@@ -15,6 +15,7 @@ const SNR1   := "res://src/main/resources/com/openworld/weapon/SNR1.tscn"
 const IMPACT := "res://src/main/java/com/openworld/world/manager/ImpactManager.java"
 const EXPLO  := "res://src/main/java/com/openworld/world/manager/ExplosionManager.java"
 const DOOR   := "res://src/main/java/com/openworld/world/Door.java"
+const DECALS := "res://src/main/java/com/openworld/world/manager/DecalManager.java"
 ## Sounds that may have no file yet (README "Wired in code" says missing).
 const ALLOWED_MISSING := ["SIREN"]
 
@@ -68,6 +69,11 @@ func _initialize() -> void:
 	_box(Vector3(200, 2, 200), Vector3(0, -1, 0))
 	world.add_child(load(IMPACT).new())
 	world.add_child(load(EXPLO).new())
+	var dm: Node = load(DECALS).new()          # a DecalManager with one template, as WorldSystems.tscn has
+	var tmpl := Decal.new()
+	tmpl.size = Vector3(0.1, 0.1, 0.1)
+	dm.add_child(tmpl)
+	world.add_child(dm)
 	await _tick(3)
 	var p: Node3D = (load(PLAYER) as PackedScene).instantiate() as Node3D
 	world.add_child(p)
@@ -104,6 +110,7 @@ func _initialize() -> void:
 		await _press("fire", 2)
 		await _tick(40)
 	_check("a punch on a body plays a flesh hit", _plays("MELEE_HIT_FLESH") > m0, "+%d" % (_plays("MELEE_HIT_FLESH") - m0))
+	_check("  ... and leaves no bullet hole", int(dm.call("decals_spawned_now")) == 0, "%d" % int(dm.call("decals_spawned_now")))
 	t.queue_free()
 	await _tick(5)
 
@@ -125,6 +132,11 @@ func _initialize() -> void:
 	await _press("fire", 2)
 	await _tick(20)
 	_check("a bullet into the wall plays a stone impact", _plays("IMPACT_STONE") > i0, "+%d" % (_plays("IMPACT_STONE") - i0))
+	var shown := ""
+	for c in dm.get_children():
+		if c is Decal and (c as Decal).visible and (c as Decal).texture_albedo != null:
+			shown = (c as Decal).texture_albedo.resource_path
+	_check("  ... and leaves a stone bullet hole", int(dm.call("decals_spawned_now")) == 1 and shown.ends_with("bullet_hole_stone.png"), shown)
 	await _tick(100)                       # the bolt cycle
 	gun.set("magazine", 0)
 	gun.set("reserve", 0)

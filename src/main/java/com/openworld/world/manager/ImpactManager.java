@@ -90,9 +90,11 @@ public class ImpactManager extends Node {
         ParticleManager pm = getParticleManager();
         if (pm != null) pm.spawn(ctx.surface, info.hitPoint);
 
+        boolean bullet = kind == com.openworld.world.DamageKind.BULLET;
         DecalManager dm = getDecalManager();
-        if (dm != null && info.hitNormal != null) dm.spawn(info.hitPoint, info.hitNormal);
-        if (kind == com.openworld.world.DamageKind.BULLET) impactSound(ctx.surface, info.hitPoint);   // melee: MeleeItem
+        // a hole only from a bullet, and never on something that moves (a body, a car: the decal stays in the world)
+        if (dm != null && bullet && ctx.healthOwner == null) dm.spawn(info.hitPoint, info.hitNormal, ctx.surface);
+        if (bullet) impactSound(ctx.surface, info.hitPoint);   // melee: MeleeItem
 
         if (SHOT_TRACE && attackerId != null && !attackerId.isEmpty()) traceHit(info, ctx, damage);
         if (ctx.healthOwner != null) {
@@ -169,7 +171,7 @@ public class ImpactManager extends Node {
         ParticleManager pm = getParticleManager();
         if (pm != null) pm.spawn(surface != null ? surface : SurfaceType.DEFAULT, point);
         DecalManager dm = getDecalManager();
-        if (dm != null && normal != null) dm.spawn(point, normal);
+        if (dm != null && normal != null) dm.spawn(point, normal, surface != null ? surface : SurfaceType.DEFAULT);
         impactSound(surface, point);
     }
 
@@ -182,7 +184,7 @@ public class ImpactManager extends Node {
         ParticleManager pm = getParticleManager();
         if (pm != null) pm.spawn(ctx.surface, info.hitPoint);
         DecalManager dm = getDecalManager();
-        if (dm != null && info.hitNormal != null) dm.spawn(info.hitPoint, info.hitNormal);
+        if (dm != null && bulletSound && ctx.healthOwner == null) dm.spawn(info.hitPoint, info.hitNormal, ctx.surface);
         if (bulletSound) impactSound(ctx.surface, info.hitPoint);
     }
 

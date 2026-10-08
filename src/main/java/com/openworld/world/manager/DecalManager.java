@@ -9,6 +9,7 @@ import godot.api.Node;
 import godot.core.Basis;
 import godot.core.Transform3D;
 import godot.core.Vector3;
+import com.openworld.world.SurfaceType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -73,6 +74,7 @@ public class DecalManager extends Node {
         List<DecalEntry> entries = new ArrayList<>();
 
         template.setVisible(false);
+        baseSize = template.getSize();
         entries.add(new DecalEntry(template));
 
         // Duplicate the template to fill the pool
@@ -115,16 +117,55 @@ public class DecalManager extends Node {
      * Spawn a bullet-hole decal at the impact point, oriented to the surface.
      * No-op if the pool is exhausted.
      */
-    public void spawn(Vector3 hitPoint, Vector3 hitNormal) {
-        if (pool == null || pool.available() == 0) return;
+    public void spawn(Vector3 hitPoint, Vector3 hitNormal) { spawn(hitPoint, hitNormal, SurfaceType.STONE); }
 
-        DecalEntry entry = pool.acquire();
+    /**
+     * A bullet hole for {@code surface}: its own texture ({@code assets/vfx/decals/bullet_hole_<surface>.png}, made by
+     * {@code tools/vfx/make_bullet_holes.py}; DEFAULT = stone), turned at random about the normal and sized +-15 %.
+     * FLESH makes none (a hole on a moving body would float). With every decal in use the OLDEST is moved here (CS: a
+     * fresh hole always shows).
+     */
+    public void spawn(Vector3 hitPoint, Vector3 hitNormal, SurfaceType surface) {
+        if (pool == null || hitPoint == null || hitNormal == null || surface == SurfaceType.FLESH) return;
+        DecalEntry entry;
+        if (pool.available() > 0) {
+            entry = pool.acquire();
+            activeCount++;
+        } else {
+            entry = null;
+            for (DecalEntry e : allEntries) if (e.decal.isVisible() && (entry == null || e.age > entry.age)) entry = e;
+            if (entry == null) return;
+        }
         entry.age = 0.0;
-        activeCount++;
-
-        entry.decal.setGlobalPosition(hitPoint.plus(hitNormal.normalized().times(0.005f)));
-        orientToSurface(entry.decal, hitNormal.normalized());
+        godot.api.Texture2D tex = textureFor(surface);
+        if (tex != null) entry.decal.setTexture(Decal.DecalTexture.TEXTURE_ALBEDO, tex);
+        Vector3 n = hitNormal.normalized();
+        entry.decal.setGlobalPosition(hitPoint.plus(n.times(0.005f)));
+        orientToSurface(entry.decal, n);
+        entry.decal.rotateObjectLocal(Vector3.Companion.getUP(), (float) (Math.random() * Math.PI * 2));
+        double k = 0.85 + 0.3 * Math.random();
+        entry.decal.setSize(baseSize.times(new Vector3(k, 1.0, k)));
         entry.decal.setVisible(true);
+        spawned++;
+    }
+
+    /** Holes made so far (probe readout). */
+    private int spawned;
+    @Register public int decalsSpawnedNow() { return spawned; }
+
+    private Vector3 baseSize = new Vector3(0.1, 0.1, 0.1);
+    private final java.util.Map<SurfaceType, godot.api.Texture2D> textures = new java.util.EnumMap<>(SurfaceType.class);
+
+    private godot.api.Texture2D textureFor(SurfaceType surface) {
+        SurfaceType key = switch (surface) {
+            case METAL, WOOD, GLASS -> surface;
+            default -> SurfaceType.STONE;
+        };
+        return textures.computeIfAbsent(key, k -> {
+            String path = "res://assets/vfx/decals/bullet_hole_" + k.name().toLowerCase() + ".png";
+            return godot.api.ResourceLoader.INSTANCE.exists(path, "")
+                    && godot.global.GD.load(path) instanceof godot.api.Texture2D t ? t : null;
+        });
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
