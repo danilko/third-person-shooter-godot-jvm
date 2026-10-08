@@ -28,9 +28,19 @@ public class HitInfo {
      */
     public final Vector3 hitNormal;
 
-    public HitInfo(Node hitNode, Vector3 hitPoint, Vector3 hitNormal) {
+    /**
+     * The weapon's per-round damage that sizes the mark (a bullet hole by calibre), or 0 = size it from the damage
+     * dealt. A firearm states it on every path -- its own hit, a client's prediction, a peer's replay of a host-resolved
+     * shot -- so the hole is the same size on every peer whatever the dealt damage was (a window took some, a headshot).
+     */
+    public final float calibre;
+
+    public HitInfo(Node hitNode, Vector3 hitPoint, Vector3 hitNormal) { this(hitNode, hitPoint, hitNormal, 0f); }
+
+    public HitInfo(Node hitNode, Vector3 hitPoint, Vector3 hitNormal, float calibre) {
         this.hitNode   = hitNode;
         this.hitPoint  = hitPoint;
         this.hitNormal = hitNormal;
+        this.calibre   = calibre;
     }
 }

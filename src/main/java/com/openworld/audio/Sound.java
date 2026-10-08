@@ -27,7 +27,7 @@ public enum Sound {
 
     // water (world.Splash): a body or a car entering, a swim stroke, a wading step or a bullet into the water
     SPLASH("sfx/splash", 3),
-    SPLASH_SMALL("sfx/splash_small", 4),
+    SPLASH_SMALL("sfx/splash_small"),
     SWIM_STROKE("sfx/swim_stroke", 4),
 
     // a melee blow landing (MeleeItem): on a body, on anything else

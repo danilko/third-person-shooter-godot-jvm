@@ -166,16 +166,22 @@ public class ImpactManager extends Node {
      * shot (N1b) has no collider, only the surface the host reported.
      */
     public void processVisualImpact(SurfaceType surface, godot.core.Vector3 point, godot.core.Vector3 normal) {
+        processVisualImpact(surface, point, normal, 0f);
+    }
+
+    /** As above, the mark sized by {@code calibre} (the shooter's weapon damage, 0 = default size). */
+    public void processVisualImpact(SurfaceType surface, godot.core.Vector3 point, godot.core.Vector3 normal, float calibre) {
         ParticleManager pm = getParticleManager();
         if (pm != null) pm.spawn(surface != null ? surface : SurfaceType.DEFAULT, point, normal);
         // a peer has no collider: one short ray along the normal finds what was hit, so a car's hole rides the car
         if (normal != null && surface != SurfaceType.FLESH) {
             Node hit = colliderAt(point, normal);
             HitContext ctx = hit != null ? resolveHitContext(hit) : null;
-            if (ctx != null) mark(ctx, new HitInfo(hit, point, normal), com.openworld.world.DamageKind.BULLET, 0f);
+            if (ctx != null) mark(ctx, new HitInfo(hit, point, normal, calibre), com.openworld.world.DamageKind.BULLET, 0f);
             else {
                 DecalManager dm = getDecalManager();
-                if (dm != null) dm.spawn(point, normal, DecalManager.Mark.HOLE, surface, null, 0f);
+                if (dm != null) dm.spawn(point, normal, DecalManager.Mark.HOLE, surface, null,
+                        dm.holeSize() > 0 ? (float) (dm.holeSize() * calibreScale(calibre)) : 0f);
             }
         }
         impactSound(surface, point);
@@ -220,8 +226,9 @@ public class ImpactManager extends Node {
         godot.api.Node3D body = carrierOf(ctx.healthOwner);
         if (ctx.healthOwner != null && body == null) return;       // something else alive / moving: no mark
         if (body == null && info.hitNode instanceof godot.api.RigidBody3D) return;   // a loose prop: it would float
+        float cal = info.calibre > 0f ? info.calibre : damage;
         float size = m == DecalManager.Mark.HOLE && dm.holeSize() > 0
-                ? (float) (dm.holeSize() * calibreScale(damage)) : 0f;
+                ? (float) (dm.holeSize() * calibreScale(cal)) : 0f;
         dm.spawn(info.hitPoint, info.hitNormal, m, ctx.surface, body, size);
     }
 

@@ -242,7 +242,7 @@ public class FirearmItem extends WeaponItem {
 	  NetStats.increment("shot_result_tracer");
 	  if (tm != null) tm.spawnTracer(muzzle, p.end());
 	  if (p.kind() > 0 && im != null) {
-		im.processVisualImpact(surfaces[Math.min(p.kind() - 1, surfaces.length - 1)], p.end(), p.normal());
+		im.processVisualImpact(surfaces[Math.min(p.kind() - 1, surfaces.length - 1)], p.end(), p.normal(), damage);
 	  }
 	}
   }
@@ -485,7 +485,7 @@ public class FirearmItem extends WeaponItem {
 			origin.plus(dir.times(Math.min(range, TRACER_MISS_LENGTH))), null));
 	  }
 	  if (hit != null && im != null) {
-		HitInfo info = new HitInfo(hit.node, hit.point, hit.normal);
+		HitInfo info = new HitInfo(hit.node, hit.point, hit.normal, damage);   // the hole by calibre, on every peer
 		if (applyDamage) {
 		  float dealt = hit.damage >= 0f ? hit.damage : damage;              // a window's armour took the rest
 		  if (headshotScale != 1f && "Physical Bone head_2".equals(hit.node.getName().toString())) dealt *= headshotScale;

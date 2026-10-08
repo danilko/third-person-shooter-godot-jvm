@@ -23,7 +23,7 @@ const FOOT_HUD := "res://src/main/resources/com/openworld/ui/FootHUD.tscn"
 const WATER  := "res://src/main/java/com/openworld/world/WaterVolume.java"
 const TRACER := "res://src/main/java/com/openworld/world/manager/BulletTracerManager.java"
 ## Sounds that may have no file yet (README "Wired in code" says missing).
-const ALLOWED_MISSING := ["SIREN", "SPLASH", "SPLASH_SMALL", "SWIM_STROKE"]   # splash/swim: SHORTLIST (freesound)
+const ALLOWED_MISSING := ["SIREN"]
 
 var fails := 0
 var checks := 0
@@ -242,7 +242,9 @@ func _initialize() -> void:
 	world.add_child(tracer)
 	await _tick(2)
 	var w0 := int(pm.call("bursts_now", "WATER"))
+	var ss0 := _plays("SPLASH_SMALL")
 	tracer.call("spawn_tracer", Vector3(-60, 6, -8), Vector3(-60, 0.2, 4))
+	_check("  ... with a small splash sound", _plays("SPLASH_SMALL") == ss0 + 1, "+%d" % (_plays("SPLASH_SMALL") - ss0))
 	_check("a shot into the water splashes on the surface", int(pm.call("bursts_now", "WATER")) == w0 + 1,
 		"+%d" % (int(pm.call("bursts_now", "WATER")) - w0))
 	tracer.call("spawn_tracer", Vector3(-60, 6, -8), Vector3(-60, 3.5, 4))
@@ -273,11 +275,15 @@ func _initialize() -> void:
 	crate.queue_free()
 	p.global_position = Vector3(-60, 8, 0)
 	var sp0 := int(p.call("splashes_now"))
+	var sb0 := _plays("SPLASH")
 	await _tick(90)
+	_check("  (a body falling 5 m in plays the big splash)", _plays("SPLASH") == sb0 + 1, "+%d" % (_plays("SPLASH") - sb0))
 	_check("a body dropping in splashes once", int(p.call("splashes_now")) == sp0 + 1,
 		"+%d, WATER bursts +%d" % [int(p.call("splashes_now")) - sp0, int(pm.call("bursts_now", "WATER")) - w0])
 	var st0 := int(p.call("strokes_now"))
+	var sw0 := _plays("SWIM_STROKE")
 	await _press("forward", 180)
+	_check("  (strokes play the swim sound)", _plays("SWIM_STROKE") >= sw0 + 2, "+%d" % (_plays("SWIM_STROKE") - sw0))
 	_check("swimming splashes a stroke every few metres", int(p.call("strokes_now")) >= st0 + 2,
 		"+%d strokes" % (int(p.call("strokes_now")) - st0))
 	p.global_position = Vector3(0, 1.2, 0)

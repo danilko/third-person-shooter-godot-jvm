@@ -37,7 +37,7 @@ missing: `SHORTLIST.md`.
 ## Wired in code (`SoundTest` checks this table lists every `Sound`)
 
 A `Sound` with N takes is `<file>_1` .. `<file>_N` (one picked per play). Everything except `hit_marker` and
-`siren` (and the three water sounds, still missing) is BUILT by `python3 tools/audio/build_sfx.py` (its `SPECS` table: source takes, layers, loudness), then
+`siren` is BUILT by `python3 tools/audio/build_sfx.py` (its `SPECS` table: source takes, layers, loudness), then
 `godot --headless --path . --import`. **None of it was auditioned by ear** (2026-10-08): the picks are by name and
 waveform; listen in game and change the row. Gate: `tools/godot/probe_sfx.gd`.
 
@@ -51,9 +51,9 @@ waveform; listen in game and change the row. Gate: `tools/godot/probe_sfx.gd`.
 | `sfx/impact_stone` | `IMPACT_STONE` | a bullet into stone / concrete / anything untagged | Kenney `impactPlate_light` |
 | `sfx/impact_wood` | `IMPACT_WOOD` | a bullet into wood | Kenney `impactWood_light` |
 | `sfx/impact_glass` | `IMPACT_GLASS` | a bullet into glass that does not break | Kenney `impactGlass_light` |
-| `sfx/splash` | `SPLASH` | a body dropping into water faster than 2 m/s (Character.setInWater, world.Splash), 3D | missing (SHORTLIST: Water Jump Mono) |
-| `sfx/splash_small` | `SPLASH_SMALL` | a bullet or a grenade into water, a gentle entry, a wading step (world.Splash) | missing (SHORTLIST: Small Puddle Splash) |
-| `sfx/swim_stroke` | `SWIM_STROKE` | a swimmer's stroke every 1.6 m (CharacterAudio) | missing (SHORTLIST: Person Swimming) |
+| `sfx/splash` | `SPLASH` | a body dropping into water faster than 2 m/s (Character.setInWater, world.Splash), 3D | Freesound Nox_Sound 585744 (CC0; HQ preview, 3 jumps sliced) |
+| `sfx/splash_small` | `SPLASH_SMALL` | a bullet or a grenade into water, a gentle entry, a wading step (world.Splash) | Freesound Robo9418 841834 (CC0; HQ preview) |
+| `sfx/swim_stroke` | `SWIM_STROKE` | a swimmer's stroke every 1.6 m (CharacterAudio) | Freesound craigsmith 438845 (CC0; HQ preview, 4 strokes sliced) |
 | `sfx/melee_hit_flesh` | `MELEE_HIT_FLESH` | a melee blow landing on a body (MeleeItem) | Kenney `impactPunch_heavy` |
 | `sfx/melee_hit_hard` | `MELEE_HIT_HARD` | a melee blow on a car, a wall, anything not a body | Still North Medieval Weapon Impacts |
 | `sfx/explosion` | `EXPLOSION` | every explosion (ExplosionManager.playBlast), every peer | Kenney Sci-fi `explosionCrunch` + `lowFrequency_explosion` layered |

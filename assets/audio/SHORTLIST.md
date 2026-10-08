@@ -60,7 +60,7 @@ contact-mic recording below). Gunshots are layered offline: body + mechanical + 
 | bullet → ground/concrete | Bullet impact ground — modusmogulus | https://freesound.org/people/modusmogulus/sounds/789388/ | layer with Kenney plate/concrete; no clean CC0 concrete hit found |
 | bullet → metal | Kenney `impactMetal_*` (or martian 182263, slice) | https://freesound.org/people/martian/sounds/182263/ | |
 | bullet → wood | Single rock hitting wood — worthahep88 | https://freesound.org/people/worthahep88/sounds/319226/ | 4 variants |
-| bullet → water | Small Puddle Splash — Robo9418 | https://freesound.org/people/Robo9418/sounds/841834/ | |
+| bullet → water | Small Puddle Splash — Robo9418 | https://freesound.org/people/Robo9418/sounds/841834/ |IN (HQ preview, 2026-10-08; swap for the original download) |
 | ricochet | Ricochet 4 — saturdaysoundguy | https://freesound.org/people/saturdaysoundguy/sounds/394187/ | |
 | whiz-by | Fly-by whiz — modusmogulus | https://freesound.org/people/modusmogulus/sounds/789222/ | whip, no real-bullet CC0 found |
 | hit marker (`hit_marker`) | Hit.wav — Abacagi | https://freesound.org/people/Abacagi/sounds/478057/ | or Kenney `tick_001` |
@@ -95,8 +95,8 @@ contact-mic recording below). Gunshots are layered offline: body + mechanical + 
 |---|---|---|---|
 | footsteps metal | Footsteps On Metal — IENBA | https://freesound.org/people/IENBA/sounds/834029/ | others: Kenney |
 | footsteps water | deep water footsteps — bruno.auzet | https://freesound.org/people/bruno.auzet/sounds/553863/ | slice |
-| swim stroke | Person Swimming — craigsmith | https://freesound.org/people/craigsmith/sounds/438845/ | |
-| splash | Water Jump Mono — Nox_Sound | https://freesound.org/people/Nox_Sound/sounds/585744/ | |
+| swim stroke | Person Swimming — craigsmith | https://freesound.org/people/craigsmith/sounds/438845/ |IN (HQ preview, 2026-10-08; swap for the original download) |
+| splash | Water Jump Mono — Nox_Sound | https://freesound.org/people/Nox_Sound/sounds/585744/ |IN (HQ preview, 2026-10-08; swap for the original download) |
 | hinged door | Wooden Door Open and Close — IENBA | https://freesound.org/people/IENBA/sounds/607911/ | or Kenney RPG |
 | auto sliding door | Automatic Door — Stroms | https://freesound.org/people/Stroms/sounds/369500/ | |
 | lift ding + doors | elevator door and ding — jamie7001 | https://freesound.org/people/jamie7001/sounds/476800/ | US ding |
