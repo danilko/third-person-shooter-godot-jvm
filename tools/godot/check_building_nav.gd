@@ -88,8 +88,8 @@ func _labels(nm: NavigationMesh) -> PackedInt32Array:
 		out[p] = r
 	return out
 
-func _door_report(t: String) -> void:
-	var nm: NavigationMesh = load(NAV + t + "_nav.res")
+func _door_report(t: String, nav_dir := NAV, suffix := "_nav.res") -> void:
+	var nm: NavigationMesh = load(nav_dir + t + suffix)
 	var b: Node = (load("res://src/main/resources/com/openworld/world/buildings/%s_Shop.tscn" % t) as PackedScene).instantiate()
 	var meta: Dictionary = b.get_meta("building", {})
 	b.free()
@@ -155,8 +155,14 @@ func _initialize() -> void:
 	var all := "--all" in OS.get_cmdline_user_args()
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--doors="):
+			var nav_dir := NAV
+			var suffix := "_nav.res"
+			for b in OS.get_cmdline_user_args():
+				if b.begins_with("--nav="):      # a trial bake (bake_building_nav.gd --save=<dir> writes <Scene>_nav.res)
+					nav_dir = b.substr(6).trim_suffix("/") + "/"
+					suffix = "_Shop_nav.res"
 			for t in a.substr(8).split(","):
-				_door_report(t)
+				_door_report(t, nav_dir, suffix)
 			quit(0)
 			return
 	var fails := 0

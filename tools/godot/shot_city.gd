@@ -10,7 +10,7 @@ extends SceneTree
 ## which is exactly what the picture is being taken to judge.
 ##
 ## `--shot` is `<name>:<camera x,y,z>:<target x,y,z>`. The sun is pinned to `--time` (noon) so two runs
-## are comparable; `--no-buildings` is the control.
+## are comparable; `--no-buildings` is the control. `--fogs=` takes the haze variants (PLAN.md 2b, see _set_fog).
 ##
 
 var w: Node3D
@@ -53,6 +53,25 @@ func _settle(seconds: float) -> void:
 			last = n
 		if Time.get_ticks_msec() - t0 > 4000 and still > 120:
 			return
+
+
+## `--fogs=off;0,700,0.001;...` (PLAN.md 2b): per shot, one picture per Sky3D distance-fog setting --
+## `off`, or `start,end,density` (SkyDome fog_start / fog_end / fog_density, Sky3D.fog_enabled on).
+func _set_fog(spec: String) -> void:
+	var sky := w.get_node_or_null("Sky3D")
+	var dome := w.get_node_or_null("Sky3D/SkyDome")
+	if sky == null or dome == null:
+		return
+	if spec == "off":
+		sky.set("fog_enabled", false)
+		return
+	var v := spec.split(",")
+	sky.set("fog_enabled", true)
+	dome.set("fog_visible", true)
+	dome.set("fog_start", float(v[0]))
+	dome.set("fog_end", float(v[1]))
+	if v.size() > 2:
+		dome.set("fog_density", float(v[2]))
 
 
 func _initialize() -> void:
@@ -112,8 +131,18 @@ func _run() -> void:
 		cam.look_at(look, Vector3.UP)
 		await process_frame
 		await process_frame
-		RenderingServer.force_draw()
-		var path := "%s/%s.png" % [out, p[0]]
-		root.get_texture().get_image().save_png(path)
-		print("shot %s  cam %.1f,%.1f,%.1f -> %.1f,%.1f,%.1f" % [path, at.x, at.y, at.z, look.x, look.y, look.z])
+		var fogs: Array = str(_arg("fogs", [""])[0]).split(";", false)
+		if fogs.is_empty():
+			fogs = [""]
+		for fog in fogs:
+			var tag := ""
+			if fog != "":
+				tag = "_fog_" + str(fog).replace(",", "-")
+				_set_fog(str(fog))
+				for i in 6:
+					await process_frame
+			RenderingServer.force_draw()
+			var path := "%s/%s%s.png" % [out, p[0], tag]
+			root.get_texture().get_image().save_png(path)
+			print("shot %s  cam %.1f,%.1f,%.1f -> %.1f,%.1f,%.1f" % [path, at.x, at.y, at.z, look.x, look.y, look.z])
 	quit(0)
