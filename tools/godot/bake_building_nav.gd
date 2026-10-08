@@ -6,7 +6,7 @@ extends SceneTree
 ## Door_* marker's inside point is ON the mesh, and the cost of a path query across it.
 ##
 ##   godot --headless --path . --script tools/godot/bake_building_nav.gd -- --scenes=KonbiniL_Shop,PoliceStation_Shop
-##       [--cell=0.175] [--radius=0.35] [--save=<dir>]   (--save writes <Type>_nav.res there, for the runtime test)
+##       [--cell=0.175] [--radius=0.35] [--height=1.8] [--save=<dir>]   (--save writes <Type>_nav.res there, for the runtime test)
 ##   ... -- --all --write   THE BUILD STEP: every enterable type (a _Shop or _Open scene) baked from its _Shop
 ##                          variant (else _Open) into buildings/nav/<Type>_nav.res, which world.InteriorNav loads.
 ##                          Re-run after build_building_scenes.gd changes a building.
@@ -90,7 +90,7 @@ func _initialize() -> void:
 		nm_res.cell_size = cell
 		nm_res.cell_height = 0.1
 		nm_res.agent_radius = radius
-		nm_res.agent_height = 1.8
+		nm_res.agent_height = float(_arg("height", "1.8"))
 		nm_res.agent_max_climb = 0.5
 		nm_res.agent_max_slope = 46.0
 		nm_res.filter_baking_aabb = AABB(lo - Vector3(APRON, 1, APRON), (hi - lo) + Vector3(2 * APRON, 2, 2 * APRON))
