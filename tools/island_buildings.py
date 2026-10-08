@@ -604,6 +604,49 @@ def type_aabb(name):
     return (p[0], p[2], p[0] + s[0], p[2] + s[2], p[1] + s[1])
 
 
+_DOORS = None
+#: an ENTERABLE building's door keeps this apron clear outside it (PLAN.md 1g f, user 2026-10-07: "there should
+#: always be room for an emergency exit"): the door's width + APRON_SIDE each side, APRON_DEPTH out. Reserved as a
+#: 路地 (`field.passage`), so no later building or lot stands or grows in it, and a building is refused whose own
+#: aprons already hold another building. A car park may still stand over one (it is open ground a body crosses).
+APRON_DEPTH, APRON_SIDE = 3.0, 0.5
+
+
+def type_doors(t):
+    """The door list (`layout_buildings` doors: side, center, outward, width) of a type, its footprint variant or its
+    billboard twin falling back to the base type."""
+    global _DOORS
+    if _DOORS is None:
+        sys.path.insert(0, os.path.join(HERE, "building_kit"))
+        import layout_buildings as _lb
+        _DOORS = {b["id"]: b.get("doors", []) for b in _lb.layout_all(
+            os.path.join(ROOT, "assets", "world_source", "buildings", "building_types.json"))["buildings"]}
+    for k in (t, SIGN_OF.get(t), BASE_OF.get(t)):
+        if k and _DOORS.get(k):
+            return _DOORS[k]
+    return []
+
+
+def door_apron_cells(field, t, cx, cz, yaw):
+    """Mask indices (i, j) of every door apron of a type placed at (cx, cz) turned by yaw (radians)."""
+    np = field.np
+    ii, jj = [], []
+    for d in type_doors(t):
+        dx, _y, dz = d["center"]
+        ox, _o, oz = d.get("outward", [0.0, 0.0, 1.0])
+        hw = float(d.get("width", 1.0)) * 0.5 + APRON_SIDE
+        if abs(oz) >= abs(ox):
+            z0, z1 = (dz, dz + APRON_DEPTH) if oz > 0 else (dz - APRON_DEPTH, dz)
+            r = field.rect_points(cx, cz, yaw, dx - hw, z0, dx + hw, z1)
+        else:
+            x0, x1 = (dx, dx + APRON_DEPTH) if ox > 0 else (dx - APRON_DEPTH, dx)
+            r = field.rect_points(cx, cz, yaw, x0, dz - hw, x1, dz + hw)
+        ii.append(r[0]); jj.append(r[1])
+    if not ii:
+        return np.zeros(0, int), np.zeros(0, int)
+    return np.concatenate(ii), np.concatenate(jj)
+
+
 _PAVED = {}
 _INTERIOR_TYPES = None
 #: a PAVED site (a car park, a gas station, a compound whose yard is its own slab) stands this far over the block
@@ -952,6 +995,12 @@ def civic_plots(field, frontage):
         top = best[1] if best else 0.75
         # the building faces its road: its local +Z (the street side) is (p.nx, -p.ny) in Godot axes
         byaw = math.degrees(math.atan2(p["nx"], -p["ny"]))
+        if civic_type(p) in CIVIC_SCENE:
+            # an enterable civic building's doors keep their aprons clear outside the plot too (PLAN.md 1g f: a
+            # 交番's and a department store's side doors had a neighbour against them)
+            ai_, aj_ = door_apron_cells(field, civic_type(p), cx, cz, math.radians(byaw))
+            if ai_.size:
+                field.passage[aj_, ai_] = True
         out.append({"id": p["id"], "kind": p["kind"], "jp": p["jp"], "type": civic_type(p),
                     "pos": [round(cx, 3), round(top, 3), round(cz, 3)], "yaw": round(byaw, 3),
                     "lot": [round(-ha, 3), round(-hc, 3), round(ha, 3), round(hc, 3)]})
@@ -1957,6 +2006,12 @@ def derive(heights_path):
         if field.occupied[jj, ii].any() or (not over_passage and field.passage[jj, ii].any()):
             REFUSED["occupied/passage"] = REFUSED.get("occupied/passage", 0) + 1
             return None
+        enterable = BASE_OF.get(t, t) in SHOP_TYPES or SIGN_OF.get(t, t) in SHOP_TYPES
+        if enterable:
+            ai_, aj_ = door_apron_cells(field, t, cx, cz, yaw)
+            if ai_.size and field.occupied[aj_, ai_].any():
+                REFUSED["door apron holds a building"] = REFUSED.get("door apron holds a building", 0) + 1
+                return None
         if back_row:
             # 接道 (user, 2026-09-26: no "ring within ring" of buildings nobody can reach): a back-row building
             # stands only where a 路地, a through lane or a street runs within BACK_ACCESS of its lot -- the flag-pole
@@ -1984,6 +2039,8 @@ def derive(heights_path):
             return None
         field.occupied[jj, ii] = True
         field.owner[jj, ii] = len(placed) + 1
+        if enterable and ai_.size:
+            field.passage[aj_, ai_] = True       # the door aprons: no later building or lot in them
         if front_gap > 0.0:
             fi, fj = field.rect_points(cx, cz, yaw, x0 - al, z1, x1 + al, z1 + front_gap)
             free = field.owner[fj, fi] == 0
