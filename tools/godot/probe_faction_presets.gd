@@ -186,7 +186,10 @@ func _initialize() -> void:
 	print("=== 6. the mission ends: its table goes with it ===")
 	mm.call("complete_mission_now", "police", "ELIMINATED")
 	_check("layer back to the defaults", fm.call("active_layer_now") == "default", fm.call("active_layer_now"))
-	_check("defaults again: gang_b and police hostile", fm.call("hostile_now", "gang_b", "police"), "")
+	# DefaultFactions.tres ships police <-> the gangs NEUTRAL (the wanted system flips them when a player is wanted),
+	# so "back to the defaults" reads as: gang_b and police at peace again, the two gangs still at war
+	_check("defaults again: gang_b and police neutral, the gangs hostile",
+		not fm.call("hostile_now", "gang_b", "police") and fm.call("hostile_now", "gang_a", "gang_b"), "")
 
 	print("")
 	print("RESULT %s (%d failures)" % ["PASS" if fails == 0 else "FAIL", fails])

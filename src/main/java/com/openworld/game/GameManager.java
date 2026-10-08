@@ -400,6 +400,7 @@ public class GameManager extends Node {
                 // Occupied vehicles after spawns — the seated body must exist first (N3).
                 net.sendBaselineVehicleOccupancy(peerId);
                 // Runtime faction-relationship flips (per-character factions ride sendBaselineSpawns).
+                if (getMissionManager() != null) getMissionManager().sendBaseline(peerId);   // a running mission (1b)
                 net.sendBaselineFactionRelationships(peerId);
                 net.sendBaselineBreakables(peerId);   // already-broken destructibles (I2)
                 net.sendBaselineRace(peerId);   // a race already in progress (R2)
@@ -420,6 +421,7 @@ public class GameManager extends Node {
             net.sendBaselinePickups(peerId);
             net.sendBaselineInventories(peerId);   // after spawns + pickups — see rejoin branch
             net.sendBaselineVehicleOccupancy(peerId);   // occupied vehicles after spawns (N3)
+            if (getMissionManager() != null) getMissionManager().sendBaseline(peerId);   // a running mission (1b)
             net.sendBaselineFactionRelationships(peerId);   // runtime relationship flips (D3)
             net.sendBaselineBreakables(peerId);   // already-broken destructibles (I2)
             net.sendBaselineRace(peerId);   // a race already in progress (R2)

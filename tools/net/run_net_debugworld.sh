@@ -108,6 +108,9 @@ if hc_ and cc_:
     check("coop: the client's clock matches the host's", diff < 2.0, f"{diff:.2f} game min apart")
 else:
     check("coop: both peers printed the clock", False, f"host={hc_} client={cc_}")
+m = re.search(r"\[coop\] mission on join active=(\w+) id=(\S*)", cclient)
+check("coop: a late joiner is told the running mission", m is not None and m.group(1) == "true"
+      and m.group(2) == "coop_baseline_test", m.group(0) if m else "no line")
 print("  -- coop: die seated, then the respawn")
 m = re.search(r"\[coop\] seated=(\w+) hud=(\S*)", cclient)
 check("coop: the client took a seat in the parked car", m is not None and m.group(1) == "true", m.group(0) if m else "no line")

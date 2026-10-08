@@ -208,6 +208,17 @@ public class MissionManager extends Node {
         if (netNode instanceof NetworkManager net) net.broadcastWorldEvent(eventType, missionId, 0f, args);
     }
 
+    /** Host -> one joining peer: the mission already running, as the same WORLD_EVENT_MISSION_STARTED a live start
+     *  sends (PLAN.md 1b). Sent before the faction baseline, because applying a mission table rebuilds the live
+     *  table and drops runtime flips. No-op with no mission running or off the host. */
+    public void sendBaseline(int peerId) {
+        if (isNetClient() || !active || activeMission == null) return;
+        if (getNodeOrNull("/root/NetworkManager") instanceof NetworkManager net)
+            net.sendWorldEventTo(peerId, GameManager.WORLD_EVENT_MISSION_STARTED, activeMission.missionId, 0f,
+                    java.util.List.of(activeMission.objectiveType == null ? "" : activeMission.objectiveType,
+                            factionTablePath(activeMission)));
+    }
+
     /** Push (or clear, with null) the mission layer of {@code FactionManager}. */
     private void applyMissionFactions(com.openworld.character.FactionTable table) {
         Node fmNode = getNodeOrNull("/root/FactionManager");

@@ -725,6 +725,20 @@ public class DebugHarness extends Node {
         NetworkManager net = getNodeOrNull("/root/NetworkManager") instanceof NetworkManager n ? n : null;
         boolean client = net != null && net.isNetworked() && !net.isServer();
         Player me = localPlayer();
+        // a mission running BEFORE the client joins (PLAN.md 1b): the joiner must be told by the baseline
+        if (!client && !coopMissionStarted && coopT >= 1.0
+                && getNodeOrNull("/root/MissionManager") instanceof com.openworld.game.mission.MissionManager mm) {
+            coopMissionStarted = true;
+            var info = new com.openworld.game.mission.MissionInfo();
+            info.missionId = "coop_baseline_test";
+            info.objectiveType = com.openworld.game.mission.MissionObjectiveType.SCRIPTED;
+            mm.startMission(info);
+        }
+        if (client && !coopMissionSeen && coopT >= 12.0
+                && getNodeOrNull("/root/MissionManager") instanceof com.openworld.game.mission.MissionManager mm) {
+            coopMissionSeen = true;
+            GD.print("[coop] mission on join active=" + mm.missionActiveNow() + " id=" + mm.activeMissionIdNow());
+        }
         if (coopStep == 0 && coopT >= 14.0) {
             coopStep = 1;
             if (client && me != null) {
@@ -883,6 +897,7 @@ public class DebugHarness extends Node {
     }
 
     private double coopSeatAt = 1e9;
+    private boolean coopMissionStarted, coopMissionSeen;
     private com.openworld.carrier.vehicle.Vehicle coopCarRef;
 
     private com.openworld.carrier.vehicle.Vehicle coopCar() {
