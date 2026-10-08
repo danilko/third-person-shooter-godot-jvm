@@ -774,6 +774,7 @@ public class EnforcementDispatch extends Node {
     public void guard(Player p, String gang, Vector3 at, int n, List<String> weapons) {
         if (p == null || p.getCharacterInfo() == null || !authority()) return;
         String pid = p.getCharacterInfo().characterId;
+        bodyStars = 3;
         for (int i = 0; i < n; i++) {
             double a = Math.PI * 2 * i / Math.max(1, n) + 0.4;
             double d = 3.0 + (i % 2) * 1.5;
@@ -796,6 +797,7 @@ public class EnforcementDispatch extends Node {
 
     private void spawnFor(Player p, String side, int stars, DispatchRules r, WantedSystem ws) {
         if (p == null || !p.isAlive()) return;
+        bodyStars = stars;
         String pid = p.getCharacterInfo().characterId;
         int foot = 0, carsEnRoute = 0;
         for (Unit u : units) {
@@ -1272,9 +1274,59 @@ public class EnforcementDispatch extends Node {
         }
     }
 
+    /** The stars the next {@link #spawnBody} is dressed for (set by spawnFor / guard; the body table is by stars). */
+    private int bodyStars = 1;
+    private final Random bodyRng = new Random(0xB0D1E5);
+    private java.util.Map<String, List<DispatchRules.BodyPick>> gangBodies;
+
+    /** Which body and uniform a unit of {@code side} wears at {@link #bodyStars} (PLAN.md 1g c); null = the scene's own. */
+    private DispatchRules.BodyPick bodyFor(String side) {
+        List<DispatchRules.BodyPick> rows;
+        if (POLICE.equals(side)) {
+            WantedSystem ws = WantedSystem.get();
+            rows = ws != null && ws.dispatchRules() != null ? ws.dispatchRules().bodies : null;
+        } else {
+            if (gangBodies == null) {
+                gangBodies = godot.api.FileAccess.fileExists(GangSystem.TABLE)
+                        ? DispatchRules.parseGangBodies(godot.api.FileAccess.getFileAsString(GangSystem.TABLE))
+                        : new java.util.HashMap<>();
+            }
+            rows = gangBodies.get(side);
+        }
+        // its own stream: drawing from `rng` would move every later spawn spot (probe_breach's units then started
+        // from a different place and gave up the store's door)
+        return DispatchRules.pickBody(rows, bodyStars, bodyRng.nextDouble());
+    }
+
+    /** How many units wore each body:outfit (probe readout, "fumiriya:police=3,shino:police=1"). */
+    private final java.util.Map<String, Integer> dressed = new java.util.TreeMap<>();
+
+    /** AIController's think budget (PLAN.md 1g d): "decisions,skipped" since start, process-wide. */
+    @Register
+    public void setThinkBudgetNow(boolean on) { com.openworld.ai.AIController.thinkBudget = on; }
+
+    @Register
+    public String thinkCountsNow() {
+        return com.openworld.ai.AIController.thinks + "," + com.openworld.ai.AIController.skippedThinks;
+    }
+
+    @Register
+    public String dressedNow() {
+        StringBuilder b = new StringBuilder();
+        for (var e : dressed.entrySet()) b.append(b.length() > 0 ? "," : "").append(e.getKey()).append('=').append(e.getValue());
+        return b.toString();
+    }
+
     private AICharacter spawnBody(String side, Vector3 at, String weapon) {
         if (getTree() == null || getTree().getCurrentScene() == null) return null;
         if (!(GD.load(AI_SCENE) instanceof PackedScene ps) || !(ps.instantiate() instanceof AICharacter ai)) return null;
+        DispatchRules.BodyPick look = bodyFor(side);
+        if (look != null) {
+            String vis = "res://src/main/resources/com/openworld/character/CharacterVisuals_"
+                    + java.lang.Character.toUpperCase(look.body().charAt(0)) + look.body().substring(1) + ".tscn";
+            if (godot.api.ResourceLoader.INSTANCE.exists(vis, "") && GD.load(vis) instanceof PackedScene vps)
+                ai.characterVisuals = vps;   // before _ready, which is what instances it
+        }
         CharacterInfo info = new CharacterInfo();
         info.characterId = UUID.randomUUID().toString();
         info.displayName = POLICE.equals(side) ? "Police" : side;
@@ -1285,6 +1337,11 @@ public class EnforcementDispatch extends Node {
         container.addChild(ai);
         ai.activateForSpawn(at.plus(new Vector3(0, 0.05, 0)));
         ai.lodPinnedActive = true;
+        if (look != null && !look.outfit().isEmpty()) {
+            Node mount = ai.getNodeOrNull("VisualsMount");
+            if (com.openworld.character.Outfits.apply(mount != null ? mount : ai, look.outfit()) > 0)
+                dressed.merge(look.body() + ":" + look.outfit(), 1, Integer::sum);
+        }
         if (weapon != null && !weapon.isEmpty()) WeaponGrant.grant(ai, weapon, this);
         if (getNodeOrNull("/root/NetworkManager") instanceof NetworkManager net) net.announceSpawn(ai);
         return ai;

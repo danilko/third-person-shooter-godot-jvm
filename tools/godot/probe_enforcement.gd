@@ -59,6 +59,8 @@ func _initialize() -> void:
 		return
 	if control:
 		ed.set("enabled", false)
+	if "--no-think" in args:
+		ed.call("set_think_budget_now", false)   # PLAN.md 1g d's control: every AI decides every tick
 	# DebugWorld's zone AI are armed "enemy", hostile to every other faction: they shot the officers before they
 	# reached anyone. Police and enemy are made neutral here, so what is measured is the dispatch.
 	for pair in [["police", "enemy"], ["enemy", "police"]]:
@@ -191,6 +193,11 @@ func _initialize() -> void:
 	else:
 		_check(gang_peak >= 1, "gang_a hunters came (%d)" % gang_peak)
 		_check(bool(fm.call("hostile_now", "gang_a", "player")), "gang_a is hostile to players")
+		# PLAN.md 1g c: every unit wears its force's uniform (crimes.json / gangs.json bodies + outfits.json)
+		var dressed := String(ed.call("dressed_now"))
+		print("  dressed: %s" % dressed)
+		_check(dressed.contains(":police="), "officers wear the police uniform (%s)" % dressed)
+		_check(dressed.contains(":gang_a="), "gang_a hunters wear gang_a colours (%s)" % dressed)
 	gs.call("set_gang_stars_now", pid, "gang_a", 0)
 	print("RESULT %s (%d failures)" % ["PASS" if fails == 0 else "FAIL", fails])
 	quit(0 if fails == 0 else 1)

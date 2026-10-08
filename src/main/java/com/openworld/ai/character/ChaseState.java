@@ -12,6 +12,9 @@ public class ChaseState implements AIState {
     public static final ChaseState INSTANCE = new ChaseState();
     private ChaseState() {}
 
+    /** Inside this distance (m), with the target in sight, the chase walks straight at it instead of the nav path. */
+    static final float CLOSE_DIRECT = 8.0f;
+
     @Override
     public void enter(AICharacter body, AIController ctrl) {
         ctrl.resetLostTargetTimer();
@@ -68,12 +71,51 @@ public class ChaseState implements AIState {
             }
         }
 
-        Vector3 dir = body.getNavAgent()
-                          .getNextPathPosition()
-                          .minus(body.getGlobalPosition())
-                          .normalized();
+        // Off a navmesh the agent hands back the body's own position (ScriptedMoveState.steerDirection's trap): two
+        // baton officers 3.9 m from a still player stood there for 90 s. The agent is believed only while its next
+        // point is a real step ahead; otherwise steer at the target (in sight) or its last known place.
+        Vector3 goal = hasLoS ? body.getTarget().getGlobalPosition()
+                : ctrl.hasLastKnownPosition() ? ctrl.getLastKnownTargetPosition() : body.getGlobalPosition();
+        Vector3 dir;
+        if (hasLoS && dist < CLOSE_DIRECT && walkableLine(body, goal)) {
+            // In sight and close: straight at it. The agent leads to the nearest NAVMESH point, which for a target
+            // on a slab or a kerb island is metres off it -- baton officers circled 3.5 m from a still player while
+            // their reach is 1.9 m (probe_enforcement, 2026-10-07).
+            dir = goal.minus(body.getGlobalPosition());
+            dir.setY(0f);
+            dir = dir.length() > 0.001f ? dir.normalized() : null;
+        } else {
+            // the agent's next point, unless it is not a real step ahead (off a navmesh it hands back the body's own
+            // position); a FINISHED agent still leads (HEAD's rule -- treating it as no guidance walked breaching
+            // officers into a konbini wall right after they switched onto its interior navmesh)
+            Vector3 step = body.getNavAgent().getNextPathPosition().minus(body.getGlobalPosition());
+            step.setY(0f);
+            if (step.length() >= 0.5f) dir = step.normalized();
+            else {
+                dir = goal.minus(body.getGlobalPosition());
+                dir.setY(0f);
+                dir = dir.length() > 0.001f ? dir.normalized() : null;
+            }
+        }
+        if (dir == null) dir = Vector3.Companion.getZERO();
         cmd.movementDirection.setX(dir.getX());
         cmd.movementDirection.setZ(dir.getZ());
         return this;
+    }
+
+    /** A clear WORLD line at knee and chest height from the body to {@code goal}: sight alone is not a way (the
+     *  officer saw the player through a konbini's glazing and walked into the wall; probe_breach, 2026-10-07). */
+    static boolean walkableLine(AICharacter body, Vector3 goal) {
+        if (body.getViewport() == null || body.getViewport().getWorld3d() == null) return true;
+        var sp = body.getViewport().getWorld3d().getDirectSpaceState();
+        Vector3 from = body.getGlobalPosition();
+        for (double h : new double[] {0.5, 1.3}) {
+            var q = godot.api.PhysicsRayQueryParameters3D.create(from.plus(new Vector3(0, h, 0)),
+                    goal.plus(new Vector3(0, h, 0)), com.openworld.util.CollisionLayers.WORLD,
+                    new godot.core.VariantArray<>(godot.core.RID.class));
+            var hit = sp.intersectRay(q);
+            if (hit != null && !hit.isEmpty()) return false;
+        }
+        return true;
     }
 }

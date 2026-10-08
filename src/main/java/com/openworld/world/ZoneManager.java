@@ -1039,6 +1039,35 @@ public class ZoneManager extends Node {
 		return r == null ? "" : r;
 	}
 
+	/** THE DUMMY TIER (PLAN.md 1g e / 2d): a traffic car beyond {@link #dummyOutDist} of every player drives on rails
+	 *  (Vehicle.setDummy), and is made real again inside {@link #dummyInDist} (hysteresis). A car on a call (a plan,
+	 *  a ram target), a racer and anything with a player aboard stay real. 0 = off (the control). */
+	@Export public float dummyOutDist = 90f;
+	@Export public float dummyInDist = 70f;
+
+	private int dummiesNow;
+
+	/** Probe readout: how many traffic cars are on rails right now. */
+	@Register public int dummiesNow() { return dummiesNow; }
+
+	private void updateDummyTier() {
+		int n = 0;
+		for (LoadedZone lz : loaded.values()) {
+			for (Vehicle v : lz.vehicles) {
+				if (!GD.isInstanceValid(v) || !(v.getController() instanceof VehicleAIController ai)) continue;
+				boolean special = ai.hasPlan() || ai.ramTarget != null || ai.racing;
+				double d = nearestPlayerDistXZ(v.getGlobalPosition());
+				if (v.isDummy()) {
+					if (dummyOutDist <= 0f || special || d < dummyInDist) v.setDummy(false);
+				} else if (dummyOutDist > 0f && !special && d > dummyOutDist) {
+					v.setDummy(true);
+				}
+				if (v.isDummy()) n++;
+			}
+		}
+		dummiesNow = n;
+	}
+
 	private void maintainTraffic() {
 		if (loaded.isEmpty()) return;
 		NetworkManager net = networkManager();
@@ -1047,6 +1076,7 @@ public class ZoneManager extends Node {
 		if (container == null) return;
 		boolean logStatus = debugLog && ++trafficLogTick % TRAFFIC_LOG_EVERY == 0;
 		shedTrafficOverBudget(net);
+		updateDummyTier();
 		boolean recycledThisTick = trafficRecycleDist <= 0f
 				|| godot.api.Time.INSTANCE.getTicksMsec() - lastRecycleMsec < (long) (trafficRecycleSeconds * 1000f)
 				|| trafficNearNow(trafficNearRadius) >= trafficNearTarget;

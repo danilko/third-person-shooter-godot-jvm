@@ -66,13 +66,73 @@ public class AIController extends Controller {
             cmd.movementType      = body.getCurrentMovementType();
             return cmd;
         }
-        if (underAttackTimer > 0) underAttackTimer = Math.max(0.0, underAttackTimer - delta);
-        AIState next = currentState.update(body, this, cmd, delta);
+        // THINK BUDGET (PLAN.md 1g d): the body moves every tick, but its DECISIONS (FSM update: target scan, sight
+        // rays, nav re-path, aim) run every THINK_NEAR-th tick within THINK_NEAR_DIST of a player and every
+        // THINK_FAR-th beyond, staggered by instance id so the work spreads over ticks (PedCrowd's update groups).
+        // A skipped tick repeats the last decision's movement and aim with every one-shot press cleared, and the
+        // next decision is handed the whole elapsed time, so every timer in the FSM runs at the same speed.
+        thinkDebt += delta;
+        if (thinkBudget && lastCmd != null) {
+            int every = body.lastPlayerDistance() < THINK_NEAR_DIST ? THINK_NEAR : THINK_FAR;
+            long frame = godot.api.Engine.getPhysicsFrames() + thinkPhase();
+            if (every > 1 && frame % every != 0) {
+                skippedThinks++;
+                return held(lastCmd);
+            }
+        }
+        double d = thinkDebt;
+        thinkDebt = 0.0;
+        thinks++;
+        if (underAttackTimer > 0) underAttackTimer = Math.max(0.0, underAttackTimer - d);
+        AIState next = currentState.update(body, this, cmd, d);
         if (next != currentState) transitionTo(next);
+        lastCmd = cmd;
         return cmd;
     }
 
+    /** Off = decide every tick, the old behaviour (the control; EnforcementDispatch.set_think_budget_now). */
+    public static boolean thinkBudget = System.getenv("OW_NO_THINK") == null;
+
+    public static final int THINK_NEAR = 2, THINK_FAR = 4;
+    public static final float THINK_NEAR_DIST = 30f;
+    private UserCommand lastCmd;
+    private double thinkDebt;
+    private long phase = -1;
+    /** Process-wide counts of decisions run and skipped (probe readout via EnforcementDispatch.think_counts_now). */
+    public static long thinks, skippedThinks;
+
+    private long thinkPhase() {
+        if (phase < 0) phase = Math.floorMod(getInstanceId(), 4L);
+        return phase;
+    }
+
+    /** The last decision repeated: movement, stance, combat and aim held; every press (fire, reload, jump, a weapon
+     *  switch, a drop) released, so a held tick never doubles an action. */
+    private static UserCommand held(UserCommand last) {
+        UserCommand c = last.copy();
+        c.fire = false;
+        c.reload = false;
+        c.drop = false;
+        c.jump = false;
+        c.detonate = false;
+        c.desiredWeapon = -1;
+        c.scopeZoom = UserCommand.SCOPE_ZOOM_NONE;
+        c.enterExit = false;
+        c.resetVehicle = false;
+        return c;
+    }
+
+    /** OW_AI_TRACE=1: print every FSM transition with the distance to the target (debugging, off in the game). */
+    private static final boolean TRACE = System.getenv("OW_AI_TRACE") != null;
+
     protected final void transitionTo(AIState next) {
+        if (TRACE && getBody() != null) {
+            AICharacter b = getBody();
+            double d = b.getTarget() != null ? b.getGlobalPosition().distanceTo(b.getTarget().getGlobalPosition()) : -1;
+            GD.print("[ai] " + b.getName() + " " + (currentState == null ? "-" : currentState.getClass().getSimpleName())
+                    + " -> " + next.getClass().getSimpleName() + String.format(" d=%.2f range=%.2f melee=%b f=%d",
+                    d, b.getEffectiveAttackRange(), b.isMeleeEngagement(), godot.api.Engine.getPhysicsFrames()));
+        }
         if (currentState != null) currentState.exit(getBody(), this);
         currentState = next;
         currentState.enter(getBody(), this);
@@ -104,6 +164,8 @@ public class AIController extends Controller {
         pursuitAway = false;
         pursuitStand = false;
         pursuitVia.clear();
+        lastCmd = null;
+        thinkDebt = 0.0;
         transitionTo(initialState());
     }
 

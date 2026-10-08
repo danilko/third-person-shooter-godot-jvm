@@ -97,4 +97,31 @@ class DispatchRulesTest {
         DispatchRules h = DispatchRules.parse(read("gangs.json"), "hunters");
         org.junit.jupiter.api.Assertions.assertTrue(h.tokensFor(5) > 0);
     }
+
+    @Test
+    void bodiesAreChosenPerForceAndStars() throws Exception {
+        DispatchRules r = DispatchRules.parse(read("crimes.json"), "dispatch");
+        assertFalse(r.bodies.isEmpty(), "police name their bodies");
+        java.util.Set<String> low = new java.util.HashSet<>(), high = new java.util.HashSet<>();
+        for (int i = 0; i < 100; i++) {
+            low.add(DispatchRules.pickBody(r.bodies, 2, i / 100.0).outfit());
+            high.add(DispatchRules.pickBody(r.bodies, 6, i / 100.0).outfit());
+        }
+        assertEquals(java.util.Set.of("police"), low, "below five stars ordinary uniforms");
+        assertEquals(java.util.Set.of("special_force"), high, "special forces from five stars");
+        assertEquals("fumiriya", DispatchRules.pickBody(r.bodies, 2, 0.0).body(), "weights in table order");
+        var gangs = DispatchRules.parseGangBodies(read("gangs.json"));
+        assertEquals("gang_a", DispatchRules.pickBody(gangs.get("gang_a"), 3, 0.5).outfit());
+        assertEquals("gang_b", DispatchRules.pickBody(gangs.get("gang_b"), 3, 0.99).outfit());
+        assertNull(DispatchRules.pickBody(java.util.List.of(), 3, 0.5), "no table = the scene's own body");
+        assertEquals("Tops", com.openworld.character.OutfitTable.partOf("F00_001_01_Tops_01_CLOTH"));
+        assertEquals("Onepice", com.openworld.character.OutfitTable.partOf("F00_002_01_Onepice_01_CLOTH"));
+        assertNull(com.openworld.character.OutfitTable.partOf("F00_001_01_Body_00_SKIN"), "skin is never dressed");
+        var outfits = com.openworld.character.OutfitTable.parse(Files.readString(
+                Path.of("src/main/resources/com/openworld/character/outfits.json")));
+        for (var b : r.bodies) assertTrue(outfits.containsKey(b.outfit()), b.outfit() + " is in outfits.json");
+        for (var l : gangs.values()) for (var b : l) assertTrue(outfits.containsKey(b.outfit()), b.outfit());
+        for (var b : r.bodies) assertTrue(Files.exists(Path.of("src/main/resources/com/openworld/character/CharacterVisuals_"
+                + Character.toUpperCase(b.body().charAt(0)) + b.body().substring(1) + ".tscn")), b.body());
+    }
 }

@@ -360,7 +360,8 @@ public class AICharacter extends Character {
         lodTimer -= delta;
         if (lodTimer <= 0.0) {
             lodTimer = 2.0;
-            AILodLevel next = classifyLod(nearestPlayerDist());
+            lastPlayerDist = nearestPlayerDist();
+            AILodLevel next = classifyLod(lastPlayerDist);
             if (next != lodLevel) {
                 AILodLevel prev = lodLevel;
                 lodLevel = next;
@@ -401,6 +402,11 @@ public class AICharacter extends Character {
             cachedLoS           = false;
         }
     }
+
+    /** The nearest player's distance at the last LOD check (every 2 s); AIController's think budget reads it. */
+    private float lastPlayerDist = 0f;
+
+    public float lastPlayerDistance() { return lastPlayerDist; }
 
     private float nearestPlayerDist() {
         float min = Float.MAX_VALUE;

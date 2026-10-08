@@ -11429,6 +11429,44 @@ checks its "Wired in code" table against the enum. Licence rule as for art: CC0 
   player. `attack_tokens` / `dry_retreat` (`@Visible`) are the controls. Gate `tools/godot/probe_ammo_supply.gd
   [-- --world=island] [-- --control]` 11/11.
 
+## Uniforms per force, a think budget for AI, and dummy traffic cars (PLAN.md 1g c/d/e, 2026-10-07)
+
+- **Who a unit IS is data** (1g c): `crimes.json dispatch.bodies` (police: Fumiriya x3, Shino, Shibu below 5 stars;
+  outfit `special_force` from 5) and `gangs.json gangs.<id>.bodies` (outfit = the gang id), each row
+  `{body, outfit, weight, min_stars, max_stars}`, picked by `DispatchRules.pickBody` from its OWN rng stream
+  (`EnforcementDispatch.bodyRng`: drawing from the spawn rng moved every later spawn spot -- probe_breach's units
+  then started elsewhere and all gave up the konbini's door). `character/outfits.json` says what each outfit puts on
+  every CLOTH surface: a VRoid cloth material is `<...>_<Part>_<nn>_CLOTH`, so the part (Tops, Bottoms, Onepice,
+  Accessory, Shoes; `cloth` = any other) is read off the name, never authored per body. A value is a flat placeholder
+  colour or a res:// material an artist made. `character.Outfits` applies it (one material per source x outfit,
+  cached; cleared in GameManager._exitTree); the pure half is `OutfitTable` (DispatchRulesTest).
+  **Final art = dedicated uniform bodies** on the skeleton contract with merged materials (a perf win at ~12 units)
+  and a real silhouette; one `body` value per row, no code. Readout `EnforcementDispatch.dressed_now`.
+- **AI think budget** (1g d): `AIController.gatherInput` runs the FSM every `THINK_NEAR` (2nd) tick within
+  `THINK_NEAR_DIST` (30 m, from `AICharacter.lastPlayerDistance`, refreshed with the LOD every 2 s) and every
+  `THINK_FAR` (4th) beyond, staggered by instance id. A skipped tick repeats the last decision's movement, stance,
+  combat and aim with every press (fire, reload, jump, weapon switch, drop) released; the next decision gets the
+  whole elapsed time, so FSM timers run at the same speed. `AIController.thinkBudget` (static; env `OW_NO_THINK=1` or
+  `EnforcementDispatch.set_think_budget_now(false)`) is the control. Bench `tools/godot/bench_ai_think.gd`
+  (DebugWorld, 6 stars, alternated): physics 7.23 vs 9.15 ms/tick (-1.9 ms, -21%), decisions -60%.
+- **ChaseState, two fixes the budget work surfaced:** an agent whose next point is under 0.5 m away (off a navmesh it
+  hands back the body's own position) is not followed -- the unit steers at the goal (two baton officers stood 3.9 m
+  off a still player for 90 s); and with the target in sight inside `CLOSE_DIRECT` 8 m AND a clear WORLD line at knee
+  and chest height (`walkableLine`), it walks straight at it -- the nav path ends at the nearest navmesh point, which
+  for a target on a slab is metres off (baton officers circled at 3.5 m with a 1.9 m reach). Sight alone is not a
+  way: through a konbini's glazing it walked officers into the wall. A FINISHED agent still leads (treating it as
+  "no guidance" broke the interior-navmesh breach).
+- **Dummy traffic cars** (1g e / 2d, GTA's dummy): `ZoneManager.updateDummyTier` (each traffic tick) puts a traffic
+  car beyond `dummyOutDist` (90 m) of every player ON RAILS (`Vehicle.setDummy`: frozen KINEMATIC, no locomotion or
+  `_integrateForces`, the seated driver's AnimationTree paused) and makes it real inside `dummyInDist` (70 m). On
+  rails `VehicleAIController.dummyInput` advances its lane progress at a speed under the same rules as a real car
+  (lane limit, corner governor, `signalSpeedLimit`'s red / closed / 一時停止 踏切) and `DUMMY_GAP` 9 m behind the car
+  ahead on its lane, and poses the body on its wheels along the lane. Promotion hands the speed back as a velocity; a
+  dummy that loses health is promoted at once. Cars on a call (a plan, a ram target), racers and anything with a
+  player aboard stay real. `dummyOutDist` 0 is the control. Gate `tools/godot/probe_dummy_cars.gd [-- --world=island]
+  [-- --control]` (PASS both worlds); bench `tools/godot/bench_dummy_cars.gd` (downtown, 10 of 18 cars on rails:
+  5.55 vs 7.03 ms/tick).
+
 ## Armour, a helicopter that can be shot down, rotors on their hubs (2026-10-07, user-reported)
 
 - **Armour is per model, ONE damage rule** (early-GTA, user 2026-10-07: a rifle hurts a tank too, just slowly;

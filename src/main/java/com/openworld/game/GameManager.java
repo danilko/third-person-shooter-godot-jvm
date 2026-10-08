@@ -195,6 +195,7 @@ public class GameManager extends Node {
         com.openworld.audio.Sounds.clear();
         com.openworld.carrier.vehicle.VehicleDamageModel.clearCaches();
         com.openworld.character.ToonLook.clear();
+        com.openworld.character.Outfits.clear();
         com.openworld.ui.IconFit.clear();
         com.openworld.util.RayExclusions.clear();
         WaypointStore.clearAll();   // I5 — hygiene + clean restart (Vector3 values, but clear anyway)

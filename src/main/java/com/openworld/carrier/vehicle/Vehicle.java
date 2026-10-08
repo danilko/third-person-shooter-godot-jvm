@@ -327,6 +327,56 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         }
     }
 
+    // ── THE DUMMY TIER (PLAN.md 1g e / 2d) ────────────────────────────────────
+    //
+    // A traffic car far from every player drives on rails: frozen KINEMATIC, its pose written from the lane by its
+    // VehicleAIController (dummyInput), so no wheel probes, suspension, locomotion or contact integration run, and
+    // its seated driver's AnimationTree is paused. ZoneManager decides (distance, hysteresis); a hit promotes it at
+    // once. Only ever on the simulating peer: a puppet is already frozen and placed by the snapshot.
+
+    private boolean dummyMode;
+    private float dummyHealth = -1f;
+    private godot.api.AnimationTree pausedDriverTree;
+
+    public boolean isDummy() { return dummyMode; }
+
+    /** Switch the on-rails tier. Returns false when this car cannot be a dummy (no traffic brain, not simulated here,
+     *  a player aboard, parked). Promotion hands the lane speed back as a real velocity, so the car drives on. */
+    public boolean setDummy(boolean on) {
+        if (on == dummyMode) return true;
+        if (!(controller instanceof com.openworld.ai.vehicle.VehicleAIController ai)) return false;
+        if (on) {
+            if (!isLocallySimulated() || parked || hasPlayerAboard() || ai.getRoute() == null) return false;
+            ai.beginDummy();
+            dummyMode = true;
+            setFreezeMode(FreezeMode.KINEMATIC);
+            setFreezeEnabled(true);
+            Character d = seatOccupants.length > 0 ? seatOccupants[0] : null;
+            if (d != null && GD.isInstanceValid(d) && d.findChild("AnimationTree", true, false) instanceof godot.api.AnimationTree t
+                    && t.isActive()) {
+                t.setActive(false);
+                pausedDriverTree = t;
+            }
+        } else {
+            Vector3 fwd = ai.dummyForward();
+            double v = ai.dummySpeed;
+            ai.dummy = false;
+            dummyMode = false;
+            setFreezeEnabled(false);
+            setFreezeMode(FreezeMode.STATIC);
+            if (fwd != null) setLinearVelocity(fwd.times(v));
+            setAngularVelocity(Vector3.Companion.getZERO());
+            if (pausedDriverTree != null && GD.isInstanceValid(pausedDriverTree)) pausedDriverTree.setActive(true);
+            pausedDriverTree = null;
+        }
+        return true;
+    }
+
+    private boolean hasPlayerAboard() {
+        for (Character c : seatOccupants) if (c instanceof com.openworld.character.Player) return true;
+        return false;
+    }
+
     // ── Physics ───────────────────────────────────────────────────────────────
 
     // ── Spatial grid bookkeeping (PLAN.md Part D / D1) ───────────────────────
@@ -355,6 +405,14 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     public void _physicsProcess(double delta) {
         updateSpatialCell(delta);
         watchDriverDefeat();
+        // a dummy that is hit (a bullet, a blast, a ram) is made real at once: it must react like a car
+        if (dummyMode && getNodeOrNull("Health") instanceof Health hh) {
+            float hp = hh.getCurrentHealth();
+            if (dummyHealth >= 0f && hp < dummyHealth) setDummy(false);
+            dummyHealth = hp;
+        } else {
+            dummyHealth = -1f;
+        }
 
         cmd.motor     = 0;
         cmd.steering  = 0;
@@ -414,7 +472,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         // Wheel forces + center-of-mass tuning only run on the simulating peer (N3):
         // puppets are frozen and placed kinematically by VehicleNetworkController, which
         // also drives their wheel visuals from the replicated steering/speed.
-        if (isLocallySimulated()) {
+        if (isLocallySimulated() && !dummyMode) {
             VehicleConfig cfg = getConfig();
             float speed = (float) getLinearVelocity().length();
             boolean idle = isIdleInput();
@@ -1428,7 +1486,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         // Run-over damage is resolved only where the vehicle is simulated (N3): on puppets
         // the body is frozen (no contacts to report) and damage must stay single-sourced —
         // a client-side hit relays via Health.takeDamage from the simulating peer instead.
-        if (!isLocallySimulated()) return;
+        if (!isLocallySimulated() || dummyMode) return;
         VehicleConfig cfg = getConfig();
 
         // Static parking / low-speed brake lock. A friction coefficient can only slow

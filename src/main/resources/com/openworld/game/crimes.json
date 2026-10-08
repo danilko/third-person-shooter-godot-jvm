@@ -96,6 +96,14 @@
   "regroup_seconds_by_stars": [0, 15, 15, 14, 12, 10, 8],
   "supply_reach": 60.0,
   "note": "The police dispatch (game.EnforcementDispatch, PLAN.md W5). Index = stars (0..6). Officers on foot appear between foot_min and foot_max metres from the wanted player out of view; patrol cars (POC1/MPC1, a crew of car_crew) on a lane between car_min and car_max and drive the road route to the player, the crew bailing out within arrive_dist. From shoot_at stars (1: police HUNT the player down, user 2026-10-07) police are hostile and shoot; there is no arrest by proximity -- a wanted player who goes down is arrested (RecoveryRules). Units are freed out of view past despawn_far, or once the stars are gone. While police can see the player the calm clock does not run (seen_reach).",
+  "bodies_note": "PLAN.md 1g c: who an officer IS. body = CharacterVisuals_<Body>, outfit = character/outfits.json, weight among the rows sent at that many stars (min_stars..max_stars, 0 = no upper bound). Fumiriya is the only male body; special forces (outfit special_force) from 5 stars.",
+  "bodies": [
+   {"body": "fumiriya", "outfit": "police", "weight": 3, "min_stars": 0, "max_stars": 4},
+   {"body": "shino", "outfit": "police", "weight": 1, "min_stars": 0, "max_stars": 4},
+   {"body": "shibu", "outfit": "police", "weight": 1, "min_stars": 0, "max_stars": 4},
+   {"body": "fumiriya", "outfit": "special_force", "weight": 3, "min_stars": 5},
+   {"body": "shibu", "outfit": "special_force", "weight": 1, "min_stars": 5}
+  ],
   "shoot_at": 1,
   "foot_by_stars": [
    0,

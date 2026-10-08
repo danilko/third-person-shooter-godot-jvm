@@ -67,6 +67,7 @@ public final class DispatchRules {
         if (m.get("tokens_by_stars") != null) r.tokensByStars = ints(m.get("tokens_by_stars"));
         if (m.get("regroup_seconds_by_stars") != null) r.regroupByStars = ints(m.get("regroup_seconds_by_stars"));
         r.supplyReach = num(m, "supply_reach", 60.0);
+        r.bodies = parseBodies(m.get("bodies"));
         if (m.get("gun") instanceof Map<?, ?> g0) {
             Map<String, Object> g = (Map<String, Object>) g0;
             if (g.get("vehicles") instanceof List<?> l) for (Object o : l) r.gunVehicles.add(String.valueOf(o));
@@ -76,6 +77,60 @@ public final class DispatchRules {
             r.gunRadius = num(g, "radius", 7.0);
         }
         return r;
+    }
+
+    // ── BODIES (PLAN.md 1g c): who a unit IS -- which body and which uniform ──
+
+    /** One row of a force's body table: a body (CharacterVisuals_<Body>), its uniform (character/outfits.json), a
+     *  weight, and the stars it is sent at (inclusive; max 0 = no upper bound). */
+    public record BodyPick(String body, String outfit, double weight, int minStars, int maxStars) {
+        boolean sentAt(int stars) { return stars >= minStars && (maxStars <= 0 || stars <= maxStars); }
+    }
+
+    /** The police's (or the shared hunters') body table; a gang's own is {@link #parseGangBodies}. Empty = the
+     *  AICharacter scene's own body, as before. */
+    public List<BodyPick> bodies = new ArrayList<>();
+
+    @SuppressWarnings("unchecked")
+    static List<BodyPick> parseBodies(Object o) {
+        List<BodyPick> out = new ArrayList<>();
+        if (!(o instanceof List<?> l)) return out;
+        for (Object row : l) {
+            if (!(row instanceof Map<?, ?> r0)) continue;
+            Map<String, Object> r = (Map<String, Object>) r0;
+            Object body = r.get("body");
+            if (body == null) continue;
+            Object outfit = r.get("outfit");
+            out.add(new BodyPick(String.valueOf(body), outfit == null ? "" : String.valueOf(outfit),
+                    num(r, "weight", 1.0), (int) num(r, "min_stars", 0), (int) num(r, "max_stars", 0)));
+        }
+        return out;
+    }
+
+    /** Each gang's body table ({@code gangs.<id>.bodies} in gangs.json). */
+    @SuppressWarnings("unchecked")
+    public static Map<String, List<BodyPick>> parseGangBodies(String json) {
+        Map<String, List<BodyPick>> out = new java.util.HashMap<>();
+        if (!(MiniJson.parse(json) instanceof Map<?, ?> doc) || !(doc.get("gangs") instanceof Map<?, ?> g)) return out;
+        for (var e : ((Map<String, Object>) g).entrySet())
+            if (e.getValue() instanceof Map<?, ?> gang) out.put(e.getKey(), parseBodies(gang.get("bodies")));
+        return out;
+    }
+
+    /** The row sent at {@code stars} for a roll in [0, 1): weighted among the rows in range; null if none is. */
+    public static BodyPick pickBody(List<BodyPick> rows, int stars, double roll) {
+        if (rows == null || rows.isEmpty()) return null;
+        double total = 0;
+        for (BodyPick b : rows) if (b.sentAt(stars)) total += Math.max(0, b.weight());
+        if (total <= 0) return null;
+        double t = Math.max(0, Math.min(roll, 0.999999)) * total;
+        BodyPick last = null;
+        for (BodyPick b : rows) {
+            if (!b.sentAt(stars) || b.weight() <= 0) continue;
+            last = b;
+            if ((t -= b.weight()) < 0) return b;
+        }
+        return last;
     }
 
     private static List<List<String>> lists(Object o) {

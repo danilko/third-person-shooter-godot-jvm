@@ -358,6 +358,8 @@ public class VehicleAIController extends Controller {
             return cmd;
         }
 
+        if (dummy) return dummyInput(delta);
+
         if (rammingNow() && !holdStop) {
             // driving AT the target: not stalled, not waiting -- the dispatch decides when it has given up
             stallSeconds = 0.0;
@@ -638,8 +640,111 @@ public class VehicleAIController extends Controller {
         return cornerLimit;
     }
 
+    // ── THE DUMMY TIER (PLAN.md 1g e / 2d, GTA's "dummy car") ────────────────────────────────────────
+    //
+    // A traffic car far from every player drives ON RAILS: the body is frozen kinematic and its pose is written from
+    // the lane (progress + speed), with the same speed rules a real car obeys (lane limit, corner governor, a red /
+    // a closed or 一時停止 踏切 via signalSpeedLimit) and a gap behind the car ahead on its lane. No wheel probes, no
+    // suspension, no sensing rays. Vehicle.setDummy owns the switch; ZoneManager decides by distance.
+
+    /** True while this car drives on rails (set only through {@link Vehicle#setDummy}). */
+    public boolean dummy;
+    /** The on-rails speed (m/s), carried across both switches so a promotion keeps its pace. */
+    public double dummySpeed;
+    static final double DUMMY_ACCEL = 2.5, DUMMY_DECEL = 4.0, DUMMY_GAP = 9.0;
+    @Register public boolean dummyNow() { return dummy; }
+    @Register public double dummySpeedNow() { return dummySpeed; }
+    @Register public double progressNow() { return routeProgress; }
+    @Register public String laneNow() { return route instanceof Node n && GD.isInstanceValid(n) ? n.getName().toString() : ""; }
+
+    /** Every live traffic brain, for the gap rule (a few dozen at most; a scan is cheaper than an index). */
+    private static final java.util.Set<VehicleAIController> LIVE = new java.util.LinkedHashSet<>();
+
+    @Register
+    @Override
+    public void _enterTree() { LIVE.add(this); }
+
+    @Register
+    @Override
+    public void _exitTree() { LIVE.remove(this); }
+
+    /** Seat the on-rails state from where the body is now: progress from its position, speed from its velocity. */
+    public void beginDummy() {
+        resolveBody();
+        if (vehicleBody != null) {
+            dummySpeed = currentSpeedOfBody();
+            updateProgress(vehicleBody.getGlobalPosition());
+        }
+        dummy = true;
+    }
+
+    /** The pose on the lane at the current progress: on its wheels, facing and pitched along the lane. */
+    public Transform3D dummyPose() {
+        if (route == null || vehicleBody == null) return null;
+        double total = route.total();
+        double a = routeProgress, b = routeProgress + 2.0;
+        if (!route.isLoop() && b > total) { a = Math.max(0.0, total - 2.0); b = total; }
+        Vector3 p = route.pointAtLength(routeProgress), pa = route.pointAtLength(a), pb = route.pointAtLength(b);
+        if (p == null || pa == null || pb == null) return null;
+        Vector3 fwd = pb.minus(pa);
+        if (fwd.length() < 1e-4) return null;
+        fwd = fwd.normalized();
+        Vector3 up = new Vector3(0, 1, 0);
+        Vector3 pos = p.plus(up.times(vehicleBody.groundClearanceAtRest()));
+        return new Transform3D(godot.core.Basis.Companion.lookingAt(fwd, up, false), pos);
+    }
+
+    /** The travel direction at the current progress (unit), or null. */
+    public Vector3 dummyForward() {
+        Transform3D t = dummyPose();
+        return t == null ? null : t.getBasis().getColumn(2).times(-1.0).normalized();
+    }
+
+    private UserCommand dummyInput(double delta) {
+        UserCommand cmd = new UserCommand();
+        if (route == null) { finished = true; return cmd; }
+        double target = effectiveCruiseSpeed();
+        target = Math.min(target, cornerSpeedLimit(delta));
+        target = Math.min(target, signalSpeedLimit());
+        // the car ahead on this lane (real or dummy): hold DUMMY_GAP behind it, never run into it
+        double gap = Double.MAX_VALUE;
+        for (VehicleAIController o : LIVE) {
+            if (o == this || o.route != route) continue;
+            double d = o.routeProgress - routeProgress;
+            if (d > 0 && d < gap) gap = d;
+        }
+        if (gap < Double.MAX_VALUE) {
+            double room = Math.max(0.0, gap - DUMMY_GAP);
+            target = Math.min(target, Math.sqrt(2.0 * DUMMY_DECEL * room));
+        }
+        if (dummySpeed < target) dummySpeed = Math.min(target, dummySpeed + DUMMY_ACCEL * delta);
+        else dummySpeed = Math.max(target, dummySpeed - DUMMY_DECEL * delta);
+        routeProgress += dummySpeed * delta;
+        progressInit = true;
+        if (!route.isLoop() && routeProgress >= route.total()) {
+            double over = routeProgress - route.total();
+            if (advanceToNextRoute()) routeProgress = Math.min(over, route.total());
+            else { dummySpeed = 0.0; return cmd; }
+        } else if (route.isLoop() && routeProgress >= route.total()) {
+            routeProgress -= route.total();
+        }
+        waitingForSignal = heldAtSignal && dummySpeed < 0.5;
+        if (dummySpeed > 0.2 || waitingForSignal) { stallSeconds = 0.0; stallProgressMark = routeProgress; }
+        else stallSeconds += delta;
+        Transform3D pose = dummyPose();
+        if (pose != null && vehicleBody != null) vehicleBody.setGlobalTransform(pose);
+        return cmd;
+    }
+
+    private float currentSpeedOfBody() {
+        if (vehicleBody == null) return 0f;
+        Vector3 v = vehicleBody.getLinearVelocity();
+        return (float) Math.sqrt(v.getX() * v.getX() + v.getZ() * v.getZ());
+    }
+
     /** Horizontal (XZ) speed of the body in m/s — drives the speed-proportional look-ahead. */
     public float currentSpeed() {
+        if (dummy) return (float) dummySpeed;
         if (vehicleBody == null) return 0f;
         Vector3 v = vehicleBody.getLinearVelocity();
         return (float) Math.sqrt(v.getX() * v.getX() + v.getZ() * v.getZ());
