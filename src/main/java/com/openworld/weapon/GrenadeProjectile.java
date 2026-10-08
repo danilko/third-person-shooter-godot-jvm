@@ -159,7 +159,7 @@ public class GrenadeProjectile extends RigidBody3D implements Detonatable, Cosme
             if (m instanceof ExplosionManager mgr) {
                 mgr.triggerExplosion(at, explosionRadius, explosionMaxDamage,
                                      explosionPushForce, attackerName, attackerFaction,
-                                     weaponDisplayName, weaponIcon, null, explosionVfx, explosionVfxScale);
+                                     weaponDisplayName, weaponIcon, null, explosionVfx, explosionVfxScale, attackerId);
             }
         } else {
             playEffect(fx, at, true);

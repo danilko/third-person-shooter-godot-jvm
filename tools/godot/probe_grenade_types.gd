@@ -118,11 +118,15 @@ func _initialize() -> void:
 	var land1 := _landing(p1)
 	var victim := await _ai_at(land1 + Vector3(1.5, 0, 0))
 	var h0 := _health(victim)
+	var blast_by := []
+	root.get_node("EventBus").connect("damage_dealt", func(aid, _d, _hs, _k): blast_by.append(str(aid)))
 	var g1 := await _throw(p1)
 	_check("PIB1 throws a projectile", g1 != null, "")
 	await _tick(240)
 	_check("it went off by itself (fuse)", g1 == null or not is_instance_valid(g1), "")
 	_check("an AI 1.5 m from where it lands is hurt", _health(victim) < h0, "health %.0f -> %.0f" % [h0, _health(victim)])
+	var pid: String = str(p1.get("character_info").get("character_id")) if p1.get("character_info") != null else "?"
+	_check("the blast names its thrower (the hit marker's attacker id)", pid in blast_by, "thrower %s, dealt by %s" % [pid, blast_by])
 
 	# ── 2. flashbang ───────────────────────────────────────────────────────────────────────────
 	print("\n=== 2. FLA1 flashbang ===")

@@ -100,7 +100,7 @@ public class RocketProjectile extends RigidBody3D implements Detonatable, Cosmet
         if (m instanceof ExplosionManager mgr) {
             mgr.triggerExplosion(getGlobalPosition(), explosionRadius, explosionMaxDamage,
                                  explosionPushForce, attackerName, attackerFaction,
-                                 weaponDisplayName, weaponIcon, this, explosionVfx, explosionVfxScale);
+                                 weaponDisplayName, weaponIcon, this, explosionVfx, explosionVfxScale, attackerId);
         }
         broadcastDetonation(getGlobalPosition());
         exploded = true;

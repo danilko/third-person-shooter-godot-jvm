@@ -79,6 +79,15 @@ public class ExplosionManager extends Node {
                                  String attackerName, String attackerFaction,
                                  String weaponDisplayName, Texture2D weaponIcon,
                                  Node excludeNode, PackedScene vfx, float vfxScale) {
+        triggerExplosion(center, radius, maxDamage, pushForce, attackerName, attackerFaction, weaponDisplayName,
+                weaponIcon, excludeNode, vfx, vfxScale, "");
+    }
+
+    /** As above, naming the attacker's characterId so a blast kill shows its thrower's hit marker (P2 2.9). */
+    public void triggerExplosion(Vector3 center, float radius, float maxDamage, float pushForce,
+                                 String attackerName, String attackerFaction,
+                                 String weaponDisplayName, Texture2D weaponIcon,
+                                 Node excludeNode, PackedScene vfx, float vfxScale, String attackerId) {
         // A LIGHT crowd ped has no body (world.PedCrowd): the ones in the blast become real bodies first, so the
         // loop below damages and pushes them like anyone else (zb1). Budget-free, capped.
         com.openworld.world.PedCrowd.promoteNear(center, center, radius, 12);
@@ -86,7 +95,7 @@ public class ExplosionManager extends Node {
             if (node == excludeNode) continue;
             if (node instanceof Character c) {
                 applyToCharacter(c, center, radius, maxDamage, pushForce,
-                                 attackerName, attackerFaction, weaponDisplayName, weaponIcon);
+                                 attackerName, attackerFaction, weaponDisplayName, weaponIcon, attackerId);
             } else if (node instanceof RigidBody3D rb) {
                 applyToRigidBody(rb, center, radius, maxDamage, pushForce,
                                  attackerName, attackerFaction, weaponDisplayName, weaponIcon);
@@ -173,7 +182,7 @@ public class ExplosionManager extends Node {
 
     private void applyToCharacter(Character c, Vector3 center, float radius, float maxDamage,
                                    float pushForce, String attackerName, String attackerFaction,
-                                   String weaponDisplayName, Texture2D weaponIcon) {
+                                   String weaponDisplayName, Texture2D weaponIcon, String attackerId) {
         double dist = distanceToBody(c, center);
         float t = BlastFalloff.strength(radius, dist);
         if (t <= 0f) return;
@@ -181,7 +190,8 @@ public class ExplosionManager extends Node {
         if (h instanceof Health health && !health.isDead()) {
             float damage = BlastFalloff.damage(maxDamage, radius, dist) * health.explosionDamageMultiplier;
             // Blast center is the damage source for the HUD direction indicator.
-            health.takeDamage(c, damage, weaponDisplayName, weaponIcon, attackerName, attackerFaction, center);
+            health.takeDamage(c, damage, weaponDisplayName, weaponIcon, attackerName, attackerFaction, center,
+                    attackerId == null ? "" : attackerId);
         }
         // Alive: a stagger. Dead (including killed by THIS blast -- takeDamage above ragdolls the body
         // synchronously): the push goes into the ragdoll's bones, lifted a little so a blast throws
