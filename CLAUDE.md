@@ -11148,7 +11148,7 @@ User: the chase stopped at buildings and every unit carried small arms. All of i
     Attached to every enterable building as cells streamed, it cost ~1 ms p50 of frame on walk_station /
     drive_downtown in three ordered on/off pairs (`probe_walk_perf --no-interior-nav`), though the navigation server's
     own time rose only ~0.2 ms at p95 (the probe now prints it).
-  * Every region joins ONE separate navigation map at the 0.175 m cell (a 1.1 m konbini aisle closes at the street
+  * Every region joins ONE separate navigation map at the 0.1 m cell (a 1.1 m konbini aisle closes at the street
     map's 0.5 m), so the street map and its road-piece seams are untouched.
   * A unit's NavigationAgent3D is put on that map while it stands under that building's roof OR on its interior mesh
     (a compound's yard has no roof, and routing again from the yard sent units back out through the gate), and back
