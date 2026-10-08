@@ -119,6 +119,16 @@ func _counters(n: Node) -> Array:
 	return out
 
 
+func _with_method(n: Node, m: String) -> Node:
+	if n.has_method(m):
+		return n
+	for c in n.get_children():
+		var r := _with_method(c, m)
+		if r != null:
+			return r
+	return null
+
+
 func _menu(n: Node) -> Node:
 	if n.has_method("rows_now"):
 		return n
@@ -160,6 +170,10 @@ func _counter_cycle(counter: Area3D, p: CharacterBody3D, spawn: Node3D, weapon: 
 	p.velocity = Vector3.ZERO
 	await _tick(20)
 	_check("standing at the counter is seen", bool(counter.call("player_at_counter_now")))
+	var hud := _with_method(root, "prompt_key_now")
+	if hud != null:
+		_check("  ... the HUD prompt shows the E keycap", String(hud.call("prompt_key_now")) == "E",
+				"key '%s'" % String(hud.call("prompt_key_now")))
 	await _press("interact")
 	await _tick(2)
 	var menu := _menu(root)

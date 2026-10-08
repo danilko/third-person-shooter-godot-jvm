@@ -69,6 +69,14 @@ func _initialize() -> void:
 			bus.emit_signal("character_eliminated", "Player", "player", "Enemy %d" % k, "enemy", "ASR-1", null, k == 1)
 	await _tick(20)
 	await _snap("hud_foot")
+	if bus != null:                      # the interact prompt's keycap glyph (KeyGlyph), two spellings
+		bus.emit_signal("pickup_interact_changed", true, "Door (E)")
+		await _tick(5)
+		await _snap("hud_prompt_door")
+		bus.emit_signal("pickup_interact_changed", true, "[ F ]  Enter vehicle")
+		await _tick(5)
+		await _snap("hud_prompt_vehicle")
+		bus.emit_signal("pickup_interact_changed", false, "")
 	var wc: Node = p.get_node("WeaponController")
 	wc.call("on_set_weapon", 1)          # a switch: the inventory column pops up
 	await _tick(50)

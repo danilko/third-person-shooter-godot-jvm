@@ -37,6 +37,10 @@ public class CharacterHUD extends Control {
   private StyleBoxFlat healthFill;
   private float maxHealth = 100f;
   private Label interactPromptLabel;
+  private godot.api.TextureRect interactKey;
+  /** The key the prompt shows as a glyph ("" = shown as text); probe readout. */
+  private String promptKey = "";
+  @Register public String promptKeyNow() { return interactKey != null && interactKey.isVisible() ? promptKey : ""; }
   /** Swim breath meter root (shown only while submerged) + its fill bar. Optional in the scene. */
   private Control oxygenRoot;
   private ProgressBar oxygenBar;
@@ -55,7 +59,16 @@ public class CharacterHUD extends Control {
     }
 
     Node promptNode = getNodeOrNull("InteractPrompt");
-    if (promptNode instanceof Label l) interactPromptLabel = l;
+    if (promptNode instanceof Label l) {
+      interactPromptLabel = l;
+      interactKey = new godot.api.TextureRect();            // the key's keycap glyph, left of the text (KeyGlyph)
+      interactKey.setName(new godot.core.StringName("KeyGlyph"));
+      interactKey.setExpandMode(godot.api.TextureRect.ExpandMode.IGNORE_SIZE);
+      interactKey.setStretchMode(godot.api.TextureRect.StretchMode.KEEP_ASPECT_CENTERED);
+      interactKey.setMouseFilter(Control.MouseFilter.IGNORE);
+      interactKey.setVisible(false);
+      l.addChild(interactKey);
+    }
 
     Node oxNode = getNodeOrNull("Oxygen");
     if (oxNode instanceof Control c) {
@@ -119,17 +132,46 @@ public class CharacterHUD extends Control {
     maxHealth = max > 0f ? max : 100f;
   }
 
+  private static final java.util.Map<String, godot.api.Texture2D> GLYPHS = new java.util.HashMap<>();
+
+  /** The keycap glyph for {@code key}, or null when none is shipped (then the prompt spells it as text). */
+  private static godot.api.Texture2D glyph(String key) {
+    return GLYPHS.computeIfAbsent(key, k -> {
+      String path = KeyGlyph.texturePath(k);
+      return godot.api.ResourceLoader.INSTANCE.exists(path, "") && godot.global.GD.load(path) instanceof godot.api.Texture2D t
+          ? t : null;
+    });
+  }
+
   /** Receive EventBus.pickupInteractChanged — show/hide the "Press E to pick up" prompt. */
   @Register
   public void onPickupInteractChanged(boolean inRange, String label) {
     if (interactPromptLabel == null) return;
     if (inRange) {
-      // Labels may carry their own key hint (vehicles send "[ F ]  Enter vehicle" for the
-      // use_carrier action); only default to the pickup "interact" key when they don't.
-      interactPromptLabel.setText(label.startsWith("[") ? label : "[ E ]  " + label);
+      // Labels may carry their own key hint ("[ F ]  Enter vehicle", "Door (E)"); with none it is the interact
+      // key, E. The key is drawn as a keycap glyph (Kenney Input Prompts) left of the text, else as "[ X ]".
+      KeyGlyph.Prompt p = KeyGlyph.parse(label);
+      godot.api.Texture2D glyph = glyph(p.key());
+      interactPromptLabel.setText(glyph != null ? p.text() : "[ " + p.key() + " ]  " + p.text());
       interactPromptLabel.setVisible(true);
+      if (interactKey != null) {
+        promptKey = p.key();
+        interactKey.setTexture(glyph);
+        interactKey.setVisible(glyph != null);
+        if (glyph != null) {
+          float h = (float) interactPromptLabel.getSize().getY() + 6f;
+          godot.api.Font f = interactPromptLabel.getLabelSettings() != null && interactPromptLabel.getLabelSettings().getFont() != null
+              ? interactPromptLabel.getLabelSettings().getFont() : interactPromptLabel.getThemeDefaultFont();
+          int fs = interactPromptLabel.getLabelSettings() != null ? interactPromptLabel.getLabelSettings().getFontSize() : 16;
+          float tw = f == null ? 0f : (float) f.getStringSize(p.text(), godot.core.HorizontalAlignment.LEFT, -1f, fs).getX();
+          float left = ((float) interactPromptLabel.getSize().getX() - tw) * 0.5f;
+          interactKey.setSize(new godot.core.Vector2(h, h));
+          interactKey.setPosition(new godot.core.Vector2(left - h - 6f, -3f));
+        }
+      }
     } else {
       interactPromptLabel.setVisible(false);
+      if (interactKey != null) interactKey.setVisible(false);
     }
   }
 
