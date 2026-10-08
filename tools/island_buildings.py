@@ -1447,7 +1447,24 @@ def write_places(placed, aabbs, text):
     civic_path = os.path.join(ROOT, "assets", "world_source", "buildings", "IslandCivicSites.json")
     gang_of = {p["id"]: p["gang"] for p in (json.load(open(civic_path)).get("plots", [])
                                             if os.path.exists(civic_path) else []) if p.get("gang")}
+    # the walk round each enterable building to its side / back doors (PLAN.md 1g f): baked, so a breaching unit
+    # follows a way round the NEIGHBOURS instead of the building's own corners (tools/building_door_paths.py)
+    import building_door_paths as BDP
+    from shapely.strtree import STRtree
+    sys.path.insert(0, os.path.join(ROOT, "tools", "building_kit"))
+    import layout_buildings as LB
+    lay = {t["id"]: t for t in LB.layout_all(os.path.join(ROOT, "assets", "world_source", "buildings",
+                                                          "building_types.json"))["buildings"]}
+    polys = []
     for b in placed:
+        try:
+            polys.append(_plinth_poly(b))
+        except Exception:
+            polys.append(None)
+    pidx = [i for i, p in enumerate(polys) if p is not None]
+    ptree = STRtree([polys[i] for i in pidx])
+    unreachable = 0
+    for bi, b in enumerate(placed):
         scene = scene_of(b)
         if scene == b["type"] and b["type"] not in CIVIC_LABELS:
             continue                       # shut: not a place (a civic building is one anyway: the map names it)
@@ -1470,7 +1487,15 @@ def write_places(placed, aabbs, text):
             # building, so game.RespawnSystem needs nothing streamed to put a body there
             row["respawn"] = [[round(b["pos"][0] + lx * c + lz * sn, 2), round(b["pos"][1] + ly, 2),
                                round(b["pos"][2] - lx * sn + lz * c, 2)] for lx, ly, lz in spots]
+        if scene.endswith("_Shop") or scene.endswith("_Open"):
+            paths = BDP.door_paths(bi, placed, polys, ptree, pidx, lay, type_paved)
+            if paths:
+                row["door_paths"] = paths
+                unreachable += sum(1 for v in paths.values() if v is None)
+                row["walk"] = BDP.walk_grid(bi, placed, polys, ptree, pidx, type_paved)
         places.append(row)
+    print("island_buildings: %d side/back door(s) of enterable places reached by no walk (door_paths null)"
+          % unreachable)
     for name, x, z in site_places(text):
         if name.startswith("Parking_"):
             continue                       # a site's car park is part of the site, not a place of its own

@@ -11467,6 +11467,19 @@ checks its "Wired in code" table against the enum. Licence rule as for art: CC0 
   [-- --control]` (PASS both worlds); bench `tools/godot/bench_dummy_cars.gd` (downtown, 10 of 18 cars on rails:
   5.55 vs 7.03 ms/tick).
 
+## Breaching units walk round the BLOCK, on a baked walk grid (PLAN.md 1g f, 2026-10-07)
+
+The live breach route went round the building's OWN corners, so a neighbour touching the building stopped it: one
+extra draw from the spawn rng moved the officers' spawn spots and probe_breach went from 1 unit inside a konbini to
+26 "gave_up" of 28. `island_buildings.py places` (or `write`) now bakes, per enterable (`_Shop`/`_Open`) place in the
+places record, `walk` -- the 70 m window round the building as a 0.5 m occupancy grid (every plinth grown by a 0.4 m
+body; a compound's own yard and car parks / parks walkable; base64 bits, `tools/building_door_paths.py walk_grid`) --
+and `door_paths` (front door -> each other door, or null when no walk reaches it). `world.WalkGrid` (engine-free,
+`WalkGridTest`) searches it from wherever the unit stands; `EnforcementDispatch.breachRoute` uses it when the corner
+route's legs are not clear (`wayClear`), and never sends anyone to a null door. Record ~600 KB (4 unreachable side/back
+doors island-wide). Gate: probe_breach (default and `--stars=3`), and the fragile spawn case passes too.
+Re-run `island_buildings.py places` after any building change.
+
 ## Armour, a helicopter that can be shot down, rotors on their hubs (2026-10-07, user-reported)
 
 - **Armour is per model, ONE damage rule** (early-GTA, user 2026-10-07: a rifle hurts a tank too, just slowly;

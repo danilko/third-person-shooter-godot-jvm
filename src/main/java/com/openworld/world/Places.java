@@ -43,7 +43,15 @@ public final class Places {
     /** {@code gang}: the gang that owns the place ("" none) -- where an abducted player is held (RespawnSystem).
      *  {@code respawn}: where a downed player wakes at this building (its MARK_respawn points placed with it, world
      *  frame; empty for a building that has none) -- outside, on the forecourt (PLAN.md 1c). */
-    public record Place(String name, String kind, int tier, Vector3 at, Vector3 go, String gang, List<Vector3> respawn) {}
+    public record Place(String name, String kind, int tier, Vector3 at, Vector3 go, String gang, List<Vector3> respawn,
+                        Map<String, List<Vector3>> doorPaths, WalkGrid walk) {
+        /** The baked walk from outside the front door to outside {@code door} (a Door_<side>_<n> marker name), at
+         *  this place's height; empty = no record; null = no walk reaches that door (PLAN.md 1g f). */
+        public List<Vector3> doorPath(String door) {
+            if (doorPaths == null || !doorPaths.containsKey(door)) return List.of();
+            return doorPaths.get(door);
+        }
+    }
 
     /** A named region of the island, as an XZ box in the Godot world frame. */
     public record Region(String name, double x0, double z0, double x1, double z1) {
@@ -124,7 +132,8 @@ public final class Places {
             Map<String, Object> m = (Map<String, Object>) o;
             places.add(new Place(String.valueOf(m.get("name")), String.valueOf(m.get("kind")),
                     (int) (double) (Double) m.get("tier"), vec(m.get("at")), vec(m.get("go")),
-                    m.get("gang") == null ? "" : String.valueOf(m.get("gang")), spots(m.get("respawn"))));
+                    m.get("gang") == null ? "" : String.valueOf(m.get("gang")), spots(m.get("respawn")),
+                    doorPaths(m.get("door_paths"), m.get("at")), walk(m.get("walk"))));
         }
         for (Object o : (List<Object>) doc.get("regions")) {
             Map<String, Object> m = (Map<String, Object>) o;
@@ -145,6 +154,29 @@ public final class Places {
             Vector3 p = places.get(i).at();
             buckets.computeIfAbsent(key(p.getX(), p.getZ()), k -> new ArrayList<>()).add(i);
         }
+    }
+
+    private static WalkGrid walk(Object o) {
+        if (!(o instanceof Map<?, ?> w) || !(w.get("bits") instanceof String b)) return null;
+        return WalkGrid.parse(((Number) w.get("x0")).doubleValue(), ((Number) w.get("z0")).doubleValue(),
+                ((Number) w.get("n")).intValue(), ((Number) w.get("res")).doubleValue(), b);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, List<Vector3>> doorPaths(Object o, Object at) {
+        if (!(o instanceof Map<?, ?> m)) return null;
+        double y = at instanceof List<?> a && a.size() > 1 ? ((Number) a.get(1)).doubleValue() : 0.0;
+        Map<String, List<Vector3>> out = new java.util.HashMap<>();
+        for (var e : ((Map<String, Object>) m).entrySet()) {
+            if (!(e.getValue() instanceof List<?> pts)) { out.put(e.getKey(), null); continue; }
+            List<Vector3> path = new ArrayList<>();
+            for (Object q : pts) {
+                List<Object> xz = (List<Object>) q;
+                path.add(new Vector3(((Number) xz.get(0)).doubleValue(), y, ((Number) xz.get(1)).doubleValue()));
+            }
+            out.put(e.getKey(), path);
+        }
+        return out;
     }
 
     public static List<Place> all() { load(); return places; }

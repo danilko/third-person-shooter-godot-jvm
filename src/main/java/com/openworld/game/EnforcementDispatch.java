@@ -1001,13 +1001,31 @@ public class EnforcementDispatch extends Node {
                 taken.merge(w.breachDoor, 1, Integer::sum);
         }
         godot.api.Node3D best = null;
+        List<Vector3> bestWay = null;
         double bd = Double.MAX_VALUE;
+        // the baked walks round the neighbours to each side / back door (PLAN.md 1g f; the places record's door_paths)
+        com.openworld.world.Places.Place place = building instanceof godot.api.Node3D bn
+                ? com.openworld.world.Places.nearest(bn.getGlobalPosition(), 2.0) : null;
         for (Node c : building.getChildren()) {
             if (!(c instanceof godot.api.Node3D m) || !c.getName().toString().startsWith("Door_")) continue;
             if (u.badDoors.contains(m)) continue;
-            double d;
-            d = routeLength(from, pathAround(building, from, outsideOf(m))) + DOOR_SHARE_COST * taken.getOrDefault(m, 0);
-            if (d < bd) { bd = d; best = m; }
+            List<Vector3> baked = place == null ? List.of() : place.doorPath(c.getName().toString());
+            if (baked == null) continue;               // no walk reaches this door: never send anyone there
+            List<Vector3> way = pathAround(building, from, outsideOf(m));
+            if (place != null && place.walk() != null && !wayClear(from, way)) {
+                // the corner route runs into a neighbour: the baked walk grid round the whole block, from where the
+                // unit stands (WalkGrid; a unit spawned behind the block cannot even reach the FRONT by the corners)
+                Vector3 to = outsideOf(m);
+                List<double[]> walk = place.walk().path(from.getX(), from.getZ(), to.getX(), to.getZ());
+                if (walk == null) continue;            // no walk from here to this door
+                List<Vector3> via = new ArrayList<>();
+                for (double[] q : walk) via.add(new Vector3(q[0], from.getY(), q[1]));
+                via.set(via.size() - 1, to);
+                way = via;
+                bakedRoutes++;
+            }
+            double d = routeLength(from, way) + DOOR_SHARE_COST * taken.getOrDefault(m, 0);
+            if (d < bd) { bd = d; best = m; bestWay = way; }
         }
         if (best == null) {
             if (!u.badDoors.isEmpty()) { u.badDoors.clear(); return breachRoute(building, u); }   // every door tried: again
@@ -1016,10 +1034,25 @@ public class EnforcementDispatch extends Node {
         u.breachDoor = best;
         Vector3 c = best.getGlobalPosition();
         Vector3 o = outsideOf(best).minus(c).normalized();
-        out.addAll(pathAround(building, from, outsideOf(best)));
+        out.addAll(bestWay != null ? bestWay : pathAround(building, from, outsideOf(best)));
         out.add(c.minus(o.times(2.5)));
         forceDoorsNear(building, c, Double.MAX_VALUE);   // a breach does not knock: every door of the building
         return out;
+    }
+
+    /** Routes that followed a baked door walk (probe readout via escalation_now's breach fields). */
+    private int bakedRoutes;
+
+    @Register public int bakedRoutesNow() { return bakedRoutes; }
+
+    /** Every leg of a walk is clear of WORLD geometry (clearLine at knee and chest height). */
+    private boolean wayClear(Vector3 from, List<Vector3> way) {
+        Vector3 a = from;
+        for (Vector3 b : way) {
+            if (!clearLine(a, b)) return false;
+            a = b;
+        }
+        return true;
     }
 
     /** 2.5 m outside a door marker (its -Z points out), on the marker's height. */
