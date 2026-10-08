@@ -175,7 +175,7 @@ func _initialize() -> void:
 
 	# ── 4. remote charge ───────────────────────────────────────────────────────────────────────
 	print("\n=== 4. REC1 remote charge ===")
-	var p4 := await _armed(Vector3(300, 0.05, 0), "REC1", 2)
+	var p4 := await _armed(Vector3(200, 0.05, 0), "REC1", 2)   # x 300 was the floor's very edge: the charges fell off
 	var land4 := _landing(p4)
 	var near_ai := await _ai_at(land4 + Vector3(1.5, 0, 0))
 	var h4 := _health(near_ai)
