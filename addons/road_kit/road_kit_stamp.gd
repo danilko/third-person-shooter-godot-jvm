@@ -129,6 +129,24 @@ static func _index(corridors: Array, to_world: Transform3D, params: Dictionary) 
 ## other corridors do not reach in: a hairpin's lower leg must not cut under the upper leg's
 ## carriageway, and a junction's lower approach must not cut under the pad. Outside every corridor, the
 ## cut batter is the min over the corridors and the fill batter is the nearest one's.
+## Is world XZ on a road of `index` -- inside a paved edge, or within one terrain cell of it (the grid interpolates
+## between vertices, so the vertex one cell out decides the ground under the edge)? Ignores height: under a deck the
+## block layer has no value anyway.
+static func on_road(index: Dictionary, x: float, z: float, cell: float = 2.0) -> bool:
+	var segs: Array = index["segments"]
+	for i in index["buckets"].get(Vector2i(int(floor(x / BUCKET)), int(floor(z / BUCKET))), []):
+		var s: Dictionary = segs[i]
+		var a: Vector3 = s["a"]
+		var b: Vector3 = s["b"]
+		var dx := b.x - a.x
+		var dz := b.z - a.z
+		var l2 := dx * dx + dz * dz
+		var t := 0.0 if l2 < 1e-9 else clampf(((x - a.x) * dx + (z - a.z) * dz) / l2, 0.0, 1.0)
+		var d := Vector2(x - (a.x + dx * t), z - (a.z + dz * t)).length()
+		if d - lerpf(s["ha"], s["hb"], t) <= cell:
+			return true
+	return false
+
 static func height_at(index: Dictionary, params: Dictionary, x: float, z: float, natural: float, cell: float = 2.0) -> float:
 	var cut_slope := float(params.get("cut_slope", 1.0))
 	var fill_slope := float(params.get("fill_slope", 1.5))
@@ -208,7 +226,7 @@ static func height_at(index: Dictionary, params: Dictionary, x: float, z: float,
 ## stamp record's corridors (re-derived so a moved road leaves nothing behind). Writes the heights and
 ## updates the maps; SAVING is the caller's (the tool saves the data directory, the editor its scene).
 ## `{"ok", "message", "changed", "carved", "filled", "restored", "lowest", "highest"}`.
-static func stamp(net: Node3D, terrain: Node, corridors: Dictionary, previous: Array = [], restore_only: bool = false, layer: Dictionary = {}, dirty = null) -> Dictionary:
+static func stamp(net: Node3D, terrain: Node, corridors: Dictionary, previous: Array = [], restore_only: bool = false, layer: Dictionary = {}, dirty = null, layer_off_road: bool = false) -> Dictionary:
 	var natural := Ground.load_grid(Ground.sidecar_path(str(net.get("record_path"))))
 	if natural.is_empty():
 		return {"ok": false, "message": "no ground sidecar for %s -- sample the natural ground first (write_roadkit_ground.gd / Build)" % net.name}
@@ -234,6 +252,10 @@ static func stamp(net: Node3D, terrain: Node, corridors: Dictionary, previous: A
 		# corridor's buckets cover has exactly the candidate segments it had at the last stamp, so its height is the
 		# same. Walked by bucket cell (BUCKET is a whole number of vertex spacings, so each vertex once).
 		var d := _index(dirty, to_world, corridors)
+		if layer_off_road:
+			# only a CHANGED corridor can have moved onto block ground: elsewhere the layer is exactly what the pipeline
+			# laid (it reaches to within a cell of every paved edge), so it is laid back unchanged
+			ctx["off_road"] = d
 		var n := int(round(BUCKET / spacing))
 		for k in d["buckets"]:
 			for i in n:
@@ -284,7 +306,9 @@ static func _stamp_vertex(ctx: Dictionary, x: float, z: float) -> void:
 	var layer: Dictionary = ctx["layer"]
 	if not layer.is_empty():
 		var lv := layer_height(layer, x, z)
-		if not is_nan(lv):
+		# `layer_off_road` (a hand edit on the built island): the block ground comes back everywhere EXCEPT on a CHANGED
+		# road as it is now -- a road moved into a block must not be buried under that block's old ground
+		if not is_nan(lv) and not (ctx.has("off_road") and on_road(ctx["off_road"], x, z)):
 			h = lv
 	# 2 mm, not 0.5: a height round-trips through float32 (dump -> numpy -> apply), and a re-stamp
 	# read 3 of 855 845 vertices 1 mm off with nothing moved (probe_road_stamp, 3.30 L2)
@@ -438,11 +462,16 @@ static func delete_record(net: Node) -> void:
 ## corridors over it, stamp, record. `restore` puts the natural ground back and forgets the stamp.
 ## Saving the terrain data is the caller's.
 static func stamp_network(net: Node3D, terrain: Node, restore: bool = false, force: bool = false, full: bool = false) -> Dictionary:
-	if has_block_layer(terrain) and not force:
-		return {"ok": false, "changed": 0, "message": ("REFUSED: %s carries the city's block ground (%s). A %s would "
-				+ "re-derive every vertex it reaches from the natural ground and take the block ground there back down "
-				+ "with nothing to say so. Rebuild in order instead: tools/island_world.sh --from terrain.")
-				% [str(terrain.get("data_directory")), URBAN_MARKER, "restore" if restore else "stamp"]}
+	# The built island carries the city's block ground (island_ground.py) over the road stamp. A STAMP keeps it: it
+	# re-derives only what a changed corridor reaches (incremental) and lays the block layer back over that, except on
+	# the roads as they are now (PLAN.md item 3: a road edit no longer needs `island_world.sh --from terrain`). Ground a
+	# road LEFT reads the natural ground there until the next `--from ground`. A RESTORE would take the whole block
+	# ground down, so it still refuses. `force` = the old behaviour: no layer at all.
+	var block := has_block_layer(terrain) and not force
+	if block and restore:
+		return {"ok": false, "changed": 0, "message": ("REFUSED: %s carries the city's block ground (%s). A restore would "
+				+ "take it back down with nothing to say so. Rebuild in order instead: tools/island_world.sh --from terrain.")
+				% [str(terrain.get("data_directory")), URBAN_MARKER]}
 	var prev: Dictionary = read_record(net)
 	if restore:
 		if prev.is_empty():
@@ -460,7 +489,7 @@ static func stamp_network(net: Node3D, terrain: Node, restore: bool = false, for
 	# INCREMENTAL where the terrain still holds the last stamp by this rule: only the ground a changed corridor reaches
 	# (`dirty_corridors`). A terrain stage deletes the record, so a rebuilt terrain is always stamped whole.
 	var dirty = null if full else dirty_corridors(prev, corr.get("corridors", []))
-	var r := stamp(net, terrain, corr, prev.get("corridors", []), false, {}, dirty)
+	var r := stamp(net, terrain, corr, prev.get("corridors", []), false, load_layer(terrain) if block else {}, dirty, block)
 	if r["ok"]:
 		write_record(net, corr)
 		r["message"] = g["message"] + "\n" + r["message"] + " (corridor kinds %s)" % str(corr.get("kinds", {}))

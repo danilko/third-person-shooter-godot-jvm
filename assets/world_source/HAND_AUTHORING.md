@@ -12,8 +12,7 @@ to hand work: level designers and artists edit it in place, and the generators s
 > `--regenerate` (`tools/handover_guard.py` is the one rule; `handover_freeze.py --undo` reverses). Until someone runs
 > the freeze, those generators still OWN the island's roads and buildings, and anything edited in their outputs is
 > lost the next time they run. Everything about building TYPES, interiors, stations and DebugWorld is already
-> hand-owned and safe to edit. Still to build: a dock Stamp that cooperates with the block ground (so an island road
-> edit does not need `--from terrain`) and an editor tool that drops a building on a lot.
+> hand-owned and safe to edit. Still to build: an editor tool that drops a building on a lot.
 
 ## 1. What owns what
 
@@ -75,9 +74,11 @@ one go and works on a frozen island. By hand:
 
 1. **Terrain**:
    * DebugWorld: *Stamp Terrain* in the dock.
-   * Island: the block ground (`island_ground.py`) sits on top of the road stamp, and the dock's Stamp refuses while
-     `urban_paint.marker` exists. Run `tools/island_world.sh --from terrain` instead; it re-lays natural ground,
-     re-stamps rail then roads, and re-runs sites, buildings and ground. Unchanged road pieces are skipped.
+   * Island: *Stamp Terrain* in the dock too (since 2026-10-08). The terrain carries the city's block ground
+     (`island_ground.py`) over the road stamp; the stamp re-derives only what a CHANGED road reaches and lays the block
+     ground back over it, except on the changed road itself -- so a road moved into a block is not buried. Ground a
+     road LEFT reads the natural ground until the next `tools/island_world.sh --from ground`. *Restore Terrain* still
+     refuses on the island (it would take the whole block ground down): rebuild with `--from terrain` for that.
 2. **Traffic zones**: `python3 tools/island_traffic_zones.py` (spawn clusters from the lane entries).
 3. **Map and GPS**: `godot --headless --path . --script tools/godot/bake_road_map.gd -- --world=island`.
 4. **Sidewalk crowd lines**: `python3 tools/island_buildings.py sidewalks`.

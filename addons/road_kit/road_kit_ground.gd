@@ -206,7 +206,12 @@ static func sample_grid(net: Node3D, terrain: Node, step: float = STEP, margin: 
 		return {"ok": false, "message": "%s is stamped into the terrain but its natural ground %s is missing -- restore it from version control; re-sampling would read the stamped roads as ground" % [net.name, sidecar_path(str(net.get("record_path")))]}
 	var to_world := _world_xf(net)
 	var from_world := to_world.affine_inverse()
-	var reached := stamp_reach(net, to_world) if not src.is_empty() else {}
+	# `reached` limits the sidecar to where the previous stamp could have changed the terrain, so a later terrain edit
+	# elsewhere is read -- EXCEPT on a terrain carrying the city's block ground (island_ground.py), where "elsewhere" is
+	# the block fill: re-read, it would land in the sidecar as natural ground (2026-10-08: up to 1.5 m over 88 157 cells)
+	# and move the corridors. There the previous sidecar is the natural ground wherever it covers.
+	var S = load("res://addons/road_kit/road_kit_stamp.gd")
+	var reached := stamp_reach(net, to_world) if not src.is_empty() and not S.has_block_layer(terrain) else {}
 	var nx := int(ceil(rect.size.x / step)) + 1
 	var ny := int(ceil(rect.size.y / step)) + 1
 	var heights := PackedFloat32Array()
