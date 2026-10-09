@@ -2076,6 +2076,18 @@ Details that matter:
 - Shotguns resolve the sight leg + origin **once** per trigger pull and only re-sample the cone per
   pellet.
 
+### The crosshair says when the muzzle line is blocked (PLAN.md 1d, 2026-10-09)
+
+The two-stage trace is right that cover the camera sees over or past still stops the round at the gun -- but with
+no feedback "I shot over the shelf and nothing happened" read as a bug. `FirearmItem.muzzleBlockedPoint()` re-asks
+the shot's own two legs (sight point, then `resolveShotOrigin` -> sight with `trace`) and returns where the round
+would stop when that is more than `BLOCK_SLACK` 0.6 m short of the sight point (null when clear, scoped or seated).
+`Crosshair` asks it once a frame for the local player's held firearm: the reticle dims to `blockedAlpha` (0.35) and a
+small × is drawn where the round will land (Arma / The Division / Gears) -- the one HUD hint the minimal-HUD rule
+allows here. `showBlocked` off is the control. Gate `tools/godot/probe_muzzle_blocked.gd` 6/6 (`--control` fails 3);
+on Shino the combat camera is only ~5 cm above the muzzle, so the gate uses a post ON the muzzle's line that the
+over-the-shoulder camera sees past (the same code path as a shelf).
+
 ### A long ray steps over a small, far hitbox: short windows near each body (PLAN.md P0 0.4, 2026-09-17)
 
 User report: "standing, a still enemy, the first scoped shot does not hit". The cause is in the physics engine,

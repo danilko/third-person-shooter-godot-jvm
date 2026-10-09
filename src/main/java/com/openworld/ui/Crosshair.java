@@ -152,6 +152,45 @@ public class Crosshair extends Control {
         // separate per-shot animation is needed here.
     }
 
+    /** Alpha of the whole reticle while the muzzle line is blocked (PLAN.md 1d), and the marker's colour. */
+    @Export public float blockedAlpha = 0.35f;
+    /** Off = no blocked hint at all (the control). */
+    @Export public boolean showBlocked = true;
+    private godot.api.Label blockedMark;
+    private boolean blocked;
+
+    /** True while the local player's muzzle line is blocked short of the crosshair (probe readout). */
+    @Register public boolean blockedNow() { return blocked; }
+
+    /** The "blocked" hint: the muzzle line meets something before the aimed point. Returns the screen point of the
+     *  hit, or null. Arma / The Division / Gears show the same thing -- the round goes where the GUN points. */
+    private Vector2 blockedScreenPoint() {
+        if (!showBlocked || weaponController == null || weaponController.isHolstered()) return null;
+        if (!(weaponController.getCurrentWeaponItem() instanceof com.openworld.weapon.FirearmItem gun)) return null;
+        Vector3 at = gun.muzzleBlockedPoint();
+        if (at == null) return null;
+        godot.api.Camera3D cam = getViewport() != null ? getViewport().getCamera3d() : null;
+        if (cam == null || cam.isPositionBehind(at)) return null;
+        return cam.unprojectPosition(at);
+    }
+
+    private void showBlockedMark(Vector2 screen) {
+        if (blockedMark == null) {
+            blockedMark = new godot.api.Label();
+            blockedMark.setText("×");
+            blockedMark.setAsTopLevel(true);
+            blockedMark.setMouseFilter(MouseFilter.IGNORE);
+            blockedMark.addThemeColorOverride(new godot.core.StringName("font_color"), new Color(1.0, 0.45, 0.35, 0.9));
+            blockedMark.addThemeFontSizeOverride(new godot.core.StringName("font_size"), 22);
+            addChild(blockedMark);
+        }
+        blockedMark.setVisible(screen != null);
+        if (screen != null) {
+            blockedMark.resetSize();
+            blockedMark.setGlobalPosition(screen.minus(blockedMark.getSize().times(0.5)));
+        }
+    }
+
     @Register
     @Override
     public void _process(double delta) {
@@ -166,6 +205,7 @@ public class Crosshair extends Control {
                 : weaponController != null && weaponController.scopedNow();
         if (scoped) {
             if (isVisible()) setVisible(false);
+            blocked = false;
             return;
         }
         if (!isVisible()) setVisible(true);
@@ -189,8 +229,11 @@ public class Crosshair extends Control {
         if (reticleNode != null) reticleNode.setPosition(anchorOffset);
         boolean clamped = aimCharacter != null && aimCharacter.isSeatedAimAnchored()
                 && aimCharacter.isSeatAimClamped();
+        Vector2 hitAt = blockedScreenPoint();
+        blocked = hitAt != null;
+        showBlockedMark(hitAt);
         Color tint = getModulate();
-        tint.setA(clamped ? clampedAlpha : 1.0f);
+        tint.setA(clamped ? clampedAlpha : blocked ? blockedAlpha : 1.0f);
         setModulate(tint);
 
         // Target: 0 when hidden (arms collapse to centre), positionX when shown.

@@ -531,6 +531,30 @@ public class FirearmItem extends WeaponItem {
    * is bypassed by hugging the cover: the muzzle ends up on the far side and its trace then starts
    * past the very wall that should have stopped the shot.
    */
+  /** How far short of the aimed point a muzzle-line hit must stop to count as BLOCKED (m). */
+  private static final double BLOCK_SLACK = 0.6;
+
+  /**
+   * Where a shot fired now would actually stop, when that is NOT where the crosshair is: the muzzle leg of the
+   * two-stage trace meets something before the sight point (a shelf, low cover the camera sees over). Null when the
+   * line is clear, or the shot is a one-leg one (scoped, seated). The crosshair's "blocked" hint (PLAN.md 1d): before
+   * it the bullet hit the shelf and nothing told the player why. Two ray queries; read once per frame for the local
+   * player only.
+   */
+  public Vector3 muzzleBlockedPoint() {
+	if (!useMuzzleTrace()) return null;
+	RayCast3D ray = getEffectiveAimRay();
+	if (ray == null || !ray.isInsideTree()) return null;
+	Vector3 sight = resolveSightPoint(ray);
+	Vector3 origin = resolveShotOrigin(ray);
+	Vector3 to = sight.minus(origin);
+	double len = to.length();
+	if (len < BLOCK_SLACK + 0.05) return null;
+	TraceHit hit = trace(ray, origin, to.normalized(), (float) (len - 0.05));
+	if (hit == null || hit.point.distanceTo(sight) < BLOCK_SLACK) return null;
+	return hit.point;
+  }
+
   private Vector3 resolveShotOrigin(RayCast3D ray) {
 	Vector3 muzzle = weaponMuzzle().getGlobalPosition();
 	if (owningCharacter == null) return muzzle;
