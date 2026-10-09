@@ -166,6 +166,21 @@ func _enter_tree() -> void:
 	_section("Terrain")
 	_button("Stamp Terrain", func(): _on_stamp(false))
 	_button("Restore Terrain", func(): _on_stamp(true))
+	# PLAN.md item 3: hand-place an island building at a selected node (drop a Marker3D where it should stand)
+	_section("Island buildings")
+	building_type = OptionButton.new()
+	for t in _building_types():
+		building_type.add_item(t)
+	dock.add_child(building_type)
+	building_snap = CheckBox.new()
+	building_snap.text = "Snap back from the road"
+	building_snap.button_pressed = true
+	dock.add_child(building_snap)
+	building_facing = CheckBox.new()
+	building_facing.text = "Use the node's facing (else face the nearest road)"
+	dock.add_child(building_facing)
+	_button("Place Building at Selected Node", _on_place_building)
+	_button("Remove Building at Selected Node", _on_remove_building)
 	preview_pieces = CheckBox.new()
 	preview_pieces.text = "Preview Pieces (built roads + zones, never saved)"
 	# ON by default and remembered: a scene with road pieces SHOWS them when it opens. Off, the editor
@@ -263,6 +278,67 @@ func _exit_tree() -> void:
 		remove_node_3d_gizmo_plugin(gizmo)
 	remove_control_from_docks(dock)
 	dock.queue_free()
+
+var building_type: OptionButton
+var building_snap: CheckBox
+var building_facing: CheckBox
+var _building_thread: Thread
+
+## Every placeable building type: a type scene in the buildings folder, not an enterable variant.
+func _building_types() -> PackedStringArray:
+	var out := PackedStringArray()
+	var d := DirAccess.open("res://src/main/resources/com/openworld/world/buildings")
+	if d == null:
+		return out
+	for f in d.get_files():
+		if f.ends_with(".tscn") and not f.ends_with("_Open.tscn") and not f.ends_with("_Shop.tscn") and not f.begins_with("Pane_"):
+			out.append(f.get_basename())
+	out.sort()
+	return out
+
+func _selected_spot() -> Node3D:
+	for n in _selected():
+		if n is Node3D:
+			return n
+	return null
+
+func _on_place_building() -> void:
+	var n := _selected_spot()
+	if n == null or building_type.selected < 0:
+		_say({"ok": false, "message": "select a Node3D (drop a Marker3D) where the building should stand, and pick a type"})
+		return
+	var p := n.global_position
+	var args := ["place", building_type.get_item_text(building_type.selected), str(p.x), str(p.z)]
+	if building_snap.button_pressed:
+		args.append("--snap")
+	if building_facing.button_pressed:
+		# the node's -Z is its facing (Godot); the building's FRONT is its local +Z, so it faces where -Z points
+		var f := -n.global_transform.basis.z
+		args.append("--yaw=%f" % rad_to_deg(atan2(f.x, f.z)))
+	_run_building(args)
+
+func _on_remove_building() -> void:
+	var n := _selected_spot()
+	if n == null:
+		_say({"ok": false, "message": "select a Node3D inside (or next to) the building to remove"})
+		return
+	_run_building(["remove-near", str(n.global_position.x), str(n.global_position.z)])
+
+func _run_building(args: Array) -> void:
+	if _building_thread != null and _building_thread.is_started():
+		_say({"ok": false, "message": "a building edit is already running"})
+		return
+	status.text = "island_buildings %s ..." % args[0]
+	_building_thread = Thread.new()
+	_building_thread.start(func():
+		var r := Service.building(args)
+		call_deferred("_building_done", r))
+
+func _building_done(r: Dictionary) -> void:
+	_building_thread.wait_to_finish()
+	var lines := Array(str(r["log"]).split("\n")).filter(func(l): return l.strip_edges() != "")
+	_say({"ok": r["ok"], "message": "\n".join(PackedStringArray(lines.slice(-4)))})
+	get_editor_interface().get_resource_filesystem().scan()
 
 func _section(title: String) -> void:
 	var l := Label.new()

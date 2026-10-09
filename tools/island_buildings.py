@@ -1599,6 +1599,196 @@ def places_only(check):
     return 0
 
 
+def _band_quads(with_height=False):
+    """Every solved road band as plan quads (Godot x, z), with its road and -- `with_height` -- its two surface heights
+    (Godot y) and whether the road is kerbed (it has a footway). One owner for `roads_check` and `place`."""
+    from shapely.geometry import Polygon
+    for p_ in (os.path.join(ROOT, "blender", "lib"), os.path.join(ROOT, "blender", "addons", "road_kit_authoring")):
+        if p_ not in sys.path:
+            sys.path.insert(0, p_)
+    import point_edges as ped
+    net = pm.load_network(RECORD)
+    cors = ped.band_corridors(ped.solve_all(net, None)[3], owners=True)     # plan only: no ground needed
+    ny = json.load(open(OUT)).get("network_y", 0.0)
+    quads = []
+    for line, _h, owner in cors:
+        kerbed = road_walk(net, owner)[0] > 0.0
+        pts = [(x, -y, half, z + ny) for (x, y, z, half) in line]
+        for (x0, z0, h0, y0), (x1, z1, h1, y1) in zip(pts, pts[1:]):
+            dx, dz = x1 - x0, z1 - z0
+            L = math.hypot(dx, dz)
+            if L < 1e-6:
+                continue
+            nx, nz = -dz / L, dx / L
+            q = Polygon([(x0 + nx * h0, z0 + nz * h0), (x1 + nx * h1, z1 + nz * h1),
+                         (x1 - nx * h1, z1 - nz * h1), (x0 - nx * h0, z0 - nz * h0)])
+            quads.append((q, str(owner), (x0, z0, y0, x1, z1, y1), kerbed) if with_height else (q, str(owner)))
+    return quads
+
+
+HAND_FRONT_GAP = 1.5     # `place --snap`: how far a hand-placed building's footprint keeps off every road band
+
+
+def _footprint(t, cx, cz, yaw_deg, aabbs=None):
+    from shapely.geometry import Polygon
+    x0, z0, x1, z1, _h = (aabbs or {}).get(t) or type_aabb(t)
+    a = math.radians(yaw_deg)
+    c, sn = math.cos(a), math.sin(a)
+    return Polygon([(cx + lx * c + lz * sn, cz - lx * sn + lz * c) for lx, lz in ((x0, z0), (x1, z0), (x1, z1), (x0, z1))])
+
+
+def place(argv):
+    """HAND-PLACE a building (PLAN.md item 3, the handover): `place <Type> <x> <z> [--yaw=<deg>] [--tone=<n>] [--snap]
+    [--force] [--dry]` (Godot x, z). --snap slides it back from its road until it stands HAND_FRONT_GAP clear. With no --yaw the FRONT (local +Z) faces the nearest road band, as every derived building
+    does; the floor stands at that road's surface + the kerb (derive's `top`). Refused, unless --force, when the
+    footprint overlaps a road band or another building by more than 1 m2. Writes the record (key `hand|<n>`,
+    `hand: true`); then `island_buildings.py write` renders the cells. `remove <key>` takes one out."""
+    from shapely.geometry import Point
+    from shapely.strtree import STRtree
+    args = [a for a in argv if not a.startswith("--")]
+    opts = dict(a[2:].split("=", 1) if "=" in a else (a[2:], "1") for a in argv if a.startswith("--"))
+    if len(args) < 3:
+        print("usage: island_buildings.py place <Type> <x> <z> [--yaw=<deg>] [--tone=<n>] [--force] [--dry]")
+        return 2
+    t, cx, cz = args[0], float(args[1]), float(args[2])
+    if not os.path.exists(os.path.join(BLD_DIR, t + ".tscn")):
+        print("island_buildings: no building type %s (%s.tscn)" % (t, t))
+        return 2
+    quads = _band_quads(with_height=True)
+    tree = STRtree([q[0] for q in quads])
+    here = Point(cx, cz)
+    # the natural ground under the click (the road ground sidecar, record frame): the building fronts the nearest road
+    # that is AT GRADE here, derive's rule -- never a dike crest or a viaduct above it, whose surface is not the floor
+    for p_ in (os.path.join(ROOT, "blender", "lib"), os.path.join(ROOT, "blender", "addons", "road_kit_authoring")):
+        if p_ not in sys.path:
+            sys.path.insert(0, p_)
+    import point_ground as pg
+    ny = json.load(open(OUT)).get("network_y", 0.0)
+    gz = pg.load_ground(GROUND)(cx, -cz)
+    ground_y = None if gz is None else gz + ny
+
+    def surface(q):
+        on_ = q[0].exterior.interpolate(q[0].exterior.project(here))
+        x0, z0, y0, x1, z1, y1 = q[2]
+        L2 = (x1 - x0) ** 2 + (z1 - z0) ** 2
+        tt = 0.0 if L2 < 1e-9 else max(0.0, min(1.0, ((on_.x - x0) * (x1 - x0) + (on_.y - z0) * (z1 - z0)) / L2))
+        return on_, y0 + (y1 - y0) * tt
+    near, on, road_y, best = None, None, None, 1e9
+    for i in tree.query(here.buffer(60.0)):
+        q = quads[i]
+        d = q[0].distance(here)
+        if d >= best:
+            continue
+        on_, y_ = surface(q)
+        if ground_y is not None and not (-LOT_MAX_STEP <= ground_y - (y_ + (KERB_H if q[3] else 0.0)) <= 0.05):
+            continue
+        near, on, road_y, best = q, on_, y_, d
+    if near is None:
+        print("island_buildings: REFUSED %s at (%.1f, %.1f): no road at grade with the ground here (%s m) within 60 m"
+              % (t, cx, cz, "?" if ground_y is None else "%.2f" % ground_y))
+        return 1
+    yaw = float(opts["yaw"]) if "yaw" in opts else math.degrees(math.atan2(on.x - cx, on.y - cz))
+    fp = _footprint(t, cx, cz, yaw)
+    if "snap" in opts:
+        # slide straight BACK from the road (away from the front) until the footprint stands HAND_FRONT_GAP clear of
+        # every band, as a derived frontage building does; at most 40 m
+        fx, fz = math.sin(math.radians(yaw)), math.cos(math.radians(yaw))
+        for step in range(0, 161):
+            d = step * 0.25
+            fp = _footprint(t, cx - fx * d, cz - fz * d, yaw)
+            grown = fp.buffer(HAND_FRONT_GAP)
+            if not any(grown.intersects(quads[i][0]) for i in tree.query(grown)):
+                cx, cz = cx - fx * d, cz - fz * d
+                break
+        else:
+            print("island_buildings: REFUSED %s: no clear spot within 40 m behind (%.1f, %.1f)" % (t, cx, cz))
+            return 1
+    doc = json.load(open(OUT))
+    bad = []
+    for i in tree.query(fp):
+        a = fp.intersection(quads[i][0]).area
+        if a > 1.0:
+            bad.append("road %s (%.1f m2)" % (quads[i][1], a))
+            break
+    aabbs = {}
+    for b in doc["buildings"]:
+        if b["type"] not in aabbs:
+            aabbs[b["type"]] = type_aabb(b["type"])
+        if abs(b["pos"][0] - cx) > 150 or abs(b["pos"][2] - cz) > 150:
+            continue
+        a = fp.intersection(_footprint(b["type"], b["pos"][0], b["pos"][2], b["yaw"], aabbs)).area
+        if a > 1.0:
+            bad.append("building %s %s (%.1f m2)" % (b["type"], b["key"], a))
+    if bad and "force" not in opts:
+        print("island_buildings: REFUSED %s at (%.1f, %.1f): overlaps %s (--force to place anyway)" % (t, cx, cz, "; ".join(bad[:4])))
+        return 1
+    n = 1 + max([int(b["key"].split("|")[1]) for b in doc["buildings"] if b["key"].startswith("hand|")] or [0])
+    ax0, az0, ax1, az1, _h = type_aabb(t)
+    reg = region_of(cx, -cz)
+    entry = {"type": t, "region": reg[0] if reg else "none", "key": "hand|%d" % n,
+             "pos": [round(cx, 3), round(road_y + (KERB_H if near[3] else 0.0), 3), round(cz, 3)],
+             "yaw": round(yaw, 3), "lot": [round(ax0, 3), round(az0, 3), round(ax1, 3), round(az1, 3)],
+             "lot_depth": 1.0, "tone": int(opts.get("tone", 0)), "hand": True}
+    print("island_buildings: %s %s at (%.1f, %.1f) yaw %.1f, floor %.2f m (road %s%s)%s" % (
+        "would place" if "dry" in opts else "placed", t, cx, cz, yaw, entry["pos"][1], near[1],
+        ", kerbed" if near[3] else "", ("; FORCED over " + "; ".join(bad[:4])) if bad else ""))
+    if "dry" in opts:
+        return 0
+    doc["buildings"].append(entry)
+    with open(OUT, "w") as f:
+        json.dump(doc, f, indent=1)
+        f.write("\n")     # the record's committed form
+    print("island_buildings: key %s -- now `python3 tools/island_buildings.py write`" % entry["key"])
+    return 0
+
+
+def remove_near(argv):
+    """`remove-near <x> <z> [--within=<m>]`: take out the building whose footprint contains (x, z) (Godot), else the
+    one whose centre is nearest within --within (default 6 m) -- what the editor knows is a position, not a key."""
+    from shapely.geometry import Point
+    if len(argv) < 2:
+        print("usage: island_buildings.py remove-near <x> <z> [--within=<m>]")
+        return 2
+    x, z = float(argv[0]), float(argv[1])
+    within = float(next((a.split("=", 1)[1] for a in argv if a.startswith("--within=")), 6.0))
+    doc = json.load(open(OUT))
+    here = Point(x, z)
+    hit = None
+    for b in doc["buildings"]:
+        if abs(b["pos"][0] - x) > 200 or abs(b["pos"][2] - z) > 200:
+            continue
+        if _footprint(b["type"], b["pos"][0], b["pos"][2], b["yaw"]).contains(here):
+            hit = b
+            break
+    if hit is None:
+        near = min(doc["buildings"], key=lambda b: (b["pos"][0] - x) ** 2 + (b["pos"][2] - z) ** 2)
+        if math.hypot(near["pos"][0] - x, near["pos"][2] - z) <= within:
+            hit = near
+    if hit is None:
+        print("island_buildings: no building at (%.1f, %.1f)" % (x, z))
+        return 1
+    print("island_buildings: removing %s %s" % (hit["type"], hit["key"]))
+    return remove([hit["key"]])
+
+
+def remove(argv):
+    """`remove <key>`: take one building out of the record (a derived one or a hand-placed one)."""
+    if not argv:
+        print("usage: island_buildings.py remove <key>")
+        return 2
+    doc = json.load(open(OUT))
+    keep = [b for b in doc["buildings"] if b["key"] != argv[0]]
+    if len(keep) == len(doc["buildings"]):
+        print("island_buildings: no building with key %s" % argv[0])
+        return 1
+    doc["buildings"] = keep
+    with open(OUT, "w") as f:
+        json.dump(doc, f, indent=1)
+        f.write("\n")     # the record's committed form
+    print("island_buildings: removed %s -- now `python3 tools/island_buildings.py write`" % argv[0])
+    return 0
+
+
 def roads_check():
     """NO BUILDING STANDS ON A ROAD, AT ANY HEIGHT (user, 2026-09-29: tall buildings stood under C1's deck and pierced
     it -- "please fix the building placement on the highway"). Measured from the other side of the pipeline: every
@@ -3481,6 +3671,12 @@ def main(argv):
         return places_only("--check" in argv)
     if argv[:1] == ["roads"]:
         return roads_check()
+    if argv[:1] == ["place"]:
+        return place(argv[1:])
+    if argv[:1] == ["remove"]:
+        return remove(argv[1:])
+    if argv[:1] == ["remove-near"]:
+        return remove_near(argv[1:])
     if argv[:1] == ["sidewalks"]:
         return sidewalks_only("--check" in argv)
     if argv[:1] == ["clearance"]:

@@ -12,7 +12,7 @@ to hand work: level designers and artists edit it in place, and the generators s
 > `--regenerate` (`tools/handover_guard.py` is the one rule; `handover_freeze.py --undo` reverses). Until someone runs
 > the freeze, those generators still OWN the island's roads and buildings, and anything edited in their outputs is
 > lost the next time they run. Everything about building TYPES, interiors, stations and DebugWorld is already
-> hand-owned and safe to edit. Still to build: an editor tool that drops a building on a lot.
+> hand-owned and safe to edit. The editor building placer is in the Road Kit dock (section 4).
 
 ## 1. What owns what
 
@@ -91,7 +91,14 @@ one go and works on a frozen island. By hand:
 
 ## 4. Buildings
 
-* **Move, turn, retype or delete one town building**:
+* **Add or remove one town building, in Godot** (the Road Kit dock's *Island buildings* section): drop a `Marker3D`
+  where it should stand, select it, pick the type and press *Place Building at Selected Node* -- it faces the nearest
+  road at grade (or the marker's facing, -Z, if ticked), stands on that road's kerb, slides back clear of the road with
+  *Snap*, and is refused if it overlaps a road or another building. *Remove Building at Selected Node* takes out the
+  building under the marker. Both write `IslandBuildings.json` and render the cells. From the command line:
+  `python3 tools/island_buildings.py place <Type> <x> <z> [--snap] [--yaw=<deg>] [--dry]` (Godot x, z) and
+  `remove-near <x> <z>` / `remove <key>`, then `write`. Buildings render in game (the cells stream at runtime).
+* **Move, turn, retype or delete one town building by editing the record**:
   1. Find it in `IslandBuildings.json` (`buildings[]`: `type`, `pos` Godot x/y/z, `yaw` degrees, `lot`, `tone`,
      `key`). Its postal code (Ctrl+F9 in game) helps you locate it.
   2. Edit or remove the entry.

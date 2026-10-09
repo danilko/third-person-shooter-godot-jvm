@@ -50,6 +50,21 @@ static func downstream() -> Dictionary:
 	var code := OS.execute("bash", [ProjectSettings.globalize_path(DOWNSTREAM)], out, true)
 	return {"ok": code == 0, "log": "".join(out)}
 
+## PLAN.md item 3: hand-place / remove one island building (`tools/island_buildings.py place|remove-near`, the one
+## owner of the rule: it faces the nearest at-grade road, stands on its kerb and refuses an overlap), then render the
+## cells (`write`). Blocking: call it from a thread.
+const BUILDINGS := "res://tools/island_buildings.py"
+static func building(args: Array) -> Dictionary:
+	var out := []
+	var py := ProjectSettings.globalize_path(BUILDINGS)
+	var code := OS.execute("python3", [py] + args, out, true)
+	var log_text := "".join(out)
+	if code == 0:
+		var out2 := []
+		code = OS.execute("python3", [py, "write"], out2, true)
+		log_text += "".join(out2)
+	return {"ok": code == 0, "log": log_text}
+
 ## B8: a gesture the SOLVER owns, applied to the record -- save (which promotes any hand-rotated point
 ## first), run `cmd`, reload the network from the rewritten record and face the points the tool owns.
 ## The caller wraps it in an undo step. Returns the CLI's object (`failed`/`error` on a refusal).
