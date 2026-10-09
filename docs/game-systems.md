@@ -1,0 +1,666 @@
+# game-systems
+
+Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
+
+- Performance Foundation (Part D)
+- AI (7-state singleton FSM)
+- Event System (EventBus AutoLoad)
+- MovementController flags (Player vs AICharacter)
+- Audio: every sound is a file (2026-09-29)
+
+---
+
+## Performance Foundation (Part D)
+
+Drop-in accelerators that change nothing visually. Each degrades gracefully if its AutoLoad is
+absent (test scenes), so they are safe to rely on but never required for correctness.
+
+### Spatial partitioning — SpatialEntityGrid (`com.openworld.world`, AutoLoad, D1)
+
+Uniform XZ spatial hash (`cellSize` exported, 50 m). `Character` and `Vehicle` (both in the
+"characters" group) `register()` in `_ready()`, re-bucket via a throttled `updateSpatialCell()`
+(0.25 s) called at the **top of `_physicsProcess`, before the non-authority early return** — so
+puppet bodies (e.g. remote players on the host) keep their cell current too — and `unregister()`
+in `_exitTree()`. `AICharacter.discoverTarget()` calls `queryRadius(pos, detectionRange)` instead of
+`getNodesInGroup("characters")`, falling back to the group scan when `SpatialEntityGrid.get()` is
+null. Reached via a JVM-static `get()`; all maps + the static are cleared in `_exitTree()`
+(leak discipline).
+
+### AI level-of-detail — AILodLevel (`com.openworld.ai`, D2)
+
+`AICharacter` carries an `AILodLevel { ACTIVE, PASSIVE, FROZEN }` set every 2 s from
+`nearestPlayerDist()` (which now iterates `PlayerRegistry`, not the group): `< 80 m ACTIVE`,
+`80–200 m PASSIVE`, `> 200 m FROZEN`.
+- **FROZEN** — `AICharacter._physicsProcess` returns before `super` (whole FSM + animation tick
+  skipped). MovementController, a separate node, still decelerates the body to rest.
+- **PASSIVE** — `AIController.gatherInput` returns a hold-heading command (no NavAgent / FSM /
+  aim), and `AnimationController._physicsProcess` skips **all AnimationTree writes** when
+  `getLodLevel() != ACTIVE` — those JVM-bridge calls are the dominant per-AI cost, so this is the
+  real mid-range win.
+- Returning to ACTIVE from any non-ACTIVE tier clears stale nav/search state.
+`isLodFrozen()` is kept as a back-compat shorthand for `lodLevel == FROZEN`.
+
+### Faction relationships — FactionManager / FactionTable (`com.openworld.character`, D3)
+
+`Faction.areHostile()` is a **thin delegate** to the `FactionManager` AutoLoad (registered via
+`Faction.setRegistry`), so **all call-sites stay unchanged** and there is no duplicated rule.
+`FactionManager.areHostile()` is the single owner of the logic: NEUTRAL is never hostile → an
+explicit `FactionTable` entry wins (`HOSTILE/DESPISE` → hostile) → otherwise the inherent default
+(same faction allied, different factions hostile). The table (`DefaultFactions.tres`, a flat
+`Dictionary<String,String>` keyed `"a>b"`) only needs **overrides** of that default — it ships just
+the editable `player↔enemy = HOSTILE` rows. `setRelationship(a,b,rel)` flips a relationship at
+runtime (mission betrayals; required before Part F). With no registry loaded (engine-free tests)
+`Faction.areHostile()` returns false.
+
+#### Multi-faction & runtime changes (high-level — details will firm up with Part F mission state)
+
+Factions are arbitrary strings on `CharacterInfo.faction`, resolved fresh every target scan, so any
+number of parties works with **no code change** — author a `FactionTable` (`.tres`) with only the
+pairs that *differ* from the default (different faction ⇒ hostile, same ⇒ allied, `"neutral"` ⇒
+never fights). Two runtime levers, both **host-authoritative and replicated** over the world-event
+seam (`WORLD_EVENT_FACTION_*`):
+- `FactionManager.setRelationship(a, b, rel)` — flip a whole party relationship (the betrayal beat).
+- `Character.setFaction(s)` — swap one character's allegiance (e.g. a cornered NPC turning hostile).
+
+Use these setters, **not** a raw `characterInfo.faction = …` write, so the change syncs to clients
+(and rides the late-join baseline). **Lifetime:** the live table is a `duplicate()` of the shipped
+`.tres`, and `FactionManager` is an AutoLoad, so a flip persists across scenes/missions until
+`FactionManager.reset()` restores defaults (already called on full restart in
+`GameManager.restartLevel`; call it at mission end for per-mission scope — auto-scoping belongs with
+Part F). Behaviours that *react* to factions (a bystander fleeing when a fight erupts, corner
+detection that triggers a swap) are AI-perception features not built yet — they'll land with Part E2
+`StimulusManager` / the AI FSM.
+
+#### Presets, wildcard rows and the mission layer (F2, 2026-09-17)
+
+- **The rule has one engine-free owner: `character.FactionRules`** (`FactionRulesTest`, 7 cases).
+  `FactionManager.areHostile` and `FactionTable.relationship` both call it. The order is: `neutral`
+  is never hostile, then an exact pair (either direction), then a **wildcard row**, then the default.
+- **Wildcard row.** `"civilian>*"` (or `"*>civilian"`) means "toward every OTHER faction". It is how
+  a preset says "civilians are neutral to everyone" without listing each faction and going stale when
+  one is added. It never applies to a faction and itself. If both sides carry wildcards that disagree,
+  the LESS hostile one wins, so a civilian stays out of a hostile-to-all faction's fight.
+  `FactionTable.row` checks `containsKey` before `get`, because godot-jvm's `Dictionary.get` on a
+  missing key is not guaranteed to return null.
+- **Presets** in `character/`, beside `DefaultFactions.tres`:
+  - `OpenWorldFactions.tres`: player, police, gang_a, gang_b, civilian. Civilians are neutral to all,
+    police are neutral to the player and hostile to both gangs.
+  - `GangA_vs_Police.tres`: gang_a DESPISES police, the player sides with police, gang_b sits it out
+    (`gang_b>*` NEUTRAL).
+  - `Faction` gained `POLICE`/`GANG_A`/`GANG_B`/`CIVILIAN` constants and nameplate colours.
+- **Three layers, one live table.** The live table is a `duplicate(true)` of the highest layer
+  present: mission (`applyMissionTable`), then region (`applyTable`, from `RegionConfig`), then
+  `DefaultFactions.tres`. A region change while a mission runs is remembered but does not replace the
+  mission's table.
+  - Rebuilding the table discards runtime flips. That is the per-mission scope the flips want.
+  - `reset()` clears both layers.
+- **Missions.** `MissionInfo.factionTable` (`@Export`, nullable) is applied by
+  `MissionManager.startMission` BEFORE the ELIMINATE_ALL count and removed on complete and on fail.
+  - Clients get it as a resource path in `WORLD_EVENT_MISSION_STARTED`'s second argument
+    (`GameManager.applyMissionStarted`). A table built in code or embedded as a sub-resource has no
+    loadable path and is not mirrored. That loses nothing today: hostility is only decided on the host.
+  - Worked example: `game/mission/GangA_vs_Police_Mission.tres`.
+  - `MissionManager.startMissionFromPath` / `completeMissionNow` and `FactionManager.activeLayerNow` /
+    `hostileNow` are registered for probes. So is `AICharacter.targetIdNow`.
+- **Gate `tools/godot/probe_faction_presets.gd`** (21/21, stable over 3 runs). It uses real AI that
+  stand still and think, plus a Player.
+  - Control, shipped defaults: the policeman targets the nearest body, the civilian.
+  - `OpenWorldFactions` as the region layer: police target a gang, and nobody targets or is targeted
+    by the civilian.
+  - The mission layer: police and gang_a target each other, gang_b and the civilian are left out, and
+    a region change does not replace the layer.
+  - Armed with ASR1s through real pickups, police and gang_a damage each other and nobody else.
+  - Completing the mission restores the defaults.
+  - Probe trap: with `MovementController` off, a target 90° to the side stays past the aim reach and
+    W21's fire gate holds every shot. The policeman targeted gang_a for 20 s with a full magazine.
+
+---
+
+#### The CAMPAIGN layer (PLAN.md 0.35 / CR3, 2026-10-09)
+
+Runtime flips are per-layer by design (a rebuild discards them; `FactionFlips` re-applies the wanted / gang ones every
+0.5 s), which made a STORY change ("the police now hate gang_a") vanish at the next region boundary or mission.
+`FactionManager.setCampaignRelationship(a, b, rel)` (`flipCampaignNow` for probes / console) writes a fourth layer that
+every rebuild lays over the region / default table; an active mission table still wins and the campaign rows land
+again when it ends. Only `reset()` (new game / full restart) clears it; the save carries it as `campaign_factions`
+(restored after the reset a load does). Replicated through the SAME faction world event with a third argument
+`"campaign"` (no new event number), and sent flagged in the late-join baseline so a client keeps it across its own
+region rebuilds. Gate `tools/godot/probe_campaign_factions.gd` 12/12 (`--control` makes the flip a runtime one, fails 4).
+Player <-> gang_a / gang_b now ship NEUTRAL in `DefaultFactions.tres` (see "Gang hangouts").
+
+### The story layer — MissionDirector (`com.openworld.game.mission`, AutoLoad, F1, 2026-09-17)
+
+The one owner of story logic, beside `MissionManager`, which keeps objective TRACKING. The split is
+the whole design: **"may this mission run" is campaign state; "is it won yet" is not.** Four jobs.
+
+- **NamedCharacterRegistry** — `characterId → live AICharacter`. **Registration has ONE owner,
+  `AICharacter._ready()`**, gated on `@Export storyCharacter`; `ZoneManager.spawnNamed` sets that flag
+  before `addChild` so a streamed `NamedCharacterConfig` and a hand-placed story AI take the identical
+  path. **The flag exists because the ID cannot answer the question** — an ambient AI's id is a random
+  UUID and a named one's is authored, and those are the same type of string. A second body claiming a
+  live id is refused and reported (which boss you commanded must not depend on streaming order); one
+  replacing a FREED node is the ordinary zone reload. `_exitTree` drops the entry, so the map is
+  authoritative about "is the boss loaded right now" with no tree scan.
+- **`commandCharacter(id, ScriptCommand)`.** `ScriptCommand` is a `Resource` whose every field is a
+  command with an explicit **do-nothing sentinel** (`targetState = ""`, `move = false`,
+  `invincible = KEEP`), never a mirror of the AI's state — so a partly-filled order cannot quietly
+  reset the rest of the body. `move` is a separate flag from `moveTo` because **(0,0,0) is a legal
+  destination** (it is the spec's own verify case), so "is the vector set" is not derivable.
+  `assignSquad` is code-set rather than exported: a `.tres` cannot hold a node.
+- **`triggerBeat(beatId)`** — runs the Java handler registered under that id (beats are methods, not a
+  scripting language) and emits `EventBus.missionBeatTriggered` either way, so a beat with no logic yet
+  is still an event dialogue/HUD can hang off. `ZoneTrigger` (F3) is the caller that is still missing.
+- **The mission-output graph.** A completion folds `(missionId, outcomeVariant)` into an accumulated
+  set and re-evaluates an append-only unlock table. **Idempotent on variant** (a replay adds no branch,
+  so the tree is bounded by `missions × variants`, not by replay count), **sticky** (a branch once open
+  never closes), and unique items granted exactly once via `grantUniqueOnce`'s membership check.
+  **Ordinary rewards have no code here on purpose** — there is nothing to gate, and a field nothing
+  reads is wrong the day something reads it. It listens to **`EventBus.missionCompleted`**, which fires
+  on *every* peer (a client gets it mirrored by `GameManager.applyMissionCompleted`), so every peer's
+  graph advances with no new message — and the idempotency is what makes that safe.
+
+**Commands are host-side, and that needs no gate:** only the host runs an `AIController`; a client's
+copy of the same body is a puppet, so `commandCharacter` returns false there and the motion it causes
+on the host replicates the ordinary way. A beat script may therefore run on both peers without knowing
+which it is.
+
+**`ScriptedMoveState` — an order is not a mood.** Nothing in the world cancels it: not sight of an
+enemy, not being shot, not gunfire. The autonomous states are the opposite by design, and mixing the
+two gives a cutscene walk a passing civilian can derail. The director cancels it (`releaseCharacter`,
+or the next command). **A NavAgent off the navmesh does not go silent — it lies:** with no navigation
+map under the body it reports `isNavigationFinished() == false` forever and hands back the body's own
+position, one tick stale, so the steering vector points exactly BACKWARD along its own travel and
+feeds itself — measured on the bare probe stand, the AI ran from 20 m off the origin to **110 m in
+30 s**. The agent is believed only while its next point is a real step ahead (`NAV_MIN_STEP` 0.5 m);
+otherwise the destination answers. Arrival is likewise asked of the DESTINATION, never of
+`isNavigationFinished()` alone — an arrival that is a lie fires the next beat in the wrong place.
+
+**Invulnerability is one flag in one place**, `Health.invulnerable`, checked at the top of
+`applyDamage` — the single site every source funnels through (bullet, blast, fall, a relayed client
+request), so it can never mean "immune to some damage". `@Visible`, not `@Export`: live mission state,
+not something a scene authors. Not replicated — the host is the only peer that applies damage.
+`releaseCharacter` clears it with the order, so a beat cannot leave someone immortal.
+
+**A mission vehicle is not ambient traffic** (the `TERRAIN3D_TRANSITION.md` note, now enforced).
+`registerMissionEntity(key, node, failOnLoss)` is the declaration; `ZoneManager` asks
+`isMissionProtected` in ONE place — before the reclaim, not inside each of the seven reclaim reasons —
+and `freeTrafficCar` leaves a protected car and its driver exactly as they are, dropping only the
+pairing. From there the MISSION owns them: registering an entity is taking responsibility for it.
+Losing one registered `failOnLoss` calls **`MissionManager.failMission`** — the mission system's rule,
+never the streamer's. Loss is detected as a FREED node rather than a `Health.died` connection, because
+a wreck replaced by a wreck scene emits nothing a mission could hear.
+
+**The debug console** (`debug.DebugConsole`, **backtick** via `DebugHarness`) is F1's stated
+prerequisite: iterating a beat in one session instead of one restart per edit. Built in code like
+`PerfDebugOverlay`, so no scene wiring; opening it sets `inputBlocked` on every registered local player
+and frees the mouse (otherwise typing "state" walks the player and shoots). Its command table is
+hand-written, not reflective — a typo in a reflective console is a silent no-op — and everything it
+drives is already a `@Register`ed method, the same surface a probe uses, so it can never reach further
+into the game than the gates can. `named / move / state / invincible / release / beat / mission
+start|complete|fail / unlock / close`, and the weapon commands (the CS `give` / Unreal `summon` idiom, host or
+single player only): `weapons`, `give <id>` (straight into the inventory through `requestEquip`), `drop <id>|all`
+(a row of pickups 3 m ahead) and `ammo`. They read `weapon.WeaponCatalog`, the one runtime reader of
+`weapon_catalog.json` (the aim bench uses it too), so a new catalog weapon is spawnable with no other edit; the
+built-in fist is excluded. Gate `tools/godot/probe_debug_weapons.gd` 6/6. The debug HUD (`PerfDebugOverlay`, **Shift+F3** cycles, console
+`hud 0-3`) is levelled like CS's `net_graph`: 1 a corner FPS counter, 2 the engine monitors + JVM heap + streaming
++ a `FrameTimeGraph` (240 frames, 60/30 fps lines, avg / 1%-low / max), 3 adds the local player's live state
+(position, speed, stance, view, health, vehicle, weapon + ammo + `WeaponState` + spread, what the aim ray is on)
+and `NetworkManager.debugNetLine` (rtt, loss, kbit/s from ENet's own statistics). Gate
+`tools/godot/probe_debug_hud.gd` 10/10 (`-- --shot=<png>` with a display).
+
+**Gate `tools/godot/probe_mission_director.gd`** (34/34; `-- --control` turns the boss's
+`story_character` flag off and fails 11). Real AI bodies on a bare stand, with a **Player in the scene
+because an AICharacter with no player within 80 m is LOD-FROZEN and never thinks** — it is also the
+hostile the scripted walk must ignore. Cases: the registry (an ambient AI is not in it; a duplicate id
+refused; a freed body leaves it), the spec's own verify (`command_move_to` origin → SCRIPTED_MOVE,
+20.44 m → **1.20 m in 6.8 s**), the order held for the whole walk past a hostile, an invincible boss
+taking **0 hits from a 1e6-damage kill** and dying the moment it is released, beats, the graph (locked
+→ wrong variant does not open it → the declared one does → replay adds no branch → sticky), the
+director refusing to start a locked mission and starting it once unlocked, a mission entity freed
+failing the ACTIVE mission by name, and the console reaching the director. **Not covered, on purpose:**
+`ZoneManager`'s half of the vehicle rule needs a streamed zone with live traffic
+(`probe_traffic_spawn.gd`'s stand), so what this asserts is the ANSWER the streamer reads.
+
+### The caller the story layer was missing — `world.ZoneTrigger` (F3, 2026-09-17)
+
+F1 built `triggerBeat` and nothing in the world called it. `ZoneTrigger` is an `Area3D` an artist
+drops in a scene: the right body enters, it fires one beat, and **that is the whole of it** — mission
+start zones, objective markers, ambush triggers and cutscene entries are all the same volume with a
+different beat id. What the beat DOES stays a Java handler registered by id on the director, so a
+trigger can never become a second place story logic lives; a beat with no handler still emits
+`EventBus.missionBeatTriggered`, so an authored volume is useful to dialogue and HUD before any Java
+exists for it.
+
+- **"Has this already fired" is the DIRECTOR's answer, not a flag on the node.** `oneShot` asks
+  `MissionDirector.beatFireCount(beatId)`, and that is load-bearing rather than tidy: a trigger
+  authored inside a streamed zone's geometry is **freed and re-instanced every time the player walks
+  away and back**, so a local flag re-arms the ambush on every pass with nothing to see. The
+  director's fired-beat log is campaign state and outlives the node — and `resetCampaign()` re-arms
+  every trigger with it, which is the same answer for the same reason. `campaignOneShot` is the
+  control knob (`@Visible`, always on) that puts the local flag back, and the gate measures it.
+- **The mask is not authored.** `_ready` states `CHARACTER | VEHICLE` itself. A seated occupant is on
+  collision layer **0** (`CharacterDriveState.enter`), so without the VEHICLE half a player who
+  DRIVES to the mission marker trips nothing — and an area whose mask silently excludes the thing it
+  watches for looks exactly like a trigger that was never wired. A carrier hands the trigger whichever
+  seated occupant qualifies. `carrierAware` is that half's control knob.
+- **Every peer fires its own.** The volume is symmetric — a client's copy fires as the client's copy
+  of the body arrives — which is the director's own rule that a beat script runs on both peers without
+  knowing which it is. A beat whose EFFECT is host-authoritative is gated inside its handler, exactly
+  as `commandCharacter` already is. A `hostOnly` flag on the volume would move that decision into the
+  scene, away from the only thing that knows the answer.
+- **Gates that need no code**, each one export and each one a real authoring case:
+  `requiredMissionId` (an ambush does not fire before its mission), `requiresBeat` (objective markers
+  in sequence — otherwise marker 2 fires as you walk past it on the way to marker 1), and
+  `requiredCharacterId` (the escortee's drop-off, not the player's). `showDebugVolume` draws the box
+  or sphere (armed yellow, spent green), off by default — unlike a zone marker there are many.
+- **The escort order the verify needed did not exist.** `commandCharacter` could enter `ESCORT` but
+  not say WHOM to escort, so `ScriptCommand.escortTarget` (a live node, therefore code-set like
+  `assignSquad`) and `MissionDirector.commandEscortPlayer(id)` are new. The target is resolved through
+  `PlayerRegistry` rather than passed in, because a beat fires from a volume that knows nothing about
+  which player tripped it and in co-op "the player" is whichever one is there.
+
+**Gate `tools/godot/probe_zone_trigger.gd`** (16/16; `-- --control` turns both knobs off and fails
+exactly 2). The spec's own verify is case 1 and is a REAL walk — the player's own `PlayerController`
+reading the `forward` action — into the volume, which fires the beat, whose listener orders the boss
+to escort; the rest teleport, which crosses the boundary the same way. Also: an ambient AI does not
+trip a player trigger, a re-streamed trigger node stays silent for a spent beat, the three gates each
+refuse and then admit, a player who DRIVES in trips it (mask 18), and a trigger with no beat id is
+inert. **What is NOT asserted, on purpose: metres walked while escorting.** The escort MOTION is
+`EscortState`'s and is nav-driven, and this bare stand has no `NavigationRegion3D`, where a NavAgent
+reports "not finished" forever and hands back the body's own position — so the gate asserts the ORDER
+the trigger delivered (the state, and who is being escorted).
+
+**Probe trap, and it is the shared-sub-resource rule from the other side:** a `.tscn`-embedded
+`CharacterInfo` is SHARED by every instantiation, and `Character._ready` only privatizes one whose id
+is still **empty** — so a probe that stamps the scene's own resource *renames every AI it spawned
+before*. Spawning `ambient_01` silently renamed the boss, and the case keyed on `requiredCharacterId`
+failed with "not boss_01" while the registry (keyed by the string handed in at registration) still
+said the boss was loaded. Both this probe and `probe_mission_director.gd` now build a fresh
+`CharacterInfo` per body, which is the codebase's own "own identity in code, not the scene" rule.
+
+### The campaign save — `game.SaveSystem` (I7, AutoLoad, 2026-09-17)
+
+One JSON document per slot under `user://saves/`, written and read with Godot's own `FileAccess`.
+It carries the campaign graph, the faction flips, which mission was running, and each player's
+position / facing / health / slot manifest. **Which pieces are in it is the whole design**, and four
+rules decide it:
+
+- **Progress is saved; AUTHORING is not.** `MissionDirector.declareUnlock` rows say which variants
+  open which mission — that is content, re-declared by the same Java every launch. A saved copy would
+  be a second owner that goes stale the day the campaign is edited, with the stale copy winning. What
+  is saved is only what the player's play produced: the achieved `(missionId, variant)` set, the
+  completed missions, the sticky `unlocked` set, the granted unique items.
+- **The fired-beat log is campaign state, not a debug counter.** F3's `ZoneTrigger` decides "has this
+  already fired" by asking `MissionDirector.beatFireCount`, precisely so a trigger inside a streamed
+  zone cannot re-arm when the zone reloads. A save that left the log out would re-arm **every
+  one-shot trigger in the world** on load — the ambush you already sprang, waiting for you again —
+  with nothing on screen to say why. `SaveSystem.saveFiredBeats` (`@Visible`, always on) is the
+  control knob the gate measures that with, and it is 3 of the probe's checks.
+- **An interrupted mission RESTARTS; it does not resume mid-flight.** AI bodies are not saved (a
+  streamed world respawns its crowds), so a restored "3 of 7 left" counter would be counted against a
+  fresh crowd of 7 — a number that is simply untrue. The slot records the mission's id and its `.tres`
+  path and `loadSlot` starts it again **through the director**, so the unlock predicate still decides
+  whether it may run and a save cannot smuggle a locked mission back in. That is also what GTA does
+  with a save taken during a mission. A mission built in code or embedded as a sub-resource has no
+  loadable path (the limit `MissionManager` already documents for its client mirror), so it is
+  recorded by id and reported as unresumable rather than half-restored.
+- **Only what RUNTIME changed is saved of the factions.** `getActiveRelationships()` — the late-join
+  net baseline — returns the whole live table, which is a copy of the shipped/authored `.tres` with
+  the flips written into it, so saving that would freeze the shipped defaults into the slot and let an
+  old save silently win over an edited preset. `FactionManager.runtimeFlips` records exactly the
+  `setRelationship` calls that are still live (cleared by `rebuildLiveTable`, which IS the documented
+  "a layer change discards runtime flips" rule) and `getRuntimeOverrides()` is what the slot carries.
+  The region and mission LAYERS are not saved either: each is re-applied when its region streams in or
+  its mission restarts.
+- **The host's save is canonical and needs NO new message.** `saveSlot` refuses on a client
+  (`save_refused_client`). A load on the host reaches every client through seams that already exist:
+  the faction flips ride `FactionManager.setRelationship`'s world event, the mission restart rides
+  `WORLD_EVENT_MISSION_STARTED`, and inventory converges through the periodic `MSG_INVENTORY`
+  manifest. An RPC here would be a second way to say what the wire already says.
+
+**The player key is the id that is stable ACROSS LAUNCHES, and that is not the same field in both
+cases.** A remote player's `characterId` IS their `PersistentPlayerId` (`GameManager.onPeerIdentified`
+makes it so on first join), while a locally-owned body carries a per-launch UUID — so the local body
+is keyed by `PersistentPlayerId.getOrCreate()`, the id this install would identify as if it were the
+client. One rule, both cases, and the key survives a host/client role swap. A record whose body is not
+live yet is **held** (`pendingPlayerCount()`) and applied as that body appears, so loading before or
+during a scene coming up works, and a client that joins after the load still gets its own record.
+
+**Nothing new was written to read or apply state.** Inventory is `WeaponController.buildInventoryEntries`
+/ `applyReplicatedInventory(entries, addOnly=false)` — the N2 manifest path, with `addOnly` false
+because the owned-body guard exists to stop a *lag-stale* manifest fighting live input, and a document
+read off disk has nothing to race. Health is `Health.applyReplicatedHealth`, which is already the "set
+the number, fire no damage event" path; a save taken while dead is not resurrected into a corpse (a
+non-positive value is left alone). `MissionDirector.restoreCampaign` is a REPLACE, then
+`reevaluateUnlocks()`, so a requirement declared by this launch's code that the restored achievements
+already satisfy opens with everything else.
+
+**Autosave** (`autosaveEnabled`, slot 0) fires on `EventBus.missionBeatTriggered` and
+`missionCompleted` — the F3 hook I7 asked for, now that a beat has a caller. The debug console gained
+`save [slot]` / `load [slot]`.
+
+**Registration shapes that had to be worked around**, all the same quirk: godot-jvm merges a JavaBean
+accessor with its field into one property, so a registered `setX` with no getter does not compile and
+a registered `getX` with no setter registers READ_ONLY. The probe needed four things GDScript could
+not reach, and each is a question-named reader or a differently-named action beside the original:
+`FactionManager.flipRelationship` (beside `setRelationship`), `Health.healthNow` (beside
+`getCurrentHealth`), `WeaponController.activeSlotNow` (beside `getReplicatedActiveSlot`) and
+`MissionManager.missionActiveNow` / `activeMissionIdNow` (beside `isActive`). `FactionManager.reset`
+and `Health.applyReplicatedHealth` are not accessor-shaped and were annotated in place.
+
+**Gate `tools/godot/probe_save_system.gd`** (36/36; `-- --control` turns `saveFiredBeats` off and
+fails exactly 3). Its method is the spec's own verify, and the middle step is the part that matters:
+reach a state, save, **LOSE that state in the same session** (the stand-in for quitting), load, and
+find it back — a probe that only saves and loads cannot tell a working restore from a state that never
+went away. Cases: the graph (a declared unlock, an achieved variant, a granted unique item), a faction
+flip, a real ASR1 taken through the ordinary pickup path with a hand-set magazine, position and
+health; the file itself (schema, the four blocks, one player); everything wiped; everything restored,
+onto the SAME weapon node rather than a duplicate; a real one-shot `ZoneTrigger` dropped on the player
+after the load staying silent; the running mission recorded with a loadable path and restarted; and a
+missing slot refused rather than half-applied. **The faction flip has to DIFFER from the shipped
+default or it is unobservable** — two different factions are hostile by the inherent rule, so a flip
+to HOSTILE proves nothing and the case uses FRIENDLY (it cost one false pass first).
+
+**Not covered, on purpose:** the client refusal and the co-op mirror need two processes
+(`tools/net/run_net_*.sh`'s shape), so what this asserts is the ANSWER each seam reads. World entity
+state — which AI are dead, which pickups are gone, where the traffic is — is **not** saved at all, and
+that is the boundary the mission-restart rule above is drawn around.
+
+### Street races — `game.mission.RaceDirector` + `world.RaceCheckpoint` (R2, AutoLoad, 2026-09-17)
+
+GTA SA/VC-style checkpoint races over the existing road network, and the **first objective type
+beyond ELIMINATE_ALL with real logic**. `MissionObjectiveType.RACE` had been schema only since C1.
+
+**Where it sits is the F1 split, applied again.** "May this mission run" is `MissionDirector`'s;
+"is it won yet" is `MissionManager`'s — and a race is the second kind, so `MissionManager.startMission`
+hands a `RACE` mission to `RaceDirector` and the director hands the answer back through
+`completeMission` / `failMission`, exactly as the ELIMINATE_ALL counter does. It is a separate class
+rather than another branch in `MissionManager` because a race carries live per-racer state (progress,
+laps, placings, a clock) and a per-frame tick that no counter-shaped objective has.
+
+- **The route is checkpoints in index order, and they register themselves.** `RaceCheckpoint` calls
+  `registerCheckpoint` in `_ready` and `unregisterCheckpoint` in `_exitTree` — the
+  `Character`↔`SpatialEntityGrid` idiom — keyed by `raceId`, so a circuit authored inside a streamed
+  zone assembles and disassembles itself with no tree scan, and a world holds as many circuits as it
+  has names. Two gates claiming one index is refused and reported (`MissionDirector`'s duplicate-id
+  rule, same reason: which gate is #2 must not depend on streaming order).
+- **A checkpoint reports; it does not adjudicate.** It tells the director "this body touched index N"
+  and nothing else. **Only the racer's OWN next index counts** — so driving back through a gate you
+  already took is not progress and cutting the course cannot skip one — and that rule lives in one
+  place because it is the same rule for every gate in the world. `orderedCheckpoints` is the control
+  knob (`@Visible`, always on) that puts the naive "any untaken gate counts" implementation back, and
+  the gate measures the difference rather than asserting it in prose.
+- **The racer is the CHARACTER, never the vehicle**, keyed by `characterId` — the id the whole net
+  layer already uses. A racer who wrecks their car, steals another and drives on is the same racer;
+  one who bails out and runs the last 50 m finishes on foot, which is what GTA does and what falls
+  out of keying on the driver. A carrier hands the gate **every** seated occupant, because who is
+  enrolled is the director's answer and a passenger who is a racer has as much claim to the gate they
+  were carried through as the driver.
+- **The mask is not authored**: `CHARACTER | VEHICLE`, stated by the node, for `ZoneTrigger`'s reason
+  — a seated occupant is on collision layer **0** (`CharacterDriveState.enter`), so a gate watching
+  only CHARACTER is invisible to every car in the race, which looks exactly like a gate that was never
+  wired. Likewise a gate with no authored `CollisionShape3D` states a default cylinder: an `Area3D`
+  with no shape detects nothing and says nothing about it.
+- **Enrolment needs no authoring.** Every live `Player` races (in co-op that is the whole session,
+  the only default a mission cannot get wrong); AI racers and anyone else come from `addRacer`, which
+  works mid-race so a late joiner is not a special case.
+- **The MISSION ends when every HUMAN has finished**, not when the first one does — a co-op partner
+  two corners behind would otherwise be cut off mid-race. The variant is `WON` if any human took place
+  1, else `FINISHED`. AI racers keep their places and can end nothing: the mission is the players'.
+  `MissionInfo.timeLimit` — declared since C1 and never implemented — is the time trial's clock here,
+  and running it out calls `failMission`. Only the host may fail on the clock: two peers failing one
+  mission is two events for one fact.
+- **`endRace` FREEZES rather than wipes.** The placings, the clock and the roster stay readable until
+  the next `startRace`, because the moment a race ends is exactly when the results are wanted — by the
+  finish panel, by a beat that reads who won, and by a probe. Only `raceActiveNow()` changes.
+- **Standings** are checkpoints cleared, then distance to the next gate, recomputed at 4 Hz. Cheap and
+  exact enough for a HUD list; the only authoritative place is a FINISHED one, fixed when it is set.
+- **A race that cannot be finished is refused, loudly.** Fewer than two gates under that `raceId` and
+  `startRace` says so and does not start: a race silently running with no route is a mission the
+  player can never complete, and the cause (a mis-typed name, or a zone that has not streamed) is
+  invisible from the HUD.
+
+**Authoring costs one field and one marker prefix.** `MissionInfo.raceId` (empty = the circuit named
+after the mission — the case that needs no second name) and `raceLaps`; `WorldBaker` bakes
+`race_<raceId>_<idx>` empties into gates, the same `<name>_<n>` convention `lane_`/`spawn_` already
+use, with `radius`/`height` metas. **Shift+F4** on `DebugHarness` drops a four-gate circuit around the
+nearest player and starts a one-lap RACE mission over it — through `MissionManager.startMission`, so
+it exercises the shipped path rather than a shortcut.
+
+**AI racers are the shipped traffic brain plus ONE behavioural exception.**
+`VehicleAIController.racing` makes `shouldYield()` false: a race runs on a closed course, and
+first-come-first-served right of way at every junction is exactly what makes an AI racer finish last.
+Everything else a racer wants — a higher `cruiseThrottle`/`cruiseSpeed`, a bolder `cornerLateralAccel`
+(3.2d's corner-speed governor) — is already an exported number, so a racer is TUNING plus that one
+flag rather than a second controller.
+
+**The HUD polls, and a race is not a SITUATION.** `ui.RaceHUD` (countdown, clock, position, lap and
+checkpoint count, and the boost meter `Vehicle.getBoostFraction()` has exposed since the vehicle
+overhaul with no gauge) is self-gated like `WeaponProgress`/`ScopeOverlay` and deliberately **not** in
+`HUDManager`'s `BASE_LAYOUT`: a race is orthogonal to ON_FOOT/VEHICLE — you can finish one on foot —
+so the table could only hold a stale answer. **A race therefore needs no `EventBus` signal of its
+own**: the HUD polls, and the one event anything else cares about is the mission completing, which
+already exists. `ui.GpsArrow` points at the racer's next checkpoint while a race runs and at the
+player's own waypoint otherwise — DERIVED, never latched, because a race that WROTE the waypoint would
+clobber the destination the player set before it and not give it back (W29's rule for the view
+preference, applied to the waypoint).
+
+**Replication is three constants and no new message.** `WORLD_EVENT_RACE_START` (key = raceId,
+value = the countdown still to run, args = missionId, laps, then a `characterId` + `"0"/"1"` human
+flag per racer — the ROSTER rides in the event because a client cannot re-derive which AI the host
+enrolled), `_CHECKPOINT` (the RESULT — nextIndex and lap — not a delta, so a dropped grant is healed
+by the next one) and `_FINISH`. **The race ENDING needs no event of its own**: it is the mission
+completing or failing, which already replicates, and `RaceDirector` listens to those two signals on
+every peer. Only the host grants a checkpoint (`onCheckpointTouched` returns immediately off the host)
+and only the host decides a finish. Late join replays the start plus each racer's progress as *the
+same events* a live race sends (`NetworkManager.sendBaselineRace` → `sendWorldEventTo`, new, and now
+the shape every baseline can use), so a joiner runs the path a live event already exercises.
+**The payload's shape has one owner**: `RaceDirector.startArgs` builds it and
+`RaceDirector.applyRemoteStart` parses it, next to each other on purpose — an off-by-one between a
+builder here and a parser in `GameManager` shows up as "the client thinks the AI is a human and waits
+for it to finish", with nothing on either peer to say so. `GameManager`'s three `applyRace*` are pure
+routing.
+
+**Gate `tools/godot/probe_race.gd`** (42/42; `-- --control` turns `orderedCheckpoints` off and fails
+exactly 4, with no cascade — each later case restarts the race, and the knob's only effect is whether
+an out-of-order touch counts). Real Player, Vehicle and AICharacter bodies against the real AutoLoads,
+started the shipped way (a `MissionInfo` written as a `.tres` and handed to
+`MissionManager.startMissionFromPath`), never by calling `startRace`. Cases: a mission naming a
+circuit that is not there does not start a race; the countdown holds the clock AND refuses a gate
+cleared during it; the ordering rule (out of order, in order, and back through the one just taken);
+the GPS target and the self-gated HUD; the lap closing into a finish and the mission completing as
+`WON`, with the results still readable afterwards; two laps of the same four gates; the time trial
+failing the mission; a **car** carrying the racer clearing a gate (mask 18); an AI racer enrolled
+mid-race and scored by the same rules; standings; the `racing` exception measured on two real cars in
+a real `IntersectionZone` (ambient yields, the SAME brain with the flag on does not); the co-op mirror
+(the host's own wire payload fed back through `applyRemoteEventCsv` rebuilds its roster, and a
+mirrored checkpoint/finish lands); and a duplicate index refused / a freed gate leaving the route.
+
+**Not covered, on purpose:** the AI racer's LANE-FOLLOWING — a bare stand has no road network, and
+driving a lane is `probe_road_traffic`'s and `probe_traffic_spawn`'s gate, not this one's; and the
+two-process co-op run (`tools/net/run_net_*.sh`'s shape), for which what is asserted is the ANSWER each
+seam reads. Race state is also **not saved** (I7's boundary): an interrupted race restarts with its
+mission, which is the rule a fresh crowd already forced on every other objective.
+
+**Probe traps.** The junction arbiter registers a car on `body_entered` and skips one with no
+`VehicleAIController`, so a brain attached AFTER the car is already inside the volume is never
+registered and reads as "not yielding" for the wrong reason; and re-attaching a brain to flip `racing`
+loses that membership the same way (`VehicleProbeHelper.setRacing` flips the flag on the brain already
+in the junction). Two helpers were added there rather than registering `attachController`/`shouldYield`
+on the gameplay classes: a probe-support node exists precisely so a test does not add engine-visible
+surface to `Vehicle` and `VehicleAIController`.
+
+---
+
+---
+
+## AI (7-state singleton FSM)
+
+The AI body is `AICharacter`; its brain is `AIController` (`com.openworld.ai`), which runs the
+FSM in `gatherInput`. States are **stateless** singleton objects under `com.openworld.ai.character`.
+All mutable data lives on `AICharacter`. `AIState.update()` returns the next state; a different
+reference triggers a transition.
+
+| State | Key behaviour |
+|:------|:--------------|
+| `PatrolState` | NavAgent random walk within `patrolRadius` of spawn. → Chase/Attack on sight. → Search on hit. |
+| `ChaseState` | Sprint to target (or last known pos). → Attack when in range + LoS. → Patrol after `LOST_PLAYER_TIMEOUT` (3 s). |
+| `AttackState` | Strafe laterally. Reaction delay before first shot. Per-shot `hitChance` roll. Suppression fire for `suppressionDuration` after losing LoS. → Search when suppression expires. → RefillAmmo when dry. |
+| `SearchState` | Sprint to last known position, strafe to peek. Re-engage on sight. → Patrol after 5 s. |
+| `RefillAmmoState` | Sprint to `ammoRefill` Area3D. Fill all weapons on arrival. → Patrol. |
+| `EscortState` | Follow + defend a designated `Character`. → Attack if the escort target is attacked. |
+| `FleeState` | Sprint away from an attacker for a set distance. → Patrol on arrival. |
+
+Targeting is faction-aware (`AICharacter.discoverTarget()`): same-faction AI ignore each other
+and neutral factions are never targeted (friendly escorts / non-hostile NPCs).
+
+### Key AICharacter fields (timers all on AICharacter, not states)
+
+```java
+double attackTimer         // counts down per-shot cooldown
+double lostPlayerTimer     // time since last LoS in Attack/Chase
+double reactionTimer       // counts up from AttackState.enter; fires when >= reactionTime
+double underAttackTimer    // set to UNDER_ATTACK_DURATION (2.5 s) on damage
+double strafeTimer         // counts down; refresh strafe direction on <= 0
+double searchTimer         // counts up in SearchState
+Vector3 lastKnownPlayerPosition
+Vector3 currentAimTarget   // where AimRay is tracking this frame
+```
+
+### SightRay vs AimRay separation
+
+- **SightRay**: pure LoS check — `hasLineOfSight()`. Never moves the camera.
+- **AimRay**: fire direction — `AICharacter.snapAimRay(target)` forces it to point at the
+  computed aim target just before `command.fire = true`.
+- These are independent so accurate LoS never implies accurate aim.
+
+---
+
+## Event System (EventBus AutoLoad)
+
+`EventBus` is a global `Node` registered as AutoLoad. Any node reaches it via
+`getNodeOrNull("/root/EventBus")`.
+
+Key signals (not exhaustive — see `EventBus.java` for the full set, which also includes
+`all_players_died`, `player_spawned`, `pickup_interact_changed`, `player_ammo_changed`,
+`weapon_picked_up`, and the multi-character spawn/health/ammo signals used by `HUDManager`):
+
+| Signal | Emitter | Payload |
+|:-------|:--------|:--------|
+| `player_died` | `Player.onDied()` | — |
+| `enemy_killed` | (future use) | score: `int` |
+| `player_health_changed` | (future use) | currentHealth: `float` |
+| `ammo_picked_up` | (future use) | weapon index: `int` |
+| `character_eliminated` | `Health.takeDamage()` | `Signal7`: attackerName, attackerFaction, victimName, victimFaction, weaponName, weaponIcon, headshot |
+
+`GameManager` connects `playerDied → onPlayerDied()` in `_ready()`.
+The HUD (`HUDManager`/`CharacterHUD`) connects `characterEliminated` for the kill feed.
+
+---
+
+## MovementController flags (Player vs AICharacter)
+
+| Export flag | Player | AICharacter |
+|:------------|:------:|:-----------:|
+| `worldSpaceMovement` | `false` | `true` |
+
+Player input is camera-relative (rotated by `camRotation` at the source, in `PlayerController`).
+AI input is world-space (set directly by the AI FSM).
+
+**Combat facing is the AIM yaw, not the camera yaw.** `MovementController.aimYaw()` yaws `meshRoot`
+toward `Character.getAimTargetPosition()` — the same world point the spine IK (`SpineAimModifier`,
+a `LookAtModifier3D` tracking the `AimTarget` marker) and the bullet converge on. The TPS camera
+sits off the shoulder, so its yaw and the body→aim-point yaw differ by several degrees at close
+range: keying the body off the camera left the visible body/gun square to a wall while the shot
+went past it. It falls back to the raw `camRotation` for a non-`Character` body or an aim point
+within 0.5 m horizontally (directly overhead/underfoot). Together with the muzzle leg of the
+two-stage trace this makes the three agree — body, bone-driven gun, and bullet.
+
+---
+
+## Audio: every sound is a file (2026-09-29)
+
+No sound is synthesised in code (`SoundTest` refuses `new AudioStreamWAV(` / `AudioStreamGenerator` under
+`src/main/java`). A non-weapon sound is a `com.openworld.audio.Sound` entry naming `assets/audio/<file>.ogg|.wav`,
+played through `audio.Sounds` (`stream` / `play3D`); a missing file is silence plus one `[Sounds] missing audio`
+line. Weapons keep `fire_audio` / `reload_audio` in their scenes. `assets/audio/README.md` is the list of what
+ships, what is wired but missing a file (`glass_shatter`, `hit_marker`) and what is not wired yet; `SoundTest`
+checks its "Wired in code" table against the enum. Licence rule as for art: CC0 / MIT / public domain, credited.
+
+### Two-lane ramps, the Suburb crossroads, and the lane-split pair kept level (2026-10-04, user-asked)
+
+- **Every expressway ramp's BODY is two lanes** (`island_expressway.widen_ramps`, user: a one-lane ramp was a race
+  bottleneck; user's choice "narrow to 1 at the gore"). Each EXPRESSWAY end (a gore = AUX link, or a joint = a lane split
+  or JCT carriageway) keeps the one lane its mainline slot hands over until the ramp has parted from every road it meets
+  there, then opens or closes over `WIDEN_TAPER` (13 m: the rule wants 11.6 m at 40 km/h x 0.25, and
+  `island_grades.ramp_curves` never subdivides a taper span). The ground end runs both lanes into the intersection. The
+  mainline aux slots are unchanged. Rules each a measured defect first:
+  * **The hold is side-aware**: a one-way road lays its lanes to the LEFT of its stations, so the added lane reaches only
+    toward a partner on the left (port exit 140 -> 109 m single, Y4 94 -> 59).
+  * **The road's BASE stays one lane** (stations carry the two): `island_dike` sizes a crossing's floor from the base,
+    and at two the Suburb exit stayed up over the crest 30 m longer and came down at 8.4 %.
+  * **A station reused for a taper end must lie OUTSIDE the taper** and lane counts are assigned by those stations, or
+    a 13 m taper became 10 m. `island_grades.level_gores` never inserts its parting station into a taper span, nor within
+    `GORE_MIN_SPAN` of the station BEFORE it (two coincident stations were a zero span the profile solve divided by).
+  * Single stretches left: where a ramp still runs beside its mainline (a gore) or its lane-split sibling (T1+T3 and
+    T2+T4 run 6 m apart: a split hands each ramp one lane of a 2-lane carriageway).
+- **The Suburb junctions** (probe_road_clear: connectors through two overlapping pads). `kogai_michi` met `wangan_dori` at
+  34 deg (mouths ~200 m apart), the dike side road ran 20-40 m from `wangan_dori` and crossed it 45 m on, and the exit
+  landed on THAT junction. Now (`tools/island_suburb_kogai.py`, one-shot on the arterials input): `wangan_dori`'s
+  junction at record x 775 is a crossroads of `eki_ginza_suburb` (north) and the **Suburb exit** (south,
+  `island_plan.SB_JUNCTION` / `SB_JUNCTION_ROADS`); `kogai_michi` leaves `wangan_dori` at the Suburb station's own T
+  (x 929, opposite `ekimae_suburb`), and the side road's piece there is not built (`island_dike.SIDE_DROP`; a dropped
+  piece keeps its number, and a frozen record naming `teibo_sokudo_<n>` matches the family, `island_core_streets._family`).
+  Moving the side road away instead (`SIDE_EXTRA` 60 -> 25) cost the exit 60 m of run: 12 %.
+- **No street crosses a ramp mid-air** (`island_streets._raised_ramp`): a line crossing an expressway road between
+  `RAMP_AT_GRADE` 0.6 m and `RAMP_UNDER` 5.5 m (too high to meet, too low to pass under) is refused, so it is nudged
+  or dropped. `cho_sw_345` had cut the connector's SB exit 3 m up in its descent; that junction's pad sloped 20 % and
+  the two-lane deck overhung its own connectors (probe_road_clear).
+- **The port's EB entrance with two lanes**: its second lane (on its left) lay over the dike road's footway, so the dike
+  road moved a further 5 m north (`tools/island_dike_port_gap_2lane.py`, one-shot); its T arm leans 30 deg east toward
+  the merge (`_t_arm(skew=, lean=)`, `PORT_ON_SKEW`: square, the gap left ~10 m to turn 90 deg, an R 9 corner whose
+  setback slid all three mouths onto one point); it levels over a 30 m landing into the T (`PORT_ON_LANDING`: on the
+  turn the inner lane's path is shorter, so a grade there read K 4.4), and it merges 20 m further east
+  (`PORT_ON_X` -250) for the length. `ramp_curves` also subdivides a ramp's last span into a GROUND junction's mouth
+  (`rg._tapers` counted any non-SEGMENT end as a taper) and faces that mouth level.
+- **T1 + T3 are ONE profile** (`island_grades.PAIR_RAMPS`): each ramp is solved alone, and the two halves of the EB
+  lane split, 6 m apart, came out 0.5-0.8 m apart -- a step probe_road_clear reads as a wall. The later one takes the
+  earlier one's SOLVED height on every sample of a run >= 60 m beside it. Limited to that pair on purpose: pinning a JCT
+  split's halves (Y1/Y2, which part vertically) put Y2 at 7 %, and pinning T4 to T2 met T4's held gore at another slope.
+
+### Every crossing is a junction; two lanes at every gore (2026-10-04 evening, user-asked)
+
+- **A new layout gate: `island_layout.ungapped_crossings`** (asserted; also in `--check`). Two at-grade road
+  centrelines crossing with no junction (expressway and rail skipped, |dz| < 4 m), and a road passing THROUGH a pad it
+  is not an arm of (within 0.85 of the nearest mouth's distance from the centre, or through the mouths' convex hull).
+  The committed layout had 6; validate and flow read every one clean, because a crossing is two consistent roads.
+- **Three causes, each fixed at its source:**
+  * `island_core_streets.CUT_CROSSINGS` is on: an authored street crossing a road between its ends makes a crossroads
+    there. `kojo_minami` is removed (the dike's side road fronts that block), and the Industry station's access
+    (`island_rail_layout.HUB_ACCESS`, at (103, -664)) joins the side road x kojo_waku crossroads: a 5-arm pad.
+  * `island_streets._line_ok` / `_line_split`: a crossing that crowds a junction is dropped as a node, and now it is
+    also a WALL the line may not pass. The line keeps the run of its nodes with the most junctions, and its limit
+    stops a new-line crossing from extending it past the wall.
+  * `plan_region`: a crossing of two NEW lines given up (e.g. for MIN_SPAN) is no longer still crossed. At settle,
+    one of the two lines is trimmed short of it: the line whose shorter side holds fewer junctions loses that side.
+- **Every expressway ramp is two lanes at its gore** (`ENTRY_LANES` / `EXIT_GROUND_LANES` 2, and the three ground
+  ramps that defaulted to 1). The four T ramps stay one lane at BOTH ends: at J0 the 2+2 Wangan splits lane by lane,
+  and their spur gores would need a 108 m taper span where the bridge-approach stations are 71-76 m apart (the slot
+  ran to the road's end; `T_GORE_LANES`, `widen_ramps` already skips the hold at a two-lane gore). Five rules came
+  with it:
+  * `point_validate.check_tapers` exempts an ENTRANCE's gore station: the acceleration lane begins at the nose at
+    full width. It mirrors the exit exemption that was already there.
+  * `island_grades.level_gores` is side-aware. A one-way ramp lays its lanes LEFT of its driving direction, so with
+    the mainline on its right the bands have parted at `half(main) + edge + the mainline's AUX width there + 1 m`.
+    The old full-width rule held a two-lane exit ~30 m too long. The aux term is load-bearing: at a gore the ramp's
+    lanes lie on the mainline's aux pavement.
+  * `island_grades.ramp_curves` and `island_dike.crossing_needs`: a ramp's own GROUND junction (its arms, `TEE_SKIP`
+    40 m) is not a road it flies over. The wider band read port_off as crossing the port loop's dike ramp, and it
+    was lifted 17 m.
+  * `island_expressway.station_by_x` faces an inserted station on its alignment's design tangent. Chord-faced where
+    the Wangan bends, port_off's mouth read 5.7 deg off and the gate said `ramp_wrong_side`.
+  * `_carry` rounds its end to the NEARER station and never onto the road's end. Y3's carry rounded up onto the
+    connector joint, which left an `open_end`.
+- Re-placed for room: `Y3_ON_Y` -700 -> -650 (Y3 descends in one straight grade after its last crossing,
+  `Y3_GORE_HOLD`), `PORT_OFF_X` -200 -> -170, `PORT_ON_X` -250 -> -230; Y2 flies on a 4.5 % cone.
+

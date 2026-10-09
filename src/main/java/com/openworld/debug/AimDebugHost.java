@@ -1637,8 +1637,10 @@ public class AimDebugHost extends Node3D {
 			mm.setRelative(new Vector2((float) c.mouseDx, (float) dy));
 			Input.INSTANCE.parseInputEvent(mm);
 		}
-		// The aim pose needs a firearm in hand; slot 0 is the fist.
-		if (c.axis == Axis.PITCH || c.axis == Axis.LIMIT || c.axis == Axis.WEIGHT) {
+		// The aim pose needs a firearm in hand; slot 0 is the fist. And any combat case must DRAW first: since
+		// 2026-10-06 aiming with holstered hands is deliberately no combat (PlayerController), and the four
+		// "aim standing" yaw cases measured a body that never entered combat (found by tools/nightly_gates.sh).
+		if (c.combat || c.axis == Axis.PITCH || c.axis == Axis.LIMIT || c.axis == Axis.WEIGHT) {
 			Input.INSTANCE.actionPress(new StringName("weapon_slot_1"), 1.0f);
 		}
 		if (c.axis == Axis.WEIGHT) applyClavicleWeight(c.expected);
