@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # island_world.sh -- the WHOLE island, in the one order it may be built (PLAN.md 3.30 L0.2, review R4).
 #
-#   tools/island_world.sh [--from <stage>] [--to <stage>] [--only <stage>]
+#   tools/island_world.sh [--from <stage>] [--to <stage>] [--only <stage>] [--regenerate]
+#   (once assets/world_source/HANDOVER exists the island is hand-authored and this refuses without --regenerate)
 #
 # Everything on the island is derived from the step before it: the land, the roads laid on it, the terrain stamped to
 # the roads, the sites, the lots and buildings, the block ground. So each stage is ONE pass, and a later stage never
@@ -44,9 +45,13 @@ while [[ $# -gt 0 ]]; do
         --from) FROM=$2; shift 2 ;;
         --to) TO=$2; shift 2 ;;
         --only) FROM=$2; TO=$2; shift 2 ;;
+        --regenerate) export OW_REGENERATE=1; shift ;;
         *) echo "unknown argument $1"; exit 2 ;;
     esac
 done
+# PLAN.md item 3: a handed-over island is hand-authored; regenerating it needs --regenerate (handover_guard.py)
+python3 tools/handover_guard.py >/dev/null
+python3 -c "import sys; sys.path.insert(0, 'tools'); import handover_guard; handover_guard.refuse('island_world.sh')"
 idx() { local i; for i in "${!STAGES[@]}"; do [[ ${STAGES[$i]} == "$1" ]] && { echo "$i"; return; }; done
         echo "unknown stage $1" >&2; exit 2; }
 LO=$(idx "$FROM"); HI=$(idx "$TO")

@@ -766,6 +766,9 @@ def main(argv):
             shutil.rmtree(d)
         return
     if "--check" not in argv:
+        sys.path.insert(0, HERE)
+        import handover_guard
+        handover_guard.refuse("island_layout.py (the road record)", argv)
         derive(OUTPUT)
     rep = json.loads(run(CLI, "validate", OUTPUT))
     flow = json.loads(run(CLI, "flow", OUTPUT))["report"]

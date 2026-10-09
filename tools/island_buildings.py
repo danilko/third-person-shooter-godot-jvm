@@ -3465,6 +3465,11 @@ def tones_gate(check):
 
 
 def main(argv):
+    # PLAN.md item 3: once the island is handed over these rewrite hand-authored building records
+    if argv[:1] in (["derive"], ["anchors"], ["lots"], ["retone"]) and "--check" not in argv:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import handover_guard
+        handover_guard.refuse("island_buildings.py %s (the building record)" % argv[0], argv)
     if argv[:1] == ["derive"] and len(argv) >= 2:
         derive(argv[1])
         return 0

@@ -35,6 +35,11 @@ var deck := false
 var budget_cfg := {}
 var deck_fail := []
 
+func _no_promote(n: Node) -> void:
+	var sc = n.get_script()
+	if sc != null and str(sc.resource_path).ends_with("PedCrowd.java"):
+		n.set("promote_distance", 0.0)
+
 func _no_building_shadow(n: Node) -> void:
 	if n is GeometryInstance3D and str(n.owner.scene_file_path if n.owner != null else "").contains("/buildings/"):
 		(n as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -343,6 +348,11 @@ func _initialize() -> void:
 	if _arg("no-building-shadows", false):
 		node_added.connect(_no_building_shadow)
 		print("SWEEP: buildings cast no shadows")
+	if _arg("no-promote", false) and zm != null:
+		# the crowd stays, drawn as light peds only: nobody walks into the promote ring (attributes the crowd's cost;
+		# a budget of 0 means unlimited, so the ring itself is shut on every crowd as it streams in)
+		node_added.connect(_no_promote)
+		print("SWEEP: no crowd promotion (every PedCrowd promote_distance 0)")
 	if _arg("no-dummy", false) and zm != null:
 		zm.set("dummy_out_dist", 0.0)
 		print("CONTROL: no dummy traffic cars (PLAN.md 1g e)")
