@@ -323,16 +323,23 @@ public class WorldBaker extends Node {
      * {@code DebugHarness} F5, or editor F6); then the MultiMesh serializes natively into the {@code .tscn}.
      */
     private static int buildMultiMeshes(Node root, List<Node3D> markers, String kitDir) {
+        // PLAN.md 2f: grouped per asset AND per world chunk (`chunk` extra, point_gltf.BATCH_CHUNK), so a far
+        // chunk's batch is culled on its own by world.ViewDistance; a marker with no chunk keeps one batch per asset
         Map<String, List<Node3D>> byAsset = new LinkedHashMap<>();
         for (Node3D m : markers) {
             String path = instanceAssetPath(m, kitDir);
-            if (!path.isEmpty()) byAsset.computeIfAbsent(path, k -> new ArrayList<>()).add(m);
+            if (path.isEmpty()) continue;
+            String chunk = metaString(m, "chunk", "");
+            byAsset.computeIfAbsent(chunk.isEmpty() ? path : path + "#" + chunk, k -> new ArrayList<>()).add(m);
         }
         int total = 0;
         for (Map.Entry<String, List<Node3D>> e : byAsset.entrySet()) {
-            Mesh mesh = loadVisualMesh(e.getKey());
-            if (mesh == null) { GD.printErr("WorldBaker: mmesh — no visual mesh in '" + e.getKey() + "'"); continue; }
-            mesh = withKitMaterials(mesh, e.getKey());
+            int hash = e.getKey().indexOf('#');
+            String path = hash < 0 ? e.getKey() : e.getKey().substring(0, hash);
+            String chunk = hash < 0 ? "" : "_" + e.getKey().substring(hash + 1);
+            Mesh mesh = loadVisualMesh(path);
+            if (mesh == null) { GD.printErr("WorldBaker: mmesh — no visual mesh in '" + path + "'"); continue; }
+            mesh = withKitMaterials(mesh, path);
             List<Node3D> ms = e.getValue();
             MultiMesh mm = new MultiMesh();
             mm.setTransformFormat(MultiMesh.TransformFormat.TRANSFORM_3D);   // must precede instanceCount
@@ -341,8 +348,8 @@ public class WorldBaker extends Node {
             for (int i = 0; i < ms.size(); i++) mm.setInstanceTransform(i, ms.get(i).getGlobalTransform());
             // a knock-down pole (PLAN.md 3.11): the batch is a BreakableProps node, which owns the poles' colliders
             MultiMeshInstance3D mmi = hasMetaKey(ms.get(0), "break_mass")
-                    ? breakableBatch(ms, assetStem(e.getKey())) : new MultiMeshInstance3D();
-            mmi.setName(new StringName((mmi instanceof BreakableProps ? "Breakable_" : "MM_") + assetStem(e.getKey())));
+                    ? breakableBatch(ms, assetStem(path), chunk) : new MultiMeshInstance3D();
+            mmi.setName(new StringName((mmi instanceof BreakableProps ? "Breakable_" : "MM_") + assetStem(path) + chunk));
             mmi.setMultimesh(mm);
             root.addChild(mmi);
             total += ms.size();
@@ -362,10 +369,10 @@ public class WorldBaker extends Node {
      * {@code break_respawn}, written by {@code point_gltf.marker_node}). Each pole's base and yaw are stored beside
      * the MultiMesh because a headless run cannot read a MultiMesh's transforms back.
      */
-    private static BreakableProps breakableBatch(List<Node3D> ms, String asset) {
+    private static BreakableProps breakableBatch(List<Node3D> ms, String asset, String chunk) {
         BreakableProps bp = new BreakableProps();
         Node3D first = ms.get(0);
-        bp.pieceId = bakingPieceId;
+        bp.pieceId = bakingPieceId + chunk;
         bp.assetName = asset;
         bp.poleHalfWidth = metaFloat(first, "break_pole_half", bp.poleHalfWidth);
         bp.poleHeight = metaFloat(first, "break_pole_height", bp.poleHeight);

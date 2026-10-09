@@ -1660,6 +1660,7 @@ OTHER_TRACK_CLEAR = 7.0   # a station building / car park keeps this far (plan) 
 RESERVE_OUT = os.path.join(ROOT, "assets/world_source/buildings/IslandRailReserve.json")
 MULTI_M = 25.0           # two at-grade lines closer than this are ONE multi-track band: no street crosses it
 RESERVE_STEP = 10.0      # m between corridor samples in the reserve record
+STICKY_M = 3.0           # a previous 'no' sample within this of a new one keeps it closed (the closure's 2-cycle)
 
 
 def _cross_rule(dz):
@@ -1703,6 +1704,20 @@ def reserve(res, out):
             for q in samp:
                 if q[4] == "level" and math.hypot(q[0] - c["x"], q[1] - c["y"]) < reach:
                     q[4] = "no"
+    # ...and a closure is STICKY. The crossings above are the CURRENT layout's streets, and a closure works by keeping
+    # streets away -- so the next layout has no street there, re-opens the samples, and the planner puts one back:
+    # a 2-cycle (2026-10-08: 16 samples of rail_blue__3 by chuo_dori flipped 'no' -> 'level' and cho_128 /
+    # machi_sw_15 crossed 1-9 m from a junction). A sample the previous reserve closed stays closed while the line
+    # still runs within STICKY_M of it (a line that MOVES re-derives from scratch).
+    try:
+        prev = {c["line"]: c["pts"] for c in json.load(open(RESERVE_OUT))["corridors"]}
+    except (OSError, ValueError, KeyError, TypeError):
+        prev = {}
+    for name, samp in lines.items():
+        closed = [q[:2] for q in prev.get(name, ()) if len(q) > 4 and q[4] == "no"]
+        for q in samp:
+            if q[4] == "level" and any(math.hypot(q[0] - c[0], q[1] - c[1]) < STICKY_M for c in closed):
+                q[4] = "no"
     grade = {n: [q[:2] for q in samp if q[4] == "level"] for n, samp in lines.items()}   # BEFORE any is re-marked
     for name, samp in lines.items():
         for q in samp:

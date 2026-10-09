@@ -125,6 +125,8 @@ if want buildings; then
     python3 tools/island_buildings.py write | tail -2
     # no building stands on a road band at any height -- under C1's deck included (2026-09-29)
     python3 tools/island_buildings.py roads || echo "WARNING: a building stands on a road -- see the list above"
+    # every enterable building's doors keep a clear apron and every side/back door is walkable from the front (1g f)
+    python3 tools/island_door_access.py | tail -3
     godot 600 tools/godot/build_building_hlod.gd | tail -1      # R9: each cell's HLOD, from write's boxes
 fi
 if want ground; then

@@ -228,7 +228,10 @@ func _initialize() -> void:
 			var off := 3.5 + 1.2
 			var rec := Vector2(float(bx["x"]) + nx * sgn * off, float(bx["y"]) + nyy * sgn * off)
 			var at := Vector3(rec.x, ny + float(bx["z"]), -rec.y)
-			var hit := _ray_down(at)
+			# from 2.5 m over the rail head, under a platform shed's roof (the roofs collide since 2026-10-07: a ray
+			# from 6 m up read every station's platform at 4.51 m, the roof)
+			var hit: Dictionary = w.get_world_3d().direct_space_state.intersect_ray(
+					PhysicsRayQueryParameters3D.create(at + Vector3(0, 2.5, 0), at - Vector3(0, 3, 0), WORLD_MASK))
 			var bed := ny + float(bx["z"]) - 0.16
 			var dz := 999.0 if hit.is_empty() else (hit["position"] as Vector3).y - bed
 			if dz < 1.1 or dz > 1.4:

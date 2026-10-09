@@ -8,9 +8,9 @@ material = ExtResource("lotmat")
 
 [sub_resource type="MultiMesh" id="Aprons"]
 transform_format = 1
-instance_count = 5
+instance_count = 4
 mesh = SubResource("ApronBox")
-buffer = PackedFloat32Array(1.9981, 0.0000, -0.6154, 757.4930, 0.0000, 0.4000, 0.0000, 5.5400, 0.6461, 0.0000, 1.9030, -1518.3770, 1.9981, 0.0000, -0.6154, 759.2070, 0.0000, 0.4000, 0.0000, 5.5400, 0.6461, 0.0000, 1.9030, -1517.8230, 2.0338, 0.0000, -0.4981, 815.9960, 0.0000, 0.4000, 0.0000, 12.6660, 0.5230, 0.0000, 1.9370, -1566.2550, 2.0338, 0.0000, -0.4981, 817.9330, 0.0000, 0.4000, 0.0000, 12.6890, 0.5230, 0.0000, 1.9370, -1565.7570, 1.9898, 0.0000, -0.6392, 895.0860, 0.0000, 0.4000, 0.0000, 13.3550, 0.6712, 0.0000, 1.8951, -1542.8530)
+buffer = PackedFloat32Array(-2.0982, 0.0000, 0.0824, 836.9090, 0.0000, 0.4000, 0.0000, 10.9260, -0.0865, 0.0000, -1.9983, -1592.6110, 1.9981, 0.0000, -0.6154, 757.4930, 0.0000, 0.4000, 0.0000, 5.5400, 0.6461, 0.0000, 1.9030, -1518.3770, 1.9981, 0.0000, -0.6154, 759.2070, 0.0000, 0.4000, 0.0000, 5.5400, 0.6461, 0.0000, 1.9030, -1517.8230, 1.9921, 0.0000, -0.6330, 909.0420, 0.0000, 0.4000, 0.0000, 13.4440, 0.6646, 0.0000, 1.8972, -1538.1140)
 
 [sub_resource type="BoxShape3D" id="ApronShape"]
 size = Vector3(2.100, 0.400, 2.000)
@@ -20,7 +20,7 @@ size = Vector3(2.100, 0.400, 2.000)
 [node name="Crops" type="Node3D" parent="."]
 script = ExtResource("crop")
 chunks = PackedFloat32Array(750.000, -1550.000, 5.600, 0, 800.000, -1550.000, 5.600, 0, 850.000, -1550.000, 5.600, 0)
-masks = PackedStringArray("00000000000000000000000000000006000003f00001ff8000fff8007fffc03ffffc1fffffeffffffffffffc7ffffe07ffff007fff8007ffc0007fe00007f00000700000000000000000000000000", "000000000000000000000000000000000000000000000000000000000000000000000000000c000007e00003ff0001fff000ffff807ffff83fffff9ffffff7fffff87ffffc07fffe007fff0007ff8", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000f000007f00003ff0001fff000ffff000")
+masks = PackedStringArray("00000000000000000000000000000006000003f00001ff8000fff8007fffc03ffffc1fffffeffffffffffffc7ffffe07ffff007fff8007ffc0007fe00007f00000700000000000000000000000000", "000000000000000000000000000000000000000000000000000000000000000000000000000c000007e0001ffe001ffff03ffffffffffffffffffffffffff7fffff87ffffc07fffe007fff0007ff8", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000004000003000001c00000f000007f00003ff0001fff000ffff000")
 
 [node name="Aprons" type="MultiMeshInstance3D" parent="."]
 multimesh = SubResource("Aprons")
@@ -30,21 +30,17 @@ cast_shadow = 0
 collision_mask = 0
 
 [node name="Apron0" type="CollisionShape3D" parent="ApronCollision"]
-transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 757.493, 5.540, -1518.377)
+transform = Transform3D(-0.999152, 0, 0.041178, 0, 1, 0, -0.041178, 0, -0.999152, 836.909, 10.926, -1592.611)
 shape = SubResource("ApronShape")
 
 [node name="Apron1" type="CollisionShape3D" parent="ApronCollision"]
-transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 759.207, 5.540, -1517.823)
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 757.493, 5.540, -1518.377)
 shape = SubResource("ApronShape")
 
 [node name="Apron2" type="CollisionShape3D" parent="ApronCollision"]
-transform = Transform3D(0.968496, 0, -0.249028, 0, 1, 0, 0.249028, 0, 0.968496, 815.996, 12.666, -1566.255)
+transform = Transform3D(0.951487, 0, -0.307689, 0, 1, 0, 0.307689, 0, 0.951487, 759.207, 5.540, -1517.823)
 shape = SubResource("ApronShape")
 
 [node name="Apron3" type="CollisionShape3D" parent="ApronCollision"]
-transform = Transform3D(0.968496, 0, -0.249028, 0, 1, 0, 0.249028, 0, 0.968496, 817.933, 12.689, -1565.757)
-shape = SubResource("ApronShape")
-
-[node name="Apron4" type="CollisionShape3D" parent="ApronCollision"]
-transform = Transform3D(0.947546, 0, -0.319621, 0, 1, 0, 0.319621, 0, 0.947546, 895.086, 13.355, -1542.853)
+transform = Transform3D(0.948600, 0, -0.316477, 0, 1, 0, 0.316477, 0, 0.948600, 909.042, 13.444, -1538.114)
 shape = SubResource("ApronShape")

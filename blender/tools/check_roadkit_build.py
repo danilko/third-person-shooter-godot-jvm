@@ -68,7 +68,7 @@ def committed(record, zones, prefix, ground, tmp, extra=()):
 
 def styled(tmp):
     record = os.path.join(PIECES, "RoadKitStyled.roads.json")
-    d = cli("gltf", record, "", tmp, "RoadKitStyled")
+    d = cli("gltf", record, "", tmp, "RoadKitStyled", "--no-batch")   # its checks read objects by name
     check(d.get("written") and len(d["pieces"]) == 1, "RoadKitStyled builds")
     check([tuple(m) for m in d["missing_style"]] == [("demo_cross", "footway", "material", "M_DoesNotExist"),
                                                      ("demo_spur", "pillar", "asset", "RKA_PIER_DoesNotExist")],

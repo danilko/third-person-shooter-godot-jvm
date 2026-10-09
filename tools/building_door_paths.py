@@ -4,7 +4,7 @@ game.EnforcementDispatch sends breaching units to a building's cheapest door. It
 building's OWN corners, which runs into a neighbour that touches the building (measured: probe_breach's officers gave
 up a konbini's back door 26 times out of 28). The walk is a fact about the layout, so it is baked here, once, from the
 same footprints `tools/island_door_access.py` measures: from 1.2 m outside the FRONT door to 1.2 m outside every other
-door, on a 0.5 m grid, round every neighbour's plinth grown by a body's radius, inside a 70 m window. A door no walk
+door, on a 0.5 m grid, round every neighbour's plinth grown by a body's radius, inside a 70 m window (wider for a building that needs it, `window`). A door no walk
 reaches is recorded as null (the dispatch never sends anyone there).
 
     door_paths(i, B, polys, tree, idx, layout) -> {"Door_<side>_<module>": [[x, z], ...] | None}   (Godot frame)
@@ -20,6 +20,16 @@ from shapely.geometry import box as sbox
 
 WALK = ("Parking", "PocketPark", "Park")
 RES, WIN, R, OUT = 0.5, 70.0, 0.4, 1.2
+#: the window reaches this far past the building's own footprint on every side, so a building wider than WIN still
+#: has its side doors inside it (2026-10-08: the 72 m DepartmentStore's two side exits sat outside a fixed 70 m
+#: window and read as "no walk reaches them")
+WIN_MARGIN = 15.0
+
+
+def window(poly):
+    """The walk window's side for a building of this footprint: WIN, or the footprint + WIN_MARGIN each side."""
+    minx, minz, maxx, maxz = poly.bounds
+    return max(WIN, math.ceil((max(maxx - minx, maxz - minz) + 2 * WIN_MARGIN) / RES) * RES)
 
 
 def _door_name(d):
@@ -27,12 +37,13 @@ def _door_name(d):
 
 
 def _grid(b, i, B, polys, tree, idx, paved):
-    x0, z0 = b["pos"][0] - WIN / 2, b["pos"][2] - WIN / 2
-    n = int(WIN / RES)
+    win = window(polys[i])
+    x0, z0 = b["pos"][0] - win / 2, b["pos"][2] - win / 2
+    n = int(round(win / RES))
     occ = np.zeros((n, n), bool)
     gx = x0 + (np.arange(n) + 0.5) * RES
     X, Z = np.meshgrid(gx, z0 + (np.arange(n) + 0.5) * RES, indexing="ij")
-    for k in tree.query(sbox(x0, z0, x0 + WIN, z0 + WIN)):
+    for k in tree.query(sbox(x0, z0, x0 + win, z0 + win)):
         j = idx[int(k)]
         if B[j]["type"].startswith(WALK):
             continue
@@ -64,7 +75,7 @@ def _clear(occ, a, b):
 
 
 def walk_grid(i, B, polys, tree, idx, paved):
-    """The building's 70 m walk window as data the game can search from wherever a unit stands:
+    """The building's walk window (70 m, or `window`) as data the game can search from wherever a unit stands:
     {x0, z0, n, res, bits} with bits = base64 of the occupancy, one bit per cell, cell (gx, gz) at bit gx * n + gz,
     most significant bit first (numpy.packbits)."""
     import base64

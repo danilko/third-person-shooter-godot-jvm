@@ -534,6 +534,8 @@ def cmd_gltf(a):
         if fur.collision:
             objs.setdefault(pfu.COLLISION_OBJECT, {}).setdefault(pfu.NO_MATERIAL, []).extend(fur.collision)
         path = os.path.join(a.out_dir, piece + ".gltf")
+        if not getattr(a, "no_batch", False):
+            objs = pgl.batch(objs)       # PLAN.md 2f: one object per chunk x class, one primitive per material
         row = dict(pgl.write(objs, kit, path, markers=fur.placements), zone=zone, piece=piece, gltf=path,
                    furniture=dict(sorted(fur.counts.items())))
         pieces.append(row)
@@ -706,6 +708,7 @@ def main(argv=None):
     s.add_argument("prefix"); s.add_argument("--ground", default=""); s.add_argument("--only", default="")
     s.add_argument("--gated", action="store_true"); s.add_argument("--lanekits", default="")
     s.add_argument("--no-furniture", action="store_true")
+    s.add_argument("--no-batch", action="store_true", help="PLAN.md 2f control: one object per road layer, not per chunk")
     s.add_argument("--avoid", default=""); s.add_argument("--avoid-ground", default="")
     s.add_argument("--keep-clear-lanekits", default=""); s.add_argument("--keep-out", default="")
     s.set_defaults(fn=cmd_gltf)

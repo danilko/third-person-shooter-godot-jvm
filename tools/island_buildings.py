@@ -606,10 +606,10 @@ def type_aabb(name):
 
 _DOORS = None
 #: an ENTERABLE building's door keeps this apron clear outside it (PLAN.md 1g f, user 2026-10-07: "there should
-#: always be room for an emergency exit"): the door's width + APRON_SIDE each side, APRON_DEPTH out. Reserved as a
+#: always be room for an emergency exit"): the door's width + DOOR_APRON_SIDE each side, DOOR_APRON_DEPTH out. Reserved as a
 #: 路地 (`field.passage`), so no later building or lot stands or grows in it, and a building is refused whose own
 #: aprons already hold another building. A car park may still stand over one (it is open ground a body crosses).
-APRON_DEPTH, APRON_SIDE = 3.0, 0.5
+DOOR_APRON_DEPTH, DOOR_APRON_SIDE = 3.0, 0.5   # NOT `APRON_DEPTH`: that name is the edge apron box below (0.4 m), which silently overwrote this one
 
 
 def type_doors(t):
@@ -634,12 +634,12 @@ def door_apron_cells(field, t, cx, cz, yaw):
     for d in type_doors(t):
         dx, _y, dz = d["center"]
         ox, _o, oz = d.get("outward", [0.0, 0.0, 1.0])
-        hw = float(d.get("width", 1.0)) * 0.5 + APRON_SIDE
+        hw = float(d.get("width", 1.0)) * 0.5 + DOOR_APRON_SIDE
         if abs(oz) >= abs(ox):
-            z0, z1 = (dz, dz + APRON_DEPTH) if oz > 0 else (dz - APRON_DEPTH, dz)
+            z0, z1 = (dz, dz + DOOR_APRON_DEPTH) if oz > 0 else (dz - DOOR_APRON_DEPTH, dz)
             r = field.rect_points(cx, cz, yaw, dx - hw, z0, dx + hw, z1)
         else:
-            x0, x1 = (dx, dx + APRON_DEPTH) if ox > 0 else (dx - APRON_DEPTH, dx)
+            x0, x1 = (dx, dx + DOOR_APRON_DEPTH) if ox > 0 else (dx - DOOR_APRON_DEPTH, dx)
             r = field.rect_points(cx, cz, yaw, x0, dz - hw, x1, dz + hw)
         ii.append(r[0]); jj.append(r[1])
     if not ii:
@@ -1515,8 +1515,11 @@ def write_places(placed, aabbs, text):
     unreachable = 0
     for bi, b in enumerate(placed):
         scene = scene_of(b)
-        if scene == b["type"] and b["type"] not in CIVIC_LABELS:
-            continue                       # shut: not a place (a civic building is one anyway: the map names it)
+        if scene == b["type"] and not (b["type"] in CIVIC_LABELS and (b.get("civic") or b.get("deep"))):
+            # shut: not a place. A civic plot's building or a deep-pocket big building is one anyway (the map names
+            # it); a CIVIC-LABELLED type in an ordinary frontage slot is not (2026-10-08: a shut frontage CarDealer
+            # was named on the map, probe_gps_route "naming nothing")
+            continue
         label, tier = ROLE_PLACES.get(b.get("role", ""), PLACE_KINDS.get(b["type"], CIVIC_LABELS.get(b["type"],
                                                                                                       ("", 0))))
         if not label:

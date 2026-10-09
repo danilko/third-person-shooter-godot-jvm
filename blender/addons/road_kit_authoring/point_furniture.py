@@ -1347,8 +1347,8 @@ def expressway_sign_plan(table, lanes_doc):
 
 
 def _crossing_unit_clear(index, table, r, pos, out, fwd, cross, normal, clear):
-    """A 踏切 unit's spot clear of every lane: the nearest of a small search -- outward from the road up to 4 m,
-    and along its approach up to 6 m back or 1 m on -- that still stands at least clear - 1 m from the track (a
+    """A 踏切 unit's spot clear of every lane: the nearest of a small search -- outward from the road up to 6 m,
+    and along its approach up to 8 m back or 3 m on -- that still stands at least clear - 1 m from the track (a
     junction beside the crossing swings its turn connectors over the corner where the unit stands). The original
     spot when nothing is clear (reported by the probe, never dropped: the crossing needs its unit)."""
     if index is None:
@@ -1357,8 +1357,11 @@ def _crossing_unit_clear(index, table, r, pos, out, fwd, cross, normal, clear):
     if index.clear_of(pos, margin):
         return pos
     cands = []
-    for k in range(0, 17):
-        for a in (0.0, -1.0, -2.0, -3.0, -4.0, -6.0, 1.0):
+    # 6 m out, 8 m back or 3 m on (2026-10-08: a unit beside a junction at Godot (19, 134) found nothing within
+    # 4 m / 6 m back / 1 m on and stood 0.12 m from a turn connector's centreline; the nearest clear spot was
+    # 2 m on and 2 m out). The track rule below still keeps every candidate `clear - 1` from the rail.
+    for k in range(0, 25):
+        for a in (0.0, -1.0, -2.0, -3.0, -4.0, -6.0, -8.0, 1.0, 2.0, 3.0):
             d_out = 0.25 * k
             c = (pos[0] + out[0] * d_out + fwd[0] * a, pos[1] + out[1] * d_out + fwd[1] * a, pos[2])
             if abs((c[0] - cross[0]) * normal[0] + (c[1] - cross[1]) * normal[1]) < clear - 1.0:

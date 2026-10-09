@@ -122,12 +122,65 @@ def marker_node(m):
     node = {"name": "mmesh_" + m["asset"], "translation": godot(m["pos"]),
             "rotation": [0.0, round(math.sin(theta / 2.0), 6), 0.0, round(math.cos(theta / 2.0), 6)],
             "extras": {"asset_path": m["path"]}}
+    if BATCH_CHUNK > 0:
+        # PLAN.md 2f: WorldBaker makes one MultiMesh per asset per CHUNK, so a far batch is culled on its own
+        node["extras"]["chunk"] = "%d_%d" % chunk_of(m["pos"][0], m["pos"][1])
     if m.get("breakable"):
         # a knock-down pole (PLAN.md 3.11): flat keys, because Godot's importer keeps extras as one Dictionary meta
         node["extras"].update({"break_" + k: v for k, v in sorted(m["breakable"].items())})
     if any(abs(c - 1.0) > 1e-9 for c in m["scale"]):
         node["scale"] = [float(c) for c in m["scale"]]
     return node
+
+
+#: PLAN.md 2f: the visible geometry of a piece is regrouped into one object per world CHUNK x material x class,
+#: so a piece is a few dozen draws instead of ~140 and `world.ViewDistance` can cull each chunk at D + its own
+#: radius (a whole 504 m piece is 250-400 m in radius, so it was never culled before the far end of the cell).
+#: 252 m halves the 504 m zone grid (2 x 2 chunks per cell): measured on the island, visible primitives 4596 ->
+#: 1577 (126 m: 3337). 0 = off (the control).
+BATCH_CHUNK = 252.0
+#: Object suffixes a probe or a tool reads BY NAME (`probe_road_ground` the piers under `__surface`,
+#: `probe_road_stamp` `__pad`, `test_roadkit_draft` the tarmac, `shot_coast_road` `__shed`), kept as their own
+#: class; everything else visible (kerbs, footways, gutters, barriers, marks, rails, furniture paint) batches as
+#: `__detail`.
+BATCH_KEEP = ("surface", "pad", "gore", "shed")
+
+
+def is_collider(name):
+    return "colonly" in name
+
+
+def chunk_of(x, y, chunk=BATCH_CHUNK):
+    """The world chunk of a KIT-frame point (x, y = plan)."""
+    return int(math.floor(x / chunk)), int(math.floor(y / chunk))
+
+
+def batch_class(name):
+    suf = name.rsplit("__", 1)[-1] if "__" in name else ""
+    for k in BATCH_KEEP:
+        if suf == k or suf.startswith(k + "_"):
+            return k
+    return "detail"
+
+
+def batch(objects, chunk=BATCH_CHUNK):
+    """`objects` regrouped for drawing (PLAN.md 2f): every visible triangle goes to the chunk of its centroid,
+    grouped by class and material into `c<cx>_<cz>__<class>`; colliders are returned unchanged (their names are
+    what Godot's importer and `NavBaker` read). The triangle set is the same, so a chunk boundary adds no seam."""
+    if chunk <= 0:
+        return objects
+    out = {}
+    for name, mats in objects.items():
+        if is_collider(name):
+            out[name] = mats
+            continue
+        cls = batch_class(name)
+        for mat, tris in mats.items():
+            for t in tris:
+                cx, cy = chunk_of((t[0][0] + t[1][0] + t[2][0]) / 3.0, (t[0][1] + t[1][1] + t[2][1]) / 3.0, chunk)
+                key = "c%d_%d__%s" % (cx, cy, cls)
+                out.setdefault(key, {}).setdefault(mat, []).append(t)
+    return out
 
 
 def write(objects, kit, path, node_order=None, markers=()):
@@ -235,7 +288,18 @@ def self_test():
     ys = [doc["accessors"][0]["min"][1], doc["accessors"][0]["max"][1]]
     assert ys == [4.0, 5.0], ys                               # kit Z became glTF Y
     print("OK: the file carries a node per object, the kit's material, a material-less proxy, and Y-up positions")
-    return 3
+    near = [tuple((x + 10.0, y + 10.0, z) for (x, y, z) in t) for t in deck]
+    far = [tuple((x + 300.0, y, z) for (x, y, z) in t) for t in near]
+    deck = near
+    objs = {"a__surface": {"M_Asphalt": deck + far}, "a__edges_l": {"M_Concrete": deck},
+            "b__marks_w": {"M_Concrete": far}, "a_road-road-noped-colonly": {"": deck + far}}
+    b = batch(objs)
+    assert set(b) == {"c0_0__surface", "c1_0__surface", "c0_0__detail", "c1_0__detail",
+                      "a_road-road-noped-colonly"}, sorted(b)
+    assert sum(len(t) for o in b.values() for t in o.values()) == sum(len(t) for o in objs.values() for t in o.values())
+    assert b["a_road-road-noped-colonly"] is objs["a_road-road-noped-colonly"] and batch(objs, 0) is objs
+    print("OK: batching keeps every triangle, the colliders and the named classes, chunked by centroid")
+    return 4
 
 
 if __name__ == "__main__":

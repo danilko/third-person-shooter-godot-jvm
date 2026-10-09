@@ -50,6 +50,8 @@ for i, b in enumerate(B):
         for k in tree.query(apron):
             j = idx[int(k)]
             if j == i: continue
+            # a car park or a park may stand over a door apron (PLAN.md 1g f): it is open ground a body crosses
+            if B[j]["type"].startswith(("Parking", "PocketPark", "Park")): continue
             if polys[j].intersection(apron).area > 0.05:
                 hit = True; worst[(base, d["side"])].append((B[j]["type"], round(polys[j].intersection(apron).area, 2)))
                 break
@@ -72,11 +74,13 @@ for i, b in enumerate(B):
     if not L or len(L["doors"]) < 2: continue
     a = math.radians(b["yaw"]); c, s = math.cos(a), math.sin(a)
     def w(x, z): return (b["pos"][0] + x * c + z * s, b["pos"][2] - x * s + z * c)
-    x0, z0 = b["pos"][0] - WIN / 2, b["pos"][2] - WIN / 2
-    n = int(WIN / RES)
+    import building_door_paths as BDP
+    W = BDP.window(polys[i])          # a building wider than WIN gets a wider window (the 72 m department store)
+    x0, z0 = b["pos"][0] - W / 2, b["pos"][2] - W / 2
+    n = int(round(W / RES))
     occ = np.zeros((n, n), bool)
     from shapely.geometry import box as sbox
-    win = sbox(x0, z0, x0 + WIN, z0 + WIN)
+    win = sbox(x0, z0, x0 + W, z0 + W)
     for k in tree.query(win):
         j = idx[int(k)]
         if B[j]["type"].startswith(WALK): continue
@@ -119,3 +123,9 @@ print("\nside/back doors NOT reachable outside from the front door (window %.0f 
 for k in sorted(tested, key=lambda k: -unreach[k]):
     print("  %-22s %-6s %3d of %3d unreachable   e.g. %s" % (k[0], k[1], unreach[k], tested[k], examples[k][:3]))
 print("TOTAL", sum(unreach.values()), "of", sum(tested.values()))
+
+# a GATE (PLAN.md 1g f, 2026-10-08: both read 0 after the rebuild): run by island_world.sh after the buildings stage
+if sum(bad.values()) or sum(unreach.values()):
+    print("island_door_access: FAIL")
+    sys.exit(1)
+print("island_door_access: PASS")
