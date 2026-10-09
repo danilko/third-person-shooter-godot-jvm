@@ -190,6 +190,9 @@ public class AIController extends Controller {
     /** The FSM state this controller is in — a director reads it back to see its order took. */
     public AIState getCurrentState() { return currentState; }
 
+    /** The FSM state's class name (probe readout). */
+    @godot.annotation.Register public String currentStateNameNow() { return currentState == null ? "-" : currentState.getClass().getSimpleName(); }
+
     // ── Scripted order (F1) ───────────────────────────────────────────────────
 
     private Vector3 scriptedDestination = null;

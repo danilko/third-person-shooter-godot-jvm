@@ -362,6 +362,9 @@ public class MeleeItem extends WeaponItem {
    * swing's hitstop and kick on first contact (never on a host resolving someone else's swing). Hit names go to
    * {@code hitsOut} when given.
    */
+  /** OW_MELEE_TRACE=1 prints what every swing's sweep found (diagnosis). */
+  private static final boolean MELEE_TRACE = System.getenv("OW_MELEE_TRACE") != null;
+
   private void sweepFrom(Vector3 chest, Vector3 dir, MeleeAttackStep st, Set<Long> hitSet, boolean authoritative,
                          boolean feel, List<String> hitsOut) {
     ImpactManager im = getImpactManager();
@@ -400,6 +403,8 @@ public class MeleeItem extends WeaponItem {
       if (best == null || d < best) { nearest.put(key, collider); nearestDist.put(key, d); }
     }
 
+    if (MELEE_TRACE) godot.global.GD.INSTANCE.print("[melee] " + owningCharacter.getName() + " chest " + chest + " dir " + dir + " range " + range
+        + " overlaps " + overlaps.size() + " targets " + nearest.size());
     // 2. Each one must be reachable from the chest.
     for (Map.Entry<Long, Node3D> e : nearest.entrySet()) {
       Node3D aimAt = e.getValue();

@@ -683,6 +683,7 @@ public class WeaponController extends Node {
    */
   public void reportFireEvent(int step) {
     fireSeq = (fireSeq + 1) & 0xFF;
+    firesTotal++;
     fireStep = Math.max(0, Math.min(MAX_FIRE_STEP, step));
   }
 
@@ -955,6 +956,19 @@ public class WeaponController extends Node {
 
   /** Next hitscan trigger-pull counter (PLAN.md N1) — the seed and ordering key of one pull. */
   public long nextShotSeq() { return shotSeq++; }
+
+  /** Shots this controller has fired (probe readout: fired-but-missed vs never fired). */
+  @godot.annotation.Register public long shotsFiredNow() { return shotSeq; }
+
+  /** Total fire events this controller accepted (every weapon kind; probe readout). */
+  @godot.annotation.Register public long firesNow() { return firesTotal; }
+  private long firesTotal;
+
+  /** The held weapon's id, its magazine and reserve, e.g. "PIS1 0/0" (probe readout). */
+  @godot.annotation.Register public String getCurrentWeaponIdNow() {
+    WeaponItem w = getCurrentWeaponItem();
+    return w == null ? "-" : w.weaponId + " " + w.magazine + "/" + w.getReserve();
+  }
 
   /** Rolling shot counter sampled into each snapshot (fire-as-state). */
   public int getFireSeq() { return fireSeq; }
