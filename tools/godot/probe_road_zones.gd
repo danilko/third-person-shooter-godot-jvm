@@ -101,6 +101,15 @@ func _initialize() -> void:
 		print("CONTROL: geometry_world_placed = false on both zones")
 	root.add_child(w)
 	current_scene = w
+	# This stand tests the CUT, not the traffic ring (3.32) or the spawn-placement rules, which came
+	# after it: the player stands ~575 m from the west zone's centre, so the 250 m ring and the
+	# view / min-distance gates left the west lanes with no car at all. Both are gated elsewhere
+	# (probe_traffic_spawn, probe_traffic_ahead); here they are switched off, the old behaviour.
+	var zm := root.get_node_or_null("ZoneManager")
+	if zm != null:
+		for prop in ["traffic_sim_radius", "traffic_spawn_min_dist", "traffic_spawn_view_dist", "dummy_out_dist"]:
+			zm.set(prop, 0.0)
+		zm.set("traffic_budget", 0)
 	var player: Node3D = w.get_node("Characters/Player")
 	var health: Node = player.get_node("Health")
 	health.set("max_health", 1000000.0)

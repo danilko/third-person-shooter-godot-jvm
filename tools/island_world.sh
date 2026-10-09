@@ -141,5 +141,7 @@ if want ground; then
     godot 900 tools/godot/apply_paint_grid.gd -- "$D" "$TMP/block.paint.u8" -2304 -2304 2305 2305 2 4 "$TMP/block.height.f32" | tail -2   # 4 = Urban
     # 5 = Soil, the paddy fields (a second pass, no heights: it only paints, it leaves the block layer alone)
     godot 900 tools/godot/apply_paint_grid.gd -- "$D" "$TMP/block.soil.u8" -2304 -2304 2305 2305 2 5 | tail -1
+    # the paint is a hard id per 2 m vertex, so the block ground met the beach in a staircase: blend a 2-texel ring
+    godot 900 tools/godot/soften_paint_edge.gd -- "$D" 4 | tail -1
 fi
 stage done
