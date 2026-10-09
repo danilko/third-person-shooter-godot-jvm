@@ -18,6 +18,7 @@ extends SceneTree
 ##       [--no-balance]   control: the dispatch adds on top of the ambient budgets (ZoneManager.enforcementBalancing)
 ##       [--traffic-budget=N] [--sim-radius=M] [--recycle=M]   PLAN.md 2c sweeps: ZoneManager's car budget, simulation
 ##                  ring and the leaving-car recycle distance (0 = off)
+##       [--walker-budget=N] [--promote-ring=M]   crowd sweeps: ZoneManager.walkerBudget / every PedCrowd.promoteDistance
 ##       [--haze=<end m>]   PLAN.md 2b: Sky3D's distance haze on, ending at that distance (start at a third of it)
 ##       [--deck]   the Steam Deck PROXY (PLAN.md R-9): 1280x800, each frame's deck_ms = max(cpu x cpu_factor,
 ##                  gpu x gpu_factor) from tools/godot/perf_budget.json, judged against its frame and count budgets;
@@ -39,6 +40,11 @@ func _no_promote(n: Node) -> void:
 	var sc = n.get_script()
 	if sc != null and str(sc.resource_path).ends_with("PedCrowd.java"):
 		n.set("promote_distance", 0.0)
+
+func _promote_ring(n: Node) -> void:
+	var sc = n.get_script()
+	if sc != null and str(sc.resource_path).ends_with("PedCrowd.java"):
+		n.set("promote_distance", float(_arg("promote-ring")))
 
 func _no_building_shadow(n: Node) -> void:
 	if n is GeometryInstance3D and str(n.owner.scene_file_path if n.owner != null else "").contains("/buildings/"):
@@ -353,6 +359,12 @@ func _initialize() -> void:
 		# a budget of 0 means unlimited, so the ring itself is shut on every crowd as it streams in)
 		node_added.connect(_no_promote)
 		print("SWEEP: no crowd promotion (every PedCrowd promote_distance 0)")
+	if _arg("promote-ring") != null and zm != null:
+		node_added.connect(_promote_ring)
+		print("SWEEP: crowd promote ring %.0f m" % float(_arg("promote-ring")))
+	if _arg("walker-budget") != null and zm != null:
+		zm.set("walker_budget", int(_arg("walker-budget")))
+		print("SWEEP: walker budget %d" % int(_arg("walker-budget")))
 	if _arg("no-dummy", false) and zm != null:
 		zm.set("dummy_out_dist", 0.0)
 		print("CONTROL: no dummy traffic cars (PLAN.md 1g e)")

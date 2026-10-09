@@ -9146,15 +9146,17 @@ into `<b>_vat_mesh.res` + `<b>_vat_pos.res` (RGBAH, one texel per vertex, one ro
 and ~1.2 ms at the station (`--no-peds` the control). A ped stops now and then (idle/phone/talk), keeps its own pace
 (+-10%, stride matched) and height (+-4%).
 
-**Promotion is a decision** (PLAN.md 3.32): a ped becomes a real body only within `promoteDistance` 25 m, when aimed
+**Promotion is a decision** (PLAN.md 3.32): a ped becomes a real body only within `promoteDistance` 15 m, when aimed
 at, when a FIGHTER is scared, or when SHOT (`PedCrowd.shoot` -- an upright cylinder per ped, engine-free
 `world.CrowdShot` + `PedCrowdShotTest`; `FirearmItem.resolvePellets` asks the crowds on the authoritative path and the
 hit ped is promoted at once, budget ignored, damage through `ImpactManager.processHit`). One promotion a frame,
-nearest first; `ZoneManager.walkerBudget` 12, `fighterBudget` 6; a body is held 10 s after promotion and while hurt
+nearest first; `ZoneManager.walkerBudget` 8, `fighterBudget` 6 (budget 12 / ring 25 m until 2026-10-09: measured with
+`probe_walk_perf --walker-budget= --promote-ring=`, 8 + 15 m took downtown GPU p95 5.2-5.9 -> 3.7 ms and station
+4.8 -> 4.6; budget 6 bought nothing over 8; a shadow LOD on promoted bodies bought nothing once the ring was 15 m); a body is held 10 s after promotion and while hurt
 in the last 20 s. The promoted character wears the SAME body (`characterVisuals` = `CharacterVisuals_<Body>.tscn`).
 **Temperament** from each ped's roll: ~83% flee, 12% cower (`crouch_idle`), 5% fight -- a fighter keeps the ordinary
 AIController brain, is armed from PIS1 / MEW1 / fists, and turns to `ZoneManager.FIGHTER_FACTION` "vigilante".
-Accepted divergence: a client hides its peds inside 25 m and cannot promote; the crowd stays local per peer.
+Accepted divergence: a client hides its peds inside 15 m and cannot promote; the crowd stays local per peer.
 
 **Six bodies**: Shino, Fumiriya, and the imported Shibu, Victoria, Bibi, Vita (all female; the only male body is
 Fumiriya, weighted 3 in `character_gaits.json` `crowd_weights`). Each went `import_vrm_body.py` ->

@@ -69,8 +69,11 @@ public class PedCrowd extends Node3D {
 	@Visible public double speed = 1.4;
 	/** How far above the footway line a ped's origin rides. */
 	@Visible public double lift = 0.02;
-	/** Within this of a player a ped is PROMOTED (host / single player) or HIDDEN (client). */
-	@Visible public double promoteDistance = 25.0;
+	/**
+	 * Within this of a player a ped is PROMOTED (host / single player) or HIDDEN (client). 15 m (was 25, measured
+	 * 2026-10-09 with walkerBudget 8: downtown GPU p95 5.2-5.9 -> 3.7 ms). A shot or a car still promotes at any range.
+	 */
+	@Visible public double promoteDistance = 15.0;
 	/** A full walker beyond this is handed back to the crowd (ZoneManager reads it). Hysteresis over promote. */
 	@Visible public double demoteDistance = 40.0;
 	/** How far a ped is DRAWN (culled per ped on the CPU: a MultiMesh fades as a whole). 0 = no limit. */

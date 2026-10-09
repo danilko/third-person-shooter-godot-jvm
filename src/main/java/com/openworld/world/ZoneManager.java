@@ -199,10 +199,10 @@ public class ZoneManager extends Node {
 
 	/**
 	 * How many promoted SIDEWALK bodies may exist at once, across every zone (user, 2026-09-27). A crowd ped is
-	 * promoted only when it must be a real body (PedCrowd: a player within 25 m, aimed at, a fighter scared), one
+	 * promoted only when it must be a real body (PedCrowd: a player within 15 m, aimed at, a fighter scared), one
 	 * a frame; this is the ceiling. Past it a ped simply stays a light ped. 0 = no ceiling (the control).
 	 */
-	@Export public int walkerBudget = 12;
+	@Export public int walkerBudget = 8;
 	/** Of those, how many may be FIGHTERS (armed, turned on the player). Past it a fighter flees like the rest. */
 	@Export public int fighterBudget = 6;
 	/** A promoted sidewalk body is not handed back to the crowd for this long after its promotion. */
