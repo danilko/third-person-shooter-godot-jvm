@@ -107,9 +107,19 @@ def band_windows(b, a0, a1, z, h, every=3.6, w=2.0, skip=(), sill=0.9, head=None
 def roof(b, x0, y0, x1, y1, z, holes=(), parapet=1.1, mat="MI_ConcreteSmooth", units=0):
     b.slab(x0, y0, x1, y1, z, mat, holes=holes, group="Roof")
     b.parapet(x0, y0, x1, y1, z, parapet, mat=mat)
-    for i in range(units):
-        cx = x0 + 2.5 + i * 2.6
-        b.box("Roof", (cx, y1 - 3.5, z), (cx + 1.8, y1 - 2.3, z + 1.3), "MI_PlasticWhite")
+    # AC units keep 0.3 m off every hole (a stair well, a lift shaft): one dropped over a well stood at head height
+    # on the stair below it (SafeHouseCityLarge, probe_stairs, PLAN.md 1f)
+    def clear(ux0, uy0, ux1, uy1):
+        return ux0 >= x0 and ux1 <= x1 and all(ux1 <= h[0] - 0.3 or ux0 >= h[2] + 0.3 or uy1 <= h[1] - 0.3
+                                               or uy0 >= h[3] + 0.3 for h in holes)
+    placed, cx = 0, x0 + 2.5
+    while placed < units and cx + 1.8 <= x1 - 0.5:
+        if clear(cx, y1 - 3.5, cx + 1.8, y1 - 2.3):
+            b.box("Roof", (cx, y1 - 3.5, z), (cx + 1.8, y1 - 2.3, z + 1.3), "MI_PlasticWhite")
+            placed += 1
+            cx += 2.6
+        else:
+            cx += 0.5
 
 
 def stair_house(b, x0, y0, x1, y1, z, door_side="s", h=2.8):
@@ -300,9 +310,10 @@ def police_station(b):
     # stairs (B at the west end, A in the middle, which goes on to the roof) and the lift
     wellB = (xi0, CB + 0.06, -12.06, yb)
     wellA = (3.66, CB + 0.06, 6.34, yb)
-    holeB = b.ustair(*wellB, F1, F2 - F1, near="s")
+    # B ends at F2 (a guard over its well there); only A goes on to the roof -- B's roof flight had no roof hole
+    # over it and stopped every climber under the roof slab (probe_stairs, PLAN.md 1f)
+    holeB = b.ustair(*wellB, F1, F2 - F1, near="s", cap=True)
     holeA = b.ustair(*wellA, F1, F2 - F1, near="s")
-    b.ustair(*wellB, F2, TOP - F2, near="s", cap=True)
     holeA2 = b.ustair(*wellA, F2, TOP - F2, near="s")
     shaft = b.lift(7.55, 1.92, 1.8, 1.8, [F1, F2], faces=1, turned=True)
     b.slab(X0, Y0, X1, Y1, F1, "MI_Terrazzo")
@@ -492,9 +503,10 @@ def fire_station(b):
     b.box("Site", (8.6, 16.3, 16.0), (14.4, 21.7, 16.6), "MI_CraneRed")
     wellB = (xi0, CB + 0.06, -13.06, yb)
     wellA = (10.06, CB + 0.06, 12.74, yb)
-    holeB = b.ustair(*wellB, F1, F2 - F1, near="s")
+    # B ends at F2 (a guard over its well there); only A goes on to the roof -- B's roof flight had no roof hole
+    # over it and stopped every climber under the roof slab (probe_stairs, PLAN.md 1f)
+    holeB = b.ustair(*wellB, F1, F2 - F1, near="s", cap=True)
     holeA = b.ustair(*wellA, F1, F2 - F1, near="s")
-    b.ustair(*wellB, F2, TOP - F2, near="s", cap=True)
     holeA2 = b.ustair(*wellA, F2, TOP - F2, near="s")
     shaft = b.lift(14.3, CB + 0.875, 1.6, 1.6, [F1, F2], faces=1, turned=True)      # beside stair A (user, 2026-09-29)
     b.slab(X0, Y0, X1, Y1, F1, "MI_ConcreteSmooth")

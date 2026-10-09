@@ -1849,7 +1849,10 @@ def secure_mansion(b):
     ext(b, X0, Y0, X1, Y1, F2, TOP - F2, "MI_Plaster", {
         "f": ((), band_windows(b, -15.0, 15.0, F2, 2.9, every=3.4, w=1.6)),
         "b": ((), band_windows(b, -15.0, 15.0, F2, 2.9, every=3.4, w=1.6))})
-    b.box("Facade", (X0 - 0.5, Y0 - 0.9, F2 - 0.3), (X1 + 0.5, Y1 + 0.9, F2 - 0.1), "MI_RoofSlate")   # the 下屋 eave
+    # the 下屋 eave: a RING outside the walls (one box over the whole plan put a ceiling 1.6 m over the stair, 1f)
+    for e0, e1 in (((X0 - 0.5, Y0 - 0.9), (X1 + 0.5, Y0)), ((X0 - 0.5, Y1), (X1 + 0.5, Y1 + 0.9)),
+                   ((X0 - 0.5, Y0), (X0, Y1)), ((X1, Y0), (X1 + 0.5, Y1))):
+        b.box("Facade", (e0[0], e0[1], F2 - 0.3), (e1[0], e1[1], F2 - 0.1), "MI_RoofSlate")
     gable(b, X0, Y0, X1, Y1, TOP, 3.0, ridge="x", over=1.0, gable_mat="MI_Plaster")
     b.box("Facade", (-3.5, Y0 - 4.5, 3.0), (3.5, Y0, 3.25), "MI_RoofSlate")             # the porte-cochère
     for x in (-3.2, 3.2):
@@ -1877,7 +1880,9 @@ def secure_mansion(b):
     b.put("Office_Sofa", 10.5, -0.8, 0.0, z=F1)
     b.put("Office_Sofa", 14.5, -0.1, 270.0, z=F1)
     b.put("Rest_Table", 13.2, -0.5, 0.0, z=F1)
-    part(b, "x", CY1, xi0, xi1, F1, Hi, doors=[(-9.0, 1, 1.8, "slide", "door", 2.1), (0.6, 1, 0.8, "slide", "door", 2.1),
+    # (-2.6: the stair hall's opening off the corridor -- without it the stair was walled off on F1, PLAN.md 1f)
+    part(b, "x", CY1, xi0, xi1, F1, Hi, doors=[(-9.0, 1, 1.8, "slide", "door", 2.1), (-2.6, 1, 1.4, "", "open", 2.2),
+                                            (0.6, 1, 0.8, "slide", "door", 2.1),
                                             (3.5, 1, 0.8, "slide", "door", 2.1), (9.0, 1, 1.2, "", "open", 2.2)])
     part(b, "y", -4.0, CY1, yb, F1, Hi)
     part(b, "y", -1.2, CY1, yb, F1, Hi)
@@ -1919,7 +1924,8 @@ def secure_mansion(b):
     b.put("Office_ServerRack", 7.3, -0.8, 270.0, z=F2)
     b.mark("objective", 5.2, -0.2, F2, 0.0, note="the PANIC ROOM (0.45 m steel walls; its door off the study)")
     b.put("Hotel_Bed", 14.3, -0.4, 90.0, z=F2)
-    part(b, "x", CY1, xi0, xi1, F2, H2, doors=[(-9.0, 1, 0.9, "swing", "door", 2.1), (0.6, 1, 0.8, "slide", "door", 2.1),
+    part(b, "x", CY1, xi0, xi1, F2, H2, doors=[(-9.0, 1, 0.9, "swing", "door", 2.1), (-2.6, 1, 1.4, "", "open", 2.2),
+                                            (0.6, 1, 0.8, "slide", "door", 2.1),
                                             (3.5, 1, 0.8, "slide", "door", 2.1), (9.0, 1, 0.9, "swing", "door", 2.1)])
     part(b, "y", -4.0, CY1, yb, F2, H2)
     part(b, "y", -1.2, CY1 + 5.4, yb, F2, H2)
