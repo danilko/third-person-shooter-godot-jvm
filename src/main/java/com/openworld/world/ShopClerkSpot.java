@@ -113,6 +113,7 @@ public class ShopClerkSpot extends Node3D {
         if (container == null) container = getTree().getCurrentScene();
         container.addChild(ai);
         ai.activateForSpawn(getGlobalPosition().plus(new Vector3(0, 0.05, 0)));
+        dropBrain();
         Controller c = ai.detachController();
         brain = c instanceof AIController a ? a : null;
         still = new ClerkController();
@@ -136,6 +137,7 @@ public class ShopClerkSpot extends Node3D {
                     net.announceDespawn(clerk.getCharacterInfo().characterId);
                 clerk.queueFree();
                 clerk = null;
+                dropBrain();
             }
         }
         if (clerk == null || state == 2) return;
@@ -312,9 +314,21 @@ public class ShopClerkSpot extends Node3D {
                     && clerk.characterInfo != null) net.announceDespawn(clerk.characterInfo.characterId);
             clerk.queueFree();
         }
-        if (brain != null && GD.isInstanceValid(brain) && brain.getParent() == null) brain.queueFree();
+        dropBrain();
         clerk = null;
     }
+
+    /** Free the clerk's detached AI brain. It is OFF-TREE (detachController), so nothing else ever frees it: a calm
+     *  clerk returned past DESPAWN_FAR used to leave it behind on every round trip, and the next spawn overwrote the
+     *  reference -- the "Node ... removed with remove_child() but not freed" leak at exit (PLAN.md 0.2). free(), not
+     *  queueFree(): an off-tree node is safe to free at once, and at quit a queued deletion may never be flushed. */
+    private void dropBrain() {
+        if (brain != null && GD.isInstanceValid(brain) && brain.getParent() == null) brain.free();
+        brain = null;
+    }
+
+    /** True while a detached brain is held (probe readout). */
+    @Register public boolean brainHeldNow() { return brain != null && GD.isInstanceValid(brain); }
 
     // ── probe surface ──
     @Register public Node clerkNow() { return clerk; }
