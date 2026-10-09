@@ -304,6 +304,18 @@ detection that triggers a swap) are AI-perception features not built yet — the
 
 ---
 
+#### The CAMPAIGN layer (PLAN.md 0.35 / CR3, 2026-10-09)
+
+Runtime flips are per-layer by design (a rebuild discards them; `FactionFlips` re-applies the wanted / gang ones every
+0.5 s), which made a STORY change ("the police now hate gang_a") vanish at the next region boundary or mission.
+`FactionManager.setCampaignRelationship(a, b, rel)` (`flipCampaignNow` for probes / console) writes a fourth layer that
+every rebuild lays over the region / default table; an active mission table still wins and the campaign rows land
+again when it ends. Only `reset()` (new game / full restart) clears it; the save carries it as `campaign_factions`
+(restored after the reset a load does). Replicated through the SAME faction world event with a third argument
+`"campaign"` (no new event number), and sent flagged in the late-join baseline so a client keeps it across its own
+region rebuilds. Gate `tools/godot/probe_campaign_factions.gd` 12/12 (`--control` makes the flip a runtime one, fails 4).
+Player <-> gang_a / gang_b now ship NEUTRAL in `DefaultFactions.tres` (see "Gang hangouts").
+
 ### The story layer — MissionDirector (`com.openworld.game.mission`, AutoLoad, F1, 2026-09-17)
 
 The one owner of story logic, beside `MissionManager`, which keeps objective TRACKING. The split is

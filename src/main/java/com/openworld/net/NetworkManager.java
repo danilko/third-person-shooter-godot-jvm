@@ -2885,6 +2885,11 @@ public class NetworkManager extends Node {
             sendWorldEventTo(targetPeerId, com.openworld.game.GameManager.WORLD_EVENT_FACTION_RELATIONSHIP,
                     rel[0], 0f, java.util.List.of(rel[1], rel[2]));
         }
+        // the campaign layer last and flagged, so the client keeps it across its own region rebuilds (PLAN.md 0.35)
+        for (String[] rel : fm.getCampaignRelationships()) {
+            sendWorldEventTo(targetPeerId, com.openworld.game.GameManager.WORLD_EVENT_FACTION_RELATIONSHIP,
+                    rel[0], 0f, java.util.List.of(rel[1], rel[2], com.openworld.character.FactionManager.CAMPAIGN_ARG));
+        }
     }
 
     /**

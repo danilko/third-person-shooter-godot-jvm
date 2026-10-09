@@ -46,6 +46,14 @@ public class FactionManager extends Node {
      * runtime flips" rule, stated once.
      */
     private final java.util.LinkedHashMap<String, String> runtimeFlips = new java.util.LinkedHashMap<>();
+    /**
+     * The CAMPAIGN layer (PLAN.md 0.35 / CR3): relationships the story changed for good ("the police now hate
+     * gang_a"), keyed {@code "a>b"}. Unlike {@link #runtimeFlips} they survive {@link #rebuildLiveTable} -- a region
+     * change or a mission start / end used to discard them. Laid over the region / default layer on every rebuild;
+     * an active MISSION table still wins (a mission's own sides are its business). Cleared only by {@link #reset}
+     * (a new game / full restart) and replaced by a save load.
+     */
+    private final java.util.LinkedHashMap<String, String> campaign = new java.util.LinkedHashMap<>();
     /** Layer set by the nearest region (I4), or null for the shipped defaults. */
     private FactionTable regionTable;
     /** Layer set by the active mission (F2), or null. While set it wins over the region's. */
@@ -81,6 +89,13 @@ public class FactionManager extends Node {
         }
         table = source != null ? (FactionTable) source.duplicate(true) : null;
         runtimeFlips.clear();
+        if (missionTable == null) {
+            for (Map.Entry<String, String> e : campaign.entrySet()) {
+                int split = e.getKey().indexOf('>');
+                if (table == null) table = new FactionTable();
+                table.setRelationship(e.getKey().substring(0, split), e.getKey().substring(split + 1), e.getValue());
+            }
+        }
     }
 
     /** Restore the shipped defaults, discarding all runtime flips AND both layers. Call on full restart. */
@@ -88,6 +103,7 @@ public class FactionManager extends Node {
     public void reset() {
         regionTable = null;
         missionTable = null;
+        campaign.clear();
         rebuildLiveTable();
     }
 
@@ -181,6 +197,45 @@ public class FactionManager extends Node {
     @Register
     public void flipRelationship(String a, String b, String rel) {
         setRelationship(a, b, rel);
+    }
+
+    /**
+     * Change a relationship FOR THE CAMPAIGN (PLAN.md 0.35): it survives every region change and mission start /
+     * end, and the save carries it. Applied to the live table now unless a mission table is active (then it lands
+     * when the mission ends). On a networked host it replicates through the faction world event with a
+     * {@code "campaign"} third argument, so a client keeps it across its own (local) region rebuilds too.
+     */
+    public void setCampaignRelationship(String a, String b, String rel) {
+        if (a == null || b == null || rel == null || a.isEmpty() || b.isEmpty()) return;
+        campaign.put(FactionRules.key(a, b), rel);
+        if (missionTable == null) {
+            if (table == null) table = new FactionTable();
+            table.setRelationship(a, b, rel);
+        }
+        Node netNode = getNodeOrNull("/root/NetworkManager");
+        if (netNode instanceof NetworkManager net && net.isNetworked() && net.isServer()) {
+            net.broadcastWorldEvent(GameManager.WORLD_EVENT_FACTION_RELATIONSHIP, a, 0f,
+                    java.util.List.of(b, rel, CAMPAIGN_ARG));
+        }
+    }
+
+    /** The faction world event's third argument that marks a campaign relationship. */
+    public static final String CAMPAIGN_ARG = "campaign";
+
+    /** {@link #setCampaignRelationship} for probes and the console (see {@link #flipRelationship} for why). */
+    @Register
+    public void flipCampaignNow(String a, String b, String rel) {
+        setCampaignRelationship(a, b, rel);
+    }
+
+    /** The campaign layer as {factionA, factionB, relationship} triples (save and late-join baseline). */
+    public java.util.List<String[]> getCampaignRelationships() {
+        java.util.List<String[]> out = new java.util.ArrayList<>();
+        for (Map.Entry<String, String> e : campaign.entrySet()) {
+            int split = e.getKey().indexOf('>');
+            out.add(new String[] { e.getKey().substring(0, split), e.getKey().substring(split + 1), e.getValue() });
+        }
+        return out;
     }
 
     /** All active relationship flips as {factionA, factionB, relationship} triples — for the late-join net baseline. */

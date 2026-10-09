@@ -209,6 +209,19 @@ public class SaveSystem extends Node {
         }
         doc.endArray();
 
+        // the campaign layer (PLAN.md 0.35): story relationships that survive regions and missions
+        doc.key("campaign_factions").beginArray();
+        if (factions != null) {
+            for (String[] rel : factions.getCampaignRelationships()) {
+                doc.beginArrayItem().begin();
+                doc.str("a", rel[0]);
+                doc.str("b", rel[1]);
+                doc.str("rel", rel[2]);
+                doc.end();
+            }
+        }
+        doc.endArray();
+
         doc.key("mission").begin();
         MissionManager missions = missionManager();
         MissionInfo active = missions != null && missions.isActive() ? missions.getActiveMission() : null;
@@ -297,6 +310,13 @@ public class SaveSystem extends Node {
         if (factions == null) return;
         // A load REPLACES: reset first, or a flip the slot does not carry survives from this session.
         factions.reset();
+        if (doc.get("campaign_factions") instanceof VariantArray<?> camp) {
+            for (java.lang.Object o : camp) {
+                if (!(o instanceof Dictionary<?, ?> d)) continue;
+                String a = str(d, "a", ""), b = str(d, "b", ""), rel = str(d, "rel", "");
+                if (!a.isEmpty() && !b.isEmpty() && !rel.isEmpty()) factions.setCampaignRelationship(a, b, rel);
+            }
+        }
         if (!(doc.get("factions") instanceof VariantArray<?> arr)) return;
         for (java.lang.Object o : arr) {
             if (!(o instanceof Dictionary<?, ?> d)) continue;

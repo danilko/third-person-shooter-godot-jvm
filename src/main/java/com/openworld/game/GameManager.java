@@ -1279,7 +1279,10 @@ public class GameManager extends Node {
     private void applyFactionRelationship(String factionA, java.util.List<String> args) {
         com.openworld.character.FactionManager factions = getFactionManager();
         // No re-broadcast: FactionManager.setRelationship gates its broadcast on isServer().
-        if (factions != null) factions.setRelationship(factionA, arg(args, 0), arg(args, 1));
+        if (factions == null) return;
+        if (com.openworld.character.FactionManager.CAMPAIGN_ARG.equals(arg(args, 2)))
+            factions.setCampaignRelationship(factionA, arg(args, 0), arg(args, 1));
+        else factions.setRelationship(factionA, arg(args, 0), arg(args, 1));
     }
 
     /** Client-side: mirror a host per-character faction swap (D3). Re-targeting follows on the next AI scan. */

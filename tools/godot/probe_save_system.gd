@@ -95,9 +95,9 @@ func _initialize() -> void:
 	_check("the unique item granted once", director.call("grant_unique_once", "gold_pistol"), "")
 	# The flip has to DIFFER from the shipped default or it is unobservable: two different factions
 	# are hostile by the inherent rule, so a flip to HOSTILE would prove nothing. FRIENDLY does.
-	factions.call("flip_relationship", "player", "gang_a", "FRIENDLY")
-	_check("the runtime flip took (player/gang_a are hostile by default)",
-		not factions.call("hostile_now", "player", "gang_a"), "")
+	factions.call("flip_relationship", "player", "vigilante", "FRIENDLY")
+	_check("the runtime flip took (player/vigilante are hostile by default: no table row, two factions)",
+		not factions.call("hostile_now", "player", "vigilante"), "")
 
 	# A weapon the ordinary way: dropped on the player, auto-picked up, brought to the hand.
 	var gun: Node3D = (load(WEAPON) as PackedScene).instantiate() as Node3D
@@ -151,7 +151,7 @@ func _initialize() -> void:
 		and not director.call("has_achieved", "prologue", "SPARED"), "")
 	_check("the beat log is gone", int(director.call("beat_fire_count", "ambush_gate")) == 0, "")
 	_check("the faction flip is gone (hostile by default again)",
-		factions.call("hostile_now", "player", "gang_a"), "")
+		factions.call("hostile_now", "player", "vigilante"), "")
 	_check("the unique item would be granted again",
 		director.call("grant_unique_once", "gold_pistol"), "")
 	director.call("reset_campaign")
@@ -168,7 +168,7 @@ func _initialize() -> void:
 	_check("chapter_2 is unlocked again", director.call("is_mission_unlocked", "chapter_2"), "")
 	_check("the unique item is NOT granted a second time",
 		not director.call("grant_unique_once", "gold_pistol"), "")
-	_check("the faction flip is back", not factions.call("hostile_now", "player", "gang_a"), "")
+	_check("the faction flip is back", not factions.call("hostile_now", "player", "vigilante"), "")
 	_check("the beat log is back", int(director.call("beat_fire_count", "ambush_gate")) == 1,
 		"beat count %d" % int(director.call("beat_fire_count", "ambush_gate")))
 	_check("the player is back where it was saved",
