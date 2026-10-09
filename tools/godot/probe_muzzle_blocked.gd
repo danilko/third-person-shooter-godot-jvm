@@ -114,6 +114,26 @@ func _initialize() -> void:
 	shelf.queue_free()
 	await _tick(20)
 	_check(not bool(ch.call("blocked_now")), "with the post gone the line is clear again")
+
+	# FIRST PERSON shoots from the eye (FirearmItem.eyeTraceInFirstPerson): the same post on the GUN's line, which the
+	# eye sees past, blocks nothing. --fps-control turns the eye trace off: the old muzzle rule blocks it again.
+	gun.set("eye_trace_in_first_person", not ("--fps-control" in OS.get_cmdline_user_args()))
+	p.set("is_fps_mode", true)
+	await _tick(40)
+	await _steer_to(aim_at, 120)
+	await _tick(20)
+	mp = muzzle.global_position
+	on_line = mp + (aim_at - mp).normalized() * 1.0
+	var post := _box(world, Vector3(0.12, 3.0, 0.12), Vector3(on_line.x, 1.5, on_line.z))
+	await _tick(20)
+	var eye := (p.get_node("ActiveCamera") as Node3D).global_position
+	var q2 := PhysicsRayQueryParameters3D.create(eye, aim_at)
+	q2.exclude = [p.get_rid()]
+	var seen2: Dictionary = root.get_world_3d().direct_space_state.intersect_ray(q2)
+	print("  FPS: eye %s, muzzle %s, post %s" % [eye, mp, on_line])
+	_check(seen2.is_empty() or seen2.collider != post, "first person: the eye sees past the post")
+	_check(not bool(ch.call("blocked_now")), "first person: a post only on the gun's line does not block the shot")
+	post.queue_free()
 	Input.action_release("aim")
 	print("RESULT %s (%d failure(s))" % ["PASS" if fails == 0 else "FAIL", fails])
 	quit(0 if fails == 0 else 1)

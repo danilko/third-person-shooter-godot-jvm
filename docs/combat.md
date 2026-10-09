@@ -201,6 +201,22 @@ Details that matter:
 - Shotguns resolve the sight leg + origin **once** per trigger pull and only re-sample the cone per
   pellet.
 
+### First person shoots from the eye; third person keeps both legs, no forgiveness (2026-10-09, user decision)
+
+`FirearmItem.eyeTraceInFirstPerson` (on): in first person (`Character.isFirstPersonView()`, FPS or scoped) a shot is
+ONE leg from the camera, the CS / L4D rule -- the camera is the eye, so a wall in front of the gun is in front of the
+eye too, and the muzzle leg there only stopped shots on corners and shelf edges the player could plainly see past.
+Third person keeps the two-stage trace with NO near-muzzle forgiveness (user: forgiveness would let a player hide the
+character behind a wall and shoot from the camera). Gate `probe_muzzle_blocked.gd` (`--fps-control` fails the FPS
+case); probe_self_hit, probe_fps_camera, probe_sniper_hits, probe_hit_marker, run_net_shot_test PASS.
+
+**Moving the TPS aim camera closer was measured, not done** (`tools/godot/shot_aim_camera.gd`, display): the aim
+camera (Combat.tres: distance 1.0, shoulder 0.35, height -0.3) already sits 0.13 m above and 0.23 m beside the muzzle
+on Shino, 1.75 m behind it. Shoulder 0.35 / 0.25 / 0.15 / 0.05 gives a 0.23 / 0.16 / 0.12 / 0.13 m gap between the
+camera's line and the gun's line 1 m past the muzzle -- diminishing, because the distance behind does not change --
+and at 0.15 the character's back covers the gun and the target in the middle of the screen. The remaining TPS levers
+are a pose lift over low cover (GTA / TLOU) and a cover system that pops the gun clear of the lip (Gears).
+
 ### The crosshair says when the muzzle line is blocked (PLAN.md 1d, 2026-10-09)
 
 The two-stage trace is right that cover the camera sees over or past still stops the round at the gun -- but with

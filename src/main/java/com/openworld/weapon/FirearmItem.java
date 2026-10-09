@@ -521,8 +521,17 @@ public class FirearmItem extends WeaponItem {
    */
   private boolean useMuzzleTrace() {
 	return muzzleTrace && owningCharacter instanceof Character c && c.currentVehicleNode == null
-		&& !c.isScopeRaised();
+		&& !c.isScopeRaised() && !(eyeTraceInFirstPerson && c.isFirstPersonView());
   }
+
+  /**
+   * FIRST PERSON shoots from the EYE, one leg, the CS / L4D rule (user 2026-10-09: "the FPS still has that blocked
+   * feeling time to time"). In first person the camera IS the character's eye, so the reason for the muzzle leg --
+   * a third-person camera standing beside the cover the character hides behind -- is gone: a wall in front of the
+   * gun is in front of the eye too. The muzzle leg there only ever stopped shots on a corner or a shelf edge the
+   * player could plainly see past. Third person keeps both legs (no forgiveness, user decision). Off = the control.
+   */
+  @godot.annotation.Visible public boolean eyeTraceInFirstPerson = true;
 
 
   /**
