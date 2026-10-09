@@ -29,7 +29,7 @@ points = PackedVector3Array(13.6, 6.6, 23.42, 13.6, 6.3, 23.42, 13.6, 8.25, 20.9
 [sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_6am13"]
 points = PackedVector3Array(14.91, 8.25, 20.45, 14.91, 7.95, 20.45, 14.91, 9.9, 22.88, 14.91, 9.6, 22.88, 16.1, 8.25, 20.45, 16.1, 7.95, 20.45, 16.1, 9.9, 22.88, 16.1, 9.6, 22.88)
 
-[node name="ParkingGarage" type="Node3D" unique_id=112314166]
+[node name="ParkingGarage" type="Node3D" unique_id=1876269260]
 metadata/building = {
 "aabb": [Vector3(-15.5, -1.2, -26), Vector3(33, 14.55, 53)],
 "base_m": -1.2,
@@ -119,47 +119,47 @@ metadata/building = {
 "wall_top_m": 9.9
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=213607934]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=258086896]
 visibility_range_end = 460.2
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_u5iya")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=1186227035]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=2053378369]
 collision_mask = 0
 
-[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=350391592]
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=1459308647]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.85, 1.05, 24.7)
 shape = SubResource("BoxShape3D_ggc7b")
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1977866459]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=794154456]
 shape = ExtResource("2_6i43c")
 
-[node name="StairRamps" type="StaticBody3D" parent="." unique_id=1926416971]
+[node name="StairRamps" type="StaticBody3D" parent="." unique_id=1871569991]
 collision_layer = 64
 collision_mask = 0
 
-[node name="Ramp0" type="CollisionShape3D" parent="StairRamps" unique_id=2042703376]
+[node name="Ramp0" type="CollisionShape3D" parent="StairRamps" unique_id=283528364]
 shape = SubResource("ConvexPolygonShape3D_qnemb")
 
-[node name="Ramp1" type="CollisionShape3D" parent="StairRamps" unique_id=47678420]
+[node name="Ramp1" type="CollisionShape3D" parent="StairRamps" unique_id=1162618122]
 shape = SubResource("ConvexPolygonShape3D_1c1te")
 
-[node name="Ramp2" type="CollisionShape3D" parent="StairRamps" unique_id=89573385]
+[node name="Ramp2" type="CollisionShape3D" parent="StairRamps" unique_id=667394294]
 shape = SubResource("ConvexPolygonShape3D_4p4ec")
 
-[node name="Ramp3" type="CollisionShape3D" parent="StairRamps" unique_id=1497186995]
+[node name="Ramp3" type="CollisionShape3D" parent="StairRamps" unique_id=1608287369]
 shape = SubResource("ConvexPolygonShape3D_i7h0g")
 
-[node name="Ramp4" type="CollisionShape3D" parent="StairRamps" unique_id=96911215]
+[node name="Ramp4" type="CollisionShape3D" parent="StairRamps" unique_id=1945453959]
 shape = SubResource("ConvexPolygonShape3D_qb6nx")
 
-[node name="Ramp5" type="CollisionShape3D" parent="StairRamps" unique_id=323347091]
+[node name="Ramp5" type="CollisionShape3D" parent="StairRamps" unique_id=574160987]
 shape = SubResource("ConvexPolygonShape3D_6am13")
 
-[node name="Lifts" type="Node3D" parent="." unique_id=1905527609]
+[node name="Lifts" type="Node3D" parent="." unique_id=1122319490]
 
-[node name="Lift0" type="Node3D" parent="Lifts" unique_id=366220382]
+[node name="Lift0" type="Node3D" parent="Lifts" unique_id=45757362]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.3, 0, 17.9)
 script = ExtResource("3_vpomr")
 shaft_width = 1.6
@@ -177,18 +177,18 @@ in_service = true
 stop_heights = "0,3.3,6.6,9.9"
 faces = 1
 
-[node name="Door_exit_0" type="Marker3D" parent="." unique_id=1604375759]
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=1893212861]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 14.85, 0, 24.7)
 
-[node name="Markers" type="Node3D" parent="." unique_id=1933987284]
+[node name="Markers" type="Node3D" parent="." unique_id=1935239096]
 
-[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1877327397 groups=["mission_marker"]]
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1847241460 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 26.3)
 metadata/team = "staff"
 metadata/note = "the attendant in the booth"
 metadata/kind = "spawn"
 
-[node name="MARK_vehicle_01" type="Node3D" parent="Markers" unique_id=969898859 groups=["mission_marker"]]
+[node name="MARK_vehicle_01" type="Node3D" parent="Markers" unique_id=245623118 groups=["mission_marker"]]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -6, 0, 8.75)
 script = ExtResource("7_ke3os")
 vehicle_id = "KEC1"
@@ -198,7 +198,7 @@ metadata/vehicle = "KEC1"
 metadata/note = "a parked car"
 metadata/kind = "vehicle"
 
-[node name="MARK_vehicle_02" type="Node3D" parent="Markers" unique_id=1408930847 groups=["mission_marker"]]
+[node name="MARK_vehicle_02" type="Node3D" parent="Markers" unique_id=505895231 groups=["mission_marker"]]
 transform = Transform3D(1.1924881e-08, 0, -1, 0, 1, 0, 1, 0, 1.1924881e-08, 6, 3.3, -1.25)
 script = ExtResource("7_ke3os")
 vehicle_id = "SPC1"
@@ -208,7 +208,7 @@ metadata/vehicle = "SPC1"
 metadata/note = "a parked car"
 metadata/kind = "vehicle"
 
-[node name="MARK_vehicle_03" type="Node3D" parent="Markers" unique_id=1602164460 groups=["mission_marker"]]
+[node name="MARK_vehicle_03" type="Node3D" parent="Markers" unique_id=1455937181 groups=["mission_marker"]]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -6, 6.6, -6.25)
 script = ExtResource("7_ke3os")
 vehicle_id = "TAX1"
@@ -218,7 +218,7 @@ metadata/vehicle = "TAX1"
 metadata/note = "a parked car"
 metadata/kind = "vehicle"
 
-[node name="MARK_vehicle_04" type="Node3D" parent="Markers" unique_id=318006677 groups=["mission_marker"]]
+[node name="MARK_vehicle_04" type="Node3D" parent="Markers" unique_id=314467840 groups=["mission_marker"]]
 transform = Transform3D(1.1924881e-08, 0, -1, 0, 1, 0, 1, 0, 1.1924881e-08, 6, 9.9, 11.25)
 script = ExtResource("7_ke3os")
 vehicle_id = "CLC1"

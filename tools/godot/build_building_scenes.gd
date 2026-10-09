@@ -508,6 +508,18 @@ func _build(b: Dictionary, variant: String) -> bool:
 							"path": path, "key": "%s_%d_%d" % [path.get_file().get_basename(), surfs.find(s), isl["i"]]})
 				continue
 			var key := mat.resource_path if mat != null else "<none>"
+			var mkey := _merge_key(mat)
+			if mkey != "":
+				# PLAN.md 2f, buildings: a flat-colour material that differs from others only by its albedo goes into
+				# ONE surface with the colour in the vertices -- the same look, a fraction of the draws, and each
+				# building still culled (occlusion, visibility range) on its own.
+				if not tools.has(mkey):
+					tools[mkey] = SurfaceTool.new()
+					mats[mkey] = _merged_material(mkey, mat)
+					order.append(mkey)
+				(tools[mkey] as SurfaceTool).append_from(_coloured(s[0], s[1], mat.albedo_color), 0,
+						xf * (s[2] as Transform3D))
+				continue
 			if not tools.has(key):
 				var st := SurfaceTool.new()
 				tools[key] = st
@@ -1440,3 +1452,95 @@ func _vert_count(mesh: ArrayMesh) -> int:
 	for s in mesh.get_surface_count():
 		n += (mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
 	return n
+
+
+# ---- PLAN.md 2f, buildings: merge flat-colour materials (2026-10-08) --------------------------------------------
+# Forward+ draws one call per surface per building, and a placed building carried 7-24 surfaces (a PencilBuilding 19),
+# most of them flat colours since the toon retone (retone_downtown_kit.FLAT). Materials whose every stored property
+# but the albedo colour agrees -- the same normal map, roughness, metallic, shading -- are drawn as one surface whose
+# vertex colour IS that albedo (vertex_color_is_srgb, so the colour is exactly the material's). Never merged: a
+# transparent or textured or emissive material, a facade (it takes a per-building tone override by surface index),
+# and the night-glow materials (world.StreetLights.GLOW lights them by resource). MERGE_FLAT false = the control.
+const MERGE_FLAT := true
+# LOOSE (the default, 2026-10-08): merge every opaque flat material regardless of its normal map, roughness and
+# metallic -- the merged surface takes MERGE_LOOSE_ROUGHNESS and no normal map. Side-by-side pictures of a ShopHouse
+# and a PencilBuilding door read identical (the normal maps were weak detail under flat toon colours); a
+# PencilBuilding 19 -> 15 surfaces, a ShopHouse 12 -> 8. OW_MERGE_STRICT=1 is the strict merge (only materials that
+# differ by albedo alone: ~1 surface saved), MERGE_FLAT false no merge at all.
+var MERGE_LOOSE := OS.get_environment("OW_MERGE_STRICT") != "1"
+const MERGE_LOOSE_ROUGHNESS := 0.8
+const LOOSE_SKIP := ["normal_texture", "normal_enabled", "normal_scale", "roughness", "roughness_texture",
+		"roughness_texture_channel", "metallic", "metallic_specular", "metallic_texture"]
+const MERGED_DIR := "res://src/main/resources/com/openworld/world/buildings/merged"
+const NO_MERGE_PREFIX := ["MI_FakeInterior", "MI_Fascia", "MI_ShopBand", "MI_Light", "MI_LampGlass"]
+const SIG_SKIP := ["albedo_color", "resource_name", "resource_path", "resource_local_to_scene", "script",
+		"resource_scene_unique_id"]
+var _merge_keys := {}       # material path -> merge key ("" = not mergeable)
+var _merged_mats := {}      # merge key -> merged material
+
+func _merge_key(mat: Material) -> String:
+	if not MERGE_FLAT or not (mat is BaseMaterial3D) or mat.resource_path == "":
+		return ""
+	if _merge_keys.has(mat.resource_path):
+		return _merge_keys[mat.resource_path]
+	var m := mat as BaseMaterial3D
+	var ok := m.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED and m.albedo_texture == null \
+			and not m.emission_enabled and not m.vertex_color_use_as_albedo and m.next_pass == null \
+			and not _facade_names().has(m.resource_name)
+	for pre in NO_MERGE_PREFIX:
+		if m.resource_name.begins_with(pre):
+			ok = false
+	var key := ""
+	if ok:
+		var sig := PackedStringArray([m.get_class()])
+		for pr in m.get_property_list():
+			if not (int(pr["usage"]) & PROPERTY_USAGE_STORAGE) or SIG_SKIP.has(str(pr["name"])):
+				continue
+			if MERGE_LOOSE and LOOSE_SKIP.has(str(pr["name"])):
+				continue
+			var v = m.get(pr["name"])
+			sig.append("%s=%s" % [pr["name"], v.resource_path if v is Resource else var_to_str(v)])
+		key = ("loose:" if MERGE_LOOSE else "merge:") + "|".join(sig).md5_text()
+	_merge_keys[mat.resource_path] = key
+	return key
+
+## One material per merge key, saved so every building that uses the group shares it.
+func _merged_material(key: String, like: BaseMaterial3D) -> BaseMaterial3D:
+	if _merged_mats.has(key):
+		return _merged_mats[key]
+	var path := "%s/MM_%s.tres" % [MERGED_DIR, key.get_slice(":", 1).substr(0, 12)]
+	var m := like.duplicate() as BaseMaterial3D
+	m.albedo_color = Color.WHITE
+	if key.begins_with("loose:"):
+		m.normal_enabled = false
+		m.normal_texture = null
+		m.roughness_texture = null
+		m.metallic_texture = null
+		m.roughness = MERGE_LOOSE_ROUGHNESS
+		m.metallic = 0.0
+	m.vertex_color_use_as_albedo = true
+	m.vertex_color_is_srgb = true
+	m.resource_name = path.get_file().get_basename()
+	DirAccess.make_dir_recursive_absolute(MERGED_DIR)
+	if not FileAccess.file_exists(path):
+		ResourceSaver.save(m, path)
+	m = load(path)
+	_merged_mats[key] = m
+	return m
+
+## The surface with its colour in the vertices and no custom channels (a kit piece's wear data, which no building
+## material reads), so surfaces from different kits append into one.
+func _coloured(mesh: Mesh, si: int, c: Color) -> ArrayMesh:
+	var arr := mesh.surface_get_arrays(si)
+	var n: int = (arr[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+	var cols := PackedColorArray()
+	cols.resize(n)
+	cols.fill(Color(c.r, c.g, c.b, 1.0))
+	arr[Mesh.ARRAY_COLOR] = cols
+	for ci in range(Mesh.ARRAY_CUSTOM0, Mesh.ARRAY_CUSTOM3 + 1):
+		arr[ci] = null
+	arr[Mesh.ARRAY_BONES] = null
+	arr[Mesh.ARRAY_WEIGHTS] = null
+	var out := ArrayMesh.new()
+	out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	return out

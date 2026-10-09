@@ -13,7 +13,7 @@ points = PackedVector3Array(-6.17, 0.45, -0.93, -6.17, 0.15, -0.93, -6.17, 1.85,
 [sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_ypugu"]
 points = PackedVector3Array(-4.86, 1.85, -3.63, -4.86, 1.55, -3.63, -4.86, 3.25, -1.47, -4.86, 2.95, -1.47, -3.67, 1.85, -3.63, -3.67, 1.55, -3.63, -3.67, 3.25, -1.47, -3.67, 2.95, -1.47)
 
-[node name="SafeHouseLarge" type="Node3D" unique_id=620501557]
+[node name="SafeHouseLarge" type="Node3D" unique_id=142286136]
 metadata/building = {
 "aabb": [Vector3(-8.63, -0.2, -7.63), Vector3(17.26, 8.25, 17.829998)],
 "base_m": -0.2,
@@ -217,49 +217,49 @@ metadata/building = {
 "wall_top_m": 2.55
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1396274669]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1603519668]
 visibility_range_end = 396.6
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_xvnhi")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=868331824]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1890542063]
 collision_mask = 0
 
-[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=1808395887]
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=947410833]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, 1.15, 4.7)
 shape = SubResource("BoxShape3D_2ip6k")
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1324154304]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=958282866]
 shape = ExtResource("2_4mv7c")
 
-[node name="StairRamps" type="StaticBody3D" parent="." unique_id=1492533562]
+[node name="StairRamps" type="StaticBody3D" parent="." unique_id=1025713610]
 collision_layer = 64
 collision_mask = 0
 
-[node name="Ramp0" type="CollisionShape3D" parent="StairRamps" unique_id=1780765514]
+[node name="Ramp0" type="CollisionShape3D" parent="StairRamps" unique_id=1619717950]
 shape = SubResource("ConvexPolygonShape3D_5wk4h")
 
-[node name="Ramp1" type="CollisionShape3D" parent="StairRamps" unique_id=10698894]
+[node name="Ramp1" type="CollisionShape3D" parent="StairRamps" unique_id=1147074437]
 shape = SubResource("ConvexPolygonShape3D_ypugu")
 
-[node name="Door_exit_0" type="Marker3D" parent="." unique_id=1869888347]
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=424204438]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -0.35, 0.15, 4.7)
 
-[node name="Markers" type="Node3D" parent="." unique_id=1476723020]
+[node name="Markers" type="Node3D" parent="." unique_id=1754553579]
 
-[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=1945150905 groups=["mission_marker"]]
+[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=424193542 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.25, 1.2)
 metadata/note = "the safe (cash, documents)"
 metadata/kind = "objective"
 
-[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1793853553 groups=["mission_marker"]]
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1885235698 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -2, 0.45, 0.8)
 metadata/team = "player"
 metadata/note = "the large safe house"
 metadata/kind = "spawn"
 
-[node name="MARK_vehicle_01" type="Node3D" parent="Markers" unique_id=157101040 groups=["mission_marker"]]
+[node name="MARK_vehicle_01" type="Node3D" parent="Markers" unique_id=1822772262 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 2.4, 0, 1.8)
 script = ExtResource("3_8xkmt")
 vehicle_id = "CLC1"
@@ -269,7 +269,7 @@ metadata/vehicle = "CLC1"
 metadata/note = "the built-in garage (ビルトインガレージ)"
 metadata/kind = "vehicle"
 
-[node name="MARK_vehicle_02" type="Node3D" parent="Markers" unique_id=794201683 groups=["mission_marker"]]
+[node name="MARK_vehicle_02" type="Node3D" parent="Markers" unique_id=1372486046 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 4.9, 0, 1.8)
 script = ExtResource("3_8xkmt")
 vehicle_id = "CLC1"
@@ -279,25 +279,25 @@ metadata/vehicle = "CLC1"
 metadata/note = "the built-in garage (ビルトインガレージ)"
 metadata/kind = "vehicle"
 
-[node name="MARK_weapon_01" type="Marker3D" parent="Markers" unique_id=186617370 groups=["mission_marker"]]
+[node name="MARK_weapon_01" type="Marker3D" parent="Markers" unique_id=1514323916 groups=["mission_marker"]]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.3, 3.25, 3.2)
 metadata/weapon = "ASR1"
 metadata/note = "the study's gun locker"
 metadata/kind = "weapon"
 
-[node name="MARK_weapon_02" type="Marker3D" parent="Markers" unique_id=2112209964 groups=["mission_marker"]]
+[node name="MARK_weapon_02" type="Marker3D" parent="Markers" unique_id=135966460 groups=["mission_marker"]]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.3, 3.25, 2.7)
 metadata/weapon = "SHG1"
 metadata/note = "the study's gun locker"
 metadata/kind = "weapon"
 
-[node name="MARK_weapon_03" type="Marker3D" parent="Markers" unique_id=743002868 groups=["mission_marker"]]
+[node name="MARK_weapon_03" type="Marker3D" parent="Markers" unique_id=725193331 groups=["mission_marker"]]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.3, 3.25, 2.2)
 metadata/weapon = "SNR1"
 metadata/note = "the study's gun locker"
 metadata/kind = "weapon"
 
-[node name="MARK_weapon_04" type="Marker3D" parent="Markers" unique_id=338652968 groups=["mission_marker"]]
+[node name="MARK_weapon_04" type="Marker3D" parent="Markers" unique_id=488764761 groups=["mission_marker"]]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.3, 3.25, 1.7)
 metadata/weapon = "PIS2"
 metadata/note = "the study's gun locker"

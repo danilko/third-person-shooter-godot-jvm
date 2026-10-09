@@ -116,7 +116,7 @@ func _probe(id: String, inst: Node3D, meta: Dictionary) -> void:
 	var bad := []
 	for s in mi.mesh.get_surface_count():
 		var m := mi.mesh.surface_get_material(s)
-		if m == null or not m.resource_path.contains("/materials/MI_"):
+		if m == null or not (m.resource_path.contains("/materials/MI_") or m.resource_path.contains("/buildings/merged/MM_")):
 			bad.append(s)
 	_check(bad.is_empty(), "%s %d surfaces, all on kit materials %s" % [id, mi.mesh.get_surface_count(), bad])
 

@@ -35,6 +35,10 @@ var deck := false
 var budget_cfg := {}
 var deck_fail := []
 
+func _no_building_shadow(n: Node) -> void:
+	if n is GeometryInstance3D and str(n.owner.scene_file_path if n.owner != null else "").contains("/buildings/"):
+		(n as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
 func _arg(k: String, d = null):
 	return args.get(k, d)
 
@@ -326,6 +330,19 @@ func _initialize() -> void:
 			dome.set("fog_start", end_m / 3.0)
 			dome.set("fog_end", end_m)
 		print("SWEEP: haze %.0f .. %.0f m" % [end_m / 3.0, end_m])
+	# Shadow sweeps (2026-10-08): every caster is drawn again per cascade, so these attribute the building draws.
+	var sun := w.get_node_or_null("Sky3D/SunLight") as DirectionalLight3D
+	if sun != null and _arg("shadow-distance") != null:
+		sun.directional_shadow_max_distance = float(_arg("shadow-distance"))
+		print("SWEEP: sun shadow distance %.0f m" % float(_arg("shadow-distance")))
+	if sun != null and _arg("shadow-splits") != null:
+		var n := int(_arg("shadow-splits"))
+		sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL if n <= 1 else (
+				DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if n == 2 else DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS)
+		print("SWEEP: sun shadow splits %d" % n)
+	if _arg("no-building-shadows", false):
+		node_added.connect(_no_building_shadow)
+		print("SWEEP: buildings cast no shadows")
 	if _arg("no-dummy", false) and zm != null:
 		zm.set("dummy_out_dist", 0.0)
 		print("CONTROL: no dummy traffic cars (PLAN.md 1g e)")

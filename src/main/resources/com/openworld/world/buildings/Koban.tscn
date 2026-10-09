@@ -12,7 +12,7 @@ size = Vector3(0.94, 2.1, 0.14)
 [sub_resource type="BoxShape3D" id="BoxShape3D_m2154"]
 size = Vector3(0.9, 2.1, 0.14)
 
-[node name="Koban" type="Node3D" unique_id=1075640698]
+[node name="Koban" type="Node3D" unique_id=1692041952]
 metadata/building = {
 "aabb": [Vector3(-3.5, -0.2, -3.4), Vector3(7, 4.8999996, 8.4)],
 "base_m": -0.2,
@@ -109,55 +109,55 @@ metadata/building = {
 "wall_top_m": 4.9
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=999758992]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=706153449]
 visibility_range_end = 356.4
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_e0ain")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=1826105993]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=208354979]
 collision_mask = 0
 
-[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=819454328]
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=155988190]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.75000006, 1.05, 3.9)
 shape = SubResource("BoxShape3D_f04qc")
 
-[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=147908198]
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=1422644339]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.6500001, 1.05, 3.9)
 shape = SubResource("BoxShape3D_fmywp")
 
-[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=1100156488]
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=1591577962]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 2.9, 1.05, -0.15)
 shape = SubResource("BoxShape3D_m2154")
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1556560542]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=51459854]
 shape = ExtResource("2_jusew")
 
-[node name="Door_exit_0" type="Marker3D" parent="." unique_id=241061866]
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=1171223983]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -1.2, 0, 3.9)
 
-[node name="Door_exit_1" type="Marker3D" parent="." unique_id=1622005169]
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=1944523774]
 transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 2.9, 0, -0.15)
 
-[node name="Markers" type="Node3D" parent="." unique_id=235543126]
+[node name="Markers" type="Node3D" parent="." unique_id=1146670307]
 
-[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1379889904 groups=["mission_marker"]]
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1900896698 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 1.2)
 metadata/team = "police"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=1930230736 groups=["mission_marker"]]
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=2112843630 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, -1.5)
 metadata/team = "police"
 metadata/kind = "spawn"
 
-[node name="MARK_weapon_01" type="Marker3D" parent="Markers" unique_id=358618814 groups=["mission_marker"]]
+[node name="MARK_weapon_01" type="Marker3D" parent="Markers" unique_id=971071271 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -2, 0, -1.9)
 metadata/weapon = "PIS1"
 metadata/note = "the koban's pistol locker: light weapons only"
 metadata/kind = "weapon"
 
-[node name="MARK_weapon_02" type="Marker3D" parent="Markers" unique_id=1175273263 groups=["mission_marker"]]
+[node name="MARK_weapon_02" type="Marker3D" parent="Markers" unique_id=441131870 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -1.6, 0, -1.9)
 metadata/weapon = "PIS1"
 metadata/kind = "weapon"
