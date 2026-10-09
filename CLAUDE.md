@@ -11108,6 +11108,29 @@ Built first so peak performance can be measured with enforcement in the ring (us
   marker yet (they wake at the place's door, guards round them).
 - Peak load for perf: `probe_walk_perf.gd --wanted=N --gang=N [--no-balance]`.
 
+## Gang hangouts, and why gang escalation was unreachable in play (PLAN.md 0.1 / H1, 2026-10-09)
+
+User: "the gang / all weapons / helicopter altitude seem not working". `tools/godot/probe_escalation_play.gd`
+(World.tscn WITH the crowd and traffic, stars set ONCE, logs units / escalation / weapons / heli height every 5 s)
+showed the ladder works on the island once stars exist: tanks, rammers, snipers, both helicopters, gang hunters, every
+weapon tier. Two real gaps:
+- **Nothing to provoke.** No code spawned an ambient gang member, so gang standing could only rise at a gray-area
+  counter or in a mission. `game.GangHangouts` (built in code by GameManager, authority only; data `gangs.json`
+  `hangout`) stands `count` (4) members in the gang's uniform in front of every place the places record marks with a
+  `gang` (9 places), spawned within `near` 70 m of a player, taken away past `far` 110 m; a hangout whose members all
+  went down stays empty until every player has left. Bodies come from `EnforcementDispatch.spawnHangoutBody` (the
+  dispatch's body/outfit/weapon rules, not LOD-pinned), patrol 6 m round their spot.
+- **Player <-> gang was inherently HOSTILE** (no table row; two different factions), so an ambient member would have
+  opened fire on sight. `DefaultFactions.tres` now ships player<->gang_a/gang_b NEUTRAL: the first hit on a member is
+  `hit_member` = one star = `attack_at`, and GangSystem's flips turn the gang hostile. The konbini mission relied on
+  the inherent hostility, so it carries its own table (`M01_Konbini_Factions.tres`, player<->gang_a HOSTILE).
+- **The helicopter checked clearance only at its orbit point**, and flew there in a straight line 6 m over roofs. It
+  now takes the highest WORLD surface under the orbit point, under itself and 2 s ahead (`AHEAD_SECONDS`), and climbs
+  first (half horizontal speed) while lower than that + `orbitClearance`. Lowest AI clearance in the play probe 11.6 m.
+Gate **`tools/godot/probe_gang_hangout.gd`** 6/6 (`--control` fails 3); probe_konbini_mission kill/spare,
+probe_faction_presets, probe_shop_clerk, probe_enforcement, probe_recovery, probe_escalation, probe_helicopter PASS.
+Not done: a gang-territory overlay on the map (PLAN.md 3.5 H5).
+
 ## Enforcement escalation: armour, rammers, snipers, a helicopter, and units that come inside (PLAN.md W6, 2026-10-06)
 
 User: the chase stopped at buildings and every unit carried small arms. All of it is DATA in `crimes.json` `dispatch`

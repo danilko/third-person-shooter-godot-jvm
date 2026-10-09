@@ -1380,6 +1380,17 @@ public class EnforcementDispatch extends Node {
         return b.toString();
     }
 
+    /** A gang member standing at one of its gang's places ({@link GangHangouts}): the dispatch's body, uniform and
+     *  weapon rules, but NOT pinned to the active LOD tier (it is scenery until it is provoked). */
+    AICharacter spawnHangoutBody(String gang, Vector3 at, String weapon) {
+        int keep = bodyStars;
+        bodyStars = 1;
+        AICharacter ai = spawnBody(gang, at, weapon);
+        bodyStars = keep;
+        if (ai != null) ai.lodPinnedActive = false;
+        return ai;
+    }
+
     private AICharacter spawnBody(String side, Vector3 at, String weapon) {
         if (getTree() == null || getTree().getCurrentScene() == null) return null;
         if (!(GD.load(AI_SCENE) instanceof PackedScene ps) || !(ps.instantiate() instanceof AICharacter ai)) return null;

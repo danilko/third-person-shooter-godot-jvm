@@ -105,13 +105,23 @@ public class Helicopter extends Vehicle {
             orbitAngle += orbitSpeed * delta;
             Vector3 spot = tp.plus(new Vector3(Math.cos(orbitAngle) * orbitRadius, orbitHeight, Math.sin(orbitAngle) * orbitRadius));
             // over a tower or a station roof the orbit rises: never closer than orbitClearance to what is under it
+            // ... and so does the way there: under itself and where it will be in AHEAD_SECONDS (it flew to the
+            // orbit point in a straight line and dipped to 6 m over the roofs on the way, H1 2026-10-09)
             obstacleIn -= delta;
-            if (obstacleIn <= 0) { obstacleIn = 0.5; obstacleTop = topBelow(spot); }
+            if (obstacleIn <= 0) {
+                obstacleIn = 0.5;
+                Vector3 here = getGlobalPosition();
+                Vector3 ahead = here.plus(new Vector3(v.getX(), 0, v.getZ()).times(AHEAD_SECONDS));
+                obstacleTop = maxTop(maxTop(topBelow(spot), topBelow(here)), topBelow(ahead));
+            }
             if (!Double.isNaN(obstacleTop) && spot.getY() < obstacleTop + orbitClearance)
                 spot = new Vector3(spot.getX(), obstacleTop + orbitClearance, spot.getZ());
             Vector3 to = spot.minus(getGlobalPosition());
             want = to.times(0.5);
             if (want.length() > cruise) want = want.normalized().times(cruise);
+            // too low over what is under it or ahead: climb first, at half the horizontal speed
+            if (!Double.isNaN(obstacleTop) && getGlobalPosition().getY() < obstacleTop + orbitClearance)
+                want = new Vector3(want.getX() * 0.5, Math.max(want.getY(), climbRate), want.getZ() * 0.5);
             Vector3 face = tp.minus(getGlobalPosition());
             yawWant = Math.atan2(-face.getX(), -face.getZ());
         } else {
@@ -146,6 +156,13 @@ public class Helicopter extends Vehicle {
         Vector3 av = getAngularVelocity();
         applyTorque(axis.times(mass * 40.0f).minus(new Vector3(av.getX(), 0, av.getZ()).times(mass * 8.0f)));
         return false;
+    }
+
+    /** How far ahead along its motion the AI's clearance looks (s). */
+    private static final double AHEAD_SECONDS = 2.0;
+
+    private static double maxTop(double a, double b) {
+        return Double.isNaN(a) ? b : Double.isNaN(b) ? a : Math.max(a, b);
     }
 
     /** The highest WORLD surface straight under {@code at}, looking from 200 m above it; NaN if none. */

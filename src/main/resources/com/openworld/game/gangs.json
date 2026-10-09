@@ -51,6 +51,11 @@
    ]
   }
  },
+ "hangout": {
+  "note": "Gang members loitering in front of every place the places record marks with a gang (game.GangHangouts, PLAN.md 0.1): `count` per place, spawned within `near` m of a player, returned past `far` m of every player; set down `ring` m out from the door toward the street; they patrol `patrol_radius` m round their spot. NEUTRAL to the player until provoked (DefaultFactions.tres): the first hit is hit_member heat = attack_at.",
+  "count": 4, "near": 70, "far": 110, "ring": [3, 8], "patrol_radius": 6,
+  "weapons": ["PIS1", "MEW1", "PIS1", "SMG1"]
+ },
  "hunters": {
   "tokens_note": "PLAN.md 1g b2/b3 (2026-10-07): tokens_by_stars = how many units may attack one player at once (the rest close in and hold, the token rotates every 4 s; 0 = no limit). regroup_seconds_by_stars = after half the units on a player have run dry (they walk back to a vehicle's spare ammo, item/ammo_supply.json, within supply_reach, else leave), no new unit is sent for this long: the escape window. 0 = no lull.",
   "tokens_by_stars": [0, 0, 0, 2, 3, 4],

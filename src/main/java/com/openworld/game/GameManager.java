@@ -120,6 +120,11 @@ public class GameManager extends Node {
             wj.setName(new godot.core.StringName("WorldJanitor"));
             addChild(wj);
         }
+        if (getNodeOrNull("GangHangouts") == null) {
+            GangHangouts gh = new GangHangouts();
+            gh.setName(new godot.core.StringName("GangHangouts"));
+            addChild(gh);
+        }
         if (getNodeOrNull("RespawnSystem") == null) {
             RespawnSystem rs = new RespawnSystem();
             rs.setName(new godot.core.StringName("RespawnSystem"));
