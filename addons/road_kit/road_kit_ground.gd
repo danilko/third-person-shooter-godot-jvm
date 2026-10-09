@@ -91,9 +91,49 @@ static func lookup(grid: Dictionary, kx: float, ky: float) -> float:
 	var ty := fy - j
 	return (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty
 
+## The island's NATURAL ground as a committed height grid (`assets/world_source/terrain/island_natural.f32`, set by
+## `write_roadkit_ground.gd --natural=`). When set it is THE answer to "how high is the natural ground here" for every
+## sampler, whatever the terrain or any sidecar says: re-sampling a network over a terrain that already carries the
+## road stamp, the block ground and the cut batters read those back as ground (2026-10-08: the rail's re-sampled grid
+## differed from its natural one in 371 410 cells by > 10 cm, up to 56.7 m, which re-baked every rail piece and would
+## have sized its piers against road cuts). Layout: float32, z-major, cell (i, j) at (x0 + i*step, z0 + j*step).
+static var natural_override := {}
+
+static func set_natural_grid(path: String, x0: float, z0: float, nx: int, nz: int, step: float) -> bool:
+	var h := FileAccess.get_file_as_bytes(path).to_float32_array()
+	if h.size() != nx * nz:
+		return false
+	natural_override = {"h": h, "x0": x0, "z0": z0, "nx": nx, "nz": nz, "step": step}
+	return true
+
+static func _natural_grid_height(world: Vector3) -> float:
+	var g := natural_override
+	var fx: float = (world.x - float(g["x0"])) / float(g["step"])
+	var fz: float = (world.z - float(g["z0"])) / float(g["step"])
+	# a sample on a grid vertex reads it EXACTLY (a sidecar on the same 2 m lattice is then bit-stable across runs)
+	if absf(fx - roundf(fx)) < 1e-4:
+		fx = roundf(fx)
+	if absf(fz - roundf(fz)) < 1e-4:
+		fz = roundf(fz)
+	var i := int(floor(fx))
+	var j := int(floor(fz))
+	var nx: int = g["nx"]
+	if i < 0 or j < 0 or i + 1 >= nx or j + 1 >= int(g["nz"]):
+		return NAN
+	var h: PackedFloat32Array = g["h"]
+	var tx := fx - i
+	var tz := fz - j
+	var a := h[j * nx + i]
+	var b := h[j * nx + i + 1]
+	var c := h[(j + 1) * nx + i]
+	var d := h[(j + 1) * nx + i + 1]
+	return (a * (1 - tx) + b * tx) * (1 - tz) + (c * (1 - tx) + d * tx) * tz
+
 ## The natural-ground source for `net`: its sidecar once the terrain under it has been stamped, `{}`
-## while the terrain is still natural (read the terrain).
+## while the terrain is still natural (read the terrain) -- or when a natural grid is set (it is the answer).
 static func natural_source(net: Node) -> Dictionary:
+	if not natural_override.is_empty():
+		return {}
 	var rec := str(net.get("record_path"))
 	if rec == "" or not FileAccess.file_exists(stamp_record_path(rec)):
 		return {}
@@ -102,6 +142,8 @@ static func natural_source(net: Node) -> Dictionary:
 ## The NATURAL ground height at a world position: the stamped network's sidecar where it covers, the
 ## terrain everywhere else. NAN where neither has data.
 static func natural_height(net: Node3D, terrain: Node, src: Dictionary, world: Vector3, reached: Dictionary = {}) -> float:
+	if not natural_override.is_empty():
+		return _natural_grid_height(world)
 	# `reached` (`stamp_reach`): only where the previous stamp could have changed the terrain is the sidecar the natural
 	# ground; everywhere else the terrain was never stamped and IS natural -- so a later edit to it (the seabed dredged
 	# to -24 m after the first stamp) reaches the sidecar instead of being overwritten by a stale value forever
@@ -159,7 +201,7 @@ static func sample_grid(net: Node3D, terrain: Node, step: float = STEP, margin: 
 	var lo := (rect.position / step).floor() * step
 	rect = Rect2(lo, rect.end - lo)
 	var src := natural_source(net)
-	if src.is_empty() and FileAccess.file_exists(stamp_record_path(str(net.get("record_path")))):
+	if src.is_empty() and natural_override.is_empty() and FileAccess.file_exists(stamp_record_path(str(net.get("record_path")))):
 		# Stamped, and the natural record is gone: sampling now would read the roads back as ground.
 		return {"ok": false, "message": "%s is stamped into the terrain but its natural ground %s is missing -- restore it from version control; re-sampling would read the stamped roads as ground" % [net.name, sidecar_path(str(net.get("record_path")))]}
 	var to_world := _world_xf(net)
@@ -186,7 +228,7 @@ static func sample_grid(net: Node3D, terrain: Node, step: float = STEP, margin: 
 	var header := {"schema_ver": SCHEMA_VER, "origin": [snappedf(rect.position.x, 0.000001), snappedf(rect.position.y, 0.000001)],
 			"step": step, "nx": nx, "ny": ny}
 	return {"ok": hits > 0, "header": header, "heights": heights, "hits": hits, "misses": misses,
-			"message": "ground grid %dx%d at %.1f m: %d sample(s), %d off the terrain%s" % [nx, ny, step, hits, misses, "" if src.is_empty() else " (stamped: the previous sidecar is the natural ground where it covers)"]}
+			"message": "ground grid %dx%d at %.1f m: %d sample(s), %d off the terrain%s" % [nx, ny, step, hits, misses, (" (from the natural grid)" if not natural_override.is_empty() else ("" if src.is_empty() else " (stamped: the previous sidecar is the natural ground where it covers)"))]}
 
 ## Writes `<stem>.ground.json` + `<stem>.ground.bin` beside the record. Returns the JSON path, "" on failure.
 static func write_sidecar(record_path: String, grid: Dictionary) -> String:

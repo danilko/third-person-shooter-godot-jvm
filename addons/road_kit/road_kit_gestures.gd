@@ -441,7 +441,7 @@ static func sample_ground(net: Node, terrain: Node) -> Dictionary:
 	if terrain == null or terrain.get("data") == null:
 		return _fail("no Terrain3D data to sample")
 	var src: Dictionary = Ground.natural_source(net)
-	if src.is_empty() and FileAccess.file_exists(Ground.stamp_record_path(str(net.get("record_path")))):
+	if src.is_empty() and Ground.natural_override.is_empty() and FileAccess.file_exists(Ground.stamp_record_path(str(net.get("record_path")))):
 		return _fail("%s is stamped into the terrain but its natural ground sidecar is missing -- not re-sampling the stamped roads as ground" % net.name)
 	var in_tree: bool = net.is_inside_tree()
 	var to_world: Transform3D = net.global_transform if in_tree else net.transform

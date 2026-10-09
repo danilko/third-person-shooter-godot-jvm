@@ -4,6 +4,8 @@ extends SceneTree
 ## over the real ground from the command line.
 ##
 ##   godot --headless --path . --script tools/godot/write_roadkit_ground.gd -- <scene.tscn> [<network node name>]
+##       [--natural=<grid.f32>[,x0,z0,nx,nz,step]]   sample the natural ground from that grid, never the terrain
+##       (the island: assets/world_source/terrain/island_natural.f32, whose layout is the default -2304,-2304,2305,2305,2)
 ##   blender/tools/build_roads_piece.sh <record> Roads_<network> <zones.json> <printed sidecar>
 ##
 ## Prints `GROUND <sidecar path>`. Like the dock's service calls, the stations' own `ground_z` are
@@ -15,7 +17,22 @@ const NetworkScript := preload("res://addons/road_kit/road_kit_network.gd")
 const Gestures := preload("res://addons/road_kit/road_kit_gestures.gd")
 
 func _initialize() -> void:
-	var args := OS.get_cmdline_user_args()
+	var all := OS.get_cmdline_user_args()
+	var args := []
+	for a in all:
+		if a.begins_with("--natural="):
+			var parts: PackedStringArray = a.substr(10).split(",")
+			var p: String = parts[0] if parts[0].begins_with("res://") or parts[0].begins_with("/") else "res://" + parts[0]
+			var lay := [-2304.0, -2304.0, 2305, 2305, 2.0]
+			if parts.size() == 6:
+				lay = [float(parts[1]), float(parts[2]), int(parts[3]), int(parts[4]), float(parts[5])]
+			if not Ground.set_natural_grid(p, lay[0], lay[1], lay[2], lay[3], lay[4]):
+				print("ERROR natural grid %s does not match %s" % [p, str(lay)])
+				quit(1)
+				return
+			print("natural ground from %s" % p)
+		else:
+			args.append(a)
 	if args.is_empty():
 		print("usage: -- <scene.tscn> [<network node name>]")
 		quit(2)

@@ -30,8 +30,13 @@ if [[ "${1:-}" != "--no-layout" ]]; then
 fi
 if [ -f "$P/IslandRail.roads.json" ]; then
     step "R rail: ground, zones, pieces, stamp"
-    timeout -k 5 900 stdbuf -oL "$G" --headless --path . --script tools/godot/write_roadkit_ground.gd -- "$W" IslandRail \
-        | grep -E "^(ground|GROUND)"
+    # the rail stands on the NATURAL ground (it is stamped first): sampled from the committed grid, never the live
+    # terrain -- which, on any re-run after the roads and the block ground, reads their cuts and fills back as ground
+    # (2026-10-08: 371 410 cells off by > 10 cm, up to 56.7 m, so every rail piece re-baked). The ROADS keep sampling
+    # the terrain: to them the rail's embankment is land.
+    NATURAL=""; [ -f assets/world_source/terrain/island_natural.f32 ] && NATURAL="--natural=assets/world_source/terrain/island_natural.f32"
+    timeout -k 5 900 stdbuf -oL "$G" --headless --path . --script tools/godot/write_roadkit_ground.gd -- "$W" IslandRail $NATURAL \
+        | grep -E "^(ground|GROUND|natural)"
     python3 tools/island_road_zones.py "$P/IslandRail.roads.json" "$W" --split --network IslandRail --prefix rail \
         --holder RailZones --zone-prefix Zone_rail_ --marker-prefix Rail_ --node-id-base 910020000 | tail -1
     AVOID_GROUND=""; [ -f "$P/IslandRoads.ground.json" ] && AVOID_GROUND="--avoid-ground $P/IslandRoads.ground.json"
