@@ -1382,12 +1382,58 @@ func _add_panes(root: Node3D, panes: Array, stripe: String, out_id: String) -> v
 		var g: AABB = pn["glass"]
 		var cs := CollisionShape3D.new()
 		cs.name = "Glass"
-		var shape := BoxShape3D.new()
-		shape.size = Vector3(maxf(g.size.x, PANE_MIN_T), maxf(g.size.y, PANE_MIN_T), maxf(g.size.z, PANE_MIN_T))
-		cs.shape = shape
-		cs.position = g.get_center()
+		var tri := _island_trimesh(pn, g)
+		if tri != null:
+			# a glass island that is NOT a rectangle -- a 風除室's glass wrapped round its sliding door, a transom over a
+			# doorway -- would put its AABB box straight across the doorway (probe_buildings: the vestibule doors of
+			# the banks, hospitals, post office and civic centre could not be walked through in the open variants);
+			# its own triangles are the collider instead
+			cs.shape = tri
+		else:
+			var shape := BoxShape3D.new()
+			shape.size = Vector3(maxf(g.size.x, PANE_MIN_T), maxf(g.size.y, PANE_MIN_T), maxf(g.size.z, PANE_MIN_T))
+			cs.shape = shape
+			cs.position = g.get_center()
 		pane.add_child(cs)
 		cs.owner = root
+
+
+## A trimesh collider for a glass island whose triangles cover under PANE_RECT_FILL of its AABB's largest face, else
+## null (a plain window keeps its box: cheaper, and it stops a body that grazes the frame).
+const PANE_RECT_FILL := 0.8
+func _island_trimesh(pn: Dictionary, g: AABB) -> ConcavePolygonShape3D:
+	if not pn.has("arrays"):
+		return null
+	var verts: PackedVector3Array = pn["arrays"][Mesh.ARRAY_VERTEX]
+	var idx = pn["arrays"][Mesh.ARRAY_INDEX]
+	var faces := PackedVector3Array()
+	if idx is PackedInt32Array and (idx as PackedInt32Array).size() > 0:
+		for i in idx:
+			faces.append(verts[i])
+	else:
+		faces = verts
+	# the sheet's thin axis and its face; the area counted is ONE side -- triangles facing +thin axis -- so a thick
+	# sheet's edges and its back face do not make a wrapped wall read as a full rectangle
+	var thin := 0 if g.size.x <= g.size.y and g.size.x <= g.size.z else (1 if g.size.y <= g.size.z else 2)
+	var axis := Vector3.ZERO
+	axis[thin] = 1.0
+	var face := g.size.x * g.size.y * g.size.z / maxf(g.size[thin], 1e-6)
+	var area := 0.0
+	for t in range(0, faces.size() - 2, 3):
+		var n := (faces[t + 1] - faces[t]).cross(faces[t + 2] - faces[t])
+		if absf(n.normalized().dot(axis)) > 0.9 and n.dot(axis) > 0.0:
+			area += n.length() * 0.5
+	if area <= 0.0:
+		for t in range(0, faces.size() - 2, 3):
+			var n := (faces[t + 1] - faces[t]).cross(faces[t + 2] - faces[t])
+			if absf(n.normalized().dot(axis)) > 0.9 and n.dot(axis) < 0.0:
+				area += n.length() * 0.5
+	if face <= 0.0 or area >= face * PANE_RECT_FILL:
+		return null
+	var shape := ConcavePolygonShape3D.new()
+	shape.backface_collision = true
+	shape.set_faces(faces)
+	return shape
 
 
 ## The 目隠しシート across one panel: a white strip at eye height with two livery stripes through it. Its width,

@@ -133,6 +133,16 @@ func _probe(id: String, inst: Node3D, meta: Dictionary) -> void:
 			surf_names[sm.resource_name] = true
 			# the kit ships one card and its numbered variants (MI_FakeInterior, _1.._4)
 			faked = faked or sm.resource_name.begins_with("MI_FakeInterior")
+	# an enterable variant's shop windows are breakable PANES (1g g), out of the shell: their glass and strip count
+	var panes := inst.get_node_or_null("Panes")
+	if panes != null:
+		for pn in panes.get_children():
+			var vis := pn.get_node_or_null("IntactVisual") as MeshInstance3D
+			if vis != null and vis.mesh != null:
+				for ps in vis.mesh.get_surface_count():
+					var pm := vis.mesh.surface_get_material(ps)
+					if pm != null:
+						surf_names[pm.resource_name] = true
 	if surf_names.has("MI_GlassShopfront"):
 		_check(not faked and surf_names.has("MI_ShopBand"),
 			"%s: a shop window is clear (no fake-interior card) and wears the privacy strip" % id)
@@ -322,7 +332,8 @@ func _probe_unlock(id: String, inst: Node3D, meta: Dictionary) -> void:
 		if float(d["width"]) < 0.75 or not _capsule_hits(space, c):
 			inner_open += 1
 		else:
-			inner_shut.append("(%.2f, %.2f, %.2f)" % [d["center"][0], d["center"][1], d["center"][2]])
+			inner_shut.append("(%.2f, %.2f, %.2f) by %s" % [d["center"][0], d["center"][1], d["center"][2],
+					_capsule_blockers(space, c, inst)])
 	if inner_n > 0:
 		_check(inner_open == inner_n, "%s: the capsule fits %d of %d interior sliding doorways once open %s" % [
 			id, inner_open, inner_n, "" if inner_shut.is_empty() else "(blocked at " + ", ".join(inner_shut) + ")"])
@@ -343,6 +354,28 @@ func _capsule_hits(space: PhysicsDirectSpaceState3D, foot: Vector3) -> bool:
 	# the capsule stands 2 cm off the floor, as a character on the ground does
 	q.transform = Transform3D(Basis.IDENTITY, foot + Vector3(0, CAPSULE_H / 2.0 + 0.02, 0))
 	return not space.intersect_shape(q, 4).is_empty()
+
+## What a capsule at `foot` touches, by node path and shape index -- names the obstruction in a failure line.
+func _capsule_blockers(space: PhysicsDirectSpaceState3D, foot: Vector3, inst: Node) -> String:
+	var shape := CapsuleShape3D.new()
+	shape.radius = CAPSULE_R
+	shape.height = CAPSULE_H
+	var q := PhysicsShapeQueryParameters3D.new()
+	q.shape = shape
+	q.collision_mask = 1
+	q.transform = Transform3D(Basis.IDENTITY, foot + Vector3(0, CAPSULE_H / 2.0 + 0.02, 0))
+	var out := []
+	for h in space.intersect_shape(q, 4):
+		var col = h["collider"]
+		var nm := str(inst.get_path_to(col)) if col is Node else str(col)
+		var owner_shape := ""
+		if col is CollisionObject3D:
+			var sid: int = (col as CollisionObject3D).shape_find_owner(int(h["shape"]))
+			var so = (col as CollisionObject3D).shape_owner_get_owner(sid)
+			if so is Node:
+				owner_shape = "/" + str((so as Node).name)
+		out.append(nm + owner_shape)
+	return ",".join(out)
 
 const CELLS := "res://src/main/resources/com/openworld/world/buildings/cells"
 const TONES_JSON := "res://assets/world_source/kits/quaternius_downtown_city/materials/facade_tones.json"

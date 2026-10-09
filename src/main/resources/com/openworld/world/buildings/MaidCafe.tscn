@@ -40,7 +40,7 @@ points = PackedVector3Array(0.785, 10.6, -2.37, 0.785, 10.3, -2.37, 0.785, 12.25
 [sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_qh2ia"]
 points = PackedVector3Array(1.945, 12.25, -5.34, 1.945, 11.95, -5.34, 1.945, 13.9, -2.91, 1.945, 13.6, -2.91, 2.985, 12.25, -5.34, 2.985, 11.95, -5.34, 2.985, 13.9, -2.91, 2.985, 13.6, -2.91)
 
-[node name="MaidCafe" type="Node3D" unique_id=1808236178]
+[node name="MaidCafe" type="Node3D" unique_id=948587483]
 metadata/building = {
 "aabb": [Vector3(-3.4, -1.2, -7.5), Vector3(7.135, 18.1, 16.5)],
 "base_m": -1.2,
@@ -185,61 +185,61 @@ metadata/building = {
 "wall_top_m": 13.9
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1153074465]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1801508785]
 visibility_range_end = 502.8
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_dbtdt")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=896177194]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1565111977]
 collision_mask = 0
 
-[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=1663918199]
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=32854097]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.2, 1.1, 7.18)
 shape = SubResource("BoxShape3D_awfwo")
 
-[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=568173156]
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=424412987]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 1.1, 7.18)
 shape = SubResource("BoxShape3D_1rkd2")
 
-[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=648088138]
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=1266739187]
 transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -3.085, 1, -0.59)
 shape = SubResource("BoxShape3D_j1vo0")
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1798157708]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=595264105]
 shape = ExtResource("2_gy5uy")
 
-[node name="StairRamps" type="StaticBody3D" parent="." unique_id=967153164]
+[node name="StairRamps" type="StaticBody3D" parent="." unique_id=1637292011]
 collision_layer = 64
 collision_mask = 0
 
-[node name="Ramp0" type="CollisionShape3D" parent="StairRamps" unique_id=2113435182]
+[node name="Ramp0" type="CollisionShape3D" parent="StairRamps" unique_id=1721110584]
 shape = SubResource("ConvexPolygonShape3D_o1je1")
 
-[node name="Ramp1" type="CollisionShape3D" parent="StairRamps" unique_id=930956064]
+[node name="Ramp1" type="CollisionShape3D" parent="StairRamps" unique_id=1399060186]
 shape = SubResource("ConvexPolygonShape3D_mjv22")
 
-[node name="Ramp2" type="CollisionShape3D" parent="StairRamps" unique_id=1090547405]
+[node name="Ramp2" type="CollisionShape3D" parent="StairRamps" unique_id=1156364202]
 shape = SubResource("ConvexPolygonShape3D_uic7w")
 
-[node name="Ramp3" type="CollisionShape3D" parent="StairRamps" unique_id=565487092]
+[node name="Ramp3" type="CollisionShape3D" parent="StairRamps" unique_id=720908682]
 shape = SubResource("ConvexPolygonShape3D_ydg80")
 
-[node name="Ramp4" type="CollisionShape3D" parent="StairRamps" unique_id=363796188]
+[node name="Ramp4" type="CollisionShape3D" parent="StairRamps" unique_id=910877807]
 shape = SubResource("ConvexPolygonShape3D_p224n")
 
-[node name="Ramp5" type="CollisionShape3D" parent="StairRamps" unique_id=68620683]
+[node name="Ramp5" type="CollisionShape3D" parent="StairRamps" unique_id=1536545211]
 shape = SubResource("ConvexPolygonShape3D_esivk")
 
-[node name="Ramp6" type="CollisionShape3D" parent="StairRamps" unique_id=35775039]
+[node name="Ramp6" type="CollisionShape3D" parent="StairRamps" unique_id=1222268657]
 shape = SubResource("ConvexPolygonShape3D_4mut3")
 
-[node name="Ramp7" type="CollisionShape3D" parent="StairRamps" unique_id=1912820227]
+[node name="Ramp7" type="CollisionShape3D" parent="StairRamps" unique_id=996554032]
 shape = SubResource("ConvexPolygonShape3D_qh2ia")
 
-[node name="Lifts" type="Node3D" parent="." unique_id=739111832]
+[node name="Lifts" type="Node3D" parent="." unique_id=1649078965]
 
-[node name="Lift0" type="Node3D" parent="Lifts" unique_id=603700619]
+[node name="Lift0" type="Node3D" parent="Lifts" unique_id=1573911539]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -0.165, 0, -2.14)
 script = ExtResource("3_oev74")
 shaft_width = 1.6
@@ -257,37 +257,37 @@ in_service = true
 stop_heights = "0,4,7.3,10.6"
 faces = 1
 
-[node name="Door_exit_0" type="Marker3D" parent="." unique_id=1324312037]
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=1336756158]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -1.6, 0, 7.18)
 
-[node name="Door_exit_1" type="Marker3D" parent="." unique_id=961032313]
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=385305299]
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -3.085, 0, -0.59)
 
-[node name="Markers" type="Node3D" parent="." unique_id=1049221842]
+[node name="Markers" type="Node3D" parent="." unique_id=1838860237]
 
-[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=174355507 groups=["mission_marker"]]
+[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=372272123 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 4.3, 6.38)
 metadata/note = "the stage (a live song / photo spot)"
 metadata/kind = "objective"
 
-[node name="MARK_objective_02" type="Marker3D" parent="Markers" unique_id=1357911809 groups=["mission_marker"]]
+[node name="MARK_objective_02" type="Marker3D" parent="Markers" unique_id=1691897206 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.4, 10.6, 1.2)
 metadata/note = "the takings safe"
 metadata/kind = "objective"
 
-[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1795883228 groups=["mission_marker"]]
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=2023155018 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -1.5, 0, 8.78)
 metadata/team = "staff"
 metadata/note = "the maid handing out flyers"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=1037733502 groups=["mission_marker"]]
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=1473704544 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -1.8, 4, 1.66)
 metadata/team = "staff"
 metadata/note = "the maid at the counter"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=929992238 groups=["mission_marker"]]
+[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=900507178 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.2, 4, 2)
 metadata/team = "civilian"
 metadata/kind = "spawn"
