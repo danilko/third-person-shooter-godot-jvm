@@ -41,6 +41,15 @@ static func build_piece(record_path: String, piece: String, zones_path: String =
 			dirty = Array(line.substr(14).strip_edges().split(",", false))
 	return {"ok": code == 0, "log": log_text, "dirty": dirty}
 
+## PLAN.md item 3 (the handover): everything that READS the road pieces -- traffic zones, the road map, the crowd's
+## walk lines, the building and civic-plot road checks -- re-derived by `tools/island_downstream.sh`, the one owner
+## of that list (the command line runs the same script). Blocking: call it from a thread.
+const DOWNSTREAM := "res://tools/island_downstream.sh"
+static func downstream() -> Dictionary:
+	var out := []
+	var code := OS.execute("bash", [ProjectSettings.globalize_path(DOWNSTREAM)], out, true)
+	return {"ok": code == 0, "log": "".join(out)}
+
 ## B8: a gesture the SOLVER owns, applied to the record -- save (which promotes any hand-rotated point
 ## first), run `cmd`, reload the network from the rewritten record and face the points the tool owns.
 ## The caller wraps it in an undo step. Returns the CLI's object (`failed`/`error` on a refusal).

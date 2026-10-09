@@ -162,6 +162,7 @@ func _enter_tree() -> void:
 	_button("Build Piece (changed zones)", _on_build)
 	_button("Rebuild All Pieces", func(): _on_build(false))
 	_button("Flow Report", _on_flow_report)
+	_button("Downstream (traffic, map, sidewalks, checks)", _on_downstream)
 	_section("Terrain")
 	_button("Stamp Terrain", func(): _on_stamp(false))
 	_button("Restore Terrain", func(): _on_stamp(true))
@@ -1164,6 +1165,26 @@ func _on_build(dirty_only: bool = true) -> void:
 	build_thread.start(func():
 		var r := Service.build_piece(record, piece, zones_path, ground_path, dirty_only)
 		call_deferred("_build_done", piece, r, net, notes))
+
+## PLAN.md item 3: after a hand edit is built (and stamped), re-derive what reads the road pieces. The scene's
+## TrafficZones block is rewritten on disk, so the scene is reloaded afterwards if it is the one open.
+var _downstream_thread: Thread
+func _on_downstream() -> void:
+	if _downstream_thread != null and _downstream_thread.is_started():
+		_say({"ok": false, "message": "downstream is already running"})
+		return
+	status.text = "downstream: traffic zones, road map, sidewalks, checks (a few minutes)..."
+	_downstream_thread = Thread.new()
+	_downstream_thread.start(func():
+		var r := Service.downstream()
+		call_deferred("_downstream_done", r))
+
+func _downstream_done(r: Dictionary) -> void:
+	_downstream_thread.wait_to_finish()
+	var lines := Array(str(r["log"]).split("\n")).filter(func(l): return l.strip_edges() != "")
+	_say({"ok": r["ok"], "message": ("downstream done" if r["ok"] else "downstream FAILED") + "\n"
+			+ "\n".join(PackedStringArray(lines.slice(-14)))})
+	get_editor_interface().get_resource_filesystem().scan()
 
 func _build_done(piece: String, r: Dictionary, net: Node, notes: Array) -> void:
 	build_thread.wait_to_finish()

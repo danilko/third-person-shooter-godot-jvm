@@ -5,10 +5,15 @@ and each stage rewrites its outputs from scratch. When the overall generation is
 to hand work: level designers and artists edit it in place, and the generators stop running over it. This guide says
 **where each thing is edited, and what has to be re-run afterwards**.
 
-> **Read this first — the handover is not done yet (PLAN.md NEXT, item 12 -- the last piece).** Until it is, `tools/island_world.sh` and
-> `tools/island_layout.py` still OWN the island's roads and buildings, and anything edited in their outputs is lost
-> the next time they run. Each section below says what works today and what changes at the handover. Everything
-> about building TYPES, interiors, stations and DebugWorld is already hand-owned and safe to edit.
+> **Read this first — the freeze exists but is not switched on yet.** `python3 tools/handover_freeze.py [--note ...]`
+> hands the island over: it writes `assets/world_source/HANDOVER` and unticks `generated` on the `IslandRoads` /
+> `IslandRail` networks, so the Road Kit dock saves hand edits to their records. From then on `tools/island_world.sh`,
+> `tools/island_layout.py` and `tools/island_buildings.py derive|anchors|lots|retone` REFUSE (exit 3) unless given
+> `--regenerate` (`tools/handover_guard.py` is the one rule; `handover_freeze.py --undo` reverses). Until someone runs
+> the freeze, those generators still OWN the island's roads and buildings, and anything edited in their outputs is
+> lost the next time they run. Everything about building TYPES, interiors, stations and DebugWorld is already
+> hand-owned and safe to edit. Still to build: a dock Stamp that cooperates with the block ground (so an island road
+> edit does not need `--from terrain`) and an editor tool that drops a building on a lot.
 
 ## 1. What owns what
 
@@ -64,7 +69,9 @@ retired for the island.
 
 ## 3. After a road or lane edit: the downstream list
 
-The dock's Build rebuilds the road pieces. The rest of the world reads the roads, so after an island road edit, run:
+The dock's Build rebuilds the road pieces. The rest of the world reads the roads, so after an island road edit, run
+the dock's **Downstream** button (or `tools/island_downstream.sh`; `--check` only reports) -- it does steps 2-5 below in
+one go and works on a frozen island. By hand:
 
 1. **Terrain**:
    * DebugWorld: *Stamp Terrain* in the dock.
