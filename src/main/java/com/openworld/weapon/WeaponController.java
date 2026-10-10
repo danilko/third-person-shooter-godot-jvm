@@ -495,6 +495,7 @@ public class WeaponController extends Node {
     // N3: the rest of a replicated burst, one cue per remembered shot at the weapon's own rhythm.
     remoteCues.tick(delta);
     updateCoverLift();
+    updateAimDownSights();
     // Process equips first (deferred from Area3D body_entered signals)
     if (!pendingEquips.isEmpty()) {
       equippedThisPass.clear();
@@ -974,6 +975,27 @@ public class WeaponController extends Node {
         && !(c instanceof com.openworld.character.AICharacter ai && ai.getLodLevel() != com.openworld.ai.AILodLevel.ACTIVE))
       want = f.coverLift(ac.coverLiftNow(), ac.coverLiftMax(), 0.05);
     ac.setCoverLift(want);
+  }
+
+  /**
+   * First-person aim down sights (PLAN.md 0.43): the aim button held, in first person, with a single firearm up and the
+   * view on THIS body's camera (a puppet or an AI never), and not scoped (the optic is its own view), switching,
+   * reloading or seated. The firing arm (the recoil modifier) brings the gun to the eye line and back.
+   */
+  private void updateAimDownSights() {
+    AnimationController ac = animation();
+    if (ac == null) return;
+    boolean want = getParent() instanceof Character c && c.isFpsMode && c.currentVehicleNode == null && c.isAlive()
+        && scopeRequested && !c.isScopeRaised() && c.activeCamera != null && c.activeCamera.isCurrent()
+        && !isHolstered() && !isWeaponTransitioning() && !isWeaponReloading()
+        && getCurrentWeaponItem() instanceof FirearmItem f && !(f instanceof DualPistolItem);
+    ac.setAimDownSights(want);
+  }
+
+  /** How far up the sights the gun is (0..1; probe readout). */
+  @Register public double aimDownSightsNow() {
+    AnimationController ac = animation();
+    return ac != null ? ac.aimDownSightsNow() : 0.0;
   }
 
   /** The cover lift the firing arm carries now (m; probe readout). */

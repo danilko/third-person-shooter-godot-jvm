@@ -3,6 +3,7 @@
 Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 
 - Animation — the export pipeline, the Root-bone rule, and how to MEASURE it (2026-09-07)
+- First-person AIM DOWN SIGHTS (PLAN.md 0.43, 2026-10-10)
 
 ---
 
@@ -4076,3 +4077,25 @@ theirs, since only the authoring body has ARP.
 `export_def_bones=True` had always filtered the CTRL bones out — so the shipped export was never
 rewritten.
 
+
+### First-person AIM DOWN SIGHTS (PLAN.md 0.43, 2026-10-10, user: "yes, add FPS ADS")
+
+Before this, aim == hip in first person: ASR1 sat 12 deg right / 9.5 deg down of the crosshair with its line ~14 cm
+off it. The rounds were already right (FPS shoots from the eye, `FirearmItem.eyeTraceInFirstPerson`), so this is the
+PICTURE only, and it lives in the layer that already moves the gun every frame: `WeaponRecoilModifier`, before the
+kick and the cover lift, so the arm solve (TwoBoneIK), the kick and the support hand all follow it for free.
+
+- **The rule** (the 2026-10-07 one, kept): the gun's highest point stays UNDER the camera's centre ray, `adsMargin`
+  (1.2 cm) below it, so the front sight sits just under the crosshair and never on it. The bore is turned PARALLEL to
+  the centre ray (the muzzle marker's frame onto the camera's: -Z out of the barrel, +Y the top of the gun) and moved
+  sideways/up at the depth the clip already holds it (never nearer the eye than `adsMinDepth` 0.30 m).
+- **No sight marker is authored**: `FirearmItem.sightTopAboveBore()` measures the top of the gun above the bore from
+  the meshes' boxes in the muzzle's frame, once. Trap found doing it: the muzzle's own flash GLOW quad is a mesh and read
+  as 0.148 m of "gun" on every weapon (the guns are 0.02-0.06 m); the Muzzle subtree is excluded.
+- **Who gets it**: `WeaponController.updateAimDownSights` -- aim held, `isFpsMode`, on foot, alive, a single firearm in
+  hand (not DUP1: two guns have no sight line; they straddle the centre already, 0.42), not scoped (the optic is its own
+  view), not switching / reloading, and the body's `activeCamera` is the CURRENT camera -- so a puppet or an AI never.
+  `adsSpeed` 7/s (0.14 s up). TPS keeps the shoulder hold.
+- Measured (`probe_fps_ads.gd`, 24/24; `--control` = adsSpeed 0, fails 11): ASR1 / PIS1 / SMG1 / SHG1 bores 0.00 deg off
+  the centre ray, muzzles 0.000-0.008 m off the centre line, tops 0.005-0.013 m under the crosshair. Pictures:
+  `measure_gun_screen.gd --out` (xvfb). recoil_kick / cover_lift / dual_pistol / fps_camera / self_hit unchanged.

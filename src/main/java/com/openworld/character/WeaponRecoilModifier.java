@@ -7,7 +7,10 @@ import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.api.Skeleton3D;
 import godot.api.SkeletonModifier3D;
+import godot.api.Camera3D;
+import godot.api.Node3D;
 import godot.core.Basis;
+import godot.core.Quaternion;
 import godot.core.Transform3D;
 import godot.core.Vector3;
 
@@ -110,6 +113,26 @@ public class WeaponRecoilModifier extends SkeletonModifier3D {
     /** The lift the arm carries right now (m) -- for probes and for the next search's start. */
     @Register public double currentLift() { return lift; }
 
+    /** First-person AIM DOWN SIGHTS (PLAN.md 0.43): how fast the gun comes up to the eye line (weight per second, so
+     *  1/adsSpeed s to raise), how far its highest point stays UNDER the camera's centre ray (m -- "the gun must not
+     *  block the crosshair", 2026-10-07), and the nearest its muzzle may come to the eye (m). 0 speed = never (the
+     *  control). The TARGET comes from WeaponController every frame. */
+    @Export public float adsSpeed = 7.0f;
+    @Export public float adsMargin = 0.012f;
+    @Export public float adsMinDepth = 0.30f;
+    public float getAdsSpeed() { return adsSpeed; }
+    public void setAdsSpeed(float v) { this.adsSpeed = v; }
+    public float getAdsMargin() { return adsMargin; }
+    public void setAdsMargin(float v) { this.adsMargin = v; }
+    public float getAdsMinDepth() { return adsMinDepth; }
+    public void setAdsMinDepth(float v) { this.adsMinDepth = v; }
+    private double ads, adsTarget;
+
+    /** Raise (true) or lower the gun to the eye line. */
+    public void setAdsTarget(boolean on) { adsTarget = on && adsSpeed > 0.0f ? 1.0 : 0.0; }
+    /** How far up the sights the gun is right now (0 = the clip's hold, 1 = on the eye line) -- for probes. */
+    @Register public double currentAds() { return ads; }
+
     private WeaponController weaponController;
     private boolean controllerResolved = false;
 
@@ -176,7 +199,11 @@ public class WeaponRecoilModifier extends SkeletonModifier3D {
             double stepM = liftSpeed * dt;
             lift = Math.abs(liftTarget - lift) <= stepM ? liftTarget : lift + Math.signum(liftTarget - lift) * stepM;
         }
-        if (back == 0.0 && pitch == 0.0 && lift == 0.0) return;   // at rest: the arm is the clip's/the IK's
+        if (dt > 0.0 && ads != adsTarget) {
+            double stepA = Math.max(adsSpeed, 1.0f) * dt;
+            ads = Math.abs(adsTarget - ads) <= stepA ? adsTarget : ads + Math.signum(adsTarget - ads) * stepA;
+        }
+        if (back == 0.0 && pitch == 0.0 && lift == 0.0 && ads == 0.0) return;   // at rest: the arm is the clip's/the IK's
 
         if (!controllerResolved) {
             controllerResolved = true;
@@ -194,12 +221,17 @@ public class WeaponRecoilModifier extends SkeletonModifier3D {
         int ie = skel.findBone(endBone);
         if (iu < 0 || il < 0 || ie < 0) return;
 
+        Transform3D hand = skel.getBoneGlobalPose(ie);
+        if (ads > 0.0) {
+            Transform3D[] raised = aimDownSights(skel, held, gun, hand);
+            if (raised != null) { gun = raised[0]; hand = raised[1]; }
+        }
+
         Basis gunBasis = gun.getBasis().orthonormalized();
         Vector3 lateral = gunBasis.getColumn(0);
         Vector3 boreBack = gunBasis.getColumn(2);
         Basis rise = new Basis(lateral, Math.toRadians(pitch));
 
-        Transform3D hand = skel.getBoneGlobalPose(ie);
         Vector3 pivot = skel.getBoneGlobalPose(iu).getOrigin();
         Vector3 target = pivot.plus(rise.times(hand.getOrigin().minus(pivot))).plus(boreBack.times((float) back));
         // The cover lift: straight up in the WORLD (the skeleton's frame may be turned), and then the gun re-pointed
@@ -231,6 +263,39 @@ public class WeaponRecoilModifier extends SkeletonModifier3D {
         skel.setBoneGlobalPose(ie, new Transform3D(turn.times(hand.getBasis()), solved));
     }
 
+    /**
+     * First-person aim down sights: the gun turned so its bore is PARALLEL to the camera's centre ray and moved
+     * (sideways and up, at the depth the clip holds it) so that ray passes just over its highest point -- the front
+     * sight sits under the crosshair, never on it. In FPS the round already leaves the eye (FirearmItem
+     * .eyeTraceInFirstPerson), so this is the picture, not the ballistics. Blended by {@link #ads}; the arm follows
+     * through the same TwoBoneIK solve as the kick, and the support hand follows the gun as it always does.
+     * Returns {gun, hand} in skeleton space, or null when there is no camera / muzzle to line up with.
+     */
+    private Transform3D[] aimDownSights(Skeleton3D skel, WeaponItem held, Transform3D gun, Transform3D hand) {
+        if (!(held instanceof com.openworld.weapon.FirearmItem f)) return null;
+        godot.api.Node body = weaponController != null ? weaponController.getParent() : null;
+        Camera3D cam = body instanceof Character c ? c.activeCamera : null;
+        Node3D muzzleNode = f.muzzleMarker();
+        if (cam == null || muzzleNode == null || !cam.isInsideTree()) return null;
+        Transform3D camS = skel.getGlobalTransform().affineInverse().times(cam.getGlobalTransform());
+        Transform3D muz = HeldWeaponPose.markerInSkeleton(gun, held, muzzleNode);
+        Basis camB = camS.getBasis().orthonormalized();
+        // the muzzle marker's frame IS the bore's: -Z out of the barrel, +Y the top of the gun
+        Quaternion full = camB.times(muz.getBasis().orthonormalized().inverse()).getRotationQuaternion();
+        Basis turnFull = new Basis(full);
+        Vector3 go = gun.getOrigin();
+        Vector3 mzTurned = go.plus(turnFull.times(muz.getOrigin().minus(go)));
+        Vector3 mc = camS.affineInverse().times(mzTurned);
+        double depth = Math.max(adsMinDepth, -mc.getZ());
+        Vector3 want = new Vector3(0.0, -(f.sightTopAboveBore() + adsMargin), -depth);
+        Vector3 shift = camB.times(want.minus(mc)).times((float) ads);
+        Basis turn = new Basis(new Quaternion().slerp(full, (float) ads));
+        Transform3D g2 = new Transform3D(turn.times(gun.getBasis()), go.plus(shift));
+        Transform3D h2 = new Transform3D(turn.times(hand.getBasis()),
+                go.plus(turn.times(hand.getOrigin().minus(go))).plus(shift));
+        return new Transform3D[] {g2, h2};
+    }
+
     @Register
     @Override
     public void _exitTree() {
@@ -238,5 +303,6 @@ public class WeaponRecoilModifier extends SkeletonModifier3D {
         controllerResolved = false;
         back = 0.0; backVel = 0.0; pitch = 0.0; pitchVel = 0.0;
         lift = 0.0; liftTarget = 0.0;
+        ads = 0.0; adsTarget = 0.0;
     }
 }

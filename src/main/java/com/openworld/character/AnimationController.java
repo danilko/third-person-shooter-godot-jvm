@@ -504,6 +504,9 @@ public class AnimationController extends Node {
   public void setCoverLift(double metres) { if (recoilModifier != null) recoilModifier.setLiftTarget(metres); }
   public double coverLiftNow() { return recoilModifier != null ? recoilModifier.currentLift() : 0.0; }
   public double coverLiftMax() { return recoilModifier != null ? recoilModifier.maxLift : 0.0; }
+  /** First-person aim down sights (PLAN.md 0.43): raise the gun to the eye line, and how far up it is (0..1). */
+  public void setAimDownSights(boolean on) { if (recoilModifier != null) recoilModifier.setAdsTarget(on); }
+  public double aimDownSightsNow() { return recoilModifier != null ? recoilModifier.currentAds() : 0.0; }
 
   public void onWeaponKick(double back, double pitchDeg, double spring, double damping) {
     if (recoilModifier == null || (back == 0.0 && pitchDeg == 0.0)) return;

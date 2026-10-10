@@ -104,7 +104,7 @@ func _initialize() -> void:
 			var aim_node: Node3D = _find(p, "AimTarget") as Node3D
 			var aim: Vector3 = aim_node.global_position if aim_node != null else cam.global_position - cam.global_transform.basis.z * 20.0
 			var body: Vector3 = cam.global_transform.affine_inverse() * mesh_root.global_position
-			print("  %s %s: camera %s, body centre %+.3f m right of the camera" % ["FPS" if fps else "TPS", "hip" if hip else "aim", cam.get_path(), body.x])
+			print("  %s %s: camera %s, body centre %+.3f m right of the camera, ads %.2f" % ["FPS" if fps else "TPS", "hip" if hip else "aim", cam.get_path(), body.x, wc.call("aim_down_sights_now")])
 			var m: Node3D = _find(gun, "Muzzle") as Node3D
 			if m != null:
 				_report("right", cam, m, aim)

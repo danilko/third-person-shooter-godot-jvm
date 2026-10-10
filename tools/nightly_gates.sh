@@ -49,6 +49,7 @@ GATES=(
   "character_visuals_shino|400|0|0|$HF --script $P/probe_character_visuals.gd -- --visuals=res://src/main/resources/com/openworld/character/CharacterVisuals_Shino.tscn"
   "character_visuals_fumiriya|400|0|0|$HF --script $P/probe_character_visuals.gd -- --visuals=res://src/main/resources/com/openworld/character/CharacterVisuals_Fumiriya.tscn"
   "recoil_kick|400|0|0|$HF --script $P/probe_recoil_kick.gd"
+  "fps_ads|400|0|0|$HF --script $P/probe_fps_ads.gd"
   "aim_debug_auto|600|0|0|$H res://src/main/resources/com/openworld/world/hosts/AimDebugAuto.tscn"
   "faction_presets|400|0|0|$HF --script $P/probe_faction_presets.gd"
   "campaign_factions|200|0|0|$H --script $P/probe_campaign_factions.gd"

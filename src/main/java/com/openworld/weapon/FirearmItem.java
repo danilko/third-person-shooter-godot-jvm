@@ -708,6 +708,46 @@ public class FirearmItem extends WeaponItem {
 	return (Marker3D) getNode("Muzzle");
   }
 
+  /** The bore's marker (-Z out of the barrel), or null on a weapon without one -- for the first-person sight line. */
+  public Marker3D muzzleMarker() {
+	return getNodeOrNull("Muzzle") instanceof Marker3D m ? m : null;
+  }
+
+  private double sightTop = Double.NaN;
+
+  /**
+   * How far the gun's highest visible point stands above the bore line, along the muzzle's +Y (m): what first-person
+   * aim down sights keeps under the camera's centre ray (WeaponRecoilModifier, PLAN.md 0.43). Measured once from the
+   * meshes' boxes in the muzzle's frame (the muzzle's own VFX excluded) -- no weapon authors a sight marker, and the top of the gun is exactly what
+   * must not cover the crosshair.
+   */
+  @Register
+  public double sightTopAboveBore() {
+	if (!Double.isNaN(sightTop)) return sightTop;
+	Marker3D m = muzzleMarker();
+	if (m == null) return 0.0;
+	double top = 0.0;
+	java.util.ArrayDeque<Node> stack = new java.util.ArrayDeque<>();
+	stack.push(this);
+	boolean any = false;
+	while (!stack.isEmpty()) {
+	  Node n = stack.pop();
+	  if (n == m) continue;   // the muzzle's own effects (the flash's glow quad) are not the gun
+	  for (Node ch : n.getChildren()) stack.push(ch);
+	  if (!(n instanceof godot.api.MeshInstance3D mi) || !mi.isVisibleInTree() || mi.getMesh() == null) continue;
+	  godot.core.AABB box = mi.getAabb();
+	  // a fresh inverse each time: Transform3D.times(Transform3D) MUTATES its receiver (godot-jvm rc1)
+	  godot.core.Transform3D t = m.getGlobalTransform().affineInverse().times(mi.getGlobalTransform());
+	  for (int i = 0; i < 8; i++) {
+		Vector3 p = t.times(box.getEndpoint(i));
+		top = any ? Math.max(top, p.getY()) : p.getY();
+		any = true;
+	  }
+	}
+	sightTop = Math.max(0.0, top);
+	return sightTop;
+  }
+
   private BulletTracerManager getBulletTracerManager() {
 	if (bulletTracerManager != null) return bulletTracerManager;
 	Node found = getTree().getFirstNodeInGroup("bullet_tracer_manager");
