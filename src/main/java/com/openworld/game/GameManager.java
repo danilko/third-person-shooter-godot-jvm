@@ -187,6 +187,9 @@ public class GameManager extends Node {
      */
     public void prepareForQuit() {
         if (getTree() == null) return;
+        // the coalesced autosave and the player's profile (PLAN.md 1.4, CR5) are written before the JVM goes
+        SaveSystem s = SaveSystem.get();
+        if (s != null) s.flushAll();
         stopAllAudio(getTree().getRoot());
     }
 

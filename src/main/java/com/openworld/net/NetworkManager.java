@@ -120,6 +120,7 @@ public class NetworkManager extends Node {
     private static final int MSG_SUPPLY_USE             = 32; // W3  — client→host: the owner used a healing supply
     private static final int MSG_BEAT_REQUEST           = 34; // F3  — client→host: the owner's body tripped a ZoneTrigger here; the host fires its beat
     private static final int MSG_SHOP_GRANT             = 33; // W3  — host→owner: a shop sale the host accepted; the owner grants it to its own body
+    private static final int MSG_PROFILE                = 35; // 1.4 AR2 — client→host at join: my PlayerProfile; host→owner: it as the host now holds it
 
     /** WeaponController's slotTypes table has 7 entries (FIST/PRIMARY×2/SECONDARY/MELEE/THROWABLE/CONSUMABLE) — bounds isValidSnapshot's activeSlotIndex check. */
     private static final int WEAPON_SLOT_COUNT = 7;
@@ -172,7 +173,7 @@ public class NetworkManager extends Node {
                     MSG_WORLD_EVENT, MSG_OWNERSHIP, MSG_PICKUP_REQUEST, MSG_PICKUP_TAKEN,
                     MSG_WEAPON_DROPPED, MSG_ELIMINATION, MSG_INVENTORY,
                     MSG_VEHICLE_SEAT_REQUEST, MSG_VEHICLE_OCCUPANCY, MSG_WEAPON_SWITCH,
-                    MSG_VEHICLE_SPAWN, MSG_WAYPOINT, MSG_DETONATION, MSG_SHOP_GRANT, MSG_BEAT_REQUEST ->
+                    MSG_VEHICLE_SPAWN, MSG_WAYPOINT, MSG_DETONATION, MSG_SHOP_GRANT, MSG_BEAT_REQUEST, MSG_PROFILE ->
                     new ChannelSpec(0, ENetPacketPeer.FLAG_RELIABLE);
             case MSG_SNAPSHOT, MSG_SNAPSHOT_BATCH, MSG_VEHICLE_SNAPSHOT, MSG_VEHICLE_SNAPSHOT_BATCH ->
                     new ChannelSpec(2, 0L);
@@ -285,6 +286,7 @@ public class NetworkManager extends Node {
         }
         if (connection == null) return;
         if (!delayedSends.isEmpty()) flushDelayedSends();
+        sendChangedProfiles(delta);
         int now = nowMs();
         if (now - lastNetStatsDumpMs >= NETSTATS_DUMP_INTERVAL_MS) {
             lastNetStatsDumpMs = now;
@@ -897,6 +899,7 @@ public class NetworkManager extends Node {
                 case MSG_SHOP_REQUEST -> handleShopRequestMessage(senderPeerId, buf);
                 case MSG_SHOP_GRANT -> handleShopGrantMessage(senderPeerId, buf);
                 case MSG_BEAT_REQUEST -> handleBeatRequestMessage(senderPeerId, buf);
+                case MSG_PROFILE -> handleProfileMessage(senderPeerId, buf);
                 case MSG_SUPPLY_USE -> handleSupplyUseMessage(senderPeerId, buf);
                 case MSG_WORLD_EVENT -> handleWorldEventMessage(senderPeerId, buf);
                 case MSG_OWNERSHIP -> handleOwnershipMessage(senderPeerId, buf);
@@ -1342,8 +1345,90 @@ public class NetworkManager extends Node {
         } else {
             localPeerId = id.assignedPeerId();
             GD.print("NetworkManager: assigned local peer id " + localPeerId);
+            // the profile handshake (PLAN.md 1.4, AR2): what this player owns travels with them to the host's world
+            String json = com.openworld.util.MiniJson.write(com.openworld.game.profile.Profiles.local().toMap());
+            if (json.length() <= MAX_PROFILE_BYTES) {
+                sendMessage(SERVER_PEER_ID, NetMessageCodec.encodeProfile(MSG_PROFILE, json));
+                com.openworld.net.NetStats.increment("profile_sent");
+            } else {
+                GD.printErr("NetworkManager: profile is " + json.length() + " bytes, over " + MAX_PROFILE_BYTES + " -- not sent");
+            }
         }
     }
+
+    /** A profile must fit one packet under {@link #MAX_PACKET_BYTES} with its framing. */
+    private static final int MAX_PROFILE_BYTES = 3800;
+    /** Host: the revision of each player's session copy last sent back to its owner. */
+    private final Map<String, Long> profileSentRevision = new java.util.HashMap<>();
+    private double profileSendIn;
+    private int profilesReceived, profilesSent;
+
+    /**
+     * MSG_PROFILE (PLAN.md 1.4, AR2). On the HOST it is a joining player's own profile: kept as the session copy,
+     * keyed by the PersistentPlayerId the peer identified as -- never by anything the payload claims. On a CLIENT it
+     * is the host's copy of THIS player's profile after the host changed it (money moves on the host); it replaces the
+     * local one, which the client then saves itself.
+     */
+    private void handleProfileMessage(int senderPeerId, StreamPeerBuffer buf) {
+        String json = NetMessageCodec.decodeProfile(buf);
+        com.openworld.game.profile.PlayerProfile p = null;
+        if (json != null && json.length() <= MAX_PROFILE_BYTES) {
+            try {
+                java.util.Map<String, java.lang.Object> m = com.openworld.game.profile.SaveMigrations.migrate(
+                        com.openworld.game.profile.Maps.map(com.openworld.util.MiniJson.parse(json)),
+                        "version", com.openworld.game.profile.SaveMigrations.PROFILE);
+                if (m != null) p = com.openworld.game.profile.PlayerProfile.fromMap(m);
+            } catch (IllegalArgumentException e) {
+                p = null;
+            }
+        }
+        if (p == null) {
+            dropInvalid("profile", "MSG_PROFILE", senderPeerId);
+            return;
+        }
+        profilesReceived++;
+        if (isServer()) {
+            com.openworld.net.session.PlayerSession s = getNodeOrNull("/root/MissionManager")
+                    instanceof com.openworld.game.mission.MissionManager mm ? mm.getSession(senderPeerId) : null;
+            if (s == null || s.characterId == null || s.characterId.isEmpty()) {
+                com.openworld.net.NetStats.increment("profile_rejected_no_session");
+                return;
+            }
+            com.openworld.game.profile.Profiles.putRemote(s.characterId, p);
+            profileSentRevision.put(s.characterId, com.openworld.game.profile.Profiles.remote(s.characterId).revision());
+            com.openworld.net.NetStats.increment("profile_received");
+            GD.print("NetworkManager: profile of " + s.characterId + " held for this session (balance " + p.balance + ")");
+        } else if (senderPeerId == SERVER_PEER_ID) {
+            com.openworld.game.profile.PlayerProfile local = com.openworld.game.profile.Profiles.local();
+            String id = local.playerId;
+            local.copyFrom(p);
+            local.playerId = id;
+            com.openworld.net.NetStats.increment("profile_updated_by_host");
+        }
+    }
+
+    /** Host: send each joined player's session copy back to them when it changed (<= 2 / s). */
+    private void sendChangedProfiles(double delta) {
+        if (!amServer || (profileSendIn -= delta) > 0) return;
+        profileSendIn = 0.5;
+        if (!(getNodeOrNull("/root/MissionManager") instanceof com.openworld.game.mission.MissionManager mm)) return;
+        for (com.openworld.net.session.PlayerSession s : mm.activeSessions.values()) {
+            if (!s.isConnected || s.characterId == null) continue;
+            com.openworld.game.profile.PlayerProfile rp = com.openworld.game.profile.Profiles.remotes().get(s.characterId);
+            if (rp == null) continue;
+            Long sent = profileSentRevision.get(s.characterId);
+            if (sent != null && sent == rp.revision()) continue;
+            String json = com.openworld.util.MiniJson.write(rp.toMap());
+            if (json.length() > MAX_PROFILE_BYTES) continue;
+            sendMessage(s.peerId, NetMessageCodec.encodeProfile(MSG_PROFILE, json));
+            profileSentRevision.put(s.characterId, rp.revision());
+            profilesSent++;
+        }
+    }
+
+    /** Probe readouts: MSG_PROFILE received / sent back by this peer. */
+    @Register public int profilesReceivedNow() { return profilesReceived; }
+    @Register public int profilesSentNow() { return profilesSent; }
 
     /**
      * Client → host: damage the client's OWN simulation resolved and cannot hand to the host as inputs (PLAN.md
@@ -1937,9 +2022,14 @@ public class NetworkManager extends Node {
         for (Node n : getTree().getNodesInGroup(new StringName(com.openworld.item.ShopCounter.GROUP))) {
             if (n instanceof com.openworld.item.ShopCounter sc && sc.sells(r.itemId())
                     && sc.holds(c.getGlobalPosition(), 1.5)) {
+                if (!sc.grantTo(c, r.itemId())) {
+                    // not sold (too little money, a full stack): nothing to tell the owner -- its profile copy
+                    // already shows the balance, and its menu the SHORT / FULL tag
+                    com.openworld.net.NetStats.increment("shop_request_refused");
+                    return;
+                }
                 com.openworld.net.NetStats.increment("shop_request_accepted");
                 GD.print("NetworkManager: shop sale '" + r.itemId() + "' to " + r.buyerCharacterId());
-                sc.grantTo(c, r.itemId());
                 // The owner's own body never takes an item from a manifest (WeaponInventorySync: an owned slot
                 // is not resurrected, and its ammo is not overwritten), so the sale is told to it directly. On
                 // channel 0 with the manifests, so a manifest built after the grant cannot overtake it.

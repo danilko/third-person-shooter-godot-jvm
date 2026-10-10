@@ -137,8 +137,7 @@ public class GangSystem extends Node {
         if (who == null || who.getCharacterInfo() == null || !authority()) return false;
         String pid = who.getCharacterInfo().characterId;
         int fee = feeOf(pid, gang);
-        if (fee <= 0 || who.cash < fee) return false;
-        who.cash -= fee;
+        if (fee <= 0 || !com.openworld.game.profile.Economy.transfer(com.openworld.game.profile.Profiles.of(who), null, fee, com.openworld.game.profile.Economy.Reason.GANG_FEE)) return false;
         states.remove(pid + "|" + gang);
         Captivity held = captive.get(pid);
         if (held != null && held.gang.equals(gang)) captive.remove(pid);
@@ -175,8 +174,7 @@ public class GangSystem extends Node {
         if (who == null || who.getCharacterInfo() == null || !authority()) return false;
         String pid = who.getCharacterInfo().characterId;
         Captivity c = captive.get(pid);
-        if (c == null || who.cash < c.ransom) return false;
-        who.cash -= c.ransom;
+        if (c == null || !com.openworld.game.profile.Economy.transfer(com.openworld.game.profile.Profiles.of(who), null, c.ransom, com.openworld.game.profile.Economy.Reason.RANSOM)) return false;
         captive.remove(pid);
         states.remove(pid + "|" + c.gang);
         GD.print("GangSystem: " + pid + " paid a ransom of " + c.ransom + " yen to " + c.gang);

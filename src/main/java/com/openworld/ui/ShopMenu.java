@@ -210,7 +210,7 @@ public class ShopMenu extends Control {
         boolean robbing = clerk != null && (clerk.robbable() || ids.contains(ShopCounter.TILL));
         drawString(font, new Vector2(20f, 38f), robbing ? counter.title + "  (ROBBERY)" : counter.title,
                 HorizontalAlignment.LEFT, -1f, 26, robbing ? new Color(1f, 0.45f, 0.35f, 1f) : new Color(1f, 1f, 1f, 1f));
-        if (buyer != null) drawString(font, new Vector2(W - 140f, 38f), "¥" + buyer.cash, HorizontalAlignment.RIGHT, 120f,
+        if (buyer != null) drawString(font, new Vector2(W - 140f, 38f), "¥" + com.openworld.game.profile.Profiles.balanceOf(buyer), HorizontalAlignment.RIGHT, 120f,
                 18, new Color(1f, 0.9f, 0.5f, 1f));
         for (int i = 0; i < ids.size(); i++) {
             float y = HEAD + ROW * i;
@@ -231,21 +231,29 @@ public class ShopMenu extends Control {
                 var c = counter.clerk();
                 int fee = gs != null && c != null && buyer.getCharacterInfo() != null
                         ? gs.feeOf(buyer.getCharacterInfo().characterId, c.gang()) : 0;
-                has = fee == 0 || buyer.cash < fee;
-                tag = fee == 0 ? "NOTHING OWED" : (buyer.cash < fee ? "SHORT " : "") + "¥" + fee;
+                boolean shortOf = com.openworld.game.profile.Profiles.balanceOf(buyer) < fee;
+                has = fee == 0 || shortOf;
+                tag = fee == 0 ? "NOTHING OWED" : (shortOf ? "SHORT " : "") + "¥" + fee;
             } else if (ShopCounter.isSupply(ids.get(i))) {
                 int n = buyer.supplyCountNow(ids.get(i));
                 int max = com.openworld.item.SupplyCatalog.find(ids.get(i)).max();
                 has = n >= max;
-                tag = has ? "FULL" : "FREE  " + n + "/" + max;
+                tag = has ? "FULL" : priceTag(ShopCounter.priceFor(buyer, ids.get(i))) + "  " + n + "/" + max;
             } else {
                 has = WeaponGrant.carries(buyer, ids.get(i));
-                tag = has ? "REFILL" : "FREE";
+                tag = (has ? "REFILL " : "") + priceTag(ShopCounter.priceFor(buyer, ids.get(i)));
             }
             drawString(font, new Vector2(W - 140f, y + 34f), tag, HorizontalAlignment.RIGHT, 120f,
                     18, has ? new Color(0.55f, 0.85f, 1f, 1f) : new Color(0.55f, 1f, 0.55f, 1f));
         }
         footer(h);
+    }
+
+    /** "¥25,000", "SHORT ¥25,000" when the buyer's balance does not cover it, "FREE" for an unpriced row. */
+    private String priceTag(long price) {
+        if (price <= 0) return "FREE";
+        boolean shortOf = com.openworld.game.profile.Profiles.balanceOf(buyer) < price;
+        return (shortOf ? "SHORT " : "") + "¥" + String.format("%,d", price);
     }
 
     private void footer(float h) {

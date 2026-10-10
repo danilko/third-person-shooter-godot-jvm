@@ -765,6 +765,15 @@ public class DebugHarness extends Node {
                     GD.print("[coop] at counter " + best.getPath() + " item=" + coopItem);
                 } else GD.print("[coop] no shop counter");
             }
+            if (!client) {
+                // shops charge since F3 (PLAN.md 1.4): the fixture pays for both purchases -- the host's own profile and
+                // every joined player's session copy (which MSG_PROFILE carries back to its owner)
+                com.openworld.game.profile.Economy.transfer(null, com.openworld.game.profile.Profiles.local(), 200000,
+                        com.openworld.game.profile.Economy.Reason.GRANT);
+                for (com.openworld.game.profile.PlayerProfile rp : com.openworld.game.profile.Profiles.remotes().values())
+                    com.openworld.game.profile.Economy.transfer(null, rp, 200000, com.openworld.game.profile.Economy.Reason.GRANT);
+                GD.print("[coop] funded " + (1 + com.openworld.game.profile.Profiles.remotes().size()) + " profile(s)");
+            }
             if (!client && me != null) {
                 // the HOST buys too (PLAN.md 1c: a host purchase took seconds to reach the client): the first weapon its
                 // nearest counter sells that it does not carry

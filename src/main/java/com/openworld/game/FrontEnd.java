@@ -59,6 +59,8 @@ public class FrontEnd extends Node {
     public static void toTitle(Node from) {
         var net = from.getNodeOrNull("/root/NetworkManager") instanceof com.openworld.net.NetworkManager n ? n : null;
         if (net != null) net.leaveSession();
+        SaveSystem s = SaveSystem.get();
+        if (s != null) s.flushAll();
         from.getTree().setPause(false);
         from.getTree().changeSceneToFile(TITLE);
     }

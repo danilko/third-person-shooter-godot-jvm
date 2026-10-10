@@ -312,8 +312,8 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     /** In combat (aiming / fighting) this tick -- a probe readout. */
     @Register public boolean combatNow() { return combat; }
 
-    /** Yen carried (a robbed till, PLAN.md W3). Kept on the authoritative peer; nothing spends it yet. */
-    public int cash = 0;
+    // Money is not on the body (PLAN.md 1.4 AR2): it is the PLAYER's, in game.profile.PlayerProfile, reached through
+    // game.profile.Profiles.of(body) and changed only by game.profile.Economy.transfer.
 
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -1707,13 +1707,20 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         }
     }
 
-    /** Yen carried (probe readout). */
+    /** This player's balance (probe readout; 0 for an AI -- no profile). Signed: a bill can leave it negative. */
     @Register
-    public int cashNow() { return cash; }
+    public int cashNow() { return (int) Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, com.openworld.game.profile.Profiles.balanceOf(this))); }
 
-    /** Hand yen to this character (probes and the debug console). */
+    /** Hand yen to (or, negative, take it from) this player's profile -- probes and the debug console. A take never
+     *  runs into debt: it takes what is there. */
     @Register
-    public void giveCashNow(int yen) { cash = Math.max(0, cash + yen); }
+    public void giveCashNow(int yen) {
+        com.openworld.game.profile.PlayerProfile p = com.openworld.game.profile.Profiles.of(this);
+        if (p == null || yen == 0) return;
+        if (yen > 0) com.openworld.game.profile.Economy.transfer(null, p, yen, com.openworld.game.profile.Economy.Reason.GRANT);
+        else com.openworld.game.profile.Economy.transfer(p, null, Math.min(-(long) yen, Math.max(0, p.balance)),
+                com.openworld.game.profile.Economy.Reason.GRANT);
+    }
 
     /** How many of a healing supply this character carries -- its CONSUMABLE stack (weapon.SupplyItem; probe readout). */
     @Register

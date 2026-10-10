@@ -66,6 +66,8 @@ GATES=(
   "weapon_counter|400|0|0|$H --script $P/probe_weapon_counter.gd"
   "front_end|600|0|0|$HF --script $P/probe_front_end.gd"
   "title_continue|600|0|0|$HF --script $P/probe_title_actions.gd -- --role=continue"
+  "profile|300|0|0|$HF --script $P/probe_profile.gd"
+  "race|300|0|0|$HF --script $P/probe_race.gd"
   "minimal_hud|300|0|0|$HF --script $P/probe_minimal_hud.gd"
   "stairs|900|0|0|$H --script $P/probe_stairs.gd"
   "building_nav|600|0|0|$H --script $P/check_building_nav.gd"

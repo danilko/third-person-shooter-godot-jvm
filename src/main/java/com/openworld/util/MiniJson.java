@@ -138,4 +138,73 @@ public final class MiniJson {
     private IllegalArgumentException err(String what) {
         return new IllegalArgumentException("JSON: " + what + " at offset " + i);
     }
+
+    /**
+     * The writer twin of {@link #parse}: Map (keys in the map's order) / List / String / Number / Boolean / null, into
+     * compact JSON. A whole number is written without a fraction, so a long round-trips through {@code parse}'s
+     * Double exactly (up to 2^53). Throws on anything else rather than guessing.
+     */
+    public static String write(Object v) {
+        StringBuilder b = new StringBuilder();
+        writeTo(b, v);
+        return b.toString();
+    }
+
+    private static void writeTo(StringBuilder b, Object v) {
+        if (v == null) { b.append("null"); return; }
+        if (v instanceof String str) { quote(b, str); return; }
+        if (v instanceof Boolean bo) { b.append(bo); return; }
+        if (v instanceof Number n) {
+            double d = n.doubleValue();
+            if (Double.isNaN(d) || Double.isInfinite(d)) throw new IllegalArgumentException("JSON: " + d);
+            if (n instanceof Long || n instanceof Integer || n instanceof Short || n instanceof Byte
+                    || (d == Math.rint(d) && Math.abs(d) < 9.007199254740992E15)) b.append((long) d);
+            else b.append(d);
+            return;
+        }
+        if (v instanceof java.util.Map<?, ?> m) {
+            b.append('{');
+            boolean first = true;
+            for (java.util.Map.Entry<?, ?> e : m.entrySet()) {
+                if (!first) b.append(',');
+                first = false;
+                quote(b, String.valueOf(e.getKey()));
+                b.append(':');
+                writeTo(b, e.getValue());
+            }
+            b.append('}');
+            return;
+        }
+        if (v instanceof java.util.Collection<?> c) {
+            b.append('[');
+            boolean first = true;
+            for (Object o : c) {
+                if (!first) b.append(',');
+                first = false;
+                writeTo(b, o);
+            }
+            b.append(']');
+            return;
+        }
+        throw new IllegalArgumentException("JSON: cannot write " + v.getClass().getName());
+    }
+
+    private static void quote(StringBuilder out, String s) {
+        out.append('"');
+        for (int k = 0; k < s.length(); k++) {
+            char c = s.charAt(k);
+            switch (c) {
+                case '"' -> out.append("\\\"");
+                case '\\' -> out.append("\\\\");
+                case '\n' -> out.append("\\n");
+                case '\r' -> out.append("\\r");
+                case '\t' -> out.append("\\t");
+                default -> {
+                    if (c < 0x20) out.append(String.format("\\u%04x", (int) c));
+                    else out.append(c);
+                }
+            }
+        }
+        out.append('"');
+    }
 }

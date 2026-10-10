@@ -7,9 +7,13 @@ extends SceneTree
 ##       stdbuf -oL <godot> --headless --fixed-fps 60 --path . --script tools/godot/probe_title_actions.gd -- --role=continue
 ##     New game -> walk the player 6 m off the spawn -> autosave -> Quit to title -> Continue is ENABLED -> press it ->
 ##     the world comes back with the player where the save put it (not the spawn). Control: the spawn is >= 5 m away.
-##     The user's own autosave is backed up first and put back at the end.
+##     (Under --script the slots are user://test/saves -- SaveSystem's harness rule -- so the player's own autosave is
+##     never touched; the backup below is belt and braces.)
 ##   --role=host / --role=join (two processes, tools/net/run_title_coop.sh): Host on one title, Join 127.0.0.1 on the
 ##     other; each side must see the session (NetworkManager.session_now) and BOTH players in its PlayerRegistry.
+##     Then the PROFILE HANDSHAKE (PLAN.md 1.4, AR2): the joiner grants its own profile 4321 yen on the title; the
+##     host must hold that as the joiner's session copy, then pays the joiner's body 1000 (money moves on the host);
+##     the joiner must receive its profile back at 5321 and save it (reloaded from its file).
 
 var fails := 0
 var role := "continue"
@@ -77,9 +81,11 @@ func _initialize() -> void:
 func _continue() -> void:
 	var save: Node = root.get_node("SaveSystem")
 	var fe: Node = root.get_node("FrontEnd")
+	await _to_title()
+	# read AFTER the first frames: the SaveSystem AutoLoad's _ready (which moves a --script run to user://test/saves)
+	# has not run yet inside _initialize
 	var path: String = save.call("slot_path", 0)
 	var backup := FileAccess.get_file_as_string(path) if FileAccess.file_exists(path) else ""
-	await _to_title()
 	_press("Newgame")
 	var up := await _wait(func(): return _local_player() != null, 3600)
 	_check("New game reaches the world with a local player", up)
@@ -136,7 +142,10 @@ func _quit_to_title() -> void:
 func _coop() -> void:
 	var fe: Node = root.get_node("FrontEnd")
 	var net: Node = root.get_node("NetworkManager")
+	var saves: Node = root.get_node("SaveSystem")
 	await _to_title()
+	if role == "join":
+		saves.call("grant_profile_now", 4321)
 	if role == "host":
 		_press("Hostco-op")
 	else:
@@ -153,4 +162,19 @@ func _coop() -> void:
 		"%s, players %d" % [net.call("session_now"), _players()])
 	print("[title] SUMMARY role=%s session=%s players=%d" % [role, String(net.call("session_now")).replace(" ", "_"), _players()])
 	if role == "host":
-		await _frames(600)   # stay up while the client checks
+		var held := await _wait(func(): return String(saves.call("remote_balances_now")).ends_with("=4321"), 1200)
+		_check("the host holds the joiner's profile (4321 yen)", held, String(saves.call("remote_balances_now")))
+		var other: Node = root.get_node("PlayerRegistry").call("remote_player_now")
+		_check("the joiner's body is here", other != null)
+		if other != null:
+			other.call("give_cash_now", 1000)
+		_check("money moved on the host's copy", String(saves.call("remote_balances_now")).ends_with("=5321"),
+			String(saves.call("remote_balances_now")))
+		await _frames(900)   # stay up while the client checks
+	else:
+		var back := await _wait(func(): return int(saves.call("profile_balance_now")) == 5321, 1800)
+		_check("the joiner got its profile back from the host (5321)", back, str(saves.call("profile_balance_now")))
+		saves.call("flush_profile")
+		var from := String(saves.call("reload_profile_now"))
+		_check("... and saved it (reloaded from its file)", int(saves.call("profile_balance_now")) == 5321,
+			"%s, %d" % [from, saves.call("profile_balance_now")])

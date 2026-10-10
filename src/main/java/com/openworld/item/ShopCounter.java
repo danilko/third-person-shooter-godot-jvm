@@ -171,15 +171,64 @@ public class ShopCounter extends Area3D implements com.openworld.control.Interac
 
     /** The authority's grant: weapons and supplies alike go through {@link WeaponGrant} (a supply is a weapon stack). */
     @Register
-    public void grantToNow(Node who, String id) {
-        if (who instanceof com.openworld.character.Character c) grantTo(c, id);
+    public boolean grantToNow(Node who, String id) {
+        return who instanceof com.openworld.character.Character c && grantTo(c, id);
     }
 
-    public void grantTo(com.openworld.character.Character who, String id) {
-        if (!sells(id)) return;
-        if (TILL.equals(id)) { clerk().robTill(who); return; }
-        if (DONATION.equals(id)) { com.openworld.game.GangSystem.get().donate(who, clerk().gang()); return; }
-        WeaponGrant.grant(who, id, this);
+    /**
+     * The authority's sale: PAID first (PLAN.md 1.4 / F3 -- every shop was free), then granted; refunded if the grant
+     * fails. False when nothing was sold (not stocked, too little money, a full stack) -- the host then sends the
+     * client no MSG_SHOP_GRANT. A body with no profile (an AI) is not charged.
+     */
+    public boolean grantTo(com.openworld.character.Character who, String id) {
+        if (!sells(id) || who == null) return false;
+        if (TILL.equals(id)) { clerk().robTill(who); return true; }
+        if (DONATION.equals(id)) return com.openworld.game.GangSystem.get().donate(who, clerk().gang());
+        long price = priceFor(who, id);
+        if (price < 0) return false;                       // a full stack: nothing to sell
+        com.openworld.game.profile.PlayerProfile p = com.openworld.game.profile.Profiles.of(who);
+        if (price > 0 && p != null && !com.openworld.game.profile.Economy.transfer(p, null, price,
+                com.openworld.game.profile.Economy.Reason.PURCHASE)) {
+            sales.refused++;
+            return false;
+        }
+        if (WeaponGrant.grant(who, id, this) == WeaponGrant.Result.FAILED) {
+            if (price > 0 && p != null)
+                com.openworld.game.profile.Economy.transfer(null, p, price, com.openworld.game.profile.Economy.Reason.REFUND);
+            return false;
+        }
+        sales.sold++;
+        return true;
+    }
+
+    /**
+     * What {@code who} pays for {@code id} here now: a weapon's price, or its REFILL price when carried; a supply's
+     * units to top the stack up. 0 = free (an unpriced row -- logged once); -1 = nothing to sell (the stack is full).
+     */
+    public static long priceFor(com.openworld.character.Character who, String id) {
+        com.openworld.game.profile.EconomyTable t = com.openworld.game.profile.EconomyTable.get();
+        Long price;
+        if (isSupply(id)) {
+            int have = who == null ? 0 : who.supplyCountNow(id);
+            long units = SupplyCatalog.find(id).max() - have;
+            if (units <= 0) return -1;
+            price = t.supplyPrice(id, units);
+        } else {
+            price = t.weaponPrice(id, WeaponGrant.carries(who, id));
+        }
+        if (price == null) {
+            if (t.firstUnpriced(id)) GD.print("ShopCounter: '" + id + "' has no price in economy.json -- sold free");
+            return 0;
+        }
+        return price;
+    }
+
+    private static final class Sales { int sold, refused; }
+    private final Sales sales = new Sales();
+    @Register public int salesNow() { return sales.sold; }
+    @Register public int salesRefusedNow() { return sales.refused; }
+    @Register public long priceForNow(Node who, String id) {
+        return priceFor(who instanceof com.openworld.character.Character c ? c : null, id);
     }
 
     public static boolean isSupply(String id) { return SupplyCatalog.find(id) != null; }

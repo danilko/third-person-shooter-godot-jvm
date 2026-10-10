@@ -38,6 +38,10 @@ func _tick(n: int) -> void:
 	for i in range(n):
 		await physics_frame
 
+## a v2 slot starts with its "#sha256:<hex>" line (game.profile.SafeSave); the JSON is the rest
+func _payload(text: String) -> String:
+	return text.substr(text.find("\n") + 1) if text.begins_with("#sha256:") else text
+
 func _wc() -> Node:
 	return player.get_node_or_null("WeaponController")
 
@@ -127,10 +131,10 @@ func _initialize() -> void:
 	_check("saveSlot wrote it", saves.call("save_slot", SLOT) and saves.call("has_slot", SLOT),
 		str(saves.call("last_save_message")))
 	_check("and counted it", int(saves.call("saves_written")) == before + 1, "")
-	var text: String = FileAccess.get_file_as_string(saves.call("slot_path", SLOT))
+	var text: String = _payload(FileAccess.get_file_as_string(saves.call("slot_path", SLOT)))
 	var doc: Variant = JSON.parse_string(text)
 	_check("the file is a JSON object of the current schema",
-		doc is Dictionary and int(doc.get("schema", -1)) == 1, "%d bytes" % text.length())
+		doc is Dictionary and int(doc.get("schema", -1)) == 2, "%d bytes" % text.length())
 	_check("it carries the campaign, the factions, the mission and a player",
 		doc.has("campaign") and doc.has("factions") and doc.has("mission")
 			and (doc["players"] as Array).size() == 1,
@@ -221,7 +225,7 @@ func _initialize() -> void:
 		and saves.call("has_slot", 0), str(saves.call("saves_written")))
 	saves.set("autosave_enabled", false)
 	_check("saveSlot recorded the running mission", saves.call("save_slot", SLOT), "")
-	var doc2: Variant = JSON.parse_string(FileAccess.get_file_as_string(saves.call("slot_path", SLOT)))
+	var doc2: Variant = JSON.parse_string(_payload(FileAccess.get_file_as_string(saves.call("slot_path", SLOT))))
 	_check("the slot names it with a loadable .tres path",
 		bool(doc2["mission"]["active"]) and String(doc2["mission"]["path"]).ends_with(".tres"),
 		str(doc2["mission"]))

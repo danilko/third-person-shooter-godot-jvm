@@ -288,7 +288,7 @@ public class ShopClerkSpot extends Node3D {
     public int robTill(com.openworld.character.Character who) {
         if (!robbable() || who == null) return 0;
         tillTaken = true;
-        who.cash += till;
+        com.openworld.game.profile.Economy.transfer(null, com.openworld.game.profile.Profiles.of(who), till, com.openworld.game.profile.Economy.Reason.ROBBERY);
         com.openworld.game.WantedSystem ws = com.openworld.game.WantedSystem.get();
         // police treat every store the same (user, 2026-10-03); a gray-area shop adds its gang's heat on top
         if (ws != null && who.getCharacterInfo() != null)

@@ -205,6 +205,7 @@ func _initialize() -> void:
 	print("")
 	print("=== 5. the lap closes, the racer finishes, the MISSION completes ===")
 	completed.clear()
+	var cash_before := int(player.call("cash_now"))
 	await _touch(player, 1)
 	await _touch(player, 2)
 	await _touch(player, 3)
@@ -217,6 +218,9 @@ func _initialize() -> void:
 		"place %d" % int(race.call("racer_place", player_id)))
 	await _tick(4)
 	_check("the mission completed as WON", completed == ["WON"], str(completed))
+	# F3 (PLAN.md 1.4): a race pays by PLACE (economy.json race_by_place), and the mission seam does not pay again
+	var won := int(player.call("cash_now")) - cash_before
+	_check("first place paid the race prize, once", won == 8000, "+¥%d" % won)
 	_check("the race is no longer active", not bool(race.call("race_active_now")),
 		str(race.call("race_phase_now")))
 	_check("but its results are still readable (the finish panel's whole point)",

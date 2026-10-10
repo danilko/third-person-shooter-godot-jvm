@@ -56,6 +56,12 @@ public class PlayerRegistry extends Node {
         return null;
     }
 
+    /** The first player body this machine does NOT play (a co-op peer's), or null -- probes. */
+    @Register public Player remotePlayerNow() {
+        for (Player p : PLAYERS) if (godot.global.GD.isInstanceValid(p) && !p.isLocalOwnedPlayer()) return p;
+        return null;
+    }
+
     /** Drop all references on engine teardown so no {@code Player} (a Godot Object) leaks past exit. */
     @Register
     @Override

@@ -1,0 +1,20 @@
+{
+  "note": "THE economy table (PLAN.md 1.4 / F3). Prices are yen, CS 1.6's dollars x 10 for the guns (the damage is CS 1.6's too, user 2026-10-08). A weapon you already carry is a REFILL at refill_fraction of its price; a supply is priced per unit and a purchase tops the stack up to its max. Bills (hospital, police per star, ransom) are crimes.json's 'fees' and gangs.json's 'abduction' -- RecoveryRules reads them there, and they may run a balance into debt (CR4). Robbery is each clerk's till. Every yen moves through game.profile.Economy.transfer. A row missing here is FREE and is logged once.",
+  "starting_cash": 20000,
+  "refill_fraction": 0.2,
+  "weapons": {
+    "PIS2": 4000, "PIS1": 5000, "REV1": 6500, "DUP1": 8000,
+    "SMG1": 15000, "SHG1": 17000, "ASR1": 25000, "ASR2": 31000, "SNR1": 47500, "ATL1": 60000,
+    "FRG1": 3000, "PIB1": 3500, "FLA1": 2000, "SMO1": 3000, "REC1": 5000,
+    "MEW1": 1500, "BAT1": 1000, "MEW2": 2000
+  },
+  "supplies_per_unit": {
+    "onigiri": 150, "energy_drink": 200, "bento": 600, "teishoku": 1200,
+    "bandage": 500, "pills": 800, "tonic": 1500, "first_aid": 2000, "med_kit": 4000
+  },
+  "rewards": {
+    "mission_default": 10000,
+    "missions": { "m01_konbini": 15000 },
+    "race_by_place": [8000, 4000, 2000]
+  }
+}

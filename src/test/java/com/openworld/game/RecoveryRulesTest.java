@@ -33,11 +33,4 @@ class RecoveryRulesTest {
         assertTrue(r.ransom(5) > r.ransom(1));
         assertEquals(0, r.fee(RecoveryRules.Outcome.ABDUCTED, 3), "a ransom is the price of leaving, not of waking");
     }
-
-    @Test
-    void aChargeNeverTakesMoreThanThereIs() {
-        assertEquals(500, RecoveryRules.charge(500, 5000));
-        assertEquals(5000, RecoveryRules.charge(9000, 5000));
-        assertEquals(0, RecoveryRules.charge(0, 5000));
-    }
 }

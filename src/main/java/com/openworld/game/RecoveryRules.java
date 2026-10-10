@@ -75,6 +75,6 @@ public final class RecoveryRules {
     /** The ransom a gang asks at these stars. */
     public int ransom(int gangStars) { return ransomPerStar * Math.max(1, gangStars); }
 
-    /** What is taken from {@code cash} for a bill: all of it if it is not enough, never below 0. */
-    public static int charge(int cash, int bill) { return Math.max(0, Math.min(cash, bill)); }
+    // A bill is taken WHOLE now and may leave the balance negative -- what the player owes (PLAN.md 1.4, CR4):
+    // game.profile.Economy.bill. The old "never more than there is" charge is gone with the cash field.
 }

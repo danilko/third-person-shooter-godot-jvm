@@ -86,7 +86,7 @@ public class RespawnSystem extends Node {
         int policeStars, gangStars;
         String gang = "";
         /** Cash carried to the new body, after the bill. */
-        int cash, charged;
+        int charged;
     }
 
     private final List<Job> jobs = new ArrayList<>();
@@ -211,9 +211,9 @@ public class RespawnSystem extends Node {
         j.gang = gs != null ? gs.worstGang(j.id) : "";
         j.gangStars = j.gang.isEmpty() ? 0 : gs.starsOf(j.id, j.gang);
         int bill = recovery().fee(RecoveryRules.Outcome.valueOf(why.name()), j.policeStars);
-        int cash = p != null ? p.cash : 0;
-        j.charged = RecoveryRules.charge(cash, bill);
-        j.cash = cash - j.charged;
+        // the bill is the PLAYER's (their profile, AR2) and may run into debt (CR4): what they cannot cover is owed
+        j.charged = (int) com.openworld.game.profile.Economy.bill(com.openworld.game.profile.Profiles.of(p), bill, why == Reason.ARRESTED
+                ? com.openworld.game.profile.Economy.Reason.BILL_BAIL : com.openworld.game.profile.Economy.Reason.BILL_HOSPITAL);
         jobs.add(j);
         if (p != null && p.isLocallyOwnedPlayer()) {
             reason = why;
@@ -357,7 +357,6 @@ public class RespawnSystem extends Node {
         if (net != null) net.announceSpawn(p);
         WantedSystem w = WantedSystem.get();
         if (w != null) w.clear(j.id);
-        p.cash = j.cash;                    // the bill was taken from what they had (RecoveryRules)
         if (j.reason == Reason.ABDUCTED) {
             // held where they wake, by the gang's guards, until they pay or run
             GangSystem gs = GangSystem.get();
@@ -402,7 +401,7 @@ public class RespawnSystem extends Node {
         if (!show) return;
         var g = gs.gang(c.gang);
         captivePrompt.setText("拉致 " + (g != null ? g.nameJa() + " " + g.name() : c.gang) + "\n身代金 ransom ¥"
-                + String.format("%,d", c.ransom) + "  [E] pay   (cash ¥" + String.format("%,d", me.cash)
+                + String.format("%,d", c.ransom) + "  [E] pay   (cash ¥" + String.format("%,d", com.openworld.game.profile.Profiles.balanceOf(me))
                 + ")   or run for it");
         if (authority() && godot.api.Input.INSTANCE.isActionJustPressed("interact") && gs.payRansom(me))
             GD.print("RespawnSystem: ransom paid");

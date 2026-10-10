@@ -177,6 +177,11 @@ public class MissionManager extends Node {
         applyMissionFactions(null);
         GD.print("MissionManager: '" + missionId + "' complete — winner=" + winningFaction
                 + " variant=" + outcomeVariant);
+        // the players won: the economy table's reward (F3), paid on the host before anyone hears of the completion,
+        // so the autosave the completion triggers already holds it
+        // (a race pays by PLACE instead -- RaceDirector, Payouts.raceFinished -- so it is not paid twice)
+        if ("player".equals(winningFaction) && !MissionObjectiveType.RACE.equals(activeMission.objectiveType))
+            com.openworld.game.profile.Payouts.missionWon(missionId);
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) {
             bus.missionCompleted.emit(missionId, winningFaction, outcomeVariant);

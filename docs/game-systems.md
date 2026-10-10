@@ -7,6 +7,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - Event System (EventBus AutoLoad)
 - MovementController flags (Player vs AICharacter)
 - Audio: every sound is a file (2026-09-29)
+- The player profile, the economy and save v2 (2026-10-10, under Performance Foundation)
 
 ---
 
@@ -365,6 +366,60 @@ to HOSTILE proves nothing and the case uses FRIENDLY (it cost one false pass fir
 (`tools/net/run_net_*.sh`'s shape), so what this asserts is the ANSWER each seam reads. World entity
 state — which AI are dead, which pickups are gone, where the traffic is — is **not** saved at all, and
 that is the boundary the mission-restart rule above is drawn around.
+
+### The player profile, the economy and save v2 (PLAN.md 1.4: AR2 + CR4 + CR5, 2026-10-10)
+
+**Money was a field on the BODY** (`Character.cash`), mutated in four systems (the robbed till, gang fees, the
+ransom, respawn bills), hand-copied across a respawn, never saved, never replicated -- and on a co-op client the shop
+showed the client's own body's 0. Now (`game.profile`, all engine-free and unit-tested except `Profiles`):
+
+- **`PlayerProfile`** -- what a PLAYER owns: a SIGNED `balance`, `debts` (lender, principal, due), CR2's `CareerState`
+  data (base, records per career, the override journal), CR1's `CampaignState` data (flags, achieved, chapter / phase,
+  endings seen, checkpoint, content version), owned cars (`VehicleInstanceData`: model, paint, upgrades, condition,
+  garage -- never written into the shared `VehicleConfig`), unlocks. `toMap` / `fromMap` is its ONE shape, on disk AND
+  on the wire; unknown keys are kept. Career / campaign are carried and saved, but NOTHING writes them yet: their
+  engines (the override stack, the campaign graph, MissionDirector's sets moving in) come with AR1 in 2.1.
+- **`Economy.transfer(from, to, amount, reason)`** -- the one door; either side may be the world (null). Only a
+  reason that `allowsDebt` (hospital / bail bills, fines, loans) may take a balance below zero (CR4): a bill the
+  player cannot cover leaves the balance negative, which is the debt, paid back by the next income. A purchase, fee or
+  ransom is refused when short. Listeners hear every applied transfer (the save's dirty flag today; AR3 later).
+  `RecoveryRules.charge` ("never more than there is") is gone with the field.
+- **`Profiles`** -- a body asks for its player's profile: the body this machine plays -> `local()` (this install's,
+  `user://profile.json`), another player's body on the HOST -> the session copy keyed by their PersistentPlayerId, an
+  AI -> null. `Character.cashNow` / `giveCashNow` read / write through it.
+- **The handshake (MSG_PROFILE = 35, reliable ch 0, the profile's JSON, <= 3800 bytes)**: a client sends its profile
+  right after the identify reply; the host keeps it as the session copy (keyed by the id the peer IDENTIFIED as, never
+  what the payload claims), changes it (money moves on the host), and sends it back to the owner at most twice a
+  second when its revision changed; the owner replaces its local copy and saves it. A client writes its OWN profile;
+  only the world save is host-only.
+- **Save v2** (`SafeSave`, `SaveMigrations`): both files are written `.tmp` -> read back and checked -> the old file
+  to `.bak1` (and that to `.bak2`) -> moved into place, with a `#sha256:` first line; a torn or edited file falls back
+  to the newest good backup. The world slot is schema 2; an older slot is MIGRATED through an ordered step list (v1
+  ->v2 only stamps the version: the world keys did not change), a newer one refused. Autosave is coalesced
+  (`autosaveMinSeconds` 30): a beat writes if the last write is older than that, else the window's end writes it; a
+  mission end always writes (world + profile); quit and Quit to title flush both.
+- **Probes never touch the player's saves**: a run under `--script` uses `user://test/profile.json` (deleted at the
+  start of each run, so one probe's money never leaks into the next probe's exact checks) and `user://test/saves`.
+
+**F3, prices on (same day).** `game/economy.json` is THE table (`EconomyTable`, parse unit-tested, and the test fails
+if a catalog weapon or a supply has no price): guns at CS 1.6's dollars x 10 in yen (PIS2 4 000 ... ASR1 25 000, SNR1
+47 500), a REFILL of one already carried at `refill_fraction` 0.2, supplies per unit (a purchase tops the stack up),
+`starting_cash` 20 000 for a profile created from nothing (a probe's is 0: it sets its own), rewards
+`mission_default` 10 000 / per mission (m01_konbini 15 000) / `race_by_place` [8 000, 4 000, 2 000]. Bills stay where
+they were authored (crimes.json / gangs.json, RecoveryRules). `ShopCounter.grantTo` charges FIRST (refused when short
+-> no MSG_SHOP_GRANT to a client; refunded if the grant fails) and returns whether it sold; the menu tags rows
+"¥25,000" / "REFILL ¥5,000" / "SHORT ¥..." / "FULL". `Payouts`: a mission the players win (`winningFaction ==
+"player"`, not a race) pays every player in the session once per profile, before the completion autosave; a race pays
+each human finisher by place. The co-op gate's DebugHarness funds both profiles before its purchases.
+
+Gates: `probe_profile.gd` 19/19 (the test file; grant / refused purchase / bill into debt through a body; checksum,
+.bak1 rotation, a TORN file falls back to .bak1 and the torn value never loads; a v1 slot migrates and loads, a newer
+one is refused; two beats in the window write once, the window writes the second, a mission end writes at once;
+a players' win pays 10 000, a police win nothing -- 21/21 with F3); `probe_weapon_counter` (no money: refused; the
+price taken; the refill price); `probe_race` (first place +8 000, once);
+`tools/net/run_title_coop.sh` now also runs the handshake (the joiner's 4321 yen held by the host, the host pays the
+joiner's body 1000, the joiner gets 5321 back and saves it). Unit: `PlayerProfileTest`, `EconomyTest`, `SafeSaveTest`,
+`SaveMigrationsTest`. Both processes of the co-op test share `user://test/` (one machine); harmless today.
 
 ### Street races — `game.mission.RaceDirector` + `world.RaceCheckpoint` (R2, AutoLoad, 2026-09-17)
 

@@ -406,6 +406,7 @@ public class RaceDirector extends Node {
         GD.print("RaceDirector: " + r.characterId + " finished #" + r.place
                 + " at " + String.format("%.2f", r.finishTime) + "s");
         broadcastFinish(r, -1);
+        if (r.human) com.openworld.game.profile.Payouts.raceFinished(r.characterId, r.place);   // F3: the prize, host-side
 
         // The MISSION ends when every human has finished — not when the first one does, or a co-op
         // partner two corners behind would be cut off mid-race. AI racers keep their places but

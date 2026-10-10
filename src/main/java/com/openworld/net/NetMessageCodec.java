@@ -411,6 +411,22 @@ public final class NetMessageCodec {
         return buf.getUtf8String();
     }
 
+    // ── MSG_PROFILE (PLAN.md 1.4, AR2; reliable channel 0): [tag u8][profile json utf8] ──
+    // A client sends its own PlayerProfile at join; the host sends a player's session copy back when it changed.
+    // JSON on purpose: the profile's file shape IS its wire shape (one owner, PlayerProfile.toMap), and unknown keys
+    // from a newer build survive the trip. Capped at one packet (NetworkManager.MAX_PROFILE_BYTES).
+
+    public static PackedByteArray encodeProfile(int msgType, String json) {
+        StreamPeerBuffer buf = new StreamPeerBuffer();
+        buf.put8(msgType);
+        buf.putUtf8String(json);
+        return buf.getDataArray();
+    }
+
+    public static String decodeProfile(StreamPeerBuffer buf) {
+        return buf.getUtf8String();
+    }
+
     // ── MSG_SHOP_REQUEST (client → host, reliable channel 1) ─────────────────
     //
     // [tag u8][buyerCharacterId utf8][itemId utf8]

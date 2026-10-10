@@ -69,7 +69,18 @@ import java.util.Map;
  * sub-resource has no loadable path (the same limit {@code MissionManager} already documents for its
  * client mirror), so it is recorded by id and reported as unresumable rather than half-restored.
  *
- * <p><b>The host's save is canonical and needs no new message.</b> {@link #saveSlot} refuses on a
+ * <h3>Save v2 (PLAN.md 1.4: AR2 + CR5)</h3>
+ * There are now TWO files. This slot is the WORLD's (the host's: campaign graph, factions, mission, bodies); what a
+ * PLAYER owns -- money, debts, career / campaign data, owned cars, unlocks -- is their {@code PlayerProfile}, which
+ * every peer keeps in its own {@code user://profile.json} ({@code game.profile.Profiles}; in co-op the host holds a
+ * session copy sent at join, MSG_PROFILE, and sends it back when it changes). Both files are written crash-safe
+ * ({@code game.profile.SafeSave}: .tmp -> check -> rename, .bak1 / .bak2, a checksum line; a bad file falls back to
+ * the newest good backup) and an older file is MIGRATED ({@code game.profile.SaveMigrations}), not refused. Autosave
+ * is coalesced: a beat writes only when the last write is {@link #autosaveMinSeconds} old (else the next window does),
+ * a mission end always writes, and quitting / Quit to title flushes ({@link #flushAll}). A run under {@code --script}
+ * (a probe) uses {@code user://test/} for both, so no probe ever touches the player's saves.
+ *
+ * <p><b>The host's WORLD save is canonical and needs no new message.</b> {@link #saveSlot} refuses on a
  * client. A load on the host reaches every client through seams that already exist: the faction
  * flips ride {@code FactionManager.setRelationship}'s world event, the mission restart rides
  * {@code MissionManager}'s {@code WORLD_EVENT_MISSION_STARTED}, and inventory converges through the
@@ -86,8 +97,16 @@ import java.util.Map;
 @Script(className = "SaveSystem")
 public class SaveSystem extends Node {
 
-    /** Bumped when the document's shape changes; an older/newer slot is refused, never half-read. */
-    public static final int SCHEMA = 1;
+    /** The document's shape. An OLDER slot is migrated (game.profile.SaveMigrations.WORLD), a newer one refused. */
+    public static final int SCHEMA = com.openworld.game.profile.SaveMigrations.WORLD_VERSION;
+
+    /** Coalesced autosave (CR5): at most one write per this many seconds for beats; a mission end always writes. */
+    @Export public double autosaveMinSeconds = 30.0;
+    public double getAutosaveMinSeconds() { return autosaveMinSeconds; }
+    public void setAutosaveMinSeconds(double v) { autosaveMinSeconds = v; }
+    private boolean worldDirty;
+    private double sinceWorldWrite = 1e9, sinceProfileWrite = 1e9;
+    private int profileWrites;
 
     private static SaveSystem instance;
 
@@ -124,6 +143,25 @@ public class SaveSystem extends Node {
     @Override
     public void _ready() {
         instance = this;
+        // The PLAYER's own file (AR2): this install's profile. A run under --script (a probe, never the shipped game)
+        // gets its own file so it never touches the player's money.
+        boolean harness = false;
+        for (String a : godot.api.OS.getCmdlineArgs()) if ("--script".equals(a) || "-s".equals(a)) harness = true;
+        java.nio.file.Path profile = java.nio.file.Path.of(godot.api.ProjectSettings.globalizePath(
+                harness ? "user://test/profile.json" : "user://profile.json"));
+        // and starts FRESH every run, so one probe's money never leaks into the next probe's exact checks
+        // (persistence is gated inside one run: probe_profile reloads)
+        if (harness) {
+            for (String suffix : new String[] {"", ".bak1", ".bak2", ".tmp"}) {
+                try { java.nio.file.Files.deleteIfExists(java.nio.file.Path.of(profile + suffix)); }
+                catch (java.io.IOException ignored) { }
+            }
+        }
+        com.openworld.game.profile.Profiles.configure(profile,
+                harness ? 0 : com.openworld.game.profile.EconomyTable.get().startingCash);
+        com.openworld.game.profile.Profiles.local();
+        // the world slots too: a probe deleting "slot 0" (probe_save_system does) must never be the player's autosave
+        if (harness && "user://saves".equals(saveDir)) saveDir = "user://test/saves";
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) {
             bus.missionBeatTriggered.connectUnsafe(
@@ -138,6 +176,8 @@ public class SaveSystem extends Node {
     public void _exitTree() {
         // Leak discipline (CLAUDE.md "Known Quirks"): the static back-reference and every held record.
         pendingPlayers.clear();
+        com.openworld.game.profile.Profiles.saveIfDirty();
+        com.openworld.game.profile.Profiles.clear();
         if (instance == this) instance = null;
     }
 
@@ -145,6 +185,26 @@ public class SaveSystem extends Node {
     @Override
     public void _process(double delta) {
         if (!pendingPlayers.isEmpty()) applyPendingPlayers();
+        sinceWorldWrite += delta;
+        sinceProfileWrite += delta;
+        if (worldDirty && sinceWorldWrite >= autosaveMinSeconds) autosaveNow("coalesced");
+        if (com.openworld.game.profile.Profiles.dirty() && sinceProfileWrite >= autosaveMinSeconds) flushProfile();
+    }
+
+    /** Write the player's profile now if it changed (money, a car). Every peer writes its own, a client included. */
+    @Register
+    public boolean flushProfile() {
+        sinceProfileWrite = 0;
+        boolean wrote = com.openworld.game.profile.Profiles.saveIfDirty();
+        if (wrote) profileWrites++;
+        return wrote;
+    }
+
+    /** Quit / title: write whatever is pending (the coalesced autosave and the profile). */
+    @Register
+    public void flushAll() {
+        if (worldDirty) autosaveNow("flush");
+        flushProfile();
     }
 
     // ── Save ──────────────────────────────────────────────────────────────────
@@ -166,10 +226,9 @@ public class SaveSystem extends Node {
             return fail("could not create '" + dir + "'");
         }
         String path = slotPath(slot);
-        FileAccess file = FileAccess.open(path, FileAccess.ModeFlags.WRITE);
-        if (file == null) return fail("could not open '" + path + "' for writing");
-        file.storeString(document());
-        file.close();
+        // CR5: .tmp -> checked -> rename, the old file kept as .bak1 / .bak2, a checksum line on top
+        if (!com.openworld.game.profile.SafeSave.write(globalPath(path), document()))
+            return fail("could not write '" + path + "'");
         saveCount++;
         if (debugLog) GD.print("SaveSystem: wrote " + path);
         lastMessage = "saved " + path;
@@ -273,13 +332,22 @@ public class SaveSystem extends Node {
     @Register
     public boolean loadSlot(int slot) {
         String path = slotPath(slot);
-        if (!FileAccess.fileExists(path)) return fail("no save at '" + path + "'");
-        java.lang.Object parsed = JSON.parseString(FileAccess.getFileAsString(path));
-        if (!(parsed instanceof Dictionary<?, ?> doc)) return fail("'" + path + "' is not a JSON object");
-        int schema = (int) num(doc, "schema", -1);
-        if (schema != SCHEMA) {
-            return fail("'" + path + "' is schema " + schema + ", this build reads " + SCHEMA);
+        // the file, else its newest good backup (a torn write / a bad checksum falls back -- CR5)
+        com.openworld.game.profile.SafeSave.Read read = com.openworld.game.profile.SafeSave.read(globalPath(path));
+        if (read == null) return fail("no readable save at '" + path + "'");
+        java.util.Map<String, java.lang.Object> migrated;
+        try {
+            migrated = com.openworld.game.profile.SaveMigrations.migrate(
+                    com.openworld.game.profile.Maps.map(com.openworld.util.MiniJson.parse(read.payload())),
+                    "schema", com.openworld.game.profile.SaveMigrations.WORLD);
+        } catch (IllegalArgumentException e) {
+            return fail("'" + path + "' is not JSON: " + e.getMessage());
         }
+        if (migrated == null) return fail("'" + path + "' is from a newer build (this one reads up to schema " + SCHEMA + ")");
+        lastReadFrom = read.from();
+        // the restore below reads Godot Dictionaries; the migrated tree goes back through Godot's parser once
+        java.lang.Object parsed = JSON.parseString(com.openworld.util.MiniJson.write(migrated));
+        if (!(parsed instanceof Dictionary<?, ?> doc)) return fail("'" + path + "' is not a JSON object");
 
         String savedScene = str(doc, "scene", "");
         if (debugLog && !savedScene.isEmpty() && !savedScene.equals(currentScenePath())) {
@@ -403,27 +471,48 @@ public class SaveSystem extends Node {
     }
 
     @Register
-    public boolean hasSlot(int slot) { return FileAccess.fileExists(slotPath(slot)); }
+    public boolean hasSlot(int slot) { return com.openworld.game.profile.SafeSave.exists(globalPath(slotPath(slot))); }
 
+    /** Deletes the slot AND its backups (a deleted slot must not come back from its .bak1). */
     @Register
     public boolean deleteSlot(int slot) {
         if (!hasSlot(slot)) return false;
-        return DirAccess.removeAbsolute(slotPath(slot)) == godot.core.Error.OK;
+        boolean ok = true;
+        for (String suffix : new String[] {"", ".bak1", ".bak2", ".tmp"}) {
+            java.nio.file.Path p = java.nio.file.Path.of(globalPath(slotPath(slot)) + suffix);
+            try { java.nio.file.Files.deleteIfExists(p); } catch (java.io.IOException e) { ok = false; }
+        }
+        return ok;
     }
+
+    private static java.nio.file.Path globalPath(String resPath) {
+        return java.nio.file.Path.of(godot.api.ProjectSettings.globalizePath(resPath));
+    }
+
+    private String lastReadFrom = "";
 
     // ── Autosave ──────────────────────────────────────────────────────────────
 
     /** I7's "autosave fires on mission-beat completion" hook — the F3 beat, now that it exists. */
+    /** A beat: written now if the last write is older than {@link #autosaveMinSeconds}, else coalesced (CR5: a run
+     *  of beats rewrote slot 0 once per beat, and a crash mid-write lost the only autosave). */
     @Register
-    public void onBeatTriggered(String beatId) { autosave("beat " + beatId); }
-
-    @Register
-    public void onMissionCompleted(String missionId, String winningFaction, String outcomeVariant) {
-        autosave("mission " + missionId);
+    public void onBeatTriggered(String beatId) {
+        if (sinceWorldWrite >= autosaveMinSeconds) autosaveNow("beat " + beatId);
+        else worldDirty = true;
     }
 
-    private void autosave(String why) {
+    /** A mission end is a CHECKPOINT: always written, with the profile. */
+    @Register
+    public void onMissionCompleted(String missionId, String winningFaction, String outcomeVariant) {
+        autosaveNow("mission " + missionId);
+        flushProfile();
+    }
+
+    private void autosaveNow(String why) {
+        worldDirty = false;
         if (!autosaveEnabled || isNetworkedClient()) return;
+        sinceWorldWrite = 0;
         if (saveSlot(autosaveSlot) && debugLog) GD.print("SaveSystem: autosaved after " + why);
     }
 
@@ -433,6 +522,43 @@ public class SaveSystem extends Node {
     @Register public int loadsApplied() { return loadCount; }
     @Register public int pendingPlayerCount() { return pendingPlayers.size(); }
     @Register public String lastSaveMessage() { return lastMessage; }
+    /** Which file the last load read: "file", or "bak1" / "bak2" when the slot itself was bad. */
+    @Register public String lastReadFromNow() { return lastReadFrom; }
+    @Register public int profileWritesNow() { return profileWrites; }
+    /** This install's balance / a grant to it (probes; the title runs before any body exists). */
+    @Register public long profileBalanceNow() { return com.openworld.game.profile.Profiles.local().balance; }
+    @Register public boolean grantProfileNow(long yen) {
+        return com.openworld.game.profile.Economy.transfer(null, com.openworld.game.profile.Profiles.local(), yen,
+                com.openworld.game.profile.Economy.Reason.GRANT);
+    }
+    /** A bill to this install's profile (may run into debt -- CR4). */
+    @Register public long billProfileNow(long yen) {
+        return com.openworld.game.profile.Economy.bill(com.openworld.game.profile.Profiles.local(), yen,
+                com.openworld.game.profile.Economy.Reason.BILL_HOSPITAL);
+    }
+    /** A purchase from this install's profile (refused when short). */
+    @Register public boolean spendProfileNow(long yen) {
+        return com.openworld.game.profile.Economy.transfer(com.openworld.game.profile.Profiles.local(), null, yen,
+                com.openworld.game.profile.Economy.Reason.PURCHASE);
+    }
+    /** Forget the in-memory profile and read the file again; returns where it came from ("file", "bak1", ...). */
+    @Register public String reloadProfileNow() {
+        com.openworld.game.profile.Profiles.clear();
+        com.openworld.game.profile.Profiles.local();
+        return com.openworld.game.profile.Profiles.loadedFrom();
+    }
+    /** The host's session copies, "id=balance;..." (probes). */
+    @Register public String remoteBalancesNow() {
+        StringBuilder b = new StringBuilder();
+        for (var e : com.openworld.game.profile.Profiles.remotes().entrySet())
+            b.append(b.length() == 0 ? "" : ";").append(e.getKey()).append('=').append(e.getValue().balance);
+        return b.toString();
+    }
+    @Register public String localPlayerIdNow() { return com.openworld.game.profile.Profiles.local().playerId; }
+    @Register public String profilePathNow() {
+        java.nio.file.Path p = com.openworld.game.profile.Profiles.file();
+        return p == null ? "" : p.toString();
+    }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
