@@ -492,9 +492,11 @@ public class VehicleCameraController extends Node3D {
 
         double nos = (target instanceof Vehicle v && v.isBoosting()) ? fovNosBoost : 0.0;
 
-        double targetFov = current ? baseFov + fovSpeedBoost * ease + surge + nos : baseFov;
+        // baseFov is the vehicle camera's authored FOV; the player's FOV setting moves it like the on-foot ones
+        double base = baseFov + com.openworld.game.QualitySettings.fovOffsetDeg();
+        double targetFov = current ? base + fovSpeedBoost * ease + surge + nos : base;
         activeCamera.setFov((float) GD.lerp((double) activeCamera.getFov(),
-                Math.min(targetFov, baseFov + 32.0),
+                Math.min(targetFov, base + 32.0),
                 Math.min(1.0, fovLerpSpeed * delta)));
 
         // Speed pull-back: the arm extends with speed so the car shrinks in frame and the

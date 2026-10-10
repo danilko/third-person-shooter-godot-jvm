@@ -218,11 +218,13 @@ public class CharacterHUD extends Control {
       // Labels may carry their own key hint ("[ F ]  Enter vehicle", "Door (E)"); with none it is the interact
       // key, E. The key is drawn as a keycap glyph (Kenney Input Prompts) left of the text, else as "[ X ]".
       KeyGlyph.Prompt p = KeyGlyph.parse(label);
-      godot.api.Texture2D glyph = glyph(p.key());
-      interactPromptLabel.setText(glyph != null ? p.text() : "[ " + p.key() + " ]  " + p.text());
+      // a pad shows the action's pad glyph (fixed layout); a keyboard shows the key BOUND NOW (KeyBindings, F2)
+      String shown = com.openworld.control.InputDevice.pad() ? p.key() : com.openworld.control.KeyBindings.shownKey(p.key());
+      godot.api.Texture2D glyph = glyph(shown);
+      interactPromptLabel.setText(glyph != null ? p.text() : "[ " + shown + " ]  " + p.text());
       interactPromptLabel.setVisible(true);
       if (interactKey != null) {
-        promptKey = p.key();
+        promptKey = shown;
         interactKey.setTexture(glyph);
         interactKey.setVisible(glyph != null);
         if (glyph != null) {

@@ -32,8 +32,10 @@ public class SettingsMenu extends Control {
 
     private Node returnFocusTo;
     private OptionButton presetBox;
-    private HSlider renderScale, shadowDist, viewDist, lookSens, padLook, volume;
-    private CheckButton invertY, aimAssist, hudMinimal;
+    private HSlider renderScale, shadowDist, viewDist, lookSens, padLook, volume, fov;
+    private CheckButton invertY, aimAssist, hudMinimal, vsync;
+    private OptionButton windowMode, resolution;
+    private Button keysButton;
     private boolean syncing;
     private static int opens;
 
@@ -77,6 +79,26 @@ public class SettingsMenu extends Control {
         aimAssist = check(v, "Aim assist (pad)", "on_controls");
         volume = slider(v, "Master volume", 0.0, 1.0, 0.05, "on_controls");
         hudMinimal = check(v, "Minimal HUD", "on_controls");
+        fov = slider(v, "Field of view (+deg)", QualitySettings.FOV_OFFSET_MIN, QualitySettings.FOV_OFFSET_MAX, 1.0, "on_controls");
+        windowMode = new OptionButton();
+        windowMode.addItem("Windowed", 0);
+        windowMode.addItem("Fullscreen (borderless)", 1);
+        windowMode.addItem("Fullscreen (exclusive)", 2);
+        row(v, "Window", windowMode);
+        windowMode.connect(new StringName("item_selected"), callable("on_display"));
+        resolution = new OptionButton();
+        resolution.addItem("Keep current", 0);
+        for (int i = 0; i < QualitySettings.RESOLUTIONS.length; i++) resolution.addItem(QualitySettings.RESOLUTIONS[i], i + 1);
+        row(v, "Window size", resolution);
+        resolution.connect(new StringName("item_selected"), callable("on_display"));
+        vsync = new CheckButton();
+        row(v, "VSync", vsync);
+        vsync.connect(new StringName("toggled"), callable("on_display_toggled"));
+        Button keys = keysButton = new Button();
+        keys.setName("KeyBindings");
+        keys.setText("Key bindings...");
+        keys.connect(new StringName("pressed"), callable("open_key_bindings"));
+        v.addChild(keys);
         Button back = new Button();
         back.setText("Back");
         back.connect(new StringName("pressed"), callable("close"));
@@ -88,6 +110,7 @@ public class SettingsMenu extends Control {
     @Register
     @Override
     public void _input(godot.api.InputEvent e) {
+        if (getNodeOrNull("KeyBindingsMenu") != null) return;   // the sub-page has the keys
         if (e.isActionPressed("ui_cancel", false)) {
             close();
             getViewport().setInputAsHandled();
@@ -106,6 +129,11 @@ public class SettingsMenu extends Control {
         aimAssist.setPressed(q.aimAssist);
         volume.setValue(q.masterVolume);
         hudMinimal.setPressed(q.hudMinimal);
+        fov.setValue(q.fovOffset);
+        windowMode.select(q.windowMode.ordinal());
+        int r = java.util.Arrays.asList(QualitySettings.RESOLUTIONS).indexOf(q.resolution);
+        resolution.select(r < 0 ? 0 : r + 1);
+        vsync.setPressed(q.vsync);
         syncing = false;
     }
 
@@ -147,7 +175,30 @@ public class SettingsMenu extends Control {
         q.aimAssist = aimAssist.isPressed();
         q.masterVolume = volume.getValue();
         q.hudMinimal = hudMinimal.isPressed();
+        q.fovOffset = fov.getValue();
         q.apply();
+    }
+
+    @Register
+    public void onDisplay(long ignored) { readDisplay(); }
+
+    @Register
+    public void onDisplayToggled(boolean ignored) { readDisplay(); }
+
+    private void readDisplay() {
+        QualitySettings q = QualitySettings.get();
+        if (q == null || syncing) return;
+        q.windowMode = QualitySettings.WindowMode.values()[Math.max(0, windowMode.getSelected())];
+        int r = resolution.getSelected();
+        q.resolution = r <= 0 ? "" : QualitySettings.RESOLUTIONS[r - 1];
+        q.vsync = vsync.isPressed();
+        q.apply();
+    }
+
+    /** The key bindings sub-page, over this one; focus comes back to its button. */
+    @Register
+    public void openKeyBindings() {
+        if (getNodeOrNull("KeyBindingsMenu") == null) KeyBindingsMenu.open(this, keysButton);
     }
 
     @Register

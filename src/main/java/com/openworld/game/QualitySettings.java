@@ -53,6 +53,21 @@ public class QualitySettings extends Node {
     public boolean aimAssist = true;
     public double masterVolume = 1.0;        // linear 0..1
     public boolean hudMinimal = false;
+    /** Added to every on-foot and vehicle camera FOV (deg), never to a scope's declared FOV. -10..+20. */
+    public double fovOffset = 0.0;
+    public static final double FOV_OFFSET_MIN = -10.0, FOV_OFFSET_MAX = 20.0;
+    /** The window: WINDOWED (at {@link #resolution}, "" = leave the size alone), FULLSCREEN (borderless), EXCLUSIVE. */
+    public enum WindowMode { WINDOWED, FULLSCREEN, EXCLUSIVE }
+    public WindowMode windowMode = WindowMode.WINDOWED;
+    public String resolution = "";
+    public boolean vsync = true;
+    /** The windowed sizes the page offers (a 16:9 ladder up to 1440p; the Deck's 1280x800 panel). */
+    public static final String[] RESOLUTIONS = {"1280x720", "1280x800", "1600x900", "1920x1080", "2560x1440"};
+
+    /** The FOV offset the cameras add (0 before the AutoLoad is up). */
+    public static double fovOffsetDeg() {
+        return instance == null ? 0.0 : clamp(instance.fovOffset, FOV_OFFSET_MIN, FOV_OFFSET_MAX);
+    }
 
     private static QualitySettings instance;
     public static QualitySettings get() { return instance; }
@@ -131,6 +146,47 @@ public class QualitySettings extends Node {
         Player me = localPlayer();
         appliedPlayer = me == null ? -1 : me.getInstanceId();
         if (me != null) applyLook(me);
+        applyWindow();
+    }
+
+    private String windowApplied = "";
+
+    /** The window mode / size / vsync -- only when they change (a re-apply on every scene must not re-centre the
+     *  window), and never on the headless display server. */
+    private void applyWindow() {
+        if ("headless".equalsIgnoreCase(godot.api.DisplayServer.getName())) return;
+        String want = windowMode + "|" + resolution + "|" + vsync;
+        if (want.equals(windowApplied)) return;
+        windowApplied = want;
+        godot.api.DisplayServer.windowSetVsyncMode(vsync ? godot.api.DisplayServer.VSyncMode.VSYNC_ENABLED
+                : godot.api.DisplayServer.VSyncMode.VSYNC_DISABLED, 0);
+        switch (windowMode) {
+            case FULLSCREEN -> godot.api.DisplayServer.windowSetMode(godot.api.DisplayServer.WindowMode.FULLSCREEN, 0);
+            case EXCLUSIVE -> godot.api.DisplayServer.windowSetMode(godot.api.DisplayServer.WindowMode.EXCLUSIVE_FULLSCREEN, 0);
+            default -> {
+                godot.api.DisplayServer.windowSetMode(godot.api.DisplayServer.WindowMode.WINDOWED, 0);
+                int[] wh = parseResolution(resolution);
+                if (wh != null) {
+                    godot.api.DisplayServer.windowSetSize(new godot.core.Vector2i(wh[0], wh[1]), 0);
+                    godot.core.Vector2i screen = godot.api.DisplayServer.screenGetSize(-1);
+                    godot.api.DisplayServer.windowSetPosition(new godot.core.Vector2i(
+                            Math.max(0, (screen.getX() - wh[0]) / 2), Math.max(0, (screen.getY() - wh[1]) / 2)), 0);
+                }
+            }
+        }
+    }
+
+    /** "1920x1080" -> {1920, 1080}; null for "" or anything unreadable. */
+    public static int[] parseResolution(String r) {
+        if (r == null) return null;
+        String[] p = r.trim().toLowerCase().split("x");
+        if (p.length != 2) return null;
+        try {
+            int w = Integer.parseInt(p[0].trim()), h = Integer.parseInt(p[1].trim());
+            return w >= 640 && h >= 360 ? new int[] {w, h} : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private void applyShadows(Node n) {
@@ -151,6 +207,7 @@ public class QualitySettings extends Node {
                 pc.padInvertY = invertY;
                 pc.aimAssist = aimAssist;
             }
+            if (c instanceof TPSCameraController cam) cam.refreshFov();   // the FOV offset reaches the camera now
         }
     }
 
@@ -169,6 +226,7 @@ public class QualitySettings extends Node {
 
     public void load() {
         ConfigFile cf = new ConfigFile();
+        com.openworld.control.KeyBindings.init();   // read project.godot's keys before any user binding lands
         if (cf.load(PATH) != godot.core.Error.OK) return;
         try { preset = Preset.valueOf(String.valueOf(cf.getValue("graphics", "preset", preset.name()))); }
         catch (IllegalArgumentException e) { preset = Preset.HIGH; }
@@ -181,6 +239,12 @@ public class QualitySettings extends Node {
         aimAssist = bool(cf, "controls", "aim_assist", aimAssist);
         masterVolume = num(cf, "audio", "master", masterVolume);
         hudMinimal = "minimal".equals(String.valueOf(cf.getValue("hud", "mode", hudMinimal ? "minimal" : "full")));
+        fovOffset = num(cf, "view", "fov_offset", fovOffset);
+        try { windowMode = WindowMode.valueOf(String.valueOf(cf.getValue("display", "window_mode", windowMode.name()))); }
+        catch (IllegalArgumentException e) { windowMode = WindowMode.WINDOWED; }
+        resolution = String.valueOf(cf.getValue("display", "resolution", resolution));
+        vsync = bool(cf, "display", "vsync", vsync);
+        com.openworld.control.KeyBindings.load(cf);
     }
 
     public boolean save() {
@@ -195,6 +259,11 @@ public class QualitySettings extends Node {
         cf.setValue("controls", "aim_assist", aimAssist);
         cf.setValue("audio", "master", masterVolume);
         cf.setValue("hud", "mode", hudMinimal ? "minimal" : "full");
+        cf.setValue("view", "fov_offset", fovOffset);
+        cf.setValue("display", "window_mode", windowMode.name());
+        cf.setValue("display", "resolution", resolution);
+        cf.setValue("display", "vsync", vsync);
+        com.openworld.control.KeyBindings.save(cf);
         return cf.save(PATH) == godot.core.Error.OK;
     }
 
@@ -220,4 +289,10 @@ public class QualitySettings extends Node {
     @Register public void setShadowDistanceNow(double m) { shadowDistance = m; graphicsChanged(); apply(); }
     @Register public boolean hudMinimalNow() { return hudMinimal; }
     @Register public void setHudMinimalNow(boolean on) { hudMinimal = on; }
+    @Register public void setFovOffsetNow(double deg) { fovOffset = clamp(deg, FOV_OFFSET_MIN, FOV_OFFSET_MAX); apply(); }
+    @Register public boolean rebindNow(String row, String spec) { return com.openworld.control.KeyBindings.rebind(row, spec); }
+    @Register public String bindingNow(String row) { return com.openworld.control.KeyBindings.specNow(row); }
+    @Register public void resetBindingsNow() { com.openworld.control.KeyBindings.resetDefaults(); }
+    @Register public boolean saveNow() { return save(); }
+    @Register public void reloadNow() { load(); apply(); }
 }

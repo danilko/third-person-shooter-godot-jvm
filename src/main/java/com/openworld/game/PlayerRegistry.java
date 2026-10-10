@@ -45,6 +45,17 @@ public class PlayerRegistry extends Node {
         return PLAYERS;
     }
 
+    /** Probe readouts: how many player bodies are live, and the one this machine plays (null when none). */
+    @Register public int playerCountNow() {
+        int n = 0;
+        for (Player p : PLAYERS) if (godot.global.GD.isInstanceValid(p)) n++;
+        return n;
+    }
+    @Register public Player localPlayerNow() {
+        for (Player p : PLAYERS) if (godot.global.GD.isInstanceValid(p) && p.isLocalOwnedPlayer()) return p;
+        return null;
+    }
+
     /** Drop all references on engine teardown so no {@code Player} (a Godot Object) leaks past exit. */
     @Register
     @Override

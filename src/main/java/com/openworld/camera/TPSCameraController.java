@@ -285,7 +285,7 @@ public class TPSCameraController extends Node3D {
     if (scopedSensitivityRatio <= 0.0 || character == null || activeCamera == null || !character.isScopeRaised()) {
       return 1.0;
     }
-    double unscoped = combat ? cameraFov : movementFov;
+    double unscoped = (combat ? cameraFov : movementFov) + com.openworld.game.QualitySettings.fovOffsetDeg();
     if (unscoped <= 0.0) return 1.0;
     return Math.min(1.0, scopedSensitivityRatio * activeCamera.getFov() / unscoped);
   }
@@ -316,6 +316,9 @@ public class TPSCameraController extends Node3D {
     setCameraFov();
   }
 
+  /** Re-aim the FOV tween at the current state (the settings page moved the FOV offset). */
+  public void refreshFov() { setCameraFov(); }
+
   private void setCameraFov() {
     // activeCamera is assigned from character.activeCamera in _ready(), but _ready() runs
     // bottom-up: this node's _ready() fires before Character._ready() assigns activeCamera.
@@ -328,7 +331,8 @@ public class TPSCameraController extends Node3D {
       tween.kill();
     }
 
-    double targetFov = combat ? cameraFov : movementFov;
+    // the player's FOV setting moves every on-foot FOV by the same degrees; a scope below keeps its declared one
+    double targetFov = (combat ? cameraFov : movementFov) + com.openworld.game.QualitySettings.fovOffsetDeg();
     double duration  = fovTweenDuration;
 
     // A scope overrides every other FOV source while it is up, and supplies its own (short)

@@ -2728,6 +2728,17 @@ public class NetworkManager extends Node {
                 secs > 0 ? recv * 8 / 1000.0 / secs : 0.0, secs > 0 ? sent * 8 / 1000.0 / secs : 0.0);
     }
 
+    /** Probe readout: "offline", or "host peers=N" / "client peers=N id=<localPeerId>" -- connected ENet peers only.
+     *  Unlike {@link #debugNetLine} it reads no statistic, so it resets nothing. */
+    @Register
+    public String sessionNow() {
+        if (connection == null) return "offline";
+        int n = 0;
+        for (ENetPacketPeer p : peersById.values())
+            if (p != null && p.getState() == ENetPacketPeer.PeerState.STATE_CONNECTED) n++;
+        return (amServer ? "host" : "client") + " peers=" + n + " id=" + localPeerId;
+    }
+
     /** True when this peer is the authority (server/host). Single-player counts as authority. */
     public boolean isServer() {
         return connection == null || amServer;

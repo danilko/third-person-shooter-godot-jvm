@@ -44,6 +44,20 @@ public final class KeyGlyph {
         };
     }
 
+    /** The input action a prompt's DEFAULT letter stands for (the table padGlyph follows), or null. */
+    public static String actionOf(String key) {
+        return switch (key == null ? "" : key.toUpperCase()) {
+            case "E" -> "interact";
+            case "F" -> "use_carrier";
+            case "H" -> "holster";
+            case "R" -> "reload";
+            case "B" -> "detonate";
+            case "G" -> "radialmenu";
+            case "M" -> "map";
+            default -> null;
+        };
+    }
+
     public static String texturePath(String key, boolean pad) {
         if (!pad) return texturePath(key);
         String g = padGlyph(key);

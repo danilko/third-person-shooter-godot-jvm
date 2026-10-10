@@ -51,6 +51,7 @@ GATES=(
   "recoil_kick|400|0|0|$HF --script $P/probe_recoil_kick.gd"
   "fps_ads|400|0|0|$HF --script $P/probe_fps_ads.gd"
   "input_contexts|300|0|0|$HF --script $P/probe_input_contexts.gd"
+  "rebind|300|0|0|$HF --script $P/probe_rebind.gd"
   "aim_debug_auto|600|0|0|$H res://src/main/resources/com/openworld/world/hosts/AimDebugAuto.tscn"
   "faction_presets|400|0|0|$HF --script $P/probe_faction_presets.gd"
   "campaign_factions|200|0|0|$H --script $P/probe_campaign_factions.gd"
@@ -64,6 +65,7 @@ GATES=(
   "interact|300|0|0|$HF --script $P/probe_interact.gd"
   "weapon_counter|400|0|0|$H --script $P/probe_weapon_counter.gd"
   "front_end|600|0|0|$HF --script $P/probe_front_end.gd"
+  "title_continue|600|0|0|$HF --script $P/probe_title_actions.gd -- --role=continue"
   "minimal_hud|300|0|0|$HF --script $P/probe_minimal_hud.gd"
   "stairs|900|0|0|$H --script $P/probe_stairs.gd"
   "building_nav|600|0|0|$H --script $P/check_building_nav.gd"
@@ -79,6 +81,7 @@ GATES=(
   "road_clear|3600|1|0|$H --script $P/probe_road_clear.gd"
   "world_boot|300|0|0|$H --quit-after 600 res://src/main/resources/com/openworld/world/World.tscn"
   "net_shot|600|0|1|tools/net/run_net_shot_test.sh"
+  "title_coop|400|0|1|tools/net/run_title_coop.sh"
   "net_debugworld|1200|1|1|tools/net/run_net_debugworld.sh"
 )
 
