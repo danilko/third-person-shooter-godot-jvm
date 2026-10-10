@@ -20,6 +20,38 @@ public class PauseMenu extends Control {
     @Override
     public void _ready() {
         hide();
+        // Settings (F2): a button the scene does not author, placed above Quit
+        Node box = getNodeOrNull("CenterContainer/Panel/VBoxContainer");
+        Node quit = box == null ? null : box.getNodeOrNull("Quit");
+        if (box != null && box.getNodeOrNull("Settings") == null) {
+            godot.api.Button b = new godot.api.Button();
+            b.setName("Settings");
+            b.setText("Settings");
+            box.addChild(b);
+            if (quit != null) box.moveChild(b, quit.getIndex());
+            b.connect(new godot.core.StringName("pressed"), godot.core.MethodCallable.createUnsafe(this, "on_settings_pressed"));
+            godot.api.Button t = new godot.api.Button();
+            t.setName("QuitToTitle");
+            t.setText("Quit to title");
+            box.addChild(t);
+            if (quit != null) box.moveChild(t, quit.getIndex());
+            t.connect(new godot.core.StringName("pressed"), godot.core.MethodCallable.createUnsafe(this, "on_quit_to_title_pressed"));
+        }
+    }
+
+    @Register
+    public void onQuitToTitlePressed() {
+        com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_CLICK);
+        hide();
+        com.openworld.game.FrontEnd.toTitle(this);
+    }
+
+    @Register
+    public void onSettingsPressed() {
+        com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_CLICK);
+        Node parent = getParent();
+        if (parent != null && parent.getNodeOrNull("SettingsMenu") == null)
+            SettingsMenu.open(parent, getNodeOrNull("CenterContainer/Panel/VBoxContainer/Settings"));
     }
 
     @Register

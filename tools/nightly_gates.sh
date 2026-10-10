@@ -60,6 +60,8 @@ GATES=(
   "gamepad|300|0|0|$HF --script $P/probe_gamepad.gd"
   "blood_hit|300|0|0|$HF --script $P/probe_blood_hit.gd"
   "interact|300|0|0|$HF --script $P/probe_interact.gd"
+  "front_end|600|0|0|$HF --script $P/probe_front_end.gd"
+  "minimal_hud|300|0|0|$HF --script $P/probe_minimal_hud.gd"
   "stairs|900|0|0|$H --script $P/probe_stairs.gd"
   "building_nav|600|0|0|$H --script $P/check_building_nav.gd"
   "konbini_kill|600|1|0|$H --script $P/probe_konbini_mission.gd -- --case=kill"

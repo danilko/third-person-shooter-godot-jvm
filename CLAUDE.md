@@ -104,7 +104,8 @@ src/main/java/com/openworld/
   vfx/            # Binbun3D effect controllers (Java ports of the packs' GDScript): VfxEffect (one-shot,
                   #   plays "main"), MuzzleFlashVfx, SmokeVfx, VfxLight — assets in assets/vfx/
   util/           # ObjectPool, generic helpers
-  debug/          # DebugHarness (temporary test-spawn harness); headless test stands —
+  debug/          # DebugHarness (temporary test-spawn harness; DebugWorld / hosts only, NOT World.tscn -- user
+                  #   2026-10-09: no F-key debug in the main world); headless test stands —
                   #   DriveTestHost (vehicle physics soak, fixed timeline) and
                   #   HandlingTestHost + ScriptedInputController (step-by-step handling
                   #   cases, each with its control — hosts/HandlingTest.tscn)
@@ -218,6 +219,7 @@ means that section title in one of these files (`grep -l "<title>" docs/*.md`).
 | `docs/island-world.md` | Terrain3D, the land redo, districts, land planning, block ground, safe-house start, the rebuild review batch, the airport, night lighting |
 | `docs/buildings.md` | building kits, the library, tones + shop windows, streamed cells, lots, civic plots, logistics, forecourts, interiors (mission + shops), sliding doors, stair ramps, vegetation, shop counters |
 | `docs/crowd.md` | the two-tier crowd, island population, the LOD ped body, the VAT tier, holster, gaits, crowd hits |
+| `docs/front-end.md` | the title screen (main scene), FrontEnd's after-load actions, QualitySettings (settings.cfg, presets, H3's client-local rule + fairness floors), the settings page |
 | `docs/input.md` | the gamepad (F1): the one binding table, the device tracker, analog walk / look rate / aim assist, triggers as pedals, pause vs back, pad glyphs |
 | `docs/rail-and-stations.md` | rail reserve + rail mode, stations, signals, street names, paid areas, lifts, station forms, EMU1, boardable trains |
 

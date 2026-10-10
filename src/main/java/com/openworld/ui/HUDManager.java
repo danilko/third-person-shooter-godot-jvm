@@ -376,7 +376,69 @@ public class HUDManager extends CanvasLayer {
 	  applyContext(currentSituation);
 	}
 	tickRegion(delta);
+	tickMinimal(delta);
   }
+
+  // ── F13: the minimal HUD (show on change, then fade) ─────────────────────
+
+  /**
+   * PLAN.md F13 (user, 2026-10-09: "the game tells the player through behaviour and the world first"). With
+   * QualitySettings' HUD mode "minimal", four always-on widgets fade out and come back only when their state CHANGES or
+   * must be seen: health (a hit, or below {@link #LOW_HEALTH}), the weapon panel (a switch / shot / reload, or while
+   * aiming), the minimap (in a vehicle, with a waypoint set, or wanted), the clock (never in minimal -- the light tells
+   * the time; the map shows it). Everything else is already event-driven or self-gated (stars hidden at zero and
+   * flashing on change, the slots column on a switch, the feed, the hit marker, prompts). "full" = every alpha 1, the
+   * HUD exactly as before. A fade is a MODULATE, under the situation table's visibility, so the two never fight.
+   */
+  public static final double LOW_HEALTH = 0.35;
+  public static final double HOLD_SECONDS = 4.0;
+  public static final double FADE_PER_SECOND = 2.5;
+
+  private final java.util.Map<String, Double> revealLeft = new java.util.HashMap<>();
+  private final java.util.Map<String, String> revealSig = new java.util.HashMap<>();
+  private final java.util.Map<String, Double> revealAlpha = new java.util.HashMap<>();
+
+  private void tickMinimal(double delta) {
+	var q = com.openworld.game.QualitySettings.get();
+	boolean minimal = q != null && q.hudMinimal;
+	Player me = localPlayer != null && GD.isInstanceValid(localPlayer) ? localPlayer : null;
+	var hp = me != null && me.getNodeOrNull("Health") instanceof com.openworld.character.Health h ? h : null;
+	var wc = me != null ? me.weaponController : null;
+	Control health = getNodeOrNull("FootHUD/Health") instanceof Control c ? c : null;
+	reveal("health", health, minimal, delta,
+		hp == null ? "" : String.valueOf(Math.round(hp.getCurrentHealth())),
+		hp != null && hp.getCurrentHealth() < hp.maxHealth * LOW_HEALTH);
+	reveal("weapon", widgets.get(W_WEAPON_HUD), minimal, delta,
+		wc == null ? "" : wc.getCurrentWeaponIdNow() + (wc.isWeaponReloading() ? " R" : "") + (wc.isHolstered() ? " H" : ""),
+		me != null && me.isCombat());
+	boolean wanted = false;
+	var ws = com.openworld.game.WantedSystem.get();
+	if (ws != null && me != null && me.getCharacterInfo() != null)
+	  wanted = ws.hudOf(me.getCharacterInfo().characterId).stars() > 0;
+	reveal("minimap", minimap, minimal, delta, "",
+		currentVehicle != null || (me != null && me.hasWaypointNow()) || wanted);
+	reveal("clock", getNodeOrNull("GameClock") instanceof Control gc ? gc : null, minimal, delta, "", false);
+  }
+
+  /** One widget's fade: back to full on a new signature or while {@code hold}, else down after HOLD_SECONDS. */
+  private void reveal(String id, Control w, boolean minimal, double delta, String sig, boolean hold) {
+	if (w == null || !GD.isInstanceValid(w)) return;
+	String was = revealSig.put(id, sig);
+	double left = revealLeft.getOrDefault(id, 0.0) - delta;
+	if (!sig.isEmpty() && !sig.equals(was) && was != null) left = HOLD_SECONDS;
+	if (hold) left = Math.max(left, 0.5);
+	revealLeft.put(id, left);
+	double target = !minimal || left > 0 ? 1.0 : 0.0;
+	double a = revealAlpha.getOrDefault(id, 1.0);
+	a = target > a ? target : Math.max(target, a - FADE_PER_SECOND * delta);   // in at once, out over 0.4 s
+	revealAlpha.put(id, a);
+	godot.core.Color m = w.getModulate();
+	w.setModulate(new godot.core.Color(m.getR(), m.getG(), m.getB(), a));
+  }
+
+  /** A widget's minimal-HUD alpha ("health", "weapon", "minimap", "clock"; probe readout). */
+  @Register
+  public double revealAlphaNow(String id) { return revealAlpha.getOrDefault(id, 1.0); }
 
   // ── which part of the island you are in (PLAN.md 3.18n) ───────────────────
 
