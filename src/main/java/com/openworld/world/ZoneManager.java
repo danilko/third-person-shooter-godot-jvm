@@ -230,6 +230,14 @@ public class ZoneManager extends Node {
 	 * player covers in {@code trafficSpawnLeadSeconds}, and never inside this peer's camera view nearer than
 	 * {@code trafficSpawnViewDist}. Checked on the car's actual placement. 0 on all three = the old gate (the control).
 	 */
+	/**
+	 * EXPERIMENT, OFF (2026-10-10): a ring car born at a random point along any lane in the band, preferring a lane
+	 * that runs toward the player ({@code placementInRing}) instead of at a lane's entry queue in cursor order. NOT
+	 * PROVEN: one 45 s standing sample each at the start point read within 60 / 100 / 200 m 2 / 2 / 13 with it and
+	 * 3 / 8 / 13 without, both spread over all four sides -- so it stays off until a census by bearing over several
+	 * sites and runs says which is better (PLAN.md, the user's traffic report of 2026-10-10 s5).
+	 */
+	@Export public boolean trafficSpawnAlongLanes = false;
 	@Export public float trafficSpawnMinDist = 80.0f;
 	@Export public float trafficSpawnLeadSeconds = 6.0f;
 	@Export public float trafficSpawnViewDist = 160.0f;
@@ -2391,6 +2399,10 @@ public class ZoneManager extends Node {
 			return null;
 		}
 		lz.laneMissLogged = false;
+		if (gateOnPlayers && trafficSpawnAlongLanes) {
+			Placement at = placementInRing(lanes, zone);
+			if (at != null) return spawnVehicle(vc, container, at, lz.trafficCursor++, lz);
+		}
 		for (int tries = 0; tries < lanes.size(); tries++) {
 			int idx = lz.trafficCursor++;
 			Lane lane = lanes.get(Math.floorMod(idx, lanes.size()));
@@ -2413,6 +2425,62 @@ public class ZoneManager extends Node {
 		}
 		return null;
 	}
+
+	/**
+	 * AN EXPERIMENT, behind {@link #trafficSpawnAlongLanes} (off; user, 2026-10-10: "rarely see 1 or 2, most on one
+	 * side -- spawn more randomly?"). The shipped top-up takes lanes in cursor order and sets the car down in the
+	 * first queue slots at the lane's ENTRY: a fixed handful of points per zone, wherever those lie from the player.
+	 * This instead takes ANY point of ANY lane in the zone, at random, that lies in the band a car can appear in unseen
+	 * ({@code trafficSpawnMinDist} .. the spawn gate) -- and of the first few such points the one whose lane runs
+	 * TOWARD the player, so the car arrives instead of driving off (GTA's "spawn on a road leading to the player,
+	 * just out of sight"). The refusal rules are unchanged and are asked of the actual placement. The same number
+	 * of cars either way, so no performance difference. Not shown to be better yet -- see the knob.
+	 */
+	private Placement placementInRing(List<Lane> lanes, Zone zone) {
+		float gate = trafficSpawnGate(zone);
+		Placement best = null;
+		double bestScore = -2.0;
+		int found = 0;
+		int start = sidewalkRng.nextInt(lanes.size());
+		for (int i = 0; i < lanes.size() && found < TRAFFIC_RING_CANDIDATES; i++) {
+			Lane lane = lanes.get((start + i) % lanes.size());
+			double total = lane.total();
+			if (total < TRAFFIC_SPAWN_CLEARANCE * 2) continue;
+			// two tries a lane, away from its ends (the junction mouths)
+			for (int k = 0; k < 2 && found < TRAFFIC_RING_CANDIDATES; k++) {
+				double s = TRAFFIC_SPAWN_CLEARANCE + sidewalkRng.nextDouble() * (total - 2 * TRAFFIC_SPAWN_CLEARANCE);
+				Vector3 p = lane.pointAtLength(s);
+				if (p == null) continue;
+				float d = nearestPlayerDistXZ(p);
+				if (d < trafficSpawnMinDist || d > gate) continue;
+				if (onCrossing(lane, s) || !isClear(p)) continue;
+				if (spawnRefusedByPlayers(p)) { spawnsRefusedNearPlayer++; continue; }
+				Vector3 dir = travelDirection(lane, s, total);
+				found++;
+				double score = dir == null ? 0.0 : towardNearestPlayer(p, dir);
+				if (score > bestScore) { bestScore = score; best = new Placement(lane, p, dir); }
+			}
+		}
+		return best;
+	}
+
+	/** How much {@code dir} at {@code p} points at the nearest player: 1 straight at them, -1 straight away. */
+	private double towardNearestPlayer(Vector3 p, Vector3 dir) {
+		Player near = null;
+		double bestD = Double.MAX_VALUE;
+		for (Player pl : PlayerRegistry.getPlayers()) {
+			if (!GD.isInstanceValid(pl)) continue;
+			double d = Math.hypot(pl.getGlobalPosition().getX() - p.getX(), pl.getGlobalPosition().getZ() - p.getZ());
+			if (d < bestD) { bestD = d; near = pl; }
+		}
+		if (near == null || bestD < 1e-3) return 0.0;
+		double tx = (near.getGlobalPosition().getX() - p.getX()) / bestD, tz = (near.getGlobalPosition().getZ() - p.getZ()) / bestD;
+		double dl = Math.max(1e-6, Math.hypot(dir.getX(), dir.getZ()));
+		return (dir.getX() * tx + dir.getZ() * tz) / dl;
+	}
+
+	/** How many legal points {@link #placementInRing} looks at before it takes the one heading most toward a player. */
+	private static final int TRAFFIC_RING_CANDIDATES = 4;
 
 	/** The first clear queue slot on {@code lane}, facing its travel direction; null when all are taken.
 	 *  A loop offers slots all the way round the ring; a one-way lane only near its entry, so a

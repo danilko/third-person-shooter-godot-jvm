@@ -29,6 +29,14 @@ func _initialize() -> void:
 		print("RESULT %s (%d failure(s))" % ["PASS" if fails == 0 else "FAIL", fails])
 		quit(0 if fails == 0 else 1)
 		return
+	# `-- --settle=<s> [--along-lanes]`: stand that long first (a traffic reading that means something); --along-lanes
+	# switches the experimental spawn rule on (ZoneManager.trafficSpawnAlongLanes) for an A/B reading
+	for a in OS.get_cmdline_user_args():
+		if a == "--along-lanes":
+			root.get_node("ZoneManager").set("traffic_spawn_along_lanes", true)
+		if a.begins_with("--settle="):
+			for i in int(float(a.substr(9)) * 60):
+				await physics_frame
 	check("World.tscn has no DebugHarness", current_scene.find_child("DebugHarness", true, false) == null)
 	check("the backtick key opens the console in the real game", gm.call("toggle_console_now"))
 	var t := str(gm.call("console_run_now", "traffic"))
