@@ -101,6 +101,10 @@ src/main/java/com/openworld/
     profile/      #   PlayerProfile, Economy.transfer, EconomyTable, SafeSave, SaveMigrations
     mission/      #   MissionInfo, MissionManager, MissionObjectiveType, MissionDirector
                   #   (story, F1), ScriptCommand, RaceDirector (R2 street races)
+    campaign/     #   the campaign GRAPH: FlagKey, Requirement, Effect, ActivityDef, CampaignLint, GameOverRule;
+                  #   content/ = the content packs (Act1) and their mission classes (KonbiniActivity)
+    activity/     #   the Activity runtime (typed Java missions): Activity, Plan, Stage, RuleSet,
+                  #   ActivityDirector, ActivityHost + FakeActivityHost, ActivityRuntime (AutoLoad)
   net/            # NetworkManager (AutoLoad RPC), NetMessageCodec, NetworkController,
                   #   VehicleNetworkController, snapshot interpolators, policies, NetStats, Vec3/Quat
     session/      #   PlayerSession, PersistentPlayerId
@@ -111,7 +115,8 @@ src/main/java/com/openworld/
                   #   plays "main"), MuzzleFlashVfx, SmokeVfx, VfxLight — assets in assets/vfx/
   util/           # ObjectPool, generic helpers
   debug/          # DebugHarness (temporary test-spawn harness; DebugWorld / hosts only, NOT World.tscn -- user
-                  #   2026-10-09: no F-key debug in the main world); headless test stands —
+                  #   2026-10-09: no F-key debug in the main world); DebugConsole (backtick) IS in the real game
+                  #   too, opened by GameManager (user 2026-10-10: `traffic`, `activity`, `hud 0-3`); test stands —
                   #   DriveTestHost (vehicle physics soak, fixed timeline) and
                   #   HandlingTestHost + ScriptedInputController (step-by-step handling
                   #   cases, each with its control — hosts/HandlingTest.tscn)
@@ -123,7 +128,8 @@ src/test/java/com/openworld/net/   # headless unit tests for the engine-free net
 ```
 
 > AutoLoads (`project.godot`): `EventBus`, `GameManager` (`game`), `MissionManager`
-> (`game.mission`), `MissionDirector` (`game.mission`), `RaceDirector` (`game.mission`), `SaveSystem`
+> (`game.mission`), `MissionDirector` (`game.mission`), `RaceDirector` (`game.mission`), `ActivityRuntime`
+> (`game.activity`), `SaveSystem`
 > (`game`), `NetworkManager` (`net`), `PlayerRegistry` (`game`), `SpatialEntityGrid` (`world`),
 > `FactionManager` (`character`), `ZoneManager` (`world`), `StimulusManager` (`world`).
 
@@ -214,7 +220,7 @@ means that section title in one of these files (`grep -l "<title>" docs/*.md`).
 
 | doc | what is in it |
 |---|---|
-| `docs/game-systems.md` | Part D: spatial grid, AI LOD, factions (presets, campaign layer), MissionDirector + ZoneTrigger, SaveSystem, the profile / economy / save v2, the garage, the authoring foundations (GameplayEvents, DataTable, MarkerRegistry, WorldLedger), RaceDirector; the AI FSM; EventBus; audio |
+| `docs/game-systems.md` | Part D: spatial grid, AI LOD, factions (presets, campaign layer), MissionDirector + ZoneTrigger, SaveSystem, the profile / economy / save v2, the garage, the authoring foundations (GameplayEvents, DataTable, MarkerRegistry, WorldLedger), the campaign graph, the Activity runtime (how a mission is written and tested), RaceDirector; the AI FSM; EventBus; audio |
 | `docs/open-world-simulation.md` | Part E: zone streaming, ambient traffic + the lane graph, traffic by region (traffic.json) + the idle-car recycle + the three car tiers, the old terrain/seam notes, StimulusManager, AISquad |
 | `docs/combat.md` | weapons (spread, two-stage trace, the long-ray fix, networked shots/melee/projectiles, damage, VFX, throwables, the blocked-muzzle hint), glass, ladders |
 | `docs/enforcement.md` | wanted level, dispatch, gang hangouts, escalation, recovery outcomes, co-op correctness batch |

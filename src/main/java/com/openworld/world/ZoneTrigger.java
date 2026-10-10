@@ -212,7 +212,7 @@ public class ZoneTrigger extends Area3D {
 		if (!requiresBeat.isEmpty() && dir.beatFireCount(requiresBeat) == 0) {
 			return "waiting on beat '" + requiresBeat + "'";
 		}
-		if (!requiredMissionId.isEmpty() && !requiredMissionId.equals(activeMissionId())) {
+		if (!requiredMissionId.isEmpty() && !requiredMissionId.equals(activeMissionId()) && !activityRunning(requiredMissionId)) {
 			return "mission '" + requiredMissionId + "' is not active";
 		}
 		return null;
@@ -232,6 +232,13 @@ public class ZoneTrigger extends Area3D {
 		if (c == null) return "not a character";
 		String r = refusalFor(c);
 		return r == null ? "" : r;
+	}
+
+	/** Is this an ACTIVITY that is running (PLAN.md 2.1)? On the host the runtime knows; a client's answer is the
+	 *  mission mirror above, which the host's start / end events keep. */
+	private static boolean activityRunning(String id) {
+		com.openworld.game.activity.ActivityRuntime rt = com.openworld.game.activity.ActivityRuntime.get();
+		return rt != null && rt.isRunning(id);
 	}
 
 	private String activeMissionId() {

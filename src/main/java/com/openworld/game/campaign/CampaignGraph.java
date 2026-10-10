@@ -29,8 +29,10 @@ public final class CampaignGraph {
     private final Set<String> endings;
     private final List<String> buildProblems;
     private final boolean openEnded;
+    private final List<GameOverRule> gameOverRules;
 
     CampaignGraph(CampaignBuilder b) {
+        gameOverRules = List.copyOf(b.gameOverRules.values());
         flags = new LinkedHashMap<>(b.flags);
         activities = new LinkedHashMap<>(b.activities);
         endings = new LinkedHashSet<>(b.endings);
@@ -44,6 +46,7 @@ public final class CampaignGraph {
     public List<ActivityDef> activities() { return new ArrayList<>(activities.values()); }
     public Set<String> endings() { return new LinkedHashSet<>(endings); }
     public boolean isOpenEnded() { return openEnded; }
+    public List<GameOverRule> gameOverRules() { return gameOverRules; }
     List<String> buildProblems() { return buildProblems; }
 
     /** The key a completion is remembered by (the same shape MissionDirector's variant keys had). */

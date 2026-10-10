@@ -13,6 +13,7 @@ public final class CampaignBuilder {
     final Map<String, FlagKey> flags = new LinkedHashMap<>();
     final Map<String, ActivityDef> activities = new LinkedHashMap<>();
     final Set<String> endings = new LinkedHashSet<>();
+    final Map<String, GameOverRule> gameOverRules = new LinkedHashMap<>();
     final List<String> problems = new ArrayList<>();
     boolean openEnded;
     private String module = "?";
@@ -40,6 +41,13 @@ public final class CampaignBuilder {
     /** Declare an ending; some activity's variant must reach it with {@link Effect#ending}. */
     public CampaignBuilder ending(String id) {
         endings.add(id);
+        return this;
+    }
+
+    /** Declare one of the few hard game overs (CR4); judged per player by {@link GameOverWatch}. */
+    public CampaignBuilder gameOverRule(GameOverRule rule) {
+        if (gameOverRules.putIfAbsent(rule.id(), rule) != null) problems.add(module + ": game-over rule '" + rule.id() + "' is declared twice");
+        if (rule.graceSeconds() <= 0) problems.add(module + ": game-over rule '" + rule.id() + "' has no grace period");
         return this;
     }
 

@@ -140,5 +140,19 @@ func _initialize() -> void:
 	_move(p, held_at + Vector3(120, 0, 0))
 	await _tick(60)
 	_check(not bool(gs.call("captive_now", pid)), "past escape_free they are free")
+
+	# 5. abducted on a LOW standing, and they stand still: nothing happens; then they shoot: the guards answer at once
+	#    (user 2026-10-10: "should not act unless the character moves past the original point or starts to attack")
+	gs.call("set_gang_stars_now", pid, "gang_a", 1)
+	r = await _go_down(p)
+	p = r[1]
+	_check(bool(gs.call("captive_now", pid)) and not bool(fm.call("hostile_now", "gang_a", "player")),
+			"held again on a low standing, and the gang is not hostile")
+	await _tick(240)
+	_check(not bool(gs.call("escaping_now", pid)) and not bool(fm.call("hostile_now", "gang_a", "player")),
+			"standing there for 4 s changes nothing")
+	gs.call("publish_shot_now", pid)
+	_check(bool(gs.call("escaping_now", pid)) and bool(fm.call("hostile_now", "gang_a", "player")),
+			"a captive who fires is attacked at once, whatever the standing (%d star)" % int(gs.call("gang_stars_now", pid, "gang_a")))
 	print("RESULT %s (%d failures)" % ["PASS" if fails == 0 else "FAIL", fails])
 	quit(0 if fails == 0 else 1)

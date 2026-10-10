@@ -438,9 +438,24 @@ public class MissionDirector extends Node {
         return missionId + "#" + (outcomeVariant == null ? "" : outcomeVariant);
     }
 
+    /**
+     * Is this id an ACTIVITY of the campaign graph (PLAN.md 2.1)? Then its progress is each player's own -- their
+     * profile, credited by {@code ActivityResult} -- and the sets below, one global copy every peer advanced from
+     * the host's {@code missionCompleted}, do not hold it. They remain for the legacy {@code MissionInfo} missions.
+     */
+    private static boolean inGraph(String missionId) {
+        return com.openworld.game.campaign.content.CampaignModules.graph().activity(missionId) != null;
+    }
+
+    private static com.openworld.game.campaign.CampaignView localStory() {
+        return new com.openworld.game.campaign.LiveCampaign(com.openworld.game.profile.Profiles.local(),
+                com.openworld.game.WorldLedger.get());
+    }
+
     @Register
     public void onMissionCompleted(String missionId, String winningFaction, String outcomeVariant) {
         clearMissionEntities();
+        if (inGraph(missionId)) return;
         completedMissions.add(missionId);
         String key = variantKey(missionId, outcomeVariant);
         // Idempotent on variant: a replay that reaches a variant already in the set changes nothing —
@@ -464,6 +479,9 @@ public class MissionDirector extends Node {
     /** True when the mission may start — a mission nobody declared a requirement for is open. */
     @Register
     public boolean isMissionUnlocked(String missionId) {
+        // a campaign activity: DERIVED from this machine's player's story and the world (never "nobody declared it")
+        if (inGraph(missionId))
+            return com.openworld.game.campaign.content.CampaignModules.graph().activity(missionId).requirement().test(localStory());
         List<String> req = unlockRequirements.get(missionId);
         if (req == null || req.isEmpty()) return true;
         return unlocked.contains(missionId);
@@ -495,6 +513,7 @@ public class MissionDirector extends Node {
     /** True when {@code (missionId, variant)} has ever been achieved. */
     @Register
     public boolean hasAchieved(String missionId, String outcomeVariant) {
+        if (inGraph(missionId)) return localStory().achieved(missionId, outcomeVariant == null ? "" : outcomeVariant);
         return achievedVariants.contains(variantKey(missionId, outcomeVariant));
     }
 
@@ -503,7 +522,9 @@ public class MissionDirector extends Node {
     public int achievedVariantCount() { return achievedVariants.size(); }
 
     @Register
-    public boolean hasCompleted(String missionId) { return completedMissions.contains(missionId); }
+    public boolean hasCompleted(String missionId) {
+        return inGraph(missionId) ? localStory().achieved(missionId, "") : completedMissions.contains(missionId);
+    }
 
     /**
      * Grant a story-wide unique item exactly once: true the first time, false ever after. Ordinary

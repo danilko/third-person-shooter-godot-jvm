@@ -82,6 +82,37 @@ public class GameManager extends Node {
     @Override
     public void _input(godot.api.InputEvent event) {
         com.openworld.control.InputDevice.note(event);
+        if (event instanceof godot.api.InputEventKey k && k.isPressed() && !k.isEcho() && k.getKeycode() == godot.core.Key.QUOTELEFT)
+            toggleConsole();
+    }
+
+    /**
+     * Backtick opens the debug console in the REAL game too (user, 2026-10-10: "so it can help to debug" -- frame
+     * spikes, thin traffic). The F-key spawn harness stays out of World.tscn (user, 2026-10-09); only the command
+     * line is here. A scene with a DebugHarness has its own console on the same key, so this one stays out of it.
+     */
+    private com.openworld.debug.DebugConsole console;
+
+    private void toggleConsole() {
+        Node scene = getTree() == null ? null : getTree().getCurrentScene();
+        if (scene == null || scene.findChild("DebugHarness", true, false) != null) return;
+        if (!(scene.findChild("Player", true, false) instanceof Player)) return;   // the title screen has no world
+        if (console == null || !GD.isInstanceValid(console)) {
+            console = new com.openworld.debug.DebugConsole();
+            scene.addChild(console);
+        }
+        console.toggle();
+    }
+
+    /** Probe entry: what the backtick key does. True when a console is open afterwards. */
+    @Register public boolean toggleConsoleNow() {
+        toggleConsole();
+        return console != null && GD.isInstanceValid(console) && console.isOpen();
+    }
+
+    /** Run one console line and return what it printed -- probes. */
+    @Register public String consoleRunNow(String line) {
+        return console != null && GD.isInstanceValid(console) ? console.runLine(line) : "";
     }
 
     /** Probe readout / override: the device the human is on ("PAD" / "KEYBOARD_MOUSE"). */
@@ -492,6 +523,7 @@ public class GameManager extends Node {
                 net.sendBaselineVehicleOccupancy(peerId);
                 // Runtime faction-relationship flips (per-character factions ride sendBaselineSpawns).
                 if (getMissionManager() != null) getMissionManager().sendBaseline(peerId);   // a running mission (1b)
+                if (com.openworld.game.activity.ActivityRuntime.get() != null) com.openworld.game.activity.ActivityRuntime.get().sendBaseline(peerId);
                 net.sendBaselineFactionRelationships(peerId);
                 net.sendBaselineBreakables(peerId);   // already-broken destructibles (I2)
                 net.sendBaselineRace(peerId);   // a race already in progress (R2)
@@ -513,6 +545,7 @@ public class GameManager extends Node {
             net.sendBaselineInventories(peerId);   // after spawns + pickups — see rejoin branch
             net.sendBaselineVehicleOccupancy(peerId);   // occupied vehicles after spawns (N3)
             if (getMissionManager() != null) getMissionManager().sendBaseline(peerId);   // a running mission (1b)
+                if (com.openworld.game.activity.ActivityRuntime.get() != null) com.openworld.game.activity.ActivityRuntime.get().sendBaseline(peerId);
             net.sendBaselineFactionRelationships(peerId);   // runtime relationship flips (D3)
             net.sendBaselineBreakables(peerId);   // already-broken destructibles (I2)
             net.sendBaselineRace(peerId);   // a race already in progress (R2)

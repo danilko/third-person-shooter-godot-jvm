@@ -36,6 +36,14 @@ public final class PlayerProfile {
     public final CampaignState campaign = new CampaignState();
     public final List<VehicleInstanceData> vehicles = new ArrayList<>();
     public final Set<String> unlocks = new LinkedHashSet<>();
+    /** The checkpoint of the activity run this player OWNS (CR5, {@code ActivityCheckpoint.toMap}); null = none. */
+    public Map<String, Object> activityCheckpoint;
+    /** The profile as it was at the last CAMPAIGN checkpoint (CR4): what a game over rolls this player back to.
+     *  Null until the first one. */
+    private Map<String, Object> checkpointSnapshot;
+    /** Counts the checkpoints taken. The snapshot itself never crosses the wire (a profile must fit one packet):
+     *  the host's copy carries this, and the owner takes their own snapshot when it moves ({@link #copyFrom}). */
+    private long checkpointSeq;
     /** Keys this build does not know, kept verbatim. */
     private final Map<String, Object> unknown = new LinkedHashMap<>();
     /** Bumped on every change (Economy, a vehicle bought); the save coalesces on it, the host sends on it. */
@@ -62,6 +70,45 @@ public final class PlayerProfile {
         return null;
     }
 
+    // ── the campaign checkpoint (CR4) ──
+
+    /** Remember the profile as it is now: balance, debts, career, story, cars, unlocks. */
+    public void takeCheckpoint() {
+        Map<String, Object> m = toMap();
+        m.remove("checkpoint_snapshot");
+        m.remove("activity_checkpoint");
+        checkpointSnapshot = m;
+        checkpointSeq++;
+        touch();
+    }
+
+    /** {@link #toMap} as it is SENT (MSG_PROFILE): without the checkpoint snapshot, which would double it. */
+    public Map<String, Object> toWireMap() {
+        Map<String, Object> m = toMap();
+        m.remove("checkpoint_snapshot");
+        return m;
+    }
+
+    public boolean hasCheckpoint() { return checkpointSnapshot != null; }
+
+    /**
+     * A game over: this profile goes back to its last campaign checkpoint -- the WORLD is not rolled back, and the
+     * checkpoint itself stays (the next game over lands here again). False, changing nothing, when there is none.
+     */
+    public boolean rollbackToCheckpoint() {
+        if (checkpointSnapshot == null) return false;
+        Map<String, Object> keep = checkpointSnapshot;
+        String id = playerId;
+        long seq = checkpointSeq;
+        copyFrom(fromMap(keep));
+        playerId = id;
+        checkpointSnapshot = keep;
+        checkpointSeq = seq;
+        activityCheckpoint = null;
+        touch();
+        return true;
+    }
+
     // ── the file shape ──
 
     public Map<String, Object> toMap() {
@@ -84,6 +131,9 @@ public final class PlayerProfile {
         for (VehicleInstanceData v : vehicles) vs.add(v.toMap());
         m.put("vehicles", vs);
         m.put("unlocks", new ArrayList<>(unlocks));
+        if (activityCheckpoint != null) m.put("activity_checkpoint", new LinkedHashMap<>(activityCheckpoint));
+        if (checkpointSnapshot != null) m.put("checkpoint_snapshot", new LinkedHashMap<>(checkpointSnapshot));
+        if (checkpointSeq != 0) m.put("checkpoint_seq", checkpointSeq);
         for (Map.Entry<String, Object> e : unknown.entrySet()) m.putIfAbsent(e.getKey(), e.getValue());
         return m;
     }
@@ -94,7 +144,8 @@ public final class PlayerProfile {
         if (m == null) return p;
         for (Map.Entry<String, Object> e : m.entrySet()) {
             switch (e.getKey()) {
-                case "version", "player_id", "balance", "debts", "career", "campaign", "vehicles", "unlocks" -> { }
+                case "version", "player_id", "balance", "debts", "career", "campaign", "vehicles", "unlocks",
+                     "activity_checkpoint", "checkpoint_snapshot", "checkpoint_seq" -> { }
                 default -> p.unknown.put(e.getKey(), e.getValue());
             }
         }
@@ -112,6 +163,9 @@ public final class PlayerProfile {
             if (v != null) p.vehicles.add(v);
         }
         for (Object o : Maps.list(m, "unlocks")) if (o instanceof String s) p.unlocks.add(s);
+        p.activityCheckpoint = Maps.map(m.get("activity_checkpoint"));
+        p.checkpointSnapshot = Maps.map(m.get("checkpoint_snapshot"));
+        p.checkpointSeq = Maps.lng(m, "checkpoint_seq", 0);
         return p;
     }
 
@@ -127,6 +181,18 @@ public final class PlayerProfile {
         for (VehicleInstanceData v : other.vehicles) vehicles.add(VehicleInstanceData.fromMap(v.toMap()));
         unlocks.clear();
         unlocks.addAll(other.unlocks);
+        activityCheckpoint = other.activityCheckpoint == null ? null : new LinkedHashMap<>(other.activityCheckpoint);
+        // the snapshot does not travel: a copy that arrives without one keeps mine, and one whose checkpoint count
+        // moved on (the host took a checkpoint of this very state) is the moment to take my own
+        boolean moved = other.checkpointSeq > checkpointSeq;
+        if (other.checkpointSnapshot != null) checkpointSnapshot = new LinkedHashMap<>(other.checkpointSnapshot);
+        else if (moved) {
+            Map<String, Object> now = toMap();
+            now.remove("checkpoint_snapshot");
+            now.remove("activity_checkpoint");
+            checkpointSnapshot = now;
+        }
+        checkpointSeq = Math.max(checkpointSeq, other.checkpointSeq);
         unknown.clear();
         unknown.putAll(other.unknown);
         touch();

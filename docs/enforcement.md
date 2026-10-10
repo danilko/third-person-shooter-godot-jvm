@@ -352,3 +352,18 @@ route's legs are not clear (`wayClear`), and never sends anyone to a null door. 
 doors island-wide). Gate: probe_breach (default and `--stars=3`), and the fragile spawn case passes too.
 Re-run `island_buildings.py places` after any building change.
 
+### Captors act on what the captive DOES (user, 2026-10-10)
+
+"Sometimes the gang attacks, or does not, at the spawn point whatever I do, even just standing there": three defects
+in `GangSystem`, all in which gangs are hostile to players (`applyFlips`, one owner now):
+- **They fired on a captive who stood still.** `hold()` only took effect at the next half-second pass, and the standing
+  that got the player abducted is usually an attacking one -- so the guards were born hostile and could open fire
+  first. `hold()` applies the flips at once, before `EnforcementDispatch.guard` spawns anybody.
+- **They did not answer an escape.** Past `escape_start` the guards' ArrestState is released, but they only shot if
+  the STANDING was at `attack_at`; a player abducted on one star walked away. A gang whose captive is `escaping` is
+  hostile whatever the standing.
+- **They did not answer being shot.** A captive who fires (`WeaponFired`), or hurts / kills a member of the gang
+  holding them, is `escaping` from that event on -- not at the next pass.
+So: held and standing there = nothing happens, for as long as it lasts; leave the spot or attack = they act.
+`probe_recovery.gd` case 5 (a low standing: 4 s standing still changes nothing; one shot makes the gang hostile in the
+same frame).

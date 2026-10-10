@@ -37,6 +37,15 @@ public class FrontEnd extends Node {
             var director = com.openworld.game.mission.MissionDirector.get();
             if (director != null) director.resetCampaign();
         }
+        // NEW GAME is a new story too (PLAN.md 2.1): the campaign lives in the player's profile now, and a new world
+        // with every mission already done would have nothing to start. Money, cars and career records are the
+        // player's and stay. Hosting does not reset it: a player brings their story into the world they host.
+        if (pending == Action.NONE) {
+            var profile = com.openworld.game.profile.Profiles.local();
+            profile.campaign.reset();
+            profile.activityCheckpoint = null;
+            profile.touch();
+        }
         from.getTree().changeSceneToFile(WORLD);
     }
 

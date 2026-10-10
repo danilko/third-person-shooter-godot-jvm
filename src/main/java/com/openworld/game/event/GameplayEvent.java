@@ -13,13 +13,16 @@ package com.openworld.game.event;
  */
 public sealed interface GameplayEvent permits GameplayEvent.Damaged, GameplayEvent.Killed, GameplayEvent.WeaponFired,
         GameplayEvent.Threatened, GameplayEvent.Theft, GameplayEvent.ZoneEntered, GameplayEvent.BalanceChanged,
-        GameplayEvent.FlagChanged {
+        GameplayEvent.FlagChanged, GameplayEvent.ActivityOutcome {
 
     /** Who did it ({@link Actor#NONE} when nobody did: a balance change, a flag). */
     Actor actor();
 
     /** Where ({@link Spot#NOWHERE} when it has no place). */
     Spot at();
+
+    /** Whom it was done to ({@link Actor#NONE} for an event with nobody on the receiving end). */
+    default Actor target() { return Actor.NONE; }
 
     /** {@code target} was hurt by {@code actor} and lived. */
     record Damaged(Actor actor, Actor target, Spot at, double amount, boolean headshot, String weapon) implements GameplayEvent {}
@@ -51,6 +54,13 @@ public sealed interface GameplayEvent permits GameplayEvent.Damaged, GameplayEve
     /** A WORLD flag changed in the ledger ({@code value} "" = cleared). */
     record FlagChanged(String flag, String value) implements GameplayEvent {
         @Override public Actor actor() { return Actor.NONE; }
+        @Override public Spot at() { return Spot.NOWHERE; }
+    }
+
+    /** An activity run ended (PLAN.md 2.1): {@code actor} is its OWNER, {@code outcome} COMPLETED / FAILED /
+     *  ABORTED, {@code variant} the outcome variant of a completed one, {@code mode} STORY / REPLAY. */
+    record ActivityOutcome(Actor actor, String activityId, String instanceId, String outcome, String variant,
+                           String mode) implements GameplayEvent {
         @Override public Spot at() { return Spot.NOWHERE; }
     }
 }

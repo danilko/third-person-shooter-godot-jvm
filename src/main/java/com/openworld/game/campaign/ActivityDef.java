@@ -4,6 +4,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
+
+import com.openworld.game.activity.Activity;
 
 /**
  * One node of the campaign graph (PLAN.md 2.1 / CR1): an activity's id, when it may be started, the variants it can
@@ -28,6 +31,7 @@ public final class ActivityDef {
     boolean sticky;
     boolean repeatable;
     boolean planned;
+    Supplier<? extends Activity> script;
     final Map<String, List<Effect>> variants = new LinkedHashMap<>();
 
     ActivityDef(String id) { this.id = id; }
@@ -53,6 +57,20 @@ public final class ActivityDef {
     /** Declared so other nodes can name it, but NOT AUTHORED yet: never available, and the lint says so in its
      *  notes instead of asking for variants. Remove it when the activity exists. */
     public ActivityDef planned() { planned = true; return this; }
+
+    /** The class that RUNS it (CR6: declared by class, {@code .runs(KonbiniActivity::new)}); a new one per run. */
+    public ActivityDef runs(Supplier<? extends Activity> s) { script = s; return this; }
+
+    /** A fresh run of its class, or null when nothing runs it yet. */
+    public Activity newRun() { return script == null ? null : script.get(); }
+
+    public boolean hasScript() { return script != null; }
+
+    /** Does any variant change the WORLD (a guest owner then needs the host's consent)? */
+    public boolean altersWorld() {
+        for (List<Effect> es : variants.values()) for (Effect e : es) if (e.world()) return true;
+        return false;
+    }
 
     /** An outcome it can end with and what that changes. */
     public ActivityDef variant(String variant, Effect... effects) {

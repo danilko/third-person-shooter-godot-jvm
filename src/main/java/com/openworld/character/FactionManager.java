@@ -54,6 +54,13 @@ public class FactionManager extends Node {
      * (a new game / full restart) and replaced by a save load.
      */
     private final java.util.LinkedHashMap<String, String> campaign = new java.util.LinkedHashMap<>();
+    /**
+     * The ACTIVITY overlays (PLAN.md 2.1 / AR1): the rows each running activity asked for, by run. Laid over
+     * everything else -- N activities at once, where the mission layer was one table swapped for the whole island --
+     * and removed with their run. Rows are {factionA, factionB, relationship}, applied both ways. Host only:
+     * hostility is decided where the AI is.
+     */
+    private final java.util.LinkedHashMap<String, java.util.List<String[]>> activityOverlays = new java.util.LinkedHashMap<>();
     /** Layer set by the nearest region (I4), or null for the shipped defaults. */
     private FactionTable regionTable;
     /** Layer set by the active mission (F2), or null. While set it wins over the region's. */
@@ -96,7 +103,41 @@ public class FactionManager extends Node {
                 table.setRelationship(e.getKey().substring(0, split), e.getKey().substring(split + 1), e.getValue());
             }
         }
+        for (java.util.List<String[]> rows : activityOverlays.values()) {
+            for (String[] r : rows) {
+                if (table == null) table = new FactionTable();
+                table.setRelationship(r[0], r[1], r[2]);
+                table.setRelationship(r[1], r[0], r[2]);
+            }
+        }
     }
+
+    /** A layer change that KEEPS the runtime flips (an activity starting or ending is not a new mission table). */
+    private void rebuildKeepingFlips() {
+        java.util.LinkedHashMap<String, String> flips = new java.util.LinkedHashMap<>(runtimeFlips);
+        rebuildLiveTable();
+        for (Map.Entry<String, String> e : flips.entrySet()) {
+            int split = e.getKey().indexOf('>');
+            if (table == null) table = new FactionTable();
+            table.setRelationship(e.getKey().substring(0, split), e.getKey().substring(split + 1), e.getValue());
+            runtimeFlips.put(e.getKey(), e.getValue());
+        }
+    }
+
+    /** Lay (or, with no rows, remove) one activity run's relationships over the live table. */
+    public void setActivityOverlay(String runId, java.util.List<String[]> rows) {
+        if (runId == null) return;
+        if (rows == null || rows.isEmpty()) {
+            if (activityOverlays.remove(runId) == null) return;
+        } else {
+            activityOverlays.put(runId, java.util.List.copyOf(rows));
+        }
+        rebuildKeepingFlips();
+    }
+
+    /** How many activity runs have an overlay now -- probe readout. */
+    @Register
+    public int activityOverlaysNow() { return activityOverlays.size(); }
 
     /** Restore the shipped defaults, discarding all runtime flips AND both layers. Call on full restart. */
     @Register
@@ -104,6 +145,7 @@ public class FactionManager extends Node {
         regionTable = null;
         missionTable = null;
         campaign.clear();
+        activityOverlays.clear();
         rebuildLiveTable();
     }
 

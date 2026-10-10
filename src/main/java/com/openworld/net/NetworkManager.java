@@ -1346,7 +1346,7 @@ public class NetworkManager extends Node {
             localPeerId = id.assignedPeerId();
             GD.print("NetworkManager: assigned local peer id " + localPeerId);
             // the profile handshake (PLAN.md 1.4, AR2): what this player owns travels with them to the host's world
-            String json = com.openworld.util.MiniJson.write(com.openworld.game.profile.Profiles.local().toMap());
+            String json = com.openworld.util.MiniJson.write(com.openworld.game.profile.Profiles.local().toWireMap());
             if (json.length() <= MAX_PROFILE_BYTES) {
                 sendMessage(SERVER_PEER_ID, NetMessageCodec.encodeProfile(MSG_PROFILE, json));
                 com.openworld.net.NetStats.increment("profile_sent");
@@ -1418,7 +1418,7 @@ public class NetworkManager extends Node {
             if (rp == null) continue;
             Long sent = profileSentRevision.get(s.characterId);
             if (sent != null && sent == rp.revision()) continue;
-            String json = com.openworld.util.MiniJson.write(rp.toMap());
+            String json = com.openworld.util.MiniJson.write(rp.toWireMap());
             if (json.length() > MAX_PROFILE_BYTES) continue;
             sendMessage(s.peerId, NetMessageCodec.encodeProfile(MSG_PROFILE, json));
             profileSentRevision.put(s.characterId, rp.revision());

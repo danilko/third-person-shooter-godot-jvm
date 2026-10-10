@@ -80,6 +80,79 @@ public class DebugConsole extends CanvasLayer {
         print("debug console — type 'help'");
     }
 
+    /** The debug HUD: the harness's where there is one (the debug scenes), this console's own in the real game. */
+    private PerfDebugOverlay ownHud;
+
+    private PerfDebugOverlay hud() {
+        if (getParent() instanceof DebugHarness h) return h.hud();
+        if (ownHud == null || !GD.isInstanceValid(ownHud)) {
+            ownHud = new PerfDebugOverlay();
+            getParent().addChild(ownHud);
+            ownHud.setLevel(0);
+        }
+        return ownHud;
+    }
+
+    /** Where the simulated cars are round the local player: the numbers behind "I rarely see a car". */
+    private void traffic() {
+        com.openworld.character.Player me = null;
+        for (com.openworld.character.Player q : PlayerRegistry.getPlayers()) if (GD.isInstanceValid(q) && q.isLocallyOwnedPlayer()) me = q;
+        com.openworld.world.ZoneManager zm = com.openworld.world.ZoneManager.get();
+        if (me == null || zm == null) { print("no player / no ZoneManager"); return; }
+        Vector3 at = me.getGlobalPosition();
+        // the way the CAMERA looks is what "in front" means to the person asking
+        godot.api.Camera3D cam = getViewport() == null ? null : getViewport().getCamera3d();
+        Vector3 fwd = cam != null ? cam.getGlobalTransform().getBasis().getColumn(2).times(-1.0) : new Vector3(0, 0, -1);
+        double fx = fwd.getX(), fz = fwd.getZ(), fl = Math.max(1e-6, Math.hypot(fx, fz));
+        fx /= fl; fz /= fl;
+        int n60 = 0, n100 = 0, n200 = 0, all = 0, moving = 0;
+        int[] side = new int[4];   // ahead, right, behind, left -- within 200 m
+        for (godot.api.Node n : getTree().getNodesInGroup(new StringName("characters"))) {
+            if (!(n instanceof com.openworld.carrier.vehicle.Vehicle v) || !GD.isInstanceValid(v)) continue;
+            double dx = v.getGlobalPosition().getX() - at.getX(), dz = v.getGlobalPosition().getZ() - at.getZ();
+            double d = Math.hypot(dx, dz);
+            all++;
+            if (v.getLinearVelocity().length() > 1.0) moving++;
+            if (d <= 60) n60++;
+            if (d <= 100) n100++;
+            if (d > 200) continue;
+            n200++;
+            double ahead = dx * fx + dz * fz, right = dx * -fz + dz * fx;
+            side[Math.abs(ahead) >= Math.abs(right) ? (ahead >= 0 ? 0 : 2) : (right >= 0 ? 1 : 3)]++;
+        }
+        print("cars (every vehicle body, parked ones too): " + all + " loaded, " + moving + " moving; within 60 m " + n60
+                + ", 100 m " + n100 + ", 200 m " + n200);
+        print("within 200 m by side of the camera: ahead " + side[0] + ", right " + side[1] + ", behind " + side[2] + ", left " + side[3]);
+        print("traffic: " + zm.trafficAliveNow() + " alive of a budget of " + zm.effectiveTrafficBudgetNow() + ", "
+                + zm.trafficSpawnsRefusedNow() + " spawns refused near a player, " + zm.trafficRecycledNow() + " recycled, far tier "
+                + zm.farTrafficCarsNow());
+        print("region " + zm.trafficRegionNow() + "; models " + zm.trafficModelsNow());
+    }
+
+    private void activity(String[] a) {
+        com.openworld.game.activity.ActivityRuntime rt = com.openworld.game.activity.ActivityRuntime.get();
+        if (rt == null) { print("no ActivityRuntime"); return; }
+        if (a.length < 2) {
+            String running = rt.runningIdsNow();
+            print(running.isEmpty() ? "no activity is running" : "running: " + running);
+            for (String id : running.isEmpty() ? new String[0] : running.split(","))
+                print("  " + id + " stage " + rt.stageNow(id) + ", " + rt.participantsNow(id));
+            if (!rt.offeredNow().isEmpty()) print("on offer: " + rt.offeredNow());
+            if (!rt.activityCheckpointNow().isEmpty()) print("can retry: " + rt.activityCheckpointNow());
+            return;
+        }
+        String id = a.length >= 3 ? a[2] : "";
+        String r = switch (a[1]) {
+            case "start" -> rt.startNow(id, "STORY");
+            case "replay" -> rt.startNow(id, "REPLAY");
+            case "retry" -> rt.retryNow();
+            case "why" -> rt.whyNotNow(id, "STORY") + " / replay: " + rt.whyNotNow(id, "REPLAY");
+            case "abort" -> { rt.abortNow(id); yield ""; }
+            default -> "start | replay | retry | abort | why";
+        };
+        print(r.isEmpty() ? "ok" : r);
+    }
+
     // ── Open / close ──────────────────────────────────────────────────────────
 
     /** Toggle the console. Called by {@code DebugHarness} on the backtick key. */
@@ -115,6 +188,15 @@ public class DebugConsole extends CanvasLayer {
     }
 
     // ── Output ────────────────────────────────────────────────────────────────
+
+    /** Run one line as if typed, and return what it printed (probes; the console need not be open). */
+    public String runLine(String text) {
+        on_submit(text);
+        java.util.List<String> now = new java.util.ArrayList<>(lines);
+        // the history is a bounded window: what is new is what follows the echoed "> line"
+        int at = now.lastIndexOf("> " + text);
+        return at < 0 ? "" : String.join("\n", now.subList(at + 1, now.size()));
+    }
 
     private void print(String line) {
         lines.addLast(line);
@@ -163,6 +245,8 @@ public class DebugConsole extends CanvasLayer {
                 print("save [slot]                            write the campaign save (default 1)");
                 print("load [slot]                            restore it (default 1)");
                 print("hud [0-3]                              debug HUD: off / FPS / perf + graph / + game state");
+                print("traffic                                cars round you now: by distance, by side, budget, region mix");
+                print("activity [start|replay|retry|abort|why <id>]   the running activities; start / replay / retry one");
                 print("where                                  the bug-report line (postal code, position, zone, road)");
                 print("postal <x-y[-s]> [tp]                  waypoint (or teleport) to a postal code, e.g. postal 12-7-5");
                 print("tp <x> <y> <z>                         teleport the local player (host / single player)");
@@ -258,10 +342,12 @@ public class DebugConsole extends CanvasLayer {
             case "drop" -> drop(a);
             case "ammo" -> ammo();
             case "hud" -> {
-                if (!(getParent() instanceof DebugHarness h)) { print("no DebugHarness"); break; }
-                if (a.length >= 2) h.hud().setLevel(Integer.parseInt(a[1]));
-                print("hud level " + h.hud().levelNow());
+                PerfDebugOverlay hud = hud();
+                if (a.length >= 2) hud.setLevel(Integer.parseInt(a[1]));
+                print("hud level " + hud.levelNow());
             }
+            case "traffic" -> traffic();
+            case "activity" -> activity(a);
             case "unlock" -> {
                 need(a, 2);
                 if (director == null) { print("no MissionDirector"); return; }

@@ -23,6 +23,9 @@ public final class CampaignState {
     public String checkpoint = "";
     public long contentVersion;
 
+    /** A new story: nothing done, nothing set. */
+    public void reset() { read(null); }
+
     Map<String, Object> toMap() {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("flags", new LinkedHashMap<>(flags));

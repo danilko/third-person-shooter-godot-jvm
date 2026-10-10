@@ -1,13 +1,15 @@
 extends SceneTree
-## PLAN.md 4.8 gate: the konbini job (`game.mission.KonbiniMission`, `game/mission/M01_Konbini.tscn`, placed in
-## World.tscn's downtown under `Missions`) plays end to end in the real world, both outcome variants.
+## PLAN.md 4.8 gate, and TIER 2 of the mission test kit for the reference activity (PLAN.md 2.1): the konbini job
+## (`game.campaign.content.KonbiniActivity` on the activity framework, placed by `game.mission.KonbiniMission` /
+## `game/mission/M01_Konbini.tscn` in World.tscn's downtown under `Missions`) plays end to end in the real world,
+## both outcome variants. Its stage graph alone is tier 1, `KonbiniActivityTest`.
 ##
 ##   stdbuf -oL godot --headless --path . --script tools/godot/probe_konbini_mission.gd -- --case=kill|spare
 ##
 ## World.tscn, the real AutoLoads and streaming. The player is set down 40 m from the shop, so the crew's zone
 ## streams its three named characters (neutral, story characters); then walks into the start trigger (a teleport
-## into the Area3D, which fires body_entered like a walk); the mission starts through the director and the crew
-## turns gang_a. The crew is killed and the boss wounded past half health through the ordinary damage paths
+## into the Area3D, which fires body_entered like a walk -> GameplayEvent.ZoneEntered); the activity starts for that
+## player through the ActivityDirector and the crew turns gang_a. The crew is killed and the boss wounded past half health through the ordinary damage paths
 ## (VehicleProbeHelper.kill / weaponHit -> ImpactManager.processHit), and he must surrender (neutral, fleeing).
 ## --case=kill shoots him anyway -> BOSS_KILLED and m02_informant stays locked; --case=spare waits -> BOSS_SPARED and
 ## m02_informant opens. `-- --control` sets the surrender threshold to 0: the boss never surrenders, and the spare
@@ -67,6 +69,9 @@ func _initialize() -> void:
 	await process_frame
 	var dir: Node = root.get_node("MissionDirector")
 	var mm: Node = root.get_node("MissionManager")
+	var rt: Node = root.get_node("ActivityRuntime")
+	var saves: Node = root.get_node("SaveSystem")
+	var factions: Node = root.get_node("FactionManager")
 	root.get_node("EventBus").connect("mission_completed", _on_completed)
 	var helper: Node = load("res://src/main/java/com/openworld/debug/VehicleProbeHelper.java").new()
 	w.add_child(helper)
@@ -93,13 +98,33 @@ func _initialize() -> void:
 	await _wait(func(): return int(zm.call("streaming_pending_now")) == 0, 90.0)
 	check("the crew loiters neutral before the job", IDS.all(func(id): return _faction(id) == "neutral"),
 			str(IDS.map(func(id): return _faction(id))))
-	check("no mission is running yet", not mm.call("mission_active_now"))
+	check("no mission is running yet", not rt.call("running_now", MISSION) and not mm.call("mission_active_now"))
+	check("the player's story is new: the job may be started", str(rt.call("why_not_now", MISSION, "STORY")) == "",
+			str(rt.call("why_not_now", MISSION, "STORY")))
+	check("player and gang_a are not hostile before the job", not factions.call("hostile_now", "player", "gang_a"))
+	var balance_before := int(saves.call("profile_balance_now"))
 
 	# 2. walking into the trigger starts the job and turns the crew
 	player.global_position = at + Vector3(0, 1.2, -3)
-	var started := await _wait(func(): return mm.call("mission_active_now"), 3.0)
-	check("the trigger starts the mission through the director", started and mm.call("active_mission_id_now") == MISSION,
-			str(mm.call("active_mission_id_now")))
+	var offered := await _wait(func(): return str(rt.call("offered_now")) == MISSION, 3.0)
+	await _wait(func(): return false, 1.0)
+	check("walking into the trigger only OFFERS the job", offered and not rt.call("running_now", MISSION)
+			and IDS.all(func(id): return _faction(id) == "neutral"), "offered '%s'" % rt.call("offered_now"))
+	check("the offer is an interact prompt (E), and taking it starts the job", int(root.get_node("GameManager").call("interact_offers_now")) >= 1
+			and rt.call("accept_offer_now"), "%d prompt(s) on offer" % root.get_node("GameManager").call("interact_offers_now"))
+	var started := await _wait(func(): return rt.call("running_now", MISSION), 3.0)
+	check("the activity starts for the player", started
+			and str(rt.call("participants_now", MISSION)).ends_with(":OWNER:true"), str(rt.call("participants_now", MISSION)))
+	check("the legacy mission slot is not used", not mm.call("mission_active_now"))
+	check("the job's overlay makes player and gang_a hostile", factions.call("hostile_now", "player", "gang_a")
+			and int(factions.call("activity_overlays_now")) == 1)
+	check("the boss is the marked target, with a marker over him", str(rt.call("marked_now", MISSION)) == "m01_boss"
+			and rt.call("marker_on_now", "m01_boss"), str(rt.call("marked_now", MISSION)))
+	check("the objective is on screen, bright", str(rt.call("objective_now")) == "Take down Kaneda's crew"
+			and float(rt.call("objective_alpha_now")) > 0.95, "'%s' alpha %.2f" % [rt.call("objective_now"), rt.call("objective_alpha_now")])
+	check("the offer is gone once it is taken", str(rt.call("offered_now")) == "")
+	check("the FIGHT is the run's checkpoint, kept in the profile", str(rt.call("activity_checkpoint_now")) == MISSION + "/FIGHT",
+			str(rt.call("activity_checkpoint_now")))
 	check("the crew turns gang_a", IDS.all(func(id): return _faction(id) == "gang_a"), str(IDS.map(func(id): return _faction(id))))
 	check("the job is in its FIGHT phase", str(job.get("phase")) == "FIGHT", str(job.get("phase")))
 	# the shop is the `_Open` variant of its type: shut (locked) everywhere else, unlocked while the job runs
@@ -153,6 +178,7 @@ func _initialize() -> void:
 	var surrendered := await _wait(func(): return str(job.get("phase")) == "SURRENDER", 2.0)
 	check("wounded past half with no crew, the boss surrenders", surrendered,
 			"phase %s, boss health %.0f" % [job.get("phase"), boss.get_node("Health").call("health_now")])
+	check("the objective changes with the stage", str(rt.call("objective_now")).begins_with("Kaneda gives up"), str(rt.call("objective_now")))
 	if surrendered:
 		check("a surrendered boss is neutral and fleeing", _faction("m01_boss") == "neutral"
 				and str(dir.call("state_name_of", "m01_boss")) == "FLEE", "%s / %s" % [_faction("m01_boss"),
@@ -164,7 +190,20 @@ func _initialize() -> void:
 		helper.call("kill", boss)
 	var done := await _wait(func(): return not completed.is_empty(), 25.0)
 	check("the mission completes as %s" % want, done and completed[-1] == [MISSION, want], str(completed))
-	check("the director records the variant", dir.call("has_achieved", MISSION, want))
+	check("the player's own story records the variant", rt.call("achieved_now", MISSION, want) and dir.call("has_achieved", MISSION, want))
+	var res := str(rt.call("last_results_now"))
+	check("one result for the one participant, with story credit", res.begins_with("%s COMPLETED %s OWNER STORY credit=true world=%s" % [
+			MISSION, want, "true" if case == "kill" else "false"]), res)
+	check("the boss is %s in the world's ledger" % ("dead" if case == "kill" else "not dead"),
+			bool(saves.call("ledger_dead_now", "m01_boss")) == (case == "kill"))
+	var paid := int(saves.call("profile_balance_now")) - balance_before
+	check("the reward is paid to the participant's profile", paid > 0 and res.contains("pay=%d" % paid), "paid %d" % paid)
+	check("a campaign checkpoint was taken, the activity's is forgotten", rt.call("has_story_checkpoint_now")
+			and str(rt.call("activity_checkpoint_now")) == "", str(rt.call("activity_checkpoint_now")))
+	check("the overlay is gone with the job", int(factions.call("activity_overlays_now")) == 0
+			and not factions.call("hostile_now", "player", "gang_a"))
+	check("it cannot be started again", str(rt.call("why_not_now", MISSION, "STORY")) == "already completed",
+			str(rt.call("why_not_now", MISSION, "STORY")))
 	var unlocked: bool = dir.call("is_mission_unlocked", "m02_informant")
 	check("m02_informant is %s" % ("open" if case == "spare" else "still locked"), unlocked == (case == "spare"), str(unlocked))
 	check("the mission shop is locked again once the job is over", doors.size() > 0
@@ -172,6 +211,8 @@ func _initialize() -> void:
 	check("the always-open shop door is still open after the job", shop_doors.size() > 0
 			and shop_doors.all(func(d): return not bool(d.get("locked"))),
 			str(shop_doors.map(func(d): return d.get("locked"))))
+	check("the objective and the marker are gone with the job", str(rt.call("objective_now")) == "" and not rt.call("marker_on_now", "m01_boss"),
+			str(rt.call("objective_now")))
 	check("the job is DONE", str(job.get("phase")) == "DONE" and str(job.get("outcome")) == want,
 			"%s %s" % [job.get("phase"), job.get("outcome")])
 	print("RESULT %s (%d failure(s))" % ["PASS" if fails == 0 else "FAIL", fails])

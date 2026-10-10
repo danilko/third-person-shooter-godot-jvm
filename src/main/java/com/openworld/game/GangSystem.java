@@ -96,11 +96,23 @@ public class GangSystem extends Node {
         if (flipIn > 0) return;
         flipIn = 0.5;
         tickCaptivity();
+        applyFlips();
+    }
+
+    /**
+     * Which gangs are hostile to players NOW. By standing (attack_at stars), and then captivity decides (user,
+     * 2026-10-10: "should not act unless the character moves past the original point or starts to attack"):
+     * a gang HOLDING a player who has done neither is not hostile whatever the standing -- the guards stand over the
+     * captive -- and one whose captive ran or attacked IS hostile whatever the standing. The second half was
+     * missing: a player abducted on a low standing could walk away, or shoot a guard, and nobody answered.
+     */
+    private void applyFlips() {
+        if (rules == null) return;
         Set<String> want = new HashSet<>();
         for (Map.Entry<String, GangRules.State> e : states.entrySet())
             if (rules.attacks(e.getValue())) want.add(e.getKey().substring(e.getKey().indexOf('|') + 1));
-        // a gang holding a player who has not run does not shoot them (the guards stand over the captive)
         for (Captivity c : captive.values()) if (!c.escaping) want.remove(c.gang);
+        for (Captivity c : captive.values()) if (c.escaping) want.add(c.gang);
         flips.apply(getNodeOrNull("/root/FactionManager") instanceof com.openworld.character.FactionManager fm ? fm : null, want);
     }
 
@@ -127,9 +139,23 @@ public class GangSystem extends Node {
     /** The seam (PLAN.md 2.0 / AR3): a member hurt or killed, a protected clerk threatened, a gray till robbed --
      *  by a player, and not sanctioned by an activity. */
     private void onGameplayEvent(GameplayEvent e, GameplayEvents.Ruling ruling) {
+        captiveAttacked(e);
         if (ruling.sanctioned()) return;
         CrimeMap.GangCrime c = CrimeMap.gang(e, this::isGang);
         if (c != null) report(c.gang(), c.crimeId(), e.actor().id());
+    }
+
+    /** A captive who shoots, or hurts one of the gang holding them, has stopped being a captive who waits: the
+     *  guards answer at once (not at the next half-second pass). */
+    private void captiveAttacked(GameplayEvent e) {
+        Captivity c = captive.get(e.actor().id());
+        if (c == null || c.escaping) return;
+        boolean attack = e instanceof GameplayEvent.WeaponFired
+                || ((e instanceof GameplayEvent.Damaged || e instanceof GameplayEvent.Killed) && c.gang.equals(e.target().faction()));
+        if (!attack) return;
+        c.escaping = true;
+        GD.print("GangSystem: " + e.actor().id() + " attacked while held by " + c.gang);
+        applyFlips();
     }
 
     public int starsOf(String playerId, String gang) {
@@ -175,6 +201,10 @@ public class GangSystem extends Node {
     /** Hold a player at {@code at} for {@code gang} until they pay {@code ransom} or escape. */
     public void hold(String playerId, String gang, godot.core.Vector3 at, int ransom) {
         captive.put(playerId, new Captivity(gang, at, ransom));
+        // NOW, before the guards are spawned: the standing that got the player abducted is usually an attacking one,
+        // and guards born hostile opened fire in the up-to-half-second before the next pass ("sometimes they attack
+        // at the spawn point whatever I do", user 2026-10-10)
+        applyFlips();
         GD.print("GangSystem: " + playerId + " held by " + gang + ", ransom " + ransom + " yen");
     }
 
@@ -207,6 +237,7 @@ public class GangSystem extends Node {
             if (!c.escaping && d > recovery.escapeStart) {
                 c.escaping = true;
                 report(c.gang, "escape", e.getKey());
+                applyFlips();
                 GD.print("GangSystem: " + e.getKey() + " is escaping from " + c.gang);
             }
             if (d > recovery.escapeFree || !p.isAlive()) {
@@ -241,6 +272,11 @@ public class GangSystem extends Node {
     public GangRules.Gang gang(String id) { return rules == null ? null : rules.gangs.get(id); }
 
     // ── probe / console surface ──
+    /** This player fired a shot, as the firearm's seam publishes it -- probes. */
+    @Register public void publishShotNow(String playerId) {
+        GameplayEvents.publish(new GameplayEvent.WeaponFired(com.openworld.game.event.Actor.player(playerId, "player"),
+                com.openworld.game.event.Spot.NOWHERE, "PIS1"));
+    }
     @Register public boolean captiveNow(String playerId) { return captive.containsKey(playerId); }
     @Register public boolean escapingNow(String playerId) { Captivity c = captive.get(playerId); return c != null && c.escaping; }
     @Register public int ransomNow(String playerId) { Captivity c = captive.get(playerId); return c == null ? 0 : c.ransom; }

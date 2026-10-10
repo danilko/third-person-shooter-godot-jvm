@@ -370,6 +370,10 @@ public class SaveSystem extends Node {
                     + currentScenePath() + "'");
         }
 
+        // a load REPLACES the world: whatever activity was running in the one before it is over (its checkpoint, in
+        // the owner's profile, is what a retry starts from -- PLAN.md 2.1 / CR5)
+        com.openworld.game.activity.ActivityRuntime activities = com.openworld.game.activity.ActivityRuntime.get();
+        if (activities != null) activities.director().abortAll("a save was loaded");
         // the ledger first: what spawns while the rest restores must already know who is dead (an old slot has none)
         WorldLedger.replace(WorldLedger.fromMap(com.openworld.game.profile.Maps.map(migrated.get("ledger"))));
         ledgerSaved = WorldLedger.get().revision();

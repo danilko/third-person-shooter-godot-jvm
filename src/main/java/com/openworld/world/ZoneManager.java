@@ -1884,6 +1884,10 @@ public class ZoneManager extends Node {
 			// A fighter keeps the ordinary AI brain (AIController's FSM): it finds the nearest hostile itself.
 			String w = FIGHTER_WEAPONS[Math.floorMod(info.characterId.hashCode(), FIGHTER_WEAPONS.length)];
 			if (!w.isEmpty()) equipWeapon(ai, w, container);
+			// the walker brain above only placed the body on its footway: never attached, so it is ours to free (a
+			// Node made with `new` and left parentless is the "Leaked instance: Node" + "SidewalkWalkerController.java
+			// still in use" at exit, one per promoted fighter -- found by probe_konbini_mission --verbose, 2026-10-10)
+			ctrl.free();
 		} else {
 			ai.attachController(ctrl);
 		}

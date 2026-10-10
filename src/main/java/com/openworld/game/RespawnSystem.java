@@ -225,6 +225,9 @@ public class RespawnSystem extends Node {
         if (getNodeOrNull("/root/MissionManager") instanceof com.openworld.game.mission.MissionManager mm
                 && mm.missionActiveNow()) mm.failMission(why == Reason.ARRESTED ? "player_arrested"
                 : why == Reason.ABDUCTED ? "player_abducted" : "player_hospitalized");
+        com.openworld.game.activity.ActivityRuntime rt = com.openworld.game.activity.ActivityRuntime.get();
+        if (rt != null) rt.playerRecovered(j.id, why == Reason.ARRESTED ? "player_arrested"
+                : why == Reason.ABDUCTED ? "player_abducted" : "player_hospitalized");
     }
 
     private static Player playerOf(String id) {

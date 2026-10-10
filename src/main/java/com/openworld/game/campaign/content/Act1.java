@@ -26,7 +26,7 @@ public final class Act1 implements CampaignModule {
 
     @Override public void define(CampaignBuilder b) {
         b.flag(SPARED_THE_BOSS);
-        b.activity(M01_KONBINI).title("The konbini job")
+        b.activity(M01_KONBINI).title("The konbini job").runs(KonbiniActivity::new)
                 .variant(BOSS_KILLED, Effect.storyDead(M01_BOSS))
                 .variant(BOSS_SPARED, Effect.set(SPARED_THE_BOSS));
         // the informant is the spared boss: his mission needs the player to have spared him AND him to be alive in

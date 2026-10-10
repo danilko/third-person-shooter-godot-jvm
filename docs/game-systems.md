@@ -11,6 +11,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - Owned cars and the safe-house garage (2026-10-10, after it)
 - Authoring foundations: GameplayEvents, DataTable, MarkerRegistry, WorldLedger (PLAN.md 2.0, 2026-10-10, after it)
 - The campaign graph, its lint, and the career override stack (PLAN.md 2.1 step 1, 2026-10-10, after it)
+- The Activity runtime: typed Java missions, the konbini job as the reference, replay, game-over rules (PLAN.md 2.1, 2026-10-10, after it)
 
 ---
 
@@ -597,6 +598,139 @@ Gates (unit): `CampaignGraphTest` (derived unlocks, a branch that closes, sticky
 and world, a guest without consent, a world requirement), `CampaignLintTest` (the SHIPPED modules lint clean; a
 branching sample with two endings is proven; the control -- a variant that clears the choice every later node needs
 -- is found as `DEAD END`; undeclared names; an unstartable activity; a truncated walk), `CareerStateTest`.
+
+### The Activity runtime -- typed Java missions (PLAN.md 2.1: AR1 = F5, CR4, CR5's checkpoint, CR6, CR7; 2026-10-10)
+
+A mission, a job or a race is an **Activity**: a Java class a designer writes from typed parts, run by a framework
+that owns everything a mission node used to hand-roll. No JSON mission graph, no beat scripting language (user,
+2026-10-09: "mission design in Java, with strong types"). `game.activity`, all of it engine-free except
+`ActivityRuntime`.
+
+```java
+public final class KonbiniActivity extends Activity {              // game.campaign.content
+    @Override protected void define(Plan p) {
+        p.startsOnZone("m01_start").cast(boss, crew...).relation("player", "gang_a", "HOSTILE")
+         .replayWorld(Requirement.storyAlive(boss));
+        p.rules().failWhenAllDown("every player is down").failWhen("left the area", a -> !a.host().present(boss));
+        p.stage("FIGHT").checkpoint().marker(boss)
+            .enter(a -> { for (String id : everyone) a.setFaction(id, "gang_a"); a.unlockDoors(25); })
+            .on(GameplayEvent.Killed.class, e -> boss.equals(e.target().id()), (a, e) -> a.complete("BOSS_KILLED"))
+            .when("the boss gives up", a -> crewUp(a) == 0 && a.host().healthFraction(boss) < 0.5, a -> a.go("SURRENDER"));
+        p.stage("SURRENDER").enter(...).after(15, spared).when("he got away", ..., spared);
+    }
+}
+// and in the content pack:   b.activity("m01_konbini").runs(KonbiniActivity::new).variant("BOSS_KILLED", ...)
+```
+
+| part | what it is |
+|---|---|
+| `Activity` | the class a designer extends; `define(Plan)` is called once per run. Tuning = its public fields. NO engine types. |
+| `Plan` | stages (the first declared is the start), `rules()`, `startsOnZone`, `cast`, `relation` (faction overlay rows), `temporaryCareer(career, real, roles)`, `maxParticipants`, `closed()`, `replayPay(share)`, `replayWorld(needs)` |
+| `Stage` | `enter` / `exit`, and TRIGGERS live while it is current: `on(EventType, match, react)` (a `GameplayEvent`), `after(seconds, react)` (once per entry), `when(name, holds, react)` (asked every step, level-triggered), `tick`; `checkpoint()`, `objective(speaker, line)`, `marker(what)` |
+| `RuleSet` | live in every stage: `failWhenAllDown`, `failWhen`, `failOn(event)` (whoever did it: an outsider robbing the shop a participant clerks), `sanction` / `veto` (through the event's `Ruling`, phase ACTIVITY), `penalty(counter, n, event)` (a participant's career strike) |
+| `ActivityInstance` | one RUN, handed to every reaction: `go(stage)` / `complete(variant)` / `fail(why)` (the first request in a step wins), `host()`, `board()`, `setFaction`, `unlockDoors`, `say`, `mark`, `nearestParticipantDistance` |
+| `Blackboard` | the run's own state, typed by `Key<T>` constants (`count`, `number`, `flag`, `text`); goes into the checkpoint |
+| `ActivityHost` | EVERYTHING an activity asks of the world: players, story characters, the placement, doors, the overlay, speaker lines, money. Two implementations: `ActivityRuntime` (engine) and `FakeActivityHost` (a table in memory + a clock) |
+| `ActivityDirector` | runs N instances; see below |
+| `ActivityResult` | what ONE participant got: outcome, variant, `storyCredit`, `worldApplied`, `pay` |
+
+**What the director owns** (so no mission class does):
+- **Who may start.** The OWNER's own story against this world: `CampaignGraph.isAvailable(id, LiveCampaign(their
+  profile, the host's ledger))`. A guest needs the host's consent for an activity with a WORLD effect in any variant
+  (`ActivityRuntime.grantWorldConsent`; the prompt UI is not built). `whyNot(id, player, mode)` says why.
+- **Who takes part.** One OWNER; anyone walking into the start zone of a running, open activity JOINS as ASSIST. A
+  player is in at most one run; an activity id runs once at a time (its story characters are one set in the world).
+  Different activities run concurrently. A helper's `eligible` flag = could they have started it themselves.
+- **The end.** `COMPLETED`: each ELIGIBLE participant gets the variant in THEIR story (`CampaignGraph.complete`); the
+  variant's WORLD effects are applied once, through the owner; everyone is paid `economy.json`'s reward (an
+  ineligible helper is paid and nothing else -- no spoiler-locking of their branch). `FAILED` / `ABORTED`: nothing
+  credited; characters whose faction the run changed get the old one back (a completed run keeps them: the outcome is
+  the world's new state). Always: `host.release(run)` re-locks its doors and drops its overlay, marker and staging,
+  and the temporary career pops. Then `GameplayEvent.ActivityOutcome` is published.
+- **The temporary career** (CR2): pushed at start / join for the listed roles, popped at any end; in a REPLAY it is
+  always TEMP. `ActivityRuntime` reconciles journals once a second on the authority (an override whose run is gone).
+- **Checkpoint + RETRY** (CR5). Entering a `checkpoint()` stage records `ActivityCheckpoint(activity, stage, mode,
+  blackboard)` in the OWNER's profile (`activity_checkpoint`). A failed or aborted run keeps it; `retry(owner)`
+  starts again AT that stage with that blackboard. A checkpoint restarts a STAGE: its `enter` must set up what it
+  needs (earlier stages' did not run). Completing, or starting anything fresh, forgets it. A save load aborts every
+  run (`SaveSystem.loadSlot`), so the checkpoint in the profile is what a retry after Continue starts from.
+- **REPLAY** (CR7): the same class in a sandbox. Needs it completed, and each `replayWorld` need to hold (or
+  `host.canStage` it). No story credit, no world effect, pay = reward x `replayPay` (default 0), penalties only onto
+  the temporary career's scratch record; every event by a participant or about the `cast` is `ruling.sandbox`ed, so
+  the ledger does not record a boss killed in a replay. Heat earned is ordinary and stays.
+- **A broken activity fails by name** instead of hanging: an undeclared variant, an unknown stage, stages that loop
+  without waiting (16 hops).
+
+**`ActivityRuntime`** (AutoLoad, after RaceDirector) is the engine side: it owns the director, steps it in
+`_physicsProcess`, subscribes it in `Phase.ACTIVITY`, and is the `ActivityHost` -- players are `PlayerRegistry` bodies
+(the id is the body's characterId) with `Profiles.of(body)`; story characters are `MissionDirector`'s named registry;
+the place is the `ActivityPlacement` node registered for the id; the overlay is `FactionManager.setActivityOverlay`
+(a per-run layer over everything, kept apart from runtime flips; N at once, where `applyMissionTable` swapped one table
+for the island); a speaker's line is `EventBus.radioChatter`. AUTHORITY ONLY (single player or the host).
+- What the rest of the game hears: `EventBus.missionStarted / missionCompleted / missionFailed` exactly as for a legacy
+  mission (HUD banner, autosave), and the three existing mission world events mirror a start / end to clients (their
+  objective-type argument is `"ACTIVITY"`; no new event ints -- AR5 replaces this). A client's own result arrives in
+  its profile.
+- `MissionDirector.hasAchieved / hasCompleted / isMissionUnlocked` answer from THIS machine's profile for an id the
+  campaign graph declares, and `onMissionCompleted` no longer records such an id: the one global copy every peer
+  advanced from the host's signal is only the legacy `MissionInfo` missions' now.
+- `RespawnSystem` tells it a player was hospitalised / arrested / abducted: the run they OWN fails (user, 2026-10-03).
+  `ZoneTrigger.requiredMissionId` also accepts a running activity.
+- **A placement node** (`game.mission.KonbiniMission`, `M01_Konbini.tscn`) implements `ActivityPlacement`: its
+  position is the anchor, `configure(Activity)` sets the run's fields from its exports, and it mirrors the stage into
+  its `phase` / `outcome` readouts. It declares nothing and decides nothing. The scene's `ZoneTrigger` is no longer
+  one-shot: walking in again after a failure starts the job again.
+- **New game is a new story** (`FrontEnd`): the profile's `CampaignState` is reset (money, cars, career records
+  stay). Hosting does not reset it.
+
+**Changed the same day on the user's play notes** ("hard to see the mission objective", "I accidentally enter the
+mission"):
+- **A mission is never started by walking in.** `ZoneEntered` on an activity's start zone makes the director call
+  `host.offer(activity, player)`; `ActivityRuntime` shows it as an interact prompt, `Start: <title> (E)` (the runtime
+  is the `control.Interactable` behind it), and the interact key calls `director.accept`. The offer is withdrawn 18 m
+  from the placement, when it starts, or when it stops being startable. Walking into the zone of a job that is already
+  RUNNING still joins it. A co-op guest's prompt and interact key are not on the wire (MSG_INTERACT, 3.0), so a guest
+  who may start one still starts it by walking in.
+- **The objective line.** `Stage.objective(speaker, line)` -> `host.say` -> a yellow line at the top centre of a
+  participant's screen (30 px, outlined): bright for 8 s after it changes, then dimmed to 60 % and THERE for as long as
+  the run is; gone with the run. A line somebody speaks is also radio chatter in the status feed; one with no speaker
+  ("") is only the objective. This overrides the minimal-HUD "a subtitle, then gone" for objectives: it failed the play
+  test. Local to the machine the activity runs on -- a co-op guest sees none yet (AR5).
+- **The marker.** `Stage.marker(storyId)` puts a yellow arrow over that story character's head, drawn through walls,
+  for a participant on this machine; cleared with the stage / the run.
+- `KonbiniActivity` now has objectives ("Take down Kaneda's crew", "Kaneda gives up -- finish him, or let him run").
+
+**Game-over rules** (CR4): `GameOverRule` (`id`, `breached(profile, story)`, `graceSeconds`, `warning`;
+`GameOverRule.debtOver(...)`), declared with `CampaignBuilder.gameOverRule`, judged by `GameOverWatch` once a second on
+the authority for every player: a breach is WARNED once, CLEARED if it stops, and past its grace it is THAT player's
+game over -- `PlayerProfile.rollbackToCheckpoint()` (balance, debts, career, story, cars; the world is untouched, the
+session goes on). `PlayerProfile.takeCheckpoint()` is called when a STORY completion is credited and the first time the
+watch sees a clean profile, and NEVER in a breached state, so a game over cannot land in another. No module declares
+a rule yet (the thresholds are a design decision), so nothing fires in play; the card and the safe-house respawn come
+with the first rule.
+
+**The mission test kit** (CR6). TIER 1, JUnit, engine-free: `KonbiniActivityTest` (15: every path of the shipped
+mission against `FakeActivityHost` with scripted events and a clock -- start, surrender only when both conditions
+hold, both spares, both kills, a death with no event, fail + restore, retry, a helper joining and being credited, a
+helper who already did it, the guest's consent, a replay changing nothing), `ActivityDirectorTest` (11: the framework --
+careers TEMP / REAL, sanction / veto / failOn an outsider, blackboard + checkpoint through a save file, timers,
+concurrency, the owner leaving, replay pay, broken activities, the lint), `GameOverWatchTest` (5). `ActivityLint`
+checks the CLASSES (a stage with nothing in it, two activities on one start zone, a `replayWorld` naming personal
+state). TIER 2, headless in World.tscn: `probe_konbini_mission.gd --case=kill|spare [--control]` (36 checks: the offer and its
+prompt, the objective line and the marker, the real
+bodies, doors, overlay, profile, ledger, reward) and the generic `probe_activity.gd --activity=m01_konbini
+--script=fail_retry|replay [--control]`; each control fails on exactly its asserted line.
+
+**Found on the way:** `ZoneManager` created a `SidewalkWalkerController` for every promoted ped and never attached
+it for a FIGHTER -- a parentless Node per promoted fighter, the "Leaked instance: Node" + "1 resources still in use
+(SidewalkWalkerController.java)" at exit that had been seen once and not traced. It is freed now.
+
+**Not built (PLAN.md 2.1 LEFT):** the race port (races are still `MissionManager` + `RaceDirector`); staging a replay's
+world (a dead story character standing again -- needs the streamer to respawn a named character, so today a replay is
+offered only where its world holds); the consent prompt, the retry prompt and the mission list (phone / map) -- the
+APIs are `grantWorldConsent`, `retryNow`, `whyNotNow`; a guest's `carryHome` effects; world markers drawn for
+`Stage.marker` (stored, `markedNow`); the faction overlay is island-wide, not participant-scoped (hostility is by
+faction string); the game-over card.
 
 ### Street races — `game.mission.RaceDirector` + `world.RaceCheckpoint` (R2, AutoLoad, 2026-09-17)
 
