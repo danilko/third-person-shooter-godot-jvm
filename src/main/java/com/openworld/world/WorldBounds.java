@@ -292,6 +292,7 @@ public class WorldBounds extends Node3D {
         Vector3 to = surfaceAt(body, pos.getX(), h, pos.getZ());
         body.setGlobalPosition(to);
         cancelAll(body);
+        com.openworld.net.NetworkManager.hostPlaced(body);   // the owner rescues itself to the same spot
         GD.print("WorldBounds: " + body.getName() + " was under the map at (" + Math.round(pos.getX()) + ", "
                 + Math.round(pos.getY()) + ", " + Math.round(pos.getZ()) + "): put back on the surface at y "
                 + String.format("%.1f", to.getY()) + " [" + describe(body) + "]");
@@ -372,6 +373,7 @@ public class WorldBounds extends Node3D {
                 : new Vector3(0f, 4f, 0f);
         body.setGlobalPosition(to);
         cancelAll(body);
+        com.openworld.net.NetworkManager.hostPlaced(body);   // the owner rescues itself to the same spot
         GD.print("WorldBounds: rescued " + body.getName() + " from below " + floorY + " m");
     }
 

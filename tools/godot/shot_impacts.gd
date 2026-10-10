@@ -95,4 +95,17 @@ func _initialize() -> void:
 	pm.call("burst_now", "FLESH", Vector3(-1.0, 1.3, -2.0), Vector3(0, 0.2, 1).normalized())
 	await _tick(5)
 	await _snap("blood_close")
+	await _tick(8)
+	await _snap("blood_close_late")
+	# the range a fight happens at (2026-10-09: the droplet spray read at 1.5 m and was gone at 15 m)
+	Engine.time_scale = 0.25
+	for d in [12.0, 25.0]:
+		cam.position = Vector3(-3.5, 1.5, -2.0 + d)
+		cam.look_at(Vector3(-3.5, 1.2, -2.0))
+		await _tick(10)
+		pm.call("burst_now", "FLESH", Vector3(-3.5, 1.25, -1.78), Vector3(0, 0.15, 1).normalized())
+		await _tick(4)
+		await _snap("blood_%dm" % int(d))
+		await _tick(8)
+		await _snap("blood_%dm_late" % int(d))
 	quit()

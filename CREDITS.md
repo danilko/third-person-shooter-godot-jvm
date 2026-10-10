@@ -97,7 +97,7 @@ There is a per-folder copy of this list in `assets/terrain3d/textures/asset_lice
 | Swim strokes | `assets/audio/sfx/swim_stroke_*.wav` (same) | craigsmith, [G54-26-Person Swimming.wav](https://freesound.org/s/438845/) (Freesound) | CC0 |
 | Melee contact on hard surfaces | `assets/audio/sfx/melee_hit_hard_*.wav` | Still North Media, [Medieval sound effects (weapon on weapon)](https://opengameart.org/content/medieval-sound-effects-weapon-textures) | CC0 |
 | Aldrich font | `assets/ui/Aldrich-Regular.ttf` | Matthew Desmond (MADType) | SIL Open Font License 1.1 |
-| Keycap glyphs for HUD prompts | `assets/ui/prompts/keyboard_*.png` | Kenney, [Input Prompts](https://kenney.nl/assets/input-prompts) (Keyboard & Mouse, Double) | CC0 |
+| Keycap and pad glyphs for HUD prompts | `assets/ui/prompts/keyboard_*.png`, `steamdeck_*.png` | Kenney, [Input Prompts](https://kenney.nl/assets/input-prompts) (Keyboard & Mouse, Steam Deck; Double) | CC0 |
 
 ## Visual effects
 

@@ -96,6 +96,8 @@ public class WeaponRadialMenu extends Control {
       hideRadialMenu();
     } else if (isVisible() && event instanceof InputEventMouseMotion mm) {
       selectFromPointer(mm.getPosition());
+    } else if (isVisible() && event instanceof godot.api.InputEventJoypadMotion) {
+      selectFromStick();
     } else if (isVisible() && event instanceof InputEventMouseButton mb && mb.isPressed()
         && mb.getButtonIndex() == godot.core.MouseButton.LEFT) {
       selectFromPointer(mb.getPosition());
@@ -119,6 +121,22 @@ public class WeaponRadialMenu extends Control {
     double angle = Math.atan2(dx, -dy);                    // 0 = up, clockwise (canvas y points down)
     int idx = Math.floorMod((int) Math.round(angle / (Math.PI * 2.0 / n)), n);
     select(idx, true);
+  }
+
+  /**
+   * The wheel on a stick (PLAN.md 1.1 / F1, GTA V): whichever stick is pushed further past {@link #STICK_PICK} points
+   * at the slot, the same angle rule as the pointer; letting the stick go keeps the pick (release LB to close on it).
+   */
+  public static final double STICK_PICK = 0.5;
+
+  @Register
+  public void selectFromStick() {
+    godot.core.Vector2 r = Input.getVector("look_left", "look_right", "look_up", "look_down", -1.0f);
+    godot.core.Vector2 l = Input.getVector("left", "right", "forward", "back", -1.0f);
+    godot.core.Vector2 v = r.length() >= l.length() ? r : l;
+    if (v.length() < STICK_PICK) return;
+    godot.core.Vector2 c = menuCentre();
+    selectFromPointer(new godot.core.Vector2(c.getX() + v.getX() * (deadZone + 100.0), c.getY() + v.getY() * (deadZone + 100.0)));
   }
 
   /** The currently highlighted slot, -1 if none — the on-screen check reads it. */

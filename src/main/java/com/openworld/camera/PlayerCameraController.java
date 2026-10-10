@@ -1,11 +1,13 @@
 package com.openworld.camera;
 
+import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.api.Input;
 import godot.api.InputEvent;
 import godot.api.InputEventMouseMotion;
 import godot.core.Vector2;
+import godot.global.GD;
 import com.openworld.character.Character;
 import com.openworld.control.Controller;
 import com.openworld.control.PlayerController;
@@ -20,6 +22,62 @@ public class PlayerCameraController extends TPSCameraController {
   // the last event velocity and drops all intermediate events.
   private double pendingYaw   = 0;
   private double pendingPitch = 0;
+
+  // ── Gamepad look (PLAN.md 1.1 / F1) ── the right stick is a RATE, not a delta: degrees per second at full
+  // deflection, shaped by a response curve (fine aim near the centre, CoD / Halo practice), with a turn boost once the
+  // stick has been held fully over for a beat (a 180 should not take two seconds). All of it scaled by the scope ratio
+  // like the mouse, and slowed while aiming down the sights.
+  @Export public double padYawRate = 220.0;
+  @Export public double padPitchRate = 150.0;
+  @Export public double padCurve = 2.0;
+  @Export public double padAimScale = 0.55;
+  @Export public double padTurnBoost = 0.7;
+  @Export public double padBoostDelay = 0.25;
+  @Export public double padBoostRamp = 0.35;
+  @Export public boolean padInvertY = false;
+  // Aim assist (pad only): the look rate drops over a body (friction), and pressing aim pulls the view onto the
+  // nearest body within assistSnapCone over assistSnapTime (the ADS snap). Never on a mouse.
+  @Export public boolean aimAssist = true;
+  @Export public double assistSlowdown = 0.45;
+  @Export public double assistSnapCone = 7.0;
+  @Export public double assistSnapTime = 0.14;
+  @Export public double assistRange = 70.0;
+
+  public double getPadYawRate() { return padYawRate; }
+  public void setPadYawRate(double v) { padYawRate = v; }
+  public double getPadPitchRate() { return padPitchRate; }
+  public void setPadPitchRate(double v) { padPitchRate = v; }
+  public double getPadCurve() { return padCurve; }
+  public void setPadCurve(double v) { padCurve = v; }
+  public double getPadAimScale() { return padAimScale; }
+  public void setPadAimScale(double v) { padAimScale = v; }
+  public double getPadTurnBoost() { return padTurnBoost; }
+  public void setPadTurnBoost(double v) { padTurnBoost = v; }
+  public double getPadBoostDelay() { return padBoostDelay; }
+  public void setPadBoostDelay(double v) { padBoostDelay = v; }
+  public double getPadBoostRamp() { return padBoostRamp; }
+  public void setPadBoostRamp(double v) { padBoostRamp = v; }
+  public boolean isPadInvertY() { return padInvertY; }
+  public void setPadInvertY(boolean v) { padInvertY = v; }
+  public boolean isAimAssist() { return aimAssist; }
+  public void setAimAssist(boolean v) { aimAssist = v; }
+  public double getAssistSlowdown() { return assistSlowdown; }
+  public void setAssistSlowdown(double v) { assistSlowdown = v; }
+  public double getAssistSnapCone() { return assistSnapCone; }
+  public void setAssistSnapCone(double v) { assistSnapCone = v; }
+  public double getAssistSnapTime() { return assistSnapTime; }
+  public void setAssistSnapTime(double v) { assistSnapTime = v; }
+  public double getAssistRange() { return assistRange; }
+  public void setAssistRange(double v) { assistRange = v; }
+
+  private double fullHeld = 0;
+  private double snapYaw, snapPitch, snapLeft;
+  private boolean assistOnTarget;
+  private int assistSnaps;
+
+  /** Probe readouts: whether the last frame's stick look was slowed over a body, and how many ADS snaps ran. */
+  @Register public boolean assistOnTargetNow() { return assistOnTarget; }
+  @Register public int assistSnapsNow() { return assistSnaps; }
 
   @Register
   @Override
@@ -102,10 +160,54 @@ public class PlayerCameraController extends TPSCameraController {
     }
 
     double scale = lookSensitivityScale();
-    double dy = pendingYaw * scale;
-    double dp = pendingPitch * scale;
+    Vector2 pad = padLook(delta);
+    Vector2 snap = assistSnap(delta);   // an absolute angle onto a body: not scaled by the scope ratio
+    double dy = (pendingYaw + pad.getX()) * scale + snap.getX();
+    double dp = (pendingPitch + pad.getY()) * scale + snap.getY();
     pendingYaw   = 0;
     pendingPitch = 0;
     return new Vector2((float) dy, (float) dp);
+  }
+
+  /** The right stick's look this frame, degrees (yaw, pitch up +), with the turn boost and the pad-only aim assist. */
+  private Vector2 padLook(double delta) {
+    Vector2 st = Input.getVector("look_left", "look_right", "look_up", "look_down", -1.0f);
+    double x = st.getX(), y = padInvertY ? -st.getY() : st.getY();
+    double mag = Math.min(1.0, Math.hypot(x, y));
+    boolean aiming = combat || Input.isActionPressed("aim", false);
+    boolean assist = aimAssist && com.openworld.control.InputDevice.pad() && character != null && activeCamera != null;
+    double yaw = 0, pitch = 0;
+    assistOnTarget = false;
+    if (mag > 1e-4) {
+      double shaped = Math.pow(mag, padCurve) / mag;
+      fullHeld = Math.abs(x) > 0.95 ? fullHeld + delta : 0.0;
+      double boost = aiming ? 1.0 : 1.0 + padTurnBoost * GD.clamp((fullHeld - padBoostDelay) / padBoostRamp, 0.0, 1.0);
+      double rate = aiming ? padAimScale : 1.0;
+      if (assist) {
+        AimAssist.Pick p = AimAssist.pick(character, activeCamera, 6.0, assistRange);
+        if (p != null && p.offDeg() <= Math.max(1.0, p.radiusDeg() * 1.5)) { rate *= assistSlowdown; assistOnTarget = true; }
+      }
+      yaw   = -x * shaped * padYawRate * boost * rate * delta;
+      pitch = -y * shaped * padPitchRate * rate * delta;
+    } else {
+      fullHeld = 0.0;
+    }
+    return new Vector2((float) yaw, (float) pitch);
+  }
+
+  /** The ADS snap (pad only): on the aim press, pull onto the nearest body in the cone over assistSnapTime. */
+  private Vector2 assistSnap(double delta) {
+    boolean assist = aimAssist && com.openworld.control.InputDevice.pad() && character != null && activeCamera != null;
+    if (assist && Input.isActionJustPressed("aim", false)) {
+      AimAssist.Pick p = AimAssist.pick(character, activeCamera, assistSnapCone, assistRange);
+      if (p != null) { snapYaw = p.dYaw(); snapPitch = p.dPitch(); snapLeft = assistSnapTime; assistSnaps++; }
+    }
+    if (snapLeft <= 0) return Vector2.Companion.getZERO();
+    double k = Math.min(1.0, delta / snapLeft);
+    double y = snapYaw * k, p = snapPitch * k;
+    snapYaw -= y;
+    snapPitch -= p;
+    snapLeft -= delta;
+    return new Vector2((float) y, (float) p);
   }
 }

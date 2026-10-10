@@ -501,6 +501,24 @@ the joiner 247 m away at y −0.7. Trap: a `SceneTree` `--script` that `change_s
 and presses F6/F7 through `push_input` hosted and "connected" but no ENet event ever arrived on either
 side (not explained); run the scene as the main scene with the harness flags instead.
 
+**The co-op seat flake and the upstream clamp's anchor (PLAN.md 0.38, 2026-10-09).** "The client took a seat in the
+parked car" failed ~4 runs in 8. It was never the parked row: the harness HAND-TELEPORTED the client 50 m to the car,
+an implausible upstream move, so the host's clamp (`NetworkManager.clampUpstreamPosition`, 60 m/s x 1.5) walked the
+host's puppet there in 2-3 m steps along the straight line -- arriving after the seat request (TOO_FAR), or, since
+the line crossed the parked row at the car itself, stepping a kinematic body into the car and flinging it 115 m into
+the sea (DEAD: the body died with it). A third cause was a fixed 11.5 s wait for a respawn that sometimes takes
+longer. The harness now waits for the client to be alive, GLIDES it (1 m per physics frame) to the side of the car
+facing it, and repeats the seat request each second until seated (`asks=` in the line). The gate also asserts no
+clamp on the way and the three parked cars within 1 m of where they started on the host.
+A real defect found with it: the clamp's baseline was keyed by characterId and never reset, so a RESPAWNED client
+(same id, woken at the hospital) was clamped from where it died and dragged across the map at the speed cap, shoving
+everything on the line. `announceSpawn` now anchors the baseline at the host-placed body (`anchorUpstream`; the
+owner's clock is unknown there, so for the next 1 s of the owner's clock every report gets the capped 0.5 s step:
+the owner's last packets from the OLD body arrive first, and the first real report from the new spot was clamped 3 m
+back toward them). WorldBounds' two rescues run on every
+peer for every Player, so the host's own move of a client's puppet anchors it too (`NetworkManager.hostPlaced`). A
+teleport ONLY the owner makes (the debug console, a harness) is still clamped, by design: give it the host's half.
+
 ### Hit detection, damage, and impact VFX
 
 `WeaponController.onWeaponFire()` collects hit data into a `HitInfo` and delegates entirely:
@@ -553,6 +571,17 @@ ASR1 144 (one-tap; the AK's identity), ASR2 0.7 -> 92 (CS's M4 against a helmet)
 (`--control` = every scale 1, fails 3). The player has 1000 HP, so AI
 fire on the player rose with it. Glass `PANE_PIERCE_AT` went 20 -> 30 so pistols, SMGs and buckshot pellets still
 stop in a window and rifles still carry on.
+
+**Blood reads at fighting range (2026-10-09, user: "the blood effect of a hit character seems no longer there").**
+The path never broke (a hit on a body still resolves FLESH and bursts once); the LOOK did. 87a4dc1f (2026-10-08) had
+replaced the old 12 bright-red 5-15 cm boxes with 14 dark-red quads of 1.4-3.5 cm living 0.45 s -- pictured only at
+1.5 m (`shot_impacts.gd` blood_close), where it read fine, and invisible at 12 m. FLESH is now two layers, the hit-mist
+practice of PUBG / GTA: a soft red MIST (7 radial-gradient quads, 0.34 m, growing 0.5 -> 1.6 over 0.4 s, fading) for
+the hit confirm, and a child `Drops` emitter (16 x 4.5 cm droplets, 0.55 s, gravity) for the spray
+(`ParticleManager.spawn` restarts child emitters). `shot_impacts.gd` now also pictures blood at 12 m and 25 m
+(blood_12m / blood_25m, early and late); both read. Gate `tools/godot/probe_blood_hit.gd`: a real Player's SNR1 shot
+through WorldSystems.tscn's own managers lands on an AI 25 m out, FLESH bursts once, 0.11 m from the chest, with its
+droplet layer (the headless renderer never reports `emitting`, so the look is the picture's job).
 
 ### Effects are Binbun3D packs driven from Java (`assets/vfx/`, `com.openworld.vfx`, 2026-09-18)
 

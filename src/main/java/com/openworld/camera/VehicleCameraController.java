@@ -377,6 +377,7 @@ public class VehicleCameraController extends Node3D {
         // local rotation (Vehicle.tscn gives CameraController a 180 deg Y flip that the Pivot flip cancels), so a car
         // with no rotation behaves exactly as before.
         setGlobalRotation(authoredFrame);
+        if (activeCamera != null && activeCamera.isCurrent()) padLook(delta);
 
         recoilPitch = GD.lerp(recoilPitch, 0.0, recoilRecoverySpeed * delta);
         recoilYaw   = GD.lerp(recoilYaw,   0.0, recoilRecoverySpeed * delta);
@@ -523,7 +524,26 @@ public class VehicleCameraController extends Node3D {
     }
 
     private boolean isAimingOrFiring() {
-        return INSTANCE.isActionPressed("aim",  false)
-            || INSTANCE.isActionPressed("fire", false);
+        // vehicle_fire (left mouse / RB) aims and fires; the right mouse aims too -- but on a pad the triggers are the
+        // throttle and reverse here, so "aim" / "fire" (LT / RT) must not swing the camera into aim (F1)
+        return INSTANCE.isActionPressed("vehicle_fire", false)
+            || (!com.openworld.control.InputDevice.pad()
+                && (INSTANCE.isActionPressed("aim", false) || INSTANCE.isActionPressed("fire", false)));
+    }
+
+    /** Right-stick look while aiming from a seat, degrees per second at full deflection (F1). */
+    @Export public double padLookRate = 160.0;
+    public double getPadLookRate() { return padLookRate; }
+    public void setPadLookRate(double v) { padLookRate = v; }
+
+    /** Add the right stick to the pending look, the same gate as the mouse (aiming, FPS or passenger aim). */
+    private void padLook(double delta) {
+        if (!isAimingOrFiring() || !(cameraMode == CameraMode.FPS || passengerAimMode)) return;
+        godot.core.Vector2 st = INSTANCE.getVector("look_left", "look_right", "look_up", "look_down", -1.0f);
+        double mag = Math.min(1.0, Math.hypot(st.getX(), st.getY()));
+        if (mag < 1e-4) return;
+        double k = mag * padLookRate * delta;   // curve: rate grows with the square of the deflection
+        pendingYaw   -= st.getX() * k;
+        pendingPitch += st.getY() * k;
     }
 }

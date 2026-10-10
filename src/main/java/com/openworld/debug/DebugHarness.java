@@ -847,43 +847,76 @@ public class DebugHarness extends Node {
                 GD.print("[coop] self damage sent x" + n);
             }
         }
-        if (coopStep == 4 && coopT >= coopDamageAt + 11.5) {
+        // the respawn: wait for the host to wake the client (the card time varies with load), give up after 25 s
+        if (coopStep == 4 && coopT >= coopDamageAt + 6.0
+                && (!client || (me != null && me.isAlive()) || coopT >= coopDamageAt + 25.0)) {
             coopStep = 5;
             var rs = com.openworld.game.RespawnSystem.get();
             if (client) GD.print("[coop] respawn alive=" + (me != null && me.isAlive()) + " owned=" + (me != null)
                     + " pos=" + (me != null ? me.getGlobalPosition() : "-") + " respawns=" + (rs != null ? rs.respawnsNow() : -1)
                     + " card=" + (rs != null ? rs.cardTextNow() : ""));
-            else GD.print("[coop] host players=" + PlayerRegistry.getPlayers().size());
+            else {
+                GD.print("[coop] host players=" + PlayerRegistry.getPlayers().size());
+                for (Node n : getTree().getNodesInGroup(new StringName("characters")))
+                    if (n instanceof com.openworld.carrier.vehicle.Vehicle v
+                            && !v.isInGroup(new StringName(com.openworld.carrier.vehicle.Vehicle.STREAMED_GROUP)))
+                        GD.print("[coop] car " + v.getName() + " at " + v.getGlobalPosition());
+            }
             coopSeatAt = coopT;
         }
-        // die seated (PLAN.md 1i, 2026-10-08): the respawned client walks to the parked car, takes a seat through the
-        // host's seat request, dies there; the host must unseat the corpse before the respawn, on BOTH peers
-        if (coopStep == 5 && coopT >= coopSeatAt + 3.0) {
+        // die seated (PLAN.md 1i, 2026-10-08): the respawned client goes to the parked car, takes a seat through the
+        // host's seat request, dies there; the host must unseat the corpse before the respawn, on BOTH peers.
+        // It GLIDES there at a plausible speed (PLAN 0.38, 2026-10-09): a hand teleport is an implausible upstream
+        // move, which the host clamps and walks at the speed cap along the straight line -- through the parked row,
+        // flinging the car it stepped into, or arriving after the seat request (TOO_FAR / DEAD, ~4 runs in 8).
+        if (coopStep == 5 && coopT >= coopSeatAt + 1.0) {
             coopStep = 6;
             com.openworld.carrier.vehicle.Vehicle car = coopCar();
             if (client && me != null && car != null) {
+                // the car's side facing the player: the path never crosses the car
                 Vector3 side = car.getGlobalTransform().getBasis().getColumn(0).normalized();
-                me.setGlobalPosition(car.getGlobalPosition().plus(side.times(-2.6)).plus(new Vector3(0, 0.3, 0)));
+                if (side.dot(me.getGlobalPosition().minus(car.getGlobalPosition())) < 0) side = side.times(-1.0);
+                coopGlideTo = car.getGlobalPosition().plus(side.times(2.6)).plus(new Vector3(0, 0.3, 0));
                 GD.print("[coop] beside car " + car.getName());
             } else if (client) { GD.print("[coop] no car (me=" + (me != null) + ")");
             }
         }
-        if (coopStep == 6 && coopT >= coopSeatAt + 5.0) {
-            coopStep = 7;
-            com.openworld.carrier.vehicle.Vehicle car = coopCar();
-            if (client && me != null && car != null) car.requestEnter(me);
+        if (coopGlideTo != null && me != null) {
+            Vector3 to = coopGlideTo.minus(me.getGlobalPosition());
+            // m per physics frame (18 m/s): the host's clamp window can be as short as ~2 m when physics catches up and
+            // runs two steps inside one sender interval (0.6 m/frame tripped it once in 6 runs)
+            double step = 0.3;
+            me.setGlobalPosition(to.length() <= step ? coopGlideTo : me.getGlobalPosition().plus(to.normalized().times(step)));
+            me.setVelocity(new Vector3());
+            if (me.movementControllerNow() != null) me.movementControllerNow().clearMotion();
+            if (to.length() <= step) { coopGlideTo = null; coopArrivedAt = coopT; }
         }
-        if (coopStep == 7 && coopT >= coopSeatAt + 7.5) {
+        // ask for the seat like a player pressing the key again: every 1 s until seated (the host must have seen the
+        // client arrive), at most 5 tries
+        if (coopStep == 6 && coopArrivedAt >= 0 && coopT >= coopArrivedAt + 0.5 && coopT >= coopNextAsk) {
+            com.openworld.carrier.vehicle.Vehicle car = coopCar();
+            boolean seated = me != null && me.currentVehicleNode != null;
+            if (client && me != null && car != null && !seated && coopAsks < 5) {
+                car.requestEnter(me);
+                coopAsks++;
+                coopNextAsk = coopT + 1.0;
+            } else {
+                coopStep = 7;
+            }
+        }
+        if (!client && coopStep == 6) coopStep = 7;
+        if (coopStep == 7) {
             coopStep = 8;
+            coopSeatedAt = coopT;
             if (client && me != null) {
-                GD.print("[coop] seated=" + (me.currentVehicleNode != null) + " hud=" + coopHud());
+                GD.print("[coop] seated=" + (me.currentVehicleNode != null) + " asks=" + coopAsks + " hud=" + coopHud());
                 if (me.getNodeOrNull("Health") instanceof com.openworld.character.Health h) {
                     int n = (int) Math.ceil(h.maxHealth / 400.0) + 1;
                     for (int i = 0; i < n; i++) h.takeDamage(null, 400f, "fall");
                 }
             }
         }
-        if (coopStep == 8 && coopT >= coopSeatAt + 20.0) {
+        if (coopStep == 8 && coopT >= (client ? coopSeatedAt + 12.5 : coopSeatAt + 22.0)) {
             coopStep = 9;
             // riders = Players seated in ANY car (the client's car on the client, every car on the host)
             int riders = 0;
@@ -893,9 +926,17 @@ public class DebugHarness extends Node {
             if (client) GD.print("[coop] seated respawn alive=" + (me != null && me.isAlive()) + " owned=" + (me != null)
                     + " inCar=" + (me != null && me.currentVehicleNode != null) + " riders=" + riders + " hud=" + coopHud());
             else GD.print("[coop] host car riders=" + riders);
+            if (!client)
+                for (Node n : getTree().getNodesInGroup(new StringName("characters")))
+                    if (n instanceof com.openworld.carrier.vehicle.Vehicle v
+                            && !v.isInGroup(new StringName(com.openworld.carrier.vehicle.Vehicle.STREAMED_GROUP)))
+                        GD.print("[coop] end car " + v.getName() + " at " + v.getGlobalPosition());
         }
     }
 
+    private Vector3 coopGlideTo;
+    private double coopArrivedAt = -1, coopNextAsk, coopSeatedAt = 1e9;
+    private int coopAsks;
     private double coopSeatAt = 1e9;
     private boolean coopMissionStarted, coopMissionSeen;
     private com.openworld.carrier.vehicle.Vehicle coopCarRef;

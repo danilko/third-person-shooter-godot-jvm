@@ -26,7 +26,7 @@ run_pair "$OUT/walk" --hold-action=left --hold-action=forward
 # its snapshots split into more MTU frames — the load that made the client's limiter drop ~20 packets/s.
 run_pair "$OUT/tour" --idle --auto-walk
 # Phase C (2026-10-06): the client buys at a real shop counter, then dies; the host must respawn it; both print the clock.
-SECS_SAVE=$SECS; SECS=62
+SECS_SAVE=$SECS; SECS=72
 run_pair "$OUT/coop" --coop-test --coop-test
 SECS=$SECS_SAVE
 echo "logs in $OUT"
@@ -112,12 +112,21 @@ m = re.search(r"\[coop\] mission on join active=(\w+) id=(\S*)", cclient)
 check("coop: a late joiner is told the running mission", m is not None and m.group(1) == "true"
       and m.group(2) == "coop_baseline_test", m.group(0) if m else "no line")
 print("  -- coop: die seated, then the respawn")
-m = re.search(r"\[coop\] seated=(\w+) hud=(\S*)", cclient)
+m = re.search(r"\[coop\] seated=(\w+) asks=(\d+) hud=(\S*)", cclient)
 check("coop: the client took a seat in the parked car", m is not None and m.group(1) == "true", m.group(0) if m else "no line")
 m = re.search(r"\[coop\] seated respawn alive=(\w+) owned=(\w+) inCar=(\w+) riders=(\d+) hud=(\S*)", cclient)
 check("coop: after a seated death the client is respawned on foot", m is not None and m.group(1) == "true"
       and m.group(2) == "true" and m.group(3) == "false" and m.group(5) == "ON_FOOT", m.group(0) if m else "no line")
 check("coop: no car on the client holds a player", m is not None and m.group(4) == "0", m.group(0) if m else "")
+# PLAN 0.38 (2026-10-09): the client reaches the car at a plausible speed, so the host never clamps it and the
+# parked row stays put (a clamped walk along the straight line flung the car 115 m into the sea)
+tail = chost[chost.find("[coop] host players="):] if "[coop] host players=" in chost else ""
+check("coop: the host clamped no upstream move on the way", tail != "" and "clamped implausible" not in tail,
+      f"{tail.count('clamped implausible')} clamps")
+start = {n: tuple(map(float, xyz)) for n, *xyz in re.findall(r"\[coop\] car (\S+) at \(([-\d.]+), ([-\d.]+), ([-\d.]+)\)", chost)}
+end = {n: tuple(map(float, xyz)) for n, *xyz in re.findall(r"\[coop\] end car (\S+) at \(([-\d.]+), ([-\d.]+), ([-\d.]+)\)", chost)}
+moved = {n: round(sum((a - b) ** 2 for a, b in zip(start[n], end[n])) ** 0.5, 2) for n in start if n in end}
+check("coop: the parked cars stayed parked on the host", len(moved) == 3 and max(moved.values()) < 1.0, str(moved))
 m = re.search(r"\[coop\] host car riders=(\d+)", chost)
 check("coop: no car on the host holds a player", m is not None and m.group(1) == "0", m.group(0) if m else "no line")
 check("coop: the host ran two respawns", chost.count("RespawnSystem: HOSPITALIZED -> respawned") >= 2,

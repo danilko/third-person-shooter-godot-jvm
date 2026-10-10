@@ -31,7 +31,7 @@ import java.util.List;
  * it. FREE until money exists. Group {@code shop_counter} is how the host finds counters.
  */
 @Script(className = "ShopCounter")
-public class ShopCounter extends Area3D {
+public class ShopCounter extends Area3D implements com.openworld.control.Interactable {
 
     public static final String GROUP = "shop_counter";
 
@@ -98,8 +98,13 @@ public class ShopCounter extends Area3D {
             setProcess(false);
             return;
         }
-        if (!ShopMenu.isOpen() && !ShopMenu.closedThisFrame() && Input.INSTANCE.isActionJustPressed("interact", false))
-            ShopMenu.open(this, inside);
+    }
+
+    /** E at the counter (its prompt is the offer, control.Interactions): open the menu. */
+    @Override
+    public void interact(com.openworld.character.Character actor) {
+        if (inside == null || actor == null || actor.getInstanceId() != inside.getInstanceId() || !GD.isInstanceValid(inside) || !inside.isAlive()) return;
+        if (!ShopMenu.isOpen() && !ShopMenu.closedThisFrame()) ShopMenu.open(this, inside);
     }
 
     private void showPrompt(boolean on) {

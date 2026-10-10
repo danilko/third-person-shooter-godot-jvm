@@ -755,6 +755,8 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
      * input source (local, AI, network) produces identical results.
      */
     protected void applyInput(UserCommand input, double delta) {
+        // the interact key uses the ONE thing its prompt offers (control.Interactions, AR4); interactables never poll
+        if (input.interact && isAlive() && currentVehicleNode == null) com.openworld.control.Interactions.useBest(this);
 
         // ── Scope intent ───────────────────────────────────────────────────
         // Before the seated early return, so a passenger's release is heard too. What the intent is

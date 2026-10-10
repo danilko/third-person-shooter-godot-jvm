@@ -49,7 +49,7 @@ import godot.core.Vector3;
  * the inherited host-authoritative break/restore replication.
  */
 @Script(className = "Door")
-public class Door extends Breakable {
+public class Door extends Breakable implements com.openworld.control.Interactable {
 
     /** "ROTATE" (hinged) or "SLIDE" (pocket). */
     @Export public String openMode = "ROTATE";
@@ -252,6 +252,14 @@ public class Door extends Breakable {
         super.applyDamage(amount, attackerPos); // Breakable also gates on breakMinDamage
     }
 
+    /** E on a manual door (its prompt is the offer): toggle it. A locked, broken or automatic door does nothing. */
+    @Override
+    public void interact(com.openworld.character.Character actor) {
+        if (locked || autoOpen || isBroken() || !localPlayerInSensor) return;
+        open = !open;
+        wake();
+    }
+
     @Register
     @Override
     public void _physicsProcess(double delta) {
@@ -265,9 +273,7 @@ public class Door extends Breakable {
             open = false;
         } else if (autoOpen) {
             open = sensorOccupants > 0;
-        } else if (localPlayerInSensor && Input.INSTANCE.isActionJustPressed("interact", false)) {
-            open = !open; // manual E toggle
-        }
+        }   // a manual door toggles in interact() (the E key, through control.Interactions)
 
         float target = open ? 1.0f : 0.0f;
         if (target > 0.0f && progress == 0.0f && !isSlide()) {

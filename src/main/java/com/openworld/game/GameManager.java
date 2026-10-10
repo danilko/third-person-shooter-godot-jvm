@@ -77,6 +77,22 @@ public class GameManager extends Node {
      */
     private final Set<String> alivePlayerCharacterIds = new HashSet<>();
 
+    /** Every input event tells {@link com.openworld.control.InputDevice} which device the human is on (F1). */
+    @Register
+    @Override
+    public void _input(godot.api.InputEvent event) {
+        com.openworld.control.InputDevice.note(event);
+    }
+
+    /** Probe readout / override: the device the human is on ("PAD" / "KEYBOARD_MOUSE"). */
+    @Register public String inputDeviceNow() { return com.openworld.control.InputDevice.last().name(); }
+    /** Probe readouts: what the interact key has on offer, and how many times it used one (control.Interactions). */
+    @Register public int interactOffersNow() { return com.openworld.control.Interactions.offersNow(); }
+    @Register public int interactUsesNow() { return com.openworld.control.Interactions.usesNow(); }
+    @Register public void forceInputDevice(String kind) {
+        com.openworld.control.InputDevice.force(com.openworld.control.InputDevice.Kind.valueOf(kind));
+    }
+
     @Register
     @Override
     public void _ready() {
@@ -723,6 +739,8 @@ public class GameManager extends Node {
             vehicle.tryExit(seat);
             if (seat == 0) vehicle.applyAuthorityState();
         }
+        // the host just moved the body (into the seat / out beside the door): the owner's upstream starts here
+        NetworkManager.hostPlaced(character);
 
         NetworkManager net = getNetworkManager();
         if (net != null && net.isNetworked()) {
@@ -751,8 +769,10 @@ public class GameManager extends Node {
         if (vehicle == null || vehicle.getSeatOccupant(seat) == null || vehicle.getCharacterInfo() == null) return;
         CharacterInfo info = vehicle.getCharacterInfo();
         if (seat == 0) info.ownerPeerId = NetworkManager.SERVER_PEER_ID;
+        Character rider = vehicle.getSeatOccupant(seat);
         vehicle.tryExit(seat);
         if (seat == 0) vehicle.applyAuthorityState();
+        NetworkManager.hostPlaced(rider);
         NetworkManager net = getNetworkManager();
         if (net != null && net.isNetworked() && net.isServer()) {
             net.broadcastVehicleOccupancy(info.characterId, "", info.ownerPeerId, false, seat);

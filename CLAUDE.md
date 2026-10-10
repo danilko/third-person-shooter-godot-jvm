@@ -218,6 +218,7 @@ means that section title in one of these files (`grep -l "<title>" docs/*.md`).
 | `docs/island-world.md` | Terrain3D, the land redo, districts, land planning, block ground, safe-house start, the rebuild review batch, the airport, night lighting |
 | `docs/buildings.md` | building kits, the library, tones + shop windows, streamed cells, lots, civic plots, logistics, forecourts, interiors (mission + shops), sliding doors, stair ramps, vegetation, shop counters |
 | `docs/crowd.md` | the two-tier crowd, island population, the LOD ped body, the VAT tier, holster, gaits, crowd hits |
+| `docs/input.md` | the gamepad (F1): the one binding table, the device tracker, analog walk / look rate / aim assist, triggers as pedals, pause vs back, pad glyphs |
 | `docs/rail-and-stations.md` | rail reserve + rail mode, stations, signals, street names, paid areas, lifts, station forms, EMU1, boardable trains |
 
 ## Godot-JVM Specifics

@@ -63,7 +63,7 @@ import com.openworld.weapon.WeaponItem;
  * in the subclass .gdj for scene signal connections.
  */
 @Script(className = "Pickup")
-public class Pickup extends Node3D {
+public class Pickup extends Node3D implements com.openworld.control.Interactable {
 
   protected static final NodePath WEAPON_CONTROLLER_PATH = new NodePath("WeaponController");
   private static final String PICKUP_AREA = "PickupArea";
@@ -278,10 +278,12 @@ public class Pickup extends Node3D {
       resolveHostCollect(collector);
     }
 
-    if (requireInteract && !overlappingBodies.isEmpty()
-        && Input.INSTANCE.isActionJustPressed("interact", false)) {
-      triggerInteract();
-    }
+  }
+
+  /** E on the item (its "Pick up" prompt is the offer, control.Interactions). */
+  @Override
+  public void interact(com.openworld.character.Character actor) {
+    if (requireInteract && !overlappingBodies.isEmpty()) triggerInteract();
   }
 
   // ── Override points ───────────────────────────────────────────────────────

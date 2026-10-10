@@ -37,7 +37,7 @@ import java.util.Map;
  * {@code MSG_SHOP_REQUEST} item {@link #ITEM}.
  */
 @Script(className = "AmmoSupply")
-public class AmmoSupply extends Area3D {
+public class AmmoSupply extends Area3D implements com.openworld.control.Interactable {
 
     public static final String GROUP = "ammo_supply";
     /** The shop-request item id a client sends to restock at a supply it stands at. */
@@ -129,7 +129,13 @@ public class AmmoSupply extends Area3D {
             setProcess(false);
             return;
         }
-        if (com.openworld.ui.ShopMenu.isOpen() || !Input.INSTANCE.isActionJustPressed("interact", false)) return;
+    }
+
+    /** E at the supply (its prompt is the offer, control.Interactions): restock -- through the host when a client. */
+    @Override
+    public void interact(com.openworld.character.Character actor) {
+        if (inside == null || actor == null || actor.getInstanceId() != inside.getInstanceId() || !GD.isInstanceValid(inside) || !inside.isAlive()
+                || inside.currentVehicleNode != null || com.openworld.ui.ShopMenu.isOpen()) return;
         if (getNodeOrNull("/root/NetworkManager") instanceof NetworkManager net && net.isNetworked() && !net.isServer()) {
             if (inside.getCharacterInfo() != null) net.sendShopRequest(inside.getCharacterInfo().characterId, ITEM);
         } else {

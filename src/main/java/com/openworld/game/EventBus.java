@@ -99,6 +99,7 @@ public class EventBus extends Node {
 
     /** Offer ({@code inRange}) or withdraw the interact prompt of {@code source}. */
     public void interactPrompt(Node source, boolean inRange, String label) {
+        com.openworld.control.Interactions.prompt(source, inRange, label);   // the offers E chooses from (AR4)
         interactPromptChanged.emit(source, inRange, inRange && label != null ? label : "");
     }
 

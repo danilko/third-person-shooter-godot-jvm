@@ -1041,6 +1041,9 @@ public class NetworkManager extends Node {
     private static final double CLAMP_MAX_DT_SECONDS = 0.5;
 
     private final Map<String, double[]> lastAcceptedUpstream = new HashMap<>();   // characterId → {x, y, z, timeMs}
+    /** After a host placement, the owner's clock (ms) until which reports get the capped step (anchorUpstream). */
+    private final Map<String, Integer> anchorGraceUntil = new HashMap<>();
+    private static final int ANCHOR_GRACE_MS = 1000;
 
     private NetMessageCodec.DecodedSnapshot clampUpstreamPosition(NetMessageCodec.DecodedSnapshot snap) {
         Vector3 pos = clampUpstreamPosition(snap.characterId(), snap.position(), snap.senderTimeMs(), MAX_PLAUSIBLE_SPEED);
@@ -1058,10 +1061,25 @@ public class NetworkManager extends Node {
         double[] prev = lastAcceptedUpstream.get(entityId);
         Vector3 accepted = pos;
         if (prev != null) {
-            double dt = Math.min(CLAMP_MAX_DT_SECONDS, Math.max(0.001, (senderTimeMs - prev[3]) / 1000.0));
+            // Anchored by the host (anchorUpstream): for the next ANCHOR_GRACE_MS of the owner's clock every report gets
+            // the capped step -- the owner's last packets from the OLD body (in flight when it was placed) arrive first,
+            // and the first real report from the new spot must not be clamped back toward them.
+            boolean anchored = Double.isNaN(prev[3]);
+            if (anchored) anchorGraceUntil.putIfAbsent(entityId, senderTimeMs + ANCHOR_GRACE_MS);
+            Integer grace = anchorGraceUntil.get(entityId);
+            boolean inGrace = grace != null && senderTimeMs - grace < 0;
+            if (grace != null && !inGrace) anchorGraceUntil.remove(entityId);
+            double dt = anchored || inGrace ? CLAMP_MAX_DT_SECONDS
+                    : Math.min(CLAMP_MAX_DT_SECONDS, Math.max(0.001, (senderTimeMs - prev[3]) / 1000.0));
             double maxDist = maxSpeed * dt * CLAMP_MARGIN;
             double dx = pos.getX() - prev[0], dy = pos.getY() - prev[1], dz = pos.getZ() - prev[2];
             double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if ((anchored || inGrace) && dist > maxDist) {
+                // a STALE report from where the body was before the host placed it (a seat 72 m off, measured): drop
+                // it -- clamping toward it dragged the respawned puppet 30 m back toward the car
+                NetStats.increment("upstream_stale_dropped");
+                return new Vector3((float) prev[0], (float) prev[1], (float) prev[2]);
+            }
             if (dist > maxDist && dist > 0.0) {
                 double s = maxDist / dist;
                 accepted = new Vector3((float) (prev[0] + dx * s), (float) (prev[1] + dy * s), (float) (prev[2] + dz * s));
@@ -2648,6 +2666,7 @@ public class NetworkManager extends Node {
         hostLossHandled = false;        // a fresh session may legitimately detect host loss again
         loggedOnceKeys.clear();   // a fresh session may legitimately re-hit one-shot diagnostics
         lastAcceptedUpstream.clear();
+        anchorGraceUntil.clear();
         lastOwnedStateSendMsById.clear();
         com.openworld.weapon.ProjectileLedger.clear();   // N4: cosmetic copies belong to the session
         com.openworld.weapon.RemoteCharges.clear();
@@ -2860,7 +2879,31 @@ public class NetworkManager extends Node {
     /** Server → all: announce a freshly-instantiated character so every client reconstructs it identically. Called wherever the server adds a Character to the "characters" group (GameManager.spawnPlayerBody, DebugHarness's F10/F11 test spawns). */
     public void announceSpawn(Character character) {
         if (!isServer() || character.characterInfo == null) return;
+        // The host placed this body (a join, a respawn at the hospital / police station): the upstream clamp starts
+        // from HERE. It kept the old body's last position under the same id, so a respawned client was walked from
+        // where it died to where it woke at the plausible-speed cap -- a puppet dragged across the map, shoving every
+        // car on the line (run_net_debugworld, 2026-10-09: a parked car flung 115 m into the sea).
+        anchorUpstream(character.characterInfo.characterId, character.getGlobalPosition());
         broadcastMessage(encodeSpawnFor(character), null);
+    }
+
+    /**
+     * Host: {@code entityId}'s next upstream is measured from {@code at} (a host-decided placement), not from its last
+     * accepted report. The owner's clock is unknown here, so the first report after it gets the capped time step.
+     */
+    public void anchorUpstream(String entityId, Vector3 at) {
+        if (entityId == null || at == null) return;
+        lastAcceptedUpstream.put(entityId, new double[]{at.getX(), at.getY(), at.getZ(), Double.NaN});
+    }
+
+    /**
+     * A hand move of {@code body} by host-side code that every peer makes the same way (WorldBounds' rescues run on
+     * every peer for every Player): on the host, anchor the owner's upstream there. Anywhere else, nothing.
+     */
+    public static void hostPlaced(Node body) {
+        if (!(body instanceof Character c) || c.characterInfo == null || body.getTree() == null) return;
+        if (body.getNodeOrNull("/root/NetworkManager") instanceof NetworkManager net && net.isNetworked() && net.isServer())
+            net.anchorUpstream(c.characterInfo.characterId, c.getGlobalPosition());
     }
 
     /** Server → one peer: the late-join baseline — one MSG_SPAWN per already-live character, so a joining/rejoining client doesn't have to wait for the next live spawn to see the existing world. */

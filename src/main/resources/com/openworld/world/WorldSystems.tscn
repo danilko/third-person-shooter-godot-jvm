@@ -13,26 +13,85 @@
 [ext_resource type="Texture2D" path="res://assets/vfx/splash/splash_drop.png" id="11_spld"]
 [ext_resource type="Texture2D" path="res://assets/vfx/splash/splash_ring.png" id="12_splr"]
 
+[sub_resource type="Gradient" id="Gradient_blood_mist"]
+offsets = PackedFloat32Array(0, 0.25, 1)
+colors = PackedColorArray(0.72, 0.03, 0.03, 0.95, 0.55, 0.02, 0.02, 0.7, 0.35, 0.01, 0.01, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture_blood_mist"]
+gradient = SubResource("Gradient_blood_mist")
+
+[sub_resource type="Curve" id="Curve_blood_grow"]
+max_value = 2.0
+_data = [Vector2(0, 0.5), 0.0, 1.5, 0, 0, Vector2(1, 1.6), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_blood_grow"]
+curve = SubResource("Curve_blood_grow")
+
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_flesh"]
 direction = Vector3(0, 1, 0)
-spread = 28.0
-initial_velocity_min = 1.2
-initial_velocity_max = 3.2
-gravity = Vector3(0, -9.8, 0)
-damping_min = 1.0
-damping_max = 2.0
-scale_min = 0.4
-scale_max = 1.0
+spread = 55.0
+initial_velocity_min = 0.8
+initial_velocity_max = 2.2
+gravity = Vector3(0, -1.5, 0)
+damping_min = 2.5
+damping_max = 4.0
+scale_min = 0.7
+scale_max = 1.5
+scale_curve = SubResource("CurveTexture_blood_grow")
+color_ramp = SubResource("GradientTexture_blood_mist")
+
+[sub_resource type="Gradient" id="Gradient_blood_soft"]
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture_blood_soft"]
+gradient = SubResource("Gradient_blood_soft")
+width = 32
+height = 32
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_flesh"]
+transparency = 1
 shading_mode = 0
-albedo_color = Color(0.34, 0.02, 0.02, 1)
+vertex_color_use_as_albedo = true
+albedo_texture = SubResource("GradientTexture_blood_soft")
 billboard_mode = 3
 billboard_keep_scale = true
 
 [sub_resource type="QuadMesh" id="BoxMesh_flesh"]
 material = SubResource("StandardMaterial3D_flesh")
-size = Vector2(0.035, 0.035)
+size = Vector2(0.34, 0.34)
+
+[sub_resource type="Gradient" id="Gradient_blood_drop"]
+colors = PackedColorArray(0.62, 0.03, 0.03, 1, 0.4, 0.02, 0.02, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture_blood_drop"]
+gradient = SubResource("Gradient_blood_drop")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_blood_drop"]
+direction = Vector3(0, 1, 0)
+spread = 30.0
+initial_velocity_min = 1.8
+initial_velocity_max = 4.2
+gravity = Vector3(0, -9.8, 0)
+damping_min = 0.5
+damping_max = 1.5
+scale_min = 0.6
+scale_max = 1.3
+color_ramp = SubResource("GradientTexture_blood_drop")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_blood_drop"]
+transparency = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_blood_drop"]
+material = SubResource("StandardMaterial3D_blood_drop")
+size = Vector2(0.045, 0.045)
 
 [sub_resource type="Gradient" id="Gradient_dust"]
 colors = PackedColorArray(0.56, 0.53, 0.49, 0.75, 0.56, 0.53, 0.49, 0)
@@ -225,12 +284,21 @@ pool_size_per_type = 40
 
 [node name="1" type="GPUParticles3D" parent="ParticleManager/FLESH" unique_id=1407804374]
 emitting = false
-amount = 14
-lifetime = 0.45
+amount = 7
+lifetime = 0.4
 one_shot = true
 explosiveness = 0.95
 process_material = SubResource("ParticleProcessMaterial_flesh")
 draw_pass_1 = SubResource("BoxMesh_flesh")
+
+[node name="Drops" type="GPUParticles3D" parent="ParticleManager/FLESH/1" unique_id=1407804375]
+emitting = false
+amount = 16
+lifetime = 0.55
+one_shot = true
+explosiveness = 0.95
+process_material = SubResource("ParticleProcessMaterial_blood_drop")
+draw_pass_1 = SubResource("QuadMesh_blood_drop")
 
 [node name="DEFAULT" type="Node" parent="ParticleManager" unique_id=795531080]
 script = ExtResource("2_kfoa7")

@@ -139,8 +139,9 @@ public class CharacterHUD extends Control {
 
   /** The keycap glyph for {@code key}, or null when none is shipped (then the prompt spells it as text). */
   private static godot.api.Texture2D glyph(String key) {
-    return GLYPHS.computeIfAbsent(key, k -> {
-      String path = KeyGlyph.texturePath(k);
+    boolean pad = com.openworld.control.InputDevice.pad();
+    return GLYPHS.computeIfAbsent((pad ? "pad:" : "") + key, k -> {
+      String path = KeyGlyph.texturePath(key, pad);
       return godot.api.ResourceLoader.INSTANCE.exists(path, "") && godot.global.GD.load(path) instanceof godot.api.Texture2D t
           ? t : null;
     });
@@ -154,6 +155,7 @@ public class CharacterHUD extends Control {
   private final java.util.LinkedHashMap<Long, String> prompts = new java.util.LinkedHashMap<>();
   private final java.util.HashMap<Long, Node> promptSources = new java.util.HashMap<>();
   private double promptPrune;
+  private int glyphSwitches;
 
   /** Receive the legacy unkeyed EventBus.pickupInteractChanged (source 0). */
   @Register
@@ -187,6 +189,11 @@ public class CharacterHUD extends Control {
   @Override
   public void _process(double delta) {
     // a source freed without withdrawing its prompt (a pickup taken by a peer, a car despawned) must not leave it up
+    // the human picked up the pad (or the mouse): redraw the shown prompt with that device's glyph
+    if (glyphSwitches != com.openworld.control.InputDevice.switches()) {
+      glyphSwitches = com.openworld.control.InputDevice.switches();
+      if (!prompts.isEmpty()) refreshPrompt();
+    }
     if (prompts.isEmpty() || (promptPrune -= delta) > 0) return;
     promptPrune = 0.5;
     boolean changed = prompts.keySet().removeIf(id -> {

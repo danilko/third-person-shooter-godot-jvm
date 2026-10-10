@@ -77,7 +77,12 @@ public class ShopMenu extends Control {
     }
 
     /** Did a menu close on this frame (so the key that closed it is not read again as "open")? */
-    public static boolean closedThisFrame() { return closedFrame == godot.api.Engine.INSTANCE.getProcessFrames(); }
+    /**
+     * The menu closed this frame or the one before: the E that closed it must not reopen it. One frame of slack because
+     * E now opens the counter from the PHYSICS step (control.Interactions) and a press that lands between frames is
+     * "just pressed" both in the process step that closed the menu and in the next physics step.
+     */
+    public static boolean closedThisFrame() { return godot.api.Engine.INSTANCE.getProcessFrames() - closedFrame <= 1; }
 
     public static void closeFor(ShopCounter counter) {
         if (isOpen() && open.counter == counter) open.close();

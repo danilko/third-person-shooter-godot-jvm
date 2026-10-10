@@ -57,7 +57,13 @@ public class MenuManager extends CanvasLayer {
     @Register
     @Override
     public void _input(InputEvent event) {
-        if (event.isActionPressed("ui_cancel", false)) {
+        // "pause" (Esc / Start) opens and closes the pause menu; "ui_cancel" (Esc / pad B) only ever BACKS OUT -- of the
+        // store, of the pause menu. Pad B is crouch in play, so it must never open a menu (PLAN.md 1.1 / F1).
+        if (getNodeOrNull("SettingsMenu") != null) return;   // the settings page owns the keys until it closes
+        boolean pausePressed = event.isActionPressed("pause", false);
+        boolean backPressed = event.isActionPressed("ui_cancel", false)
+                && (ShopMenu.isOpen() || (pauseMenu != null && pauseMenu.isVisible()));
+        if (pausePressed || backPressed) {
             // an open store menu takes Esc first: it closes the menu, and the game does not pause (user, 2026-10-05)
             if (ShopMenu.isOpen()) {
                 ShopMenu.current().close();
@@ -103,7 +109,21 @@ public class MenuManager extends CanvasLayer {
         if (pauseMenu != null) pauseMenu.hide();
         getTree().setPause(true);
         Input.INSTANCE.setMouseMode(Input.MouseMode.VISIBLE);
-        if (gameOverMenu != null) gameOverMenu.show();
+        if (gameOverMenu != null) { gameOverMenu.show(); focusFirstButton(gameOverMenu); }
+    }
+
+    /**
+     * A menu opened from a pad needs a focused control, or the D-pad / A (Godot's ui_up / ui_down / ui_accept, which
+     * carry the pad by default) do nothing (F1). The first visible, enabled Button, depth first.
+     */
+    static boolean focusFirstButton(Node n) {
+        if (n instanceof godot.api.BaseButton b && b.isVisibleInTree() && !b.isDisabled()
+                && b.getFocusMode() != godot.api.Control.FocusMode.NONE) {
+            b.grabFocus();
+            return true;
+        }
+        for (Node c : n.getChildren()) if (focusFirstButton(c)) return true;
+        return false;
     }
 
     public void restart() {
@@ -140,7 +160,7 @@ public class MenuManager extends CanvasLayer {
         } else {
             getTree().setPause(true);
             Input.INSTANCE.setMouseMode(Input.MouseMode.VISIBLE);
-            if (pauseMenu != null) pauseMenu.show();
+            if (pauseMenu != null) { pauseMenu.show(); focusFirstButton(pauseMenu); }
             com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_CLICK);
         }
     }

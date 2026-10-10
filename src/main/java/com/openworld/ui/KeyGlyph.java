@@ -25,4 +25,28 @@ public final class KeyGlyph {
     public static String texturePath(String key) {
         return "res://assets/ui/prompts/keyboard_" + key.toLowerCase() + ".png";
     }
+
+    /**
+     * The same prompt for a pad player (PLAN.md 1.1 / F1): the key's ACTION, then that action's pad input as laid out
+     * by {@code tools/input/joypad_bindings.py} (Kenney's Steam Deck glyphs, {@code steamdeck_<name>.png}). Null when
+     * the key has no pad twin -- the caller then shows the key as text.
+     */
+    public static String padGlyph(String key) {
+        return switch (key == null ? "" : key.toUpperCase()) {
+            case "E" -> "dpad_right";     // interact
+            case "F" -> "button_y";       // use_carrier
+            case "H" -> "dpad_left";      // holster
+            case "R" -> "button_x";       // reload
+            case "B" -> "button_r1";      // detonate
+            case "G" -> "button_l1";      // radialmenu
+            case "M" -> "dpad_up";        // map
+            default -> null;
+        };
+    }
+
+    public static String texturePath(String key, boolean pad) {
+        if (!pad) return texturePath(key);
+        String g = padGlyph(key);
+        return g == null ? texturePath(key) : "res://assets/ui/prompts/steamdeck_" + g + ".png";
+    }
 }

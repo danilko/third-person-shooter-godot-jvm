@@ -166,32 +166,7 @@ public class WorldMapManager extends Control {
                     lastMouse = pressAt;
                 } else if (pressing) {
                     pressing = false;
-                    if (!dragging) {
-                        Vector3 world = screenToWorld(mb.getPosition());
-                        if (world != null) {
-                            // A click within `placePickPx` of a blip is a click on that PLACE, and its waypoint
-                            // goes to the front of the building rather than to the bare pixel: picking a shop off
-                            // the map is the whole point of drawing it. The pick radius is in PIXELS, so it does
-                            // not change with zoom.
-                            Places.Place hit = pickPlace(mb.getPosition());
-                            pickedPlace = hit == null ? "" : hit.name();
-                            // a STATION opens its departures panel (user, 2026-10-02: "once a station is selected,
-                            // each way's next time"); any other click closes it
-                            selectedStation = hit != null && RoadOverlay.PlaceKind.of(hit) == RoadOverlay.PlaceKind.STATION
-                                    ? hit.at() : null;
-                            // then a click on a cell's printed "x-y" is a click on that POSTAL CODE (3.26(c)): the
-                            // waypoint goes to the cell's centre (sub-cell 5), exactly as `postal x-y` does
-                            int[] code = hit == null && showPostalGrid ? pickPostal(mb.getPosition()) : null;
-                            pickedPostal = code == null ? "" : code[0] + "-" + code[1];
-                            if (code != null) {
-                                double[] c = com.openworld.world.PostalGrid.centre(
-                                        com.openworld.world.PostalGrid.parse(pickedPostal + "-5"));
-                                world = new Vector3(c[0], world.getY(), c[1]);
-                            }
-                            player.setWaypoint(hit == null ? world : hit.go());
-                            com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_WAYPOINT);
-                        }
-                    }
+                    if (!dragging) clickAt(mb.getPosition());
                     dragging = false;
                 }
             } else if (mb.isPressed() && b == godot.core.MouseButton.RIGHT) {
@@ -210,6 +185,35 @@ public class WorldMapManager extends Control {
                 clampView();
             }
             lastMouse = p;
+        }
+    }
+
+    /** A click (or the pad's A on the centre reticle) at {@code px}: a place, a postal code, or a bare point becomes the
+     *  waypoint. */
+    private void clickAt(Vector2 px) {
+        Vector3 world = screenToWorld(px);
+        if (world != null) {
+            // A click within `placePickPx` of a blip is a click on that PLACE, and its waypoint
+            // goes to the front of the building rather than to the bare pixel: picking a shop off
+            // the map is the whole point of drawing it. The pick radius is in PIXELS, so it does
+            // not change with zoom.
+            Places.Place hit = pickPlace(px);
+            pickedPlace = hit == null ? "" : hit.name();
+            // a STATION opens its departures panel (user, 2026-10-02: "once a station is selected,
+            // each way's next time"); any other click closes it
+            selectedStation = hit != null && RoadOverlay.PlaceKind.of(hit) == RoadOverlay.PlaceKind.STATION
+                    ? hit.at() : null;
+            // then a click on a cell's printed "x-y" is a click on that POSTAL CODE (3.26(c)): the
+            // waypoint goes to the cell's centre (sub-cell 5), exactly as `postal x-y` does
+            int[] code = hit == null && showPostalGrid ? pickPostal(px) : null;
+            pickedPostal = code == null ? "" : code[0] + "-" + code[1];
+            if (code != null) {
+                double[] c = com.openworld.world.PostalGrid.centre(
+                        com.openworld.world.PostalGrid.parse(pickedPostal + "-5"));
+                world = new Vector3(c[0], world.getY(), c[1]);
+            }
+            player.setWaypoint(hit == null ? world : hit.go());
+            com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_WAYPOINT);
         }
     }
 
@@ -282,6 +286,35 @@ public class WorldMapManager extends Control {
     @Override
     public void _process(double delta) {
         if (open) queueRedraw();
+        if (open && player != null && com.openworld.control.InputDevice.pad()) padMap(delta);
+    }
+
+    /** Map metres per second a full stick pans, per metre of range (GTA: the map slides under a centre reticle). */
+    @Export public float padPanPerRange = 0.9f;
+
+    /**
+     * The map on a pad (PLAN.md 1.1 / F1, GTA V): either stick slides the map under a fixed centre reticle, RT zooms in
+     * and LT out (about the reticle), A picks what is under the reticle exactly as a click would, X clears the waypoint.
+     */
+    private void padMap(double delta) {
+        Input in = Input.INSTANCE;
+        Vector2 a = in.getVector("left", "right", "forward", "back", -1.0f);
+        Vector2 b = in.getVector("look_left", "look_right", "look_up", "look_down", -1.0f);
+        Vector2 st = a.length() >= b.length() ? a : b;
+        if (st.length() > 0.05f) {
+            float k = (float) (rangeMeters * padPanPerRange * delta);
+            viewX += st.getX() * k;
+            viewZ += st.getY() * k;
+            clampView();
+        }
+        double zoom = in.getActionStrength("aim", false) - in.getActionStrength("fire", false);
+        Vector2 centre = getSize().times(0.5f);
+        if (Math.abs(zoom) > 0.05) zoomAbout(centre, (float) Math.pow(2.0, zoom * delta * 1.5));
+        if (in.isActionJustPressed("ui_accept", false)) clickAt(centre);
+        if (in.isActionJustPressed("reload", false)) {
+            player.clearWaypoint();
+            com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_BACK);
+        }
     }
 
     @Register
@@ -362,6 +395,16 @@ public class WorldMapManager extends Control {
 
         for (Map.Entry<String, Vector3> e : WaypointStore.entries().entrySet()) {
             drawWaypoint(worldToScreen(e.getValue()), waypointColor(e.getKey()));
+        }
+
+        // the pad's reticle: A picks what is under it (padMap)
+        if (com.openworld.control.InputDevice.pad()) {
+            Color rc = new Color(1f, 1f, 1f, 0.9f);
+            drawArc(center, 9f, 0f, (float) (Math.PI * 2.0), 24, rc, 2f, true);
+            drawLine(center.plus(new Vector2(-16f, 0f)), center.plus(new Vector2(-11f, 0f)), rc, 2f, true);
+            drawLine(center.plus(new Vector2(11f, 0f)), center.plus(new Vector2(16f, 0f)), rc, 2f, true);
+            drawLine(center.plus(new Vector2(0f, -16f)), center.plus(new Vector2(0f, -11f)), rc, 2f, true);
+            drawLine(center.plus(new Vector2(0f, 11f)), center.plus(new Vector2(0f, 16f)), rc, 2f, true);
         }
 
         // The player, wherever they are on the map.

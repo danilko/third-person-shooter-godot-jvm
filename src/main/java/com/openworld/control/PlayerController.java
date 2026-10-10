@@ -106,6 +106,9 @@ public class PlayerController extends Controller {
         }
     }
 
+    /** A movement stick pushed less than this (0..1, after the action deadzone) walks instead of runs. */
+    public static final double ANALOG_WALK_BELOW = 0.65;
+
     @Override
     public UserCommand gatherInput(double delta) {
         // Re-resolve if the body has changed (hot-swap or first tick after reparent).
@@ -164,7 +167,9 @@ public class PlayerController extends Controller {
         if (cmd.movementDirection.lengthSquared() > 0.001) {
             // Default movement is SPRINT (run); holding/toggling the stealth key drops
             // to the slower, quieter WALK tier (CS-style "walk to stay quiet").
-            cmd.movementType = stealthInput.poll(inp, stealthToggleMode)
+            // A stick pushed only part way is a walk too (GTA / RDR2): the analog half of F1. The keys read 1.0.
+            boolean partStick = Math.hypot(moveX, moveZ) < ANALOG_WALK_BELOW;
+            cmd.movementType = stealthInput.poll(inp, stealthToggleMode) || partStick
                     ? MovementType.WALK : MovementType.SPRINT;
         }
 
@@ -255,6 +260,7 @@ public class PlayerController extends Controller {
         cmd.wantHolster = inp.isActionJustPressed("holster", false);
         cmd.jump    = inp.isActionJustPressed("jump", false);
         cmd.useLadder = inp.isActionJustPressed("interact", false);
+        cmd.interact  = cmd.useLadder;
 
         // ── Stance (hold or toggle, configurable via stanceToggleMode) ────────
         // Resolve the desired stance from the modal crouch/crawl inputs; crawl (prone)
@@ -331,7 +337,13 @@ public class PlayerController extends Controller {
         UserCommand cmd = new UserCommand();
         Input inp = Input.INSTANCE;
 
-        cmd.motor        = inp.getActionStrength("forward") - inp.getActionStrength("back");
+        // throttle / reverse, not forward / back: the same W / S on a keyboard, but the TRIGGERS on a pad (analog), where
+        // the left stick's forward / back would be a second throttle (PLAN.md 1.1 / F1, joypad_bindings.py)
+        boolean pad = InputDevice.pad();
+        cmd.motor        = inp.getActionStrength("throttle", false) - inp.getActionStrength("reverse", false);
+        // a keyboard player's forward / back still drive (the same W / S; scripts and probes press these actions)
+        if (!pad) cmd.motor = Math.max(-1f, Math.min(1f, cmd.motor
+                + inp.getActionStrength("forward", false) - inp.getActionStrength("back", false)));
         cmd.steering     = -(inp.getActionStrength("right") - inp.getActionStrength("left"));
         cmd.handbrake    = inp.isActionPressed("handbrake", false);
         cmd.brake        = inp.isActionPressed("brake", false);
@@ -340,7 +352,8 @@ public class PlayerController extends Controller {
         cmd.descend      = inp.isActionPressed("crouch", false);
         cmd.enterExit    = inp.isActionJustPressed("use_carrier", false);
         // Weapon inputs: relayed to the occupant by Vehicle when weaponMode != NONE.
-        cmd.fire         = inp.isActionPressed("fire", false);
+        // vehicle_fire, not fire: on a pad "fire" is the right trigger, the throttle here (left mouse on a keyboard)
+        cmd.fire         = inp.isActionPressed("vehicle_fire", false) || (!pad && inp.isActionPressed("fire", false));
         cmd.reload       = inp.isActionJustPressed("reload", false);
         // When there is no PASSENGER_WEAPON, "reload" doubles as a flip-upright reset.
         cmd.resetVehicle = inp.isActionJustPressed("reload", false);
