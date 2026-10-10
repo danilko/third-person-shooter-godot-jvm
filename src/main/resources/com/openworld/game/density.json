@@ -1,0 +1,8 @@
+{
+ "note": "WORLD DENSITY levels (game.WorldDensity; the GAME tab's 'World density', the HOST's choice in co-op and the same for every peer). One row per level -- change a number here to tune a level, nothing else. traffic = simulated ambient cars (ZoneManager.trafficBudget; game/traffic.json scales it per region), walkers = crowd pedestrians promoted to full bodies at once, fighters = how many of those may fight, attack_tokens = units added to crimes.json / gangs.json tokens_by_stars at every star level that has a limit (how many may attack one player at once). NORMAL is the baseline: 12 cars by the user's decision of 2026-10-10 (8 for a race plus a few crowd cars); 10 was the last value measured for the Steam Deck proxy. Run a session or a probe at a level with OW_WORLD_DENSITY=HIGH (or probe_walk_perf -- --density=HIGH).",
+ "levels": {
+  "NORMAL": { "traffic": 12, "walkers": 8, "fighters": 6, "attack_tokens": 0 },
+  "HIGH": { "traffic": 16, "walkers": 12, "fighters": 8, "attack_tokens": 1 },
+  "ULTRA": { "traffic": 22, "walkers": 16, "fighters": 10, "attack_tokens": 2 }
+ }
+}

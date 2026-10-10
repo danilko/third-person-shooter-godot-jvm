@@ -194,7 +194,7 @@ public class ZoneManager extends Node {
 	 * 49 cars + 48 seated drivers within 420 m downtown). A car and its driver cost ~0.16-0.18 ms of physics each per
 	 * tick (3.6), so the budget is what bounds the frame. 0 = unlimited (the control).
 	 */
-	@Export public int trafficBudget = 10;
+	@Export public int trafficBudget = 12;
 	/**
 	 * THE FAR TRAFFIC TIER (PLAN.md R-10): script-free cars on the lanes from the simulation ring out to 700 m
 	 * ({@link FarTraffic}), local to each peer. Off = the old behaviour, an empty street past the ring (the control).

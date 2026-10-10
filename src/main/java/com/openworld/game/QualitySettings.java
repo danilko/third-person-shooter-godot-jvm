@@ -163,16 +163,23 @@ public class QualitySettings extends Node {
      * and must not inherit the player's settings.cfg; {@link #setWorldDensityNow} is their door.
      */
     private void applyDensity() {
+        // OW_WORLD_DENSITY=HIGH runs this session (a perf run, a probe, a debug session) at a level, whatever
+        // settings.cfg says and without writing it
+        String env = godot.api.OS.getEnvironment("OW_WORLD_DENSITY");
+        if (env != null && !env.isEmpty()) {
+            worldDensity = WorldDensity.of(env);
+            densityForced = true;
+        }
         if (!densityForced && probeRun()) return;
         if (getNodeOrNull("/root/NetworkManager") instanceof com.openworld.net.NetworkManager n
                 && n.isNetworked() && !n.isServer()) return;
-        WorldDensity d = worldDensity == null ? WorldDensity.NORMAL : worldDensity;
+        WorldDensity.Row d = (worldDensity == null ? WorldDensity.NORMAL : worldDensity).row();
         if (getNodeOrNull("/root/ZoneManager") instanceof com.openworld.world.ZoneManager zm) {
-            zm.trafficBudget = d.trafficBudget;
-            zm.walkerBudget = d.walkerBudget;
-            zm.fighterBudget = d.fighterBudget;
+            zm.trafficBudget = d.traffic();
+            zm.walkerBudget = d.walkers();
+            zm.fighterBudget = d.fighters();
         }
-        EnforcementDispatch.attackTokenBonus = d.attackTokenBonus;
+        EnforcementDispatch.attackTokenBonus = d.attackTokens();
     }
 
     private boolean densityForced;

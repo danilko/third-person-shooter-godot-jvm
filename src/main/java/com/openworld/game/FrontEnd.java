@@ -78,6 +78,7 @@ public class FrontEnd extends Node {
             if ("1".equals(godot.api.OS.getEnvironment("OW_NO_WARMUP"))) return;
             if ("headless".equals(godot.api.DisplayServer.getName())) return;
             for (String a : godot.api.OS.getCmdlineArgs()) if ("--script".equals(a) || "-s".equals(a)) return;
+            for (String a : godot.api.OS.getCmdlineUserArgs()) if ("--no-warmup".equals(a)) return;
         }
         WorldWarmup w = new WorldWarmup();
         w.setName(new godot.core.StringName("WorldWarmup"));

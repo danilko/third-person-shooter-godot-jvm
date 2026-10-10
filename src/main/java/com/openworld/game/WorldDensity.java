@@ -1,39 +1,79 @@
 package com.openworld.game;
 
+import com.openworld.util.DataReader;
+
+import java.util.EnumMap;
+import java.util.Map;
+
 /**
  * WORLD DENSITY (user, 2026-10-10: "a setting for more crowd vehicles / peds / AI attackers, in case every player's
  * system is high end"): how much the HOST simulates. It is one value per session, the host's -- the bodies it adds
  * are replicated, collidable and shootable, so every peer plays the same street and the same fight whatever its own
  * hardware (PLAN.md H3: host-decided, never scaled per machine). A client's own choice only matters when it hosts.
  *
- * <p>NORMAL is the measured Steam Deck baseline. The steps up were measured on the development PC (probe_walk_perf,
- * 2026-10-10, walk_downtown physics ms p50 / frame p95): 10 cars 6.2 / 18.1, 16 cars 9.3 / 18.1, 22 cars 13.9 / 19.6
- * -- a car is a physics body AND a seated driver, so ULTRA wants a desktop CPU.
+ * <p>The numbers of each level are DATA ({@code game/density.json}, {@code Tables.DENSITY}), so a level is tuned in
+ * one place and a performance run can be made at any of them ({@code OW_WORLD_DENSITY=HIGH}). The values below are
+ * only what a missing table gives. Measured on the development PC (probe_walk_perf, 2026-10-10, walk_downtown
+ * physics ms p50 / frame p95): 10 cars 6.2 / 18.1, 16 cars 9.3 / 18.1, 22 cars 13.9 / 19.6 -- a car is a physics body
+ * AND a seated driver, so ULTRA wants a desktop CPU.
  */
 public enum WorldDensity {
-    /** The Steam Deck baseline. */
-    NORMAL("Normal", 10, 8, 6, 0),
-    HIGH("High", 16, 12, 8, 1),
-    ULTRA("Ultra", 22, 16, 10, 2);
+    NORMAL("Normal", new Row(12, 8, 6, 0)),
+    HIGH("High", new Row(16, 12, 8, 1)),
+    ULTRA("Ultra", new Row(22, 16, 10, 2));
+
+    /**
+     * One level's numbers: simulated ambient cars (ZoneManager.trafficBudget), crowd peds promoted to full bodies and
+     * how many of them may fight (walkerBudget / fighterBudget), and the units added to the dispatch's attack tokens
+     * at every star level that has a limit.
+     */
+    public record Row(int traffic, int walkers, int fighters, int attackTokens) {}
 
     public final String label;
-    /** ZoneManager.trafficBudget: simulated ambient cars. */
-    public final int trafficBudget;
-    /** ZoneManager.walkerBudget / fighterBudget: crowd peds promoted to full bodies, and how many may fight. */
-    public final int walkerBudget, fighterBudget;
-    /** Added to the dispatch's attack tokens at every star level that has a limit (units attacking at once). */
-    public final int attackTokenBonus;
+    private final Row builtIn;
 
-    WorldDensity(String label, int trafficBudget, int walkerBudget, int fighterBudget, int attackTokenBonus) {
+    WorldDensity(String label, Row builtIn) {
         this.label = label;
-        this.trafficBudget = trafficBudget;
-        this.walkerBudget = walkerBudget;
-        this.fighterBudget = fighterBudget;
-        this.attackTokenBonus = attackTokenBonus;
+        this.builtIn = builtIn;
+    }
+
+    public Row builtIn() { return builtIn; }
+
+    /** This level's numbers: the table's row, else the built-in one. */
+    public Row row() {
+        Map<WorldDensity, Row> t = com.openworld.game.data.Tables.DENSITY.get();
+        Row r = t == null ? null : t.get(this);
+        return r != null ? r : builtIn;
     }
 
     public static WorldDensity of(String name) {
         for (WorldDensity d : values()) if (d.name().equalsIgnoreCase(name)) return d;
         return NORMAL;
+    }
+
+    /** Parse game/density.json: a level that is missing, misspelt or not positive is a problem. */
+    public static Map<WorldDensity, Row> read(DataReader d) {
+        Map<WorldDensity, Row> out = new EnumMap<>(WorldDensity.class);
+        DataReader levels = d.child("levels");
+        if (levels == null) {
+            d.problem("levels", "missing");
+            return out;
+        }
+        for (String key : levels.keys()) {
+            WorldDensity level = null;
+            for (WorldDensity w : values()) if (w.name().equals(key)) level = w;
+            DataReader r = levels.child(key);
+            if (level == null) { levels.problem(key, "not a density level"); continue; }
+            if (r == null) continue;
+            Row row = new Row(r.integer("traffic", level.builtIn.traffic()), r.integer("walkers", level.builtIn.walkers()),
+                    r.integer("fighters", level.builtIn.fighters()), r.integer("attack_tokens", level.builtIn.attackTokens()));
+            if (row.traffic() < 1 || row.walkers() < 1 || row.fighters() < 0 || row.attackTokens() < 0) {
+                levels.problem(key, "traffic and walkers must be at least 1, the others not negative");
+                continue;
+            }
+            out.put(level, row);
+        }
+        for (WorldDensity w : values()) if (!out.containsKey(w)) levels.problem(w.name(), "missing (the built-in numbers are used)");
+        return out;
     }
 }

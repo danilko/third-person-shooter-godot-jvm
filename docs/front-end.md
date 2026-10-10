@@ -193,7 +193,7 @@ at once.
 
 | level | simulated cars | promoted peds / fighters | attack tokens |
 |---|---|---|---|
-| NORMAL (the Steam Deck baseline) | 10 | 8 / 6 | as crimes.json / gangs.json |
+| NORMAL (the baseline) | 12 | 8 / 6 | as crimes.json / gangs.json |
 | HIGH | 16 | 12 / 8 | +1 at every star level that has a limit |
 | ULTRA | 22 | 16 / 10 | +2 |
 
@@ -203,6 +203,16 @@ physics ms p50 6.2 / 9.3 / 13.9 and frame p95 18.1 / 18.1 / 19.6 at 10 / 16 / 22
 only NORMAL is safe there. Only the CAR column was measured; the ped and token columns are my picks in proportion
 (unreviewed). Graphics (render scale, shadows, view distance) stay per machine and never change what is simulated.
 Not applied under a probe (`--script`): probes set their own budgets; `set_world_density_now` is their door.
+
+**User decisions, 2026-10-10 (same day):** NORMAL is 12 cars, not 10 ("at least 12 -- maybe 8 cars for racing, and
+a few crowd cars appearing on the road like an arcade racing game"); the HIGH / ULTRA numbers are accepted. The
+levels are DATA: `game/density.json` (`Tables.DENSITY`, one row per level: traffic / walkers / fighters /
+attack_tokens; the enum's built-in row only stands in for a missing file), so a level is tuned in one place.
+`OW_WORLD_DENSITY=HIGH` runs any session -- the game, a debug run, a probe -- at a level without touching
+settings.cfg; `probe_walk_perf -- --density=HIGH` does the same for a perf run. 12 cars on the Deck is NOT measured
+(10 was the last value judged against the Deck proxy); census at 12: 6.3-10.6 simulated cars within 200 m at the
+five sites run. The race rule the user described -- 8 racers AND a few ambient cars on the course -- belongs to the
+racing AI (PLAN 3.4 / 2c.4): racers must not be starved by, or starve, the ambient budget.
 
 ## The loading screen and its warm-up tour (user, 2026-10-10)
 
@@ -222,7 +232,8 @@ after 60 s; (3) clears the focus, hands the view back and waits for the streamer
   are read back (from the OS file cache) when the player really goes there -- it does not hold VRAM. The hitch
   reduction itself is NOT measured yet (it needs a windowed A/B of probe_walk_perf's worst frames with and without).
 - Cancel / B / Esc skips the tour. Off under a probe (`--script`), on the headless display, in DebugWorld (it only
-  starts for World.tscn), and with `OW_NO_WARMUP=1`; `OW_WARMUP=1` forces it.
+  starts for World.tscn), with `OW_NO_WARMUP=1`, and with the user argument `-- --no-warmup` (a debug session that
+  wants the island at once); `OW_WARMUP=1` forces it. The user accepted a 15-60 s tour behind the cover (2026-10-10).
 
 Gate: `probe_world_warmup.gd` 11/11 (cover up from the first frame to the end; the player moved 0.00 m; loaded zones
 110 -> peak 169 during the tour; held + invulnerable meanwhile; focus, hold and invulnerability gone at the end; the

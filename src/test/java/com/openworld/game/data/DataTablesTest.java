@@ -27,7 +27,7 @@ class DataTablesTest {
         assertNotNull(Tables.CRIMES.get());
         List<String> names = new ArrayList<>();
         for (DataTable<?> t : Tables.all()) names.add(t.name);
-        assertEquals(List.of("crimes", "gangs", "economy", "supplies", "ammo_supply", "traffic", "outfits"), names);
+        assertEquals(List.of("crimes", "gangs", "economy", "supplies", "ammo_supply", "density", "traffic", "outfits"), names);
         assertEquals(List.of(), DataTable.validateAll());
     }
 
@@ -44,6 +44,15 @@ class DataTablesTest {
         assertTrue(Tables.SUPPLIES.get().containsKey("onigiri"));
         assertTrue(Tables.AMMO_SUPPLY.get().stockByVehicle().get("POC1") > 0);
         assertTrue(Tables.OUTFITS.get().containsKey("police"));
+        // every density level has its row in the file, each one more than the last, and NORMAL is at least the
+        // 12 cars the user asked for
+        var normal = com.openworld.game.WorldDensity.NORMAL.row();
+        var high = com.openworld.game.WorldDensity.HIGH.row();
+        var ultra = com.openworld.game.WorldDensity.ULTRA.row();
+        assertEquals(3, Tables.DENSITY.get().size());
+        assertTrue(normal.traffic() >= 12, "NORMAL " + normal);
+        assertTrue(high.traffic() > normal.traffic() && ultra.traffic() > high.traffic());
+        assertTrue(high.walkers() >= normal.walkers() && ultra.walkers() >= high.walkers());
     }
 
     /** The control: the same parser on a table with a typo reports it (so the clean result above means something). */

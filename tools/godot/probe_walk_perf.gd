@@ -16,6 +16,7 @@ extends SceneTree
 ##       [--no-interior-nav]   control: no building interior navmesh regions attach as cells stream (world.InteriorNav)
 ##       [--no-dummy] [--no-think]   controls: no dummy traffic cars (1g e) / every AI decides every tick (1g d)
 ##       [--no-balance]   control: the dispatch adds on top of the ambient budgets (ZoneManager.enforcementBalancing)
+##       [--density=NORMAL|HIGH|ULTRA]   run at a World density level (game/density.json: cars, promoted peds, tokens)
 ##       [--traffic-budget=N] [--sim-radius=M] [--recycle=M]   PLAN.md 2c sweeps: ZoneManager's car budget, simulation
 ##                  ring and the leaving-car recycle distance (0 = off)
 ##       [--walker-budget=N] [--promote-ring=M]   crowd sweeps: ZoneManager.walkerBudget / every PedCrowd.promoteDistance
@@ -321,6 +322,9 @@ func _initialize() -> void:
 	player.get_node("Health").set("max_health", 1000000.0)
 	if _arg("wanted") != null or _arg("gang") != null:
 		player.get_node("Health").set("invulnerable", true)
+	if _arg("density") != null and root.get_node_or_null("QualitySettings") != null:
+		root.get_node("QualitySettings").call("set_world_density_now", str(_arg("density")))
+		print("SWEEP: world density %s (game/density.json)" % str(_arg("density")))
 	if zm != null and _arg("traffic-budget") != null:
 		zm.set("traffic_budget", int(_arg("traffic-budget")))
 		print("SWEEP: traffic budget %d" % int(_arg("traffic-budget")))
