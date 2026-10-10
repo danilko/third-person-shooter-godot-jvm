@@ -38,7 +38,7 @@ import java.util.Map;
  * the local player's route, the players near the view, every player's waypoint and the player.
  *
  * <p>Overlay discipline mirrors {@code WeaponRadialMenu}: while open it sets the local
- * {@code Character.inputBlocked = true} and mouse mode {@code VISIBLE} (so a click can't fire the gun —
+ * a MENU input context ({@code Character.inputContexts}, which also shows the pointer) (so a click can't fire the gun —
  * {@code Character._physicsProcess} feeds an empty command while blocked) and moves itself to the front
  * to capture clicks. <b>Does not pause the simulation</b> (host-authoritative co-op keeps running).
  */
@@ -267,8 +267,7 @@ public class WorldMapManager extends Control {
         fitWorld();
         Node parent = getParent();
         if (parent != null) parent.moveChild(this, parent.getChildCount() - 1);
-        Input.setMouseMode(Input.MouseMode.VISIBLE);
-        player.inputBlocked = true;
+        player.inputContexts.push("map", com.openworld.control.InputContext.MENU);
         setVisible(true);
         com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_CLICK);
         queueRedraw();
@@ -276,8 +275,7 @@ public class WorldMapManager extends Control {
 
     private void close() {
         open = false;
-        if (player != null) player.inputBlocked = false;
-        Input.setMouseMode(Input.MouseMode.CAPTURED);
+        if (player != null) player.inputContexts.pop("map");
         setVisible(false);
         com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_CLICK);
     }

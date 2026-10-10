@@ -288,10 +288,27 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     // ── Non-authority replication writes (extracted to CharacterReplication — WS5 god-class split) ──
     final CharacterReplication replication = new CharacterReplication(this);
 
-    // ── UI input lock (set by radial menu / pause / any overlay that must own the mouse) ──
-    public boolean inputBlocked = false;
+    // ── Input contexts (PLAN.md AR4): every overlay that owns this body's input pushes under its own name ──
+    /** Who owns this body's input, newest on top; GAMEPLAY when empty. See {@link com.openworld.control.InputContextStack}. */
+    public final com.openworld.control.InputContextStack inputContexts =
+            new com.openworld.control.InputContextStack(this::onInputContextChanged);
+    /** Whether an overlay (or an arrest) holds this body's input: the controller is skipped, the command is empty. */
+    public boolean inputBlocked() { return inputContexts.blocksGameplay(); }
     /** For probes: is an overlay (shop menu, radial menu, console) holding this body's input. */
-    @Register public boolean inputBlockedNow() { return inputBlocked; }
+    @Register public boolean inputBlockedNow() { return inputContexts.blocksGameplay(); }
+    /** For probes and the bug line: the contexts, bottom to top ("map:MENU,radial:MENU"). */
+    @Register public String inputContextsNow() { return inputContexts.describe(); }
+    /** Probe control only (probe_input_contexts --legacy): take one owner's context off by name. */
+    @Register public void popInputContext(String owner) { inputContexts.pop(owner); }
+
+    /** The pointer follows the top context -- for the body THIS machine plays only (an arrested remote player's host
+     *  must not free its own mouse). The look itself re-captures every frame while nothing blocks
+     *  ({@code PlayerCameraController.gatherLookInput}), so only the shown case needs stating here. */
+    private void onInputContextChanged() {
+        if (!isInsideTree() || !isLocallyOwnedPlayer()) return;
+        godot.api.Input.INSTANCE.setMouseMode(inputContexts.showsCursor()
+                ? godot.api.Input.MouseMode.VISIBLE : godot.api.Input.MouseMode.CAPTURED);
+    }
     /** In combat (aiming / fighting) this tick -- a probe readout. */
     @Register public boolean combatNow() { return combat; }
 
@@ -720,7 +737,7 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
             // inputBlocked is set by UI overlays (radial menu, pause) that own the mouse.
             // _physicsProcess still runs while blocked — we return an empty command so the
             // character stays still without interrupting physics (gravity, collision).
-            cmd = inputBlocked ? new UserCommand() : controller.gatherInput(delta);
+            cmd = inputBlocked() ? new UserCommand() : controller.gatherInput(delta);
         } else {
             cmd = gatherInput(delta); // fallback: subclass override
         }

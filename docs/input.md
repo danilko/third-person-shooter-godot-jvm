@@ -133,6 +133,41 @@ E beside a door and a pickup did BOTH, and no AI or remote body could use anythi
   UI's own keys (ShopMenu, the map). No MSG_INTERACT yet: each interactable keeps its own host path (shop request,
   pickup request, supply use), unchanged.
 
+## Overlays push INPUT CONTEXTS (AR4, input half, 2026-10-10)
+
+Before: five owners wrote ONE `Character.inputBlocked` boolean and set the mouse mode themselves -- the weapon wheel,
+the shop, the map, the console and an arrest. With the wheel held over the map, closing the map wrote `false` and
+`CAPTURED` under the still-open wheel; and the wheel's release handler ran even when the press had been refused (a
+reload), clearing whatever else was open. Now:
+
+- `control.InputContextStack` on every Character (`inputContexts`), engine-free and unit-tested
+  (`InputContextStackTest`): each owner pushes under its OWN name (`radial`, `shop`, `map`, `console`, `pause`,
+  `arrest`) and pops that name, in any order; a pop of a name that is not there is a no-op. The top decides.
+- `control.InputContext`: `MENU` (blocks the controller, shows the pointer) and `HELD` (blocks, pointer stays
+  captured: an arrest). Gameplay is the EMPTY stack. On foot vs in a vehicle is deliberately NOT a context: it is
+  already derived from the seat (`currentVehicleNode`), and a pushed copy would be a second latch.
+- `Character.inputBlocked()` (was the field) reads the stack; the pointer follows the top context, applied by the
+  Character only for the body this machine plays (a host arresting a client's body must not free its own mouse).
+  `MenuManager`'s pause is a context too, so resuming over an open shop or map keeps their pointer.
+- Readouts: `input_blocked_now()`, `input_contexts_now()` ("map:MENU,radial:MENU").
+- Gate `tools/godot/probe_input_contexts.gd` 7/7 (in nightly_gates; under xvfb it also checks the pointer): map, wheel
+  over it, map shut -> still blocked with the pointer free; wheel released -> free and captured; a stray wheel release
+  under the map does not free the body. `--legacy` (the map's close also clears the wheel, what the one flag did)
+  fails the case.
+
+**Found with it: E could not close the shop above 60 fps.** `ShopMenu.closedThisFrame` guarded the reopen with one
+PROCESS frame of slack, but E opens the counter from the PHYSICS step; with 2+ process frames per physics step (a
+144 Hz display, an uncapped headless run) the same held press reopened the store two frames after closing it --
+`probe_weapon_counter`'s "interact opens it again and interact closes it" had been failing on HEAD for this reason.
+Now an E close refuses a reopen until E is released, at any frame rate; the probe holds its press like a person does.
+
+**MSG_INTERACT is deferred to 3.0 (decision 2026-10-10).** Every interactable today already has a correct path: the
+door is cosmetic and local per peer (the no-sync rule), a pickup swap rides MSG_PICKUP_REQUEST and its tested grant
+policy, the counter's menu is local UI whose purchase is MSG_SHOP_REQUEST, the ammo supply rides MSG_SHOP_REQUEST,
+and AI bodies are the host's, so they call `interact` directly. One generic message would have no consumer until a
+client's use must change HOST state with no item transaction behind it -- PuzzleStation, captive actions (cuff /
+lead / load), seats in 3.0 -- so it is built with the first of them, not ahead of it.
+
 ## Gate
 
 `tools/godot/probe_gamepad.gd` 18/18 (in `tools/nightly_gates.sh`): real joypad events through
@@ -142,8 +177,8 @@ RT throttle (half slower than full), LT reverse, the triggers neither fire nor a
 
 ## What is not done yet
 
-- AR4's input half, rest: the input-context stack (on-foot / vehicle / menu / close-up as a stack instead of each
-  reader checking `inputBlocked`), one host-validated MSG_INTERACT, AI / remote bodies using Interactables.
+- AR4's input half, rest: a CLOSE_UP / PUZZLE context when 3.0's CloseUpMode lands (pushed like the others), and
+  MSG_INTERACT with its first host-state consumer (3.0, above).
 - UI focus in the shop and the map (the pause / game-over menus are done); a settings page for sensitivity, invert,
   aim assist (F2).
 - Rebinding (F2), a Deck play test of the rates (F10), rumble.

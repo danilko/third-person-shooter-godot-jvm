@@ -76,13 +76,23 @@ public class ShopMenu extends Control {
         openedFrame = godot.api.Engine.INSTANCE.getProcessFrames();
     }
 
-    /** Did a menu close on this frame (so the key that closed it is not read again as "open")? */
+    /** The menu was closed by E and E has not been let go since. */
+    private static boolean closedByInteract;
+
     /**
-     * The menu closed this frame or the one before: the E that closed it must not reopen it. One frame of slack because
-     * E now opens the counter from the PHYSICS step (control.Interactions) and a press that lands between frames is
-     * "just pressed" both in the process step that closed the menu and in the next physics step.
+     * The key that just closed the menu must not reopen it. E opens the counter from the PHYSICS step
+     * (control.Interactions) and closes it from this _process, so one press is "just pressed" in both. This used to be
+     * one PROCESS frame of slack, which only covers a press when there is one process frame per physics step: above
+     * 60 fps (a 144 Hz display, or an uncapped headless run) the next physics step came 2+ frames later and the same
+     * press reopened the store -- E could not close it (probe_weapon_counter, found 2026-10-10). Now: refused for a
+     * frame after any close, and after an E close until E is RELEASED, whatever the frame rate.
      */
-    public static boolean closedThisFrame() { return godot.api.Engine.INSTANCE.getProcessFrames() - closedFrame <= 1; }
+    public static boolean closedThisFrame() {
+        if (godot.api.Engine.INSTANCE.getProcessFrames() - closedFrame <= 1) return true;
+        if (closedByInteract && Input.INSTANCE.isActionPressed("interact", false)) return true;
+        closedByInteract = false;
+        return false;
+    }
 
     public static void closeFor(ShopCounter counter) {
         if (isOpen() && open.counter == counter) open.close();
@@ -136,8 +146,7 @@ public class ShopMenu extends Control {
     }
 
     private void block(boolean on) {
-        if (buyer != null && GD.isInstanceValid(buyer)) buyer.inputBlocked = on;
-        Input.INSTANCE.setMouseMode(on ? Input.MouseMode.VISIBLE : Input.MouseMode.CAPTURED);
+        if (buyer != null && GD.isInstanceValid(buyer)) buyer.inputContexts.set("shop", com.openworld.control.InputContext.MENU, on);
     }
 
     public void close() {
@@ -156,7 +165,7 @@ public class ShopMenu extends Control {
         Input in = Input.INSTANCE;
         if (in.isActionJustPressed("ui_cancel", false)) { close(); return; }
         if (in.isActionJustPressed("interact", false)
-                && godot.api.Engine.INSTANCE.getProcessFrames() != openedFrame) { close(); return; }
+                && godot.api.Engine.INSTANCE.getProcessFrames() != openedFrame) { closedByInteract = true; close(); return; }
         if (in.isActionJustPressed("ui_down", false) || in.isActionJustPressed("back", false)) move(1);
         if (in.isActionJustPressed("ui_up", false) || in.isActionJustPressed("forward", false)) move(-1);
         if (in.isActionJustPressed("ui_accept", false)) buySelected();

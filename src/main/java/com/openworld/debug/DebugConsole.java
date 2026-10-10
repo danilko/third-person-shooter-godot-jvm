@@ -32,7 +32,7 @@ import java.util.Deque;
  * be iterated on in one session instead of one per restart.
  *
  * <p>Built in code (the {@code PerfDebugOverlay} convention), so it needs no scene wiring and is
- * available in every scene that has a {@code DebugHarness}. Opening it sets {@code inputBlocked} on
+ * available in every scene that has a {@code DebugHarness}. Opening it pushes a MENU input context on
  * every local player and frees the mouse — the same two things every other modal overlay does
  * ({@code WorldMapManager}, {@code WeaponRadialMenu}) — because otherwise typing "state" would walk
  * the player and shoot.
@@ -110,7 +110,7 @@ public class DebugConsole extends CanvasLayer {
      */
     private void blockPlayerInput(boolean blocked) {
         for (Player p : PlayerRegistry.getPlayers()) {
-            if (GD.isInstanceValid(p)) p.inputBlocked = blocked;
+            if (GD.isInstanceValid(p)) p.inputContexts.set("console", com.openworld.control.InputContext.MENU, blocked);
         }
     }
 

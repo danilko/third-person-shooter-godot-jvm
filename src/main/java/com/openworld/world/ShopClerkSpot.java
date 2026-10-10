@@ -155,7 +155,7 @@ public class ShopClerkSpot extends Node3D {
         Vector3 chest = clerk.getGlobalPosition().plus(new Vector3(0, 1.2, 0));
         Player aimer = null;
         for (Player p : PlayerRegistry.getPlayers()) {
-            if (!GD.isInstanceValid(p) || !p.isAlive() || !p.isCombat() || p.inputBlocked) continue;
+            if (!GD.isInstanceValid(p) || !p.isAlive() || !p.isCombat() || p.inputBlocked()) continue;
             if (!drawsWeapon(p)) continue;
             if (p.getGlobalPosition().distanceTo(chest) > THREAT_RANGE) continue;
             Vector3 aim = p.getAimTargetPosition();

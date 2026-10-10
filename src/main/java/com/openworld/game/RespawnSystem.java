@@ -169,7 +169,7 @@ public class RespawnSystem extends Node {
         // a lethal-wanted player is not arrested: police shoot (user, 2026-10-03 -- it usually ends in hospital)
         WantedSystem ws = WantedSystem.get();
         if (ws != null && ws.isLethal(p.getCharacterInfo().characterId)) return false;
-        p.inputBlocked = true;
+        p.inputContexts.push("arrest", com.openworld.control.InputContext.HELD);
         start(p, p.getCharacterInfo(), Reason.ARRESTED);
         return true;
     }

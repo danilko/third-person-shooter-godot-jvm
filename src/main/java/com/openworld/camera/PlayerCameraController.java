@@ -138,7 +138,7 @@ public class PlayerCameraController extends TPSCameraController {
     // mouse or apply look. This runs in _physicsProcess, which setProcessInput(false) does not stop,
     // so without this guard the per-frame CAPTURED re-grab below immediately hides/locks the cursor
     // the overlay just made visible — making the radial menu impossible to navigate with the mouse.
-    if (character != null && character.inputBlocked) {
+    if (character != null && character.inputBlocked()) {
       pendingYaw   = 0;
       pendingPitch = 0;
       return Vector2.Companion.getZERO();

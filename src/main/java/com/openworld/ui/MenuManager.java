@@ -101,7 +101,7 @@ public class MenuManager extends CanvasLayer {
 
     public void resume() {
         if (pauseMenu != null) pauseMenu.hide();
-        Input.INSTANCE.setMouseMode(Input.MouseMode.CAPTURED);
+        pauseContext(false);
         getTree().setPause(false);
     }
 
@@ -154,12 +154,27 @@ public class MenuManager extends CanvasLayer {
 
     // ── Internal ──────────────────────────────────────────────────────────────
 
+    /**
+     * The pause menu is one more MENU input context on every body this machine plays (PLAN.md AR4), so resuming over an
+     * open shop or map leaves THEIR pointer up instead of capturing it under them. With no local body (a host's empty
+     * scene) the pointer is set directly.
+     */
+    private void pauseContext(boolean on) {
+        boolean any = false;
+        for (com.openworld.character.Player p : com.openworld.game.PlayerRegistry.getPlayers()) {
+            if (!godot.global.GD.isInstanceValid(p) || !p.isLocallyOwnedPlayer()) continue;
+            p.inputContexts.set("pause", com.openworld.control.InputContext.MENU, on);
+            any = true;
+        }
+        if (!any) Input.INSTANCE.setMouseMode(on ? Input.MouseMode.VISIBLE : Input.MouseMode.CAPTURED);
+    }
+
     private void togglePause() {
         if (pauseMenu != null && pauseMenu.isVisible()) {
             resume();
         } else {
             getTree().setPause(true);
-            Input.INSTANCE.setMouseMode(Input.MouseMode.VISIBLE);
+            pauseContext(true);
             if (pauseMenu != null) { pauseMenu.show(); focusFirstButton(pauseMenu); }
             com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_CLICK);
         }

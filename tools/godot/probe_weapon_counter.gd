@@ -142,6 +142,9 @@ func _menu(n: Node) -> Node:
 func _press(action: String) -> void:
 	Input.action_press(action)
 	await physics_frame
+	# held across a whole process step and into the next, like a real press (a human E lasts ~6 frames): the E that
+	# closes the store must not reopen it while still held (ShopMenu.closedThisFrame, 2026-10-10)
+	await process_frame
 	await process_frame
 	Input.action_release(action)
 	await process_frame
@@ -221,7 +224,8 @@ func _counter_cycle(counter: Area3D, p: CharacterBody3D, spawn: Node3D, weapon: 
 	await _press("interact")
 	await _tick(4)
 	_check("interact opens it again and interact closes it", reopened and _menu(root) == null
-			and not bool(p.call("input_blocked_now")))
+			and not bool(p.call("input_blocked_now")), "reopened %s, open after %s, blocked %s" % [reopened,
+			_menu(root) != null, p.call("input_blocked_now")])
 	# Esc as a real input EVENT (the pause menu listens to events): it closes the store and does NOT pause the game
 	await _press("interact")
 	await _tick(2)
