@@ -95,6 +95,21 @@ public class WeaponRecoilModifier extends SkeletonModifier3D {
     public float getRestEpsilon() { return restEpsilon; }
     public void setRestEpsilon(float v) { this.restEpsilon = v; }
 
+    /** The cover lift (PLAN.md 1d): how high the arm may raise the gun over low cover (m), and how fast it moves
+     *  there (m/s). 0 max = never lift (the control). The TARGET comes from WeaponController every few frames. */
+    @Export public float maxLift = 0.30f;
+    @Export public float liftSpeed = 1.6f;
+    public float getMaxLift() { return maxLift; }
+    public void setMaxLift(float v) { this.maxLift = v; }
+    public float getLiftSpeed() { return liftSpeed; }
+    public void setLiftSpeed(float v) { this.liftSpeed = v; }
+    private double lift, liftTarget;
+
+    /** The lift to move toward (m, clamped to {@link #maxLift}). */
+    public void setLiftTarget(double metres) { liftTarget = Math.max(0.0, Math.min(maxLift, metres)); }
+    /** The lift the arm carries right now (m) -- for probes and for the next search's start. */
+    @Register public double currentLift() { return lift; }
+
     private WeaponController weaponController;
     private boolean controllerResolved = false;
 
@@ -157,7 +172,11 @@ public class WeaponRecoilModifier extends SkeletonModifier3D {
             if (Math.abs(back) < restEpsilon && Math.abs(backVel) < restEpsilon) { back = 0.0; backVel = 0.0; }
             if (Math.abs(pitch) < restEpsilon && Math.abs(pitchVel) < restEpsilon) { pitch = 0.0; pitchVel = 0.0; }
         }
-        if (back == 0.0 && pitch == 0.0) return;          // at rest: the arm is the clip's/the IK's
+        if (dt > 0.0 && lift != liftTarget) {
+            double stepM = liftSpeed * dt;
+            lift = Math.abs(liftTarget - lift) <= stepM ? liftTarget : lift + Math.signum(liftTarget - lift) * stepM;
+        }
+        if (back == 0.0 && pitch == 0.0 && lift == 0.0) return;   // at rest: the arm is the clip's/the IK's
 
         if (!controllerResolved) {
             controllerResolved = true;
@@ -183,11 +202,33 @@ public class WeaponRecoilModifier extends SkeletonModifier3D {
         Transform3D hand = skel.getBoneGlobalPose(ie);
         Vector3 pivot = skel.getBoneGlobalPose(iu).getOrigin();
         Vector3 target = pivot.plus(rise.times(hand.getOrigin().minus(pivot))).plus(boreBack.times((float) back));
+        // The cover lift: straight up in the WORLD (the skeleton's frame may be turned), and then the gun re-pointed
+        // at the aim target from its new height -- "raise against the aim target" -- so the bore still converges on
+        // the crosshair instead of shooting a parallel line over it.
+        Basis aimFix = null;
+        if (lift > 0.0) {
+            Basis toSkel = skel.getGlobalTransform().getBasis().inverse();
+            Vector3 upS = toSkel.times(new Vector3(0, 1, 0)).normalized();
+            Vector3 liftV = upS.times((float) lift);
+            target = target.plus(liftV);
+            godot.api.Node body = weaponController != null ? weaponController.getParent() : null;
+            if (body instanceof Character c) {
+                Vector3 aimS = skel.getGlobalTransform().affineInverse().times(c.getAimTargetPosition());
+                Vector3 from = aimS.minus(gun.getOrigin());
+                Vector3 to = aimS.minus(gun.getOrigin().plus(liftV));
+                if (from.length() > 0.5 && to.length() > 0.5) {
+                    Vector3 axis = from.cross(to);
+                    double ang = from.angleTo(to);
+                    if (axis.length() > 1e-6 && ang > 1e-5) aimFix = new Basis(axis.normalized(), ang);
+                }
+            }
+        }
         Vector3 solved = TwoBoneIK.solve(skel, iu, il, ie, target, 1.0f);
         if (solved == null) return;
         // The gun turns WITH the hand: TwoBoneIK moves the hand by swinging its parents, which leaves
         // the hand's own rotation to them, so the kick's rotation is stated here explicitly.
-        skel.setBoneGlobalPose(ie, new Transform3D(rise.times(hand.getBasis()), solved));
+        Basis turn = aimFix != null ? aimFix.times(rise) : rise;
+        skel.setBoneGlobalPose(ie, new Transform3D(turn.times(hand.getBasis()), solved));
     }
 
     @Register
@@ -196,5 +237,6 @@ public class WeaponRecoilModifier extends SkeletonModifier3D {
         weaponController = null;
         controllerResolved = false;
         back = 0.0; backVel = 0.0; pitch = 0.0; pitchVel = 0.0;
+        lift = 0.0; liftTarget = 0.0;
     }
 }

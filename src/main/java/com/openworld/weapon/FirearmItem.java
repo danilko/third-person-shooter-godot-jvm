@@ -564,6 +564,36 @@ public class FirearmItem extends WeaponItem {
 	return hit.point;
   }
 
+  /** Beyond this from the muzzle an obstruction is not "the cover lip in front of the gun": no lift for it (m). */
+  private static final double LIFT_REACH = 2.5;
+
+  /**
+   * THE COVER LIFT (PLAN.md 1d, user 2026-10-09: "raise the gun against the aim target"): how far the gun must be
+   * raised for its line to clear low cover -- a shelf, a car bonnet, a wall top -- that the camera sees over. 0 when
+   * the line is already clear, when what blocks it is further than {@link #LIFT_REACH} from the muzzle (a real wall
+   * down range is not lifted over), or when no lift up to {@code max} clears it (the crosshair's x then says so).
+   * {@code current} is the lift the arm already carries, so the search starts from the UNLIFTED muzzle. The bullet
+   * still leaves the real muzzle (the arm actually raises the gun), so a character fully behind a wall gains nothing.
+   */
+  public double coverLift(double current, double max, double step) {
+	if (!useMuzzleTrace()) return 0.0;
+	RayCast3D ray = getEffectiveAimRay();
+	if (ray == null || !ray.isInsideTree()) return 0.0;
+	Vector3 sight = resolveSightPoint(ray);
+	Vector3 up = new Vector3(0, 1, 0);
+	Vector3 base = weaponMuzzle().getGlobalPosition().minus(up.times(current));
+	for (double h = 0.0; h <= max + 1e-6; h += step) {
+	  Vector3 o = base.plus(up.times(h));
+	  Vector3 to = sight.minus(o);
+	  double len = to.length();
+	  if (len < BLOCK_SLACK + 0.05) return 0.0;
+	  TraceHit hit = trace(ray, o, to.normalized(), (float) (len - 0.05));
+	  if (hit == null || hit.point.distanceTo(sight) < BLOCK_SLACK) return h;
+	  if (h == 0.0 && hit.point.distanceTo(o) > LIFT_REACH) return 0.0;
+	}
+	return 0.0;
+  }
+
   private Vector3 resolveShotOrigin(RayCast3D ray) {
 	Vector3 muzzle = weaponMuzzle().getGlobalPosition();
 	if (owningCharacter == null) return muzzle;

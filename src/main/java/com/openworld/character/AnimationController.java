@@ -500,6 +500,11 @@ public class AnimationController extends Node {
    * A weapon that authors no kick passes zeros and nothing happens.
    */
   @Register
+  /** The cover lift's target (m) for the firing arm (PLAN.md 1d), and the lift it carries now. */
+  public void setCoverLift(double metres) { if (recoilModifier != null) recoilModifier.setLiftTarget(metres); }
+  public double coverLiftNow() { return recoilModifier != null ? recoilModifier.currentLift() : 0.0; }
+  public double coverLiftMax() { return recoilModifier != null ? recoilModifier.maxLift : 0.0; }
+
   public void onWeaponKick(double back, double pitchDeg, double spring, double damping) {
     if (recoilModifier == null || (back == 0.0 && pitchDeg == 0.0)) return;
     recoilModifier.kick(back, pitchDeg, spring, damping);

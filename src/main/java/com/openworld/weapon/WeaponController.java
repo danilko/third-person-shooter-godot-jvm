@@ -494,6 +494,7 @@ public class WeaponController extends Node {
   public void _process(double delta) {
     // N3: the rest of a replicated burst, one cue per remembered shot at the weapon's own rhythm.
     remoteCues.tick(delta);
+    updateCoverLift();
     // Process equips first (deferred from Area3D body_entered signals)
     if (!pendingEquips.isEmpty()) {
       equippedThisPass.clear();
@@ -952,6 +953,33 @@ public class WeaponController extends Node {
   public String fireGateReport() {
     return String.format(java.util.Locale.ROOT, "fireTimer %.3f reloadTimer %.3f transitioning %s buffered %s",
         fireTimer.getTimeLeft(), reloadTimer.getTimeLeft(), isWeaponTransitioning(), bufferedFireUntilMs > 0);
+  }
+
+  private int liftIn;
+
+  /**
+   * The cover lift (PLAN.md 1d): every third frame, while this body is in combat with a firearm up, ask the gun how
+   * high it must rise to clear low cover, and hand that to the firing arm (AnimationController -> the recoil
+   * modifier, which eases there and re-aims). Out of combat, holstered, switching, scoped, in first person or seated
+   * the target is 0 and the arm comes back down. An AI off the ACTIVE tier asks nothing.
+   */
+  private void updateCoverLift() {
+    if (--liftIn > 0) return;
+    liftIn = 3;
+    AnimationController ac = animation();
+    if (ac == null || ac.coverLiftMax() <= 0.0) return;
+    double want = 0.0;
+    if (getParent() instanceof Character c && c.isCombat() && !isHolstered() && !isWeaponTransitioning()
+        && !isWeaponReloading() && getCurrentWeaponItem() instanceof FirearmItem f
+        && !(c instanceof com.openworld.character.AICharacter ai && ai.getLodLevel() != com.openworld.ai.AILodLevel.ACTIVE))
+      want = f.coverLift(ac.coverLiftNow(), ac.coverLiftMax(), 0.05);
+    ac.setCoverLift(want);
+  }
+
+  /** The cover lift the firing arm carries now (m; probe readout). */
+  @Register public double coverLiftNow() {
+    AnimationController ac = animation();
+    return ac != null ? ac.coverLiftNow() : 0.0;
   }
 
   /** Next hitscan trigger-pull counter (PLAN.md N1) — the seed and ordering key of one pull. */

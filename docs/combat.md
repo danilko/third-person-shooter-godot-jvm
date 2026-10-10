@@ -217,6 +217,28 @@ camera's line and the gun's line 1 m past the muzzle -- diminishing, because the
 and at 0.15 the character's back covers the gun and the target in the middle of the screen. The remaining TPS levers
 are a pose lift over low cover (GTA / TLOU) and a cover system that pops the gun clear of the lip (Gears).
 
+### The cover lift: the arm raises the gun over low cover, re-aimed at the target (PLAN.md 1d, 2026-10-09)
+
+GTA V / TLOU's answer to the two-ray problem, without forgiveness: when low cover the camera sees over (a shelf, a car
+bonnet, a wall top) meets the gun's line, the ARM raises the gun until the line clears -- and the bullet still leaves
+the real muzzle, so a character fully behind a wall gains nothing (a 2.5 m wall is beyond `maxLift` and is never
+lifted over).
+- `FirearmItem.coverLift(current, max, step)`: from the UNLIFTED muzzle (current lift subtracted), the smallest lift in
+  5 cm steps whose line to the sight point is clear; 0 when the line is clear, when the block is further than
+  `LIFT_REACH` 2.5 m from the muzzle, or when nothing up to `max` clears it (the crosshair's x then says so).
+- `WeaponController.updateCoverLift` asks it every third frame while the body is in combat with a firearm up (not
+  holstered, switching, reloading, scoped, first person or seated; an AI only on the ACTIVE tier) and hands it to
+  `AnimationController.setCoverLift`.
+- `WeaponRecoilModifier` carries it (no scene change: it already sits after the stock mount and before the support
+  hand, so the off hand follows): eases to the target at `liftSpeed` 1.6 m/s up to `maxLift` 0.30 m (0 = the control),
+  moves the hand straight up in the WORLD, re-solves the arm (TwoBoneIK) and turns the hand so the bore points at the
+  aim target from the new height ("raise against the aim target").
+- A puppet has no aim ray and is not lifted (remote players' guns do not rise on other peers -- cosmetic, accepted).
+Gate `tools/godot/probe_cover_lift.gd` 8/8 (shelf top between the gun's and the camera's line, measured: lift 0.10 m,
+x gone, a round from the real muzzle reaches the wall at 24 m, bore 0.2 deg off the aim, back down when the shelf
+goes, a 2.5 m wall not lifted over); `--control` (max_lift 0) fails 3. AimDebugAuto, weapon_fit, self_hit,
+support_hand_ik, recoil_kick (only its known ASR1 hair), net_shot PASS.
+
 ### The crosshair says when the muzzle line is blocked (PLAN.md 1d, 2026-10-09)
 
 The two-stage trace is right that cover the camera sees over or past still stops the round at the gun -- but with

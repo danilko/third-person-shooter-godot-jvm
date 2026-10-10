@@ -165,7 +165,9 @@ public class Crosshair extends Control {
     /** The "blocked" hint: the muzzle line meets something before the aimed point. Returns the screen point of the
      *  hit, or null. Arma / The Division / Gears show the same thing -- the round goes where the GUN points. */
     private Vector2 blockedScreenPoint() {
-        if (!showBlocked || weaponController == null || weaponController.isHolstered()) return null;
+        // a co-op client frees its pre-placed Player a few frames before the HUD re-wires (WeaponProgress's guard)
+        if (!showBlocked || weaponController == null || !godot.global.GD.INSTANCE.isInstanceValid(weaponController)
+                || weaponController.isHolstered()) return null;
         if (!(weaponController.getCurrentWeaponItem() instanceof com.openworld.weapon.FirearmItem gun)) return null;
         Vector3 at = gun.muzzleBlockedPoint();
         if (at == null) return null;
