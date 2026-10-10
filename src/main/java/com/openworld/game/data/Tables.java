@@ -79,6 +79,11 @@ public final class Tables {
     public static final DataTable<AmmoSupplies> AMMO_SUPPLY = DataTable.define("ammo_supply",
             ROOT + "item/ammo_supply.json", AmmoSupplies::read, () -> new AmmoSupplies(2.2, 2.0, Map.of()));
 
+    public static final DataTable<com.openworld.world.TrafficMix> TRAFFIC = DataTable.define("traffic",
+            ROOT + "game/traffic.json",
+            d -> com.openworld.world.TrafficMix.read(d, id -> com.openworld.carrier.vehicle.VehicleModels.sceneOfId(id) != null),
+            () -> new com.openworld.world.TrafficMix(com.openworld.world.TrafficMix.EMPTY, Map.of()));
+
     public static final DataTable<Map<String, Map<String, Object>>> OUTFITS = DataTable.define("outfits",
             ROOT + "character/outfits.json", OutfitTable::read, HashMap::new);
 

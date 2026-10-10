@@ -10,6 +10,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - The player profile, the economy and save v2 (2026-10-10, under Performance Foundation)
 - Owned cars and the safe-house garage (2026-10-10, after it)
 - Authoring foundations: GameplayEvents, DataTable, MarkerRegistry, WorldLedger (PLAN.md 2.0, 2026-10-10, after it)
+- The campaign graph, its lint, and the career override stack (PLAN.md 2.1 step 1, 2026-10-10, after it)
 
 ---
 
@@ -552,6 +553,50 @@ spawned again, an ambient one is not recorded, with the ledger reset the same bo
 brings the death, a flag and a place override back and sweeps the live boss); `probe_markers.gd` 15/15 (two Koban,
 expected counts read from the scene file's TEXT; by kind, near, under, the facing of a turned building; one freed ->
 its markers are gone). Both are in `tools/nightly_gates.sh`.
+
+### The campaign graph, its lint, and the career override stack (PLAN.md 2.1 step 1: CR1 + CR2 + CR6, 2026-10-10)
+
+ENGINE-FREE, and NOTHING RUNS ON IT YET: `MissionDirector` still owns the unlock sets the game plays by. This is the
+declared campaign the Activity runtime (2.1, next) will read; it is here so the shape is fixed and proven first.
+
+- **`game.campaign.FlagKey`** -- a flag is DECLARED: id, scope (WORLD = the host's ledger, PERSONAL = the player's
+  profile; never both -- the co-op model's rule 2) and a finite set of values (a BOOL, or a CHOICE among names). The
+  finite domain is what lets the lint walk every state.
+- **`Requirement`** -- a typed predicate algebra, DATA not lambdas: `flag(key[, value])`, `achieved(activity[,
+  variant])`, `career`, `cashAtLeast`, `storyAlive(storyId)` (a WORLD requirement: "the boss is alive in the world this
+  would run in"), `beforeEnding / afterEnding`, `endingSeen`, `all / any / not`. It is asked against a
+  `CampaignView`: ONE player's story + the world they are in.
+- **`Effect`** -- what a variant changes: `set / clear(flag)`, `storyDead`, `place(id, owner, state)`,
+  `ending(id)`, `chapter`. `world()` says which change the host's world (a guest's need the host's consent; a replay
+  applies none).
+- **`ActivityDef` / `CampaignBuilder` / `CampaignModule` / `content.CampaignModules`** -- a content pack is a class
+  that declares flags, activities (`requires`, `variant(name, effects...)`, `sticky()`, `repeatable()`, `kind(JOB /
+  RACE)`, `planned()` = named but not authored) and endings; the index lists the packs. `content.Act1` is what exists:
+  `m01_konbini` (BOSS_KILLED -> the boss is dead in the world, BOSS_SPARED -> the personal flag) and the planned
+  `m02_informant` (needs the spare AND the boss alive in that world). `openEnded()` until an ending is authored.
+- **`CampaignGraph`** -- `isAvailable / available / whyNot / complete(activity, variant, write, world)`. Unlocks are
+  DERIVED at every evaluation (a choice can CLOSE a branch); only `sticky()` is remembered
+  (`CampaignState.sticky`). An activity NOBODY declared is not available -- MissionDirector's "no declared row =
+  unlocked" let an unstreamed node open a gated mission. An ending is a state transition (phase `POST_ENDING`).
+  Completions are remembered as `"activity#variant"`, MissionDirector's key shape.
+- **`LiveCampaign(profile, ledger)`** is the real state (personal -> `PlayerProfile.campaign`, world ->
+  `WorldLedger`); **`SimCampaign`** an in-memory one (the lint, tests, CR6's fake host), optimistic about career and
+  money unless pinned.
+- **`CampaignLint.check(graph)`** -- (1) everything NAMED is DECLARED (a requirement's flag / value / activity /
+  variant / ending, an effect's flag / value / ending; every activity has a variant or is planned), (2) everything
+  declared is REACHABLE, (3) **NO DEAD END**: a brute-force walk over every available activity x variant from the
+  empty state; every reachable state must have reached an ending or still be able to. Capped (200 000 states; a
+  truncated walk is a problem, not a pass). Notes say what was NOT proven: an open-ended campaign skips (3); the walk
+  is one world with its one player -- the guest-in-another-world cross product (rule 3) is not checked yet.
+- **`profile.CareerState` override stack (CR2)** -- `push(instanceId, career, real)` / `pop(instanceId)` (wherever
+  it is in the stack) / `effective()` / `count(counter, n)` (onto a SCRATCH record under a TEMP override, discarded
+  on pop; onto the real record under REAL) / `reconcile(running)` after a load (the journal is saved, the activity is
+  not). Only the Activity framework will push and pop.
+
+Gates (unit): `CampaignGraphTest` (derived unlocks, a branch that closes, sticky, repeatable, the live split of story
+and world, a guest without consent, a world requirement), `CampaignLintTest` (the SHIPPED modules lint clean; a
+branching sample with two endings is proven; the control -- a variant that clears the choice every later node needs
+-- is found as `DEAD END`; undeclared names; an unstartable activity; a truncated walk), `CareerStateTest`.
 
 ### Street races — `game.mission.RaceDirector` + `world.RaceCheckpoint` (R2, AutoLoad, 2026-09-17)
 

@@ -78,7 +78,7 @@ public class GameMenu extends Control {
     private boolean dirty;
 
     private VBoxContainer statusLeft, statusRight;
-    private OptionButton presetBox, windowMode, resolution;
+    private OptionButton presetBox, windowMode, resolution, worldDensity;
     private HSlider renderScale, shadowDist, viewDist, lookSens, padLook, volume, fov;
     private CheckButton invertY, aimAssist, hudMinimal, vsync;
     private final Map<HSlider, Label> sliderValues = new LinkedHashMap<>();
@@ -264,6 +264,12 @@ public class GameMenu extends Control {
         VBoxContainer o = column(h, "OPTIONS");
         volume = slider(o, "Master volume", 0.0, 1.0, 0.05, "on_controls");
         hudMinimal = check(o, "Minimal HUD");
+        worldDensity = new OptionButton();
+        for (com.openworld.game.WorldDensity d : com.openworld.game.WorldDensity.values()) worldDensity.addItem(d.label, d.ordinal());
+        worldDensity.setName("WorldDensity");
+        row(o, "World density", worldDensity);
+        worldDensity.connect(new StringName("item_selected"), callable("on_display"));
+        note(o, "Cars, pedestrians and attackers at once. The host's choice in co-op, the same for every player. Normal is tuned for the Steam Deck.");
         VBoxContainer s = column(h, inGame ? "SESSION" : "");
         if (inGame) {
             action(s, "Resume", "Resume", "on_resume_pressed");
@@ -508,6 +514,7 @@ public class GameMenu extends Control {
         aimAssist.setPressed(q.aimAssist);
         volume.setValue(q.masterVolume);
         hudMinimal.setPressed(q.hudMinimal);
+        worldDensity.select(q.worldDensity.ordinal());
         fov.setValue(q.fovOffset);
         windowMode.select(q.windowMode.ordinal());
         int r = java.util.Arrays.asList(QualitySettings.RESOLUTIONS).indexOf(q.resolution);
@@ -581,6 +588,7 @@ public class GameMenu extends Control {
         int r = resolution.getSelected();
         q.resolution = r <= 0 ? "" : QualitySettings.RESOLUTIONS[r - 1];
         q.vsync = vsync.isPressed();
+        q.worldDensity = com.openworld.game.WorldDensity.values()[Math.max(0, worldDensity.getSelected())];
         q.apply();
     }
 

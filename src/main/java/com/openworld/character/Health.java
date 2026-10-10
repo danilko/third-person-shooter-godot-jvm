@@ -78,6 +78,7 @@ public class Health extends Node {
      */
     @Visible
     public boolean invulnerable = false;
+    @Register public boolean invulnerableNow() { return invulnerable; }
 
     /**
      * Discrete "took a hit" event carrying the damage amount. Fires ONLY on authority-side

@@ -10,6 +10,8 @@ The title screen, the settings and what they may touch (PLAN.md 1.3: F2 + H3, st
 - The full-screen menu (GameMenu) and controller rebinding
 - The minimal HUD (F13)
 - Debug keys are DebugWorld's only
+- World density: the host's simulation load (2026-10-10)
+- The loading screen and its warm-up tour (2026-10-10)
 - Gate
 - What is not done yet
 
@@ -178,3 +180,50 @@ nightly_gates.
 - Subtitles (with F5's speakers, above), head-bob (there is no head-bob to switch off yet); a Deck preset driven by
   `perf_budget.json` (needs the F10 Deck run); LAN discovery for Join.
 - F13: the HUD's show-on-change policy and the minimal / full toggle reading `[hud] mode`.
+
+## World density: the host's simulation load (user, 2026-10-10)
+
+"A setting for more crowd vehicles / peds / AI attackers, in case every player's system is high end." It is NOT a
+graphics setting and not per machine: `game.WorldDensity` is ONE value per session, the HOST's
+(`QualitySettings.worldDensity`, `settings.cfg [world] density`, the GAME tab's "World density"), applied on the
+authority only (`applyDensity`: a client's own value changes nothing until it hosts). The bodies it adds are
+replicated, collidable and shootable, so every peer plays the same street and the same fight -- H3's rule
+("host-decided, never scaled by a peer's hardware") extended, by the user's decision, to how many units may attack
+at once.
+
+| level | simulated cars | promoted peds / fighters | attack tokens |
+|---|---|---|---|
+| NORMAL (the Steam Deck baseline) | 10 | 8 / 6 | as crimes.json / gangs.json |
+| HIGH | 16 | 12 / 8 | +1 at every star level that has a limit |
+| ULTRA | 22 | 16 / 10 | +2 |
+
+Measured on the development PC (`probe_walk_perf --deck --traffic-budget=N`, vsync on, 2026-10-10): walk_downtown
+physics ms p50 6.2 / 9.3 / 13.9 and frame p95 18.1 / 18.1 / 19.6 at 10 / 16 / 22 cars; drive_downtown physics p50
+13.7 / 15.0 / 21.9. HIGH is free on a desktop, ULTRA starts to show; with the Deck's CPU factor (x2.2, uncalibrated)
+only NORMAL is safe there. Only the CAR column was measured; the ped and token columns are my picks in proportion
+(unreviewed). Graphics (render scale, shadows, view distance) stay per machine and never change what is simulated.
+Not applied under a probe (`--script`): probes set their own budgets; `set_world_density_now` is their door.
+
+## The loading screen and its warm-up tour (user, 2026-10-10)
+
+`game.WorldWarmup`, built in code by `FrontEnd` when the island scene comes up (once per world load). A black cover
+("LOADING n / N") stays up while it (1) waits for this machine's player, (2) visits up to 8 region centres of the
+places record at least 450 m apart: it sets `ZoneManager.setStreamFocus` there -- the streamer loads those zones
+exactly as for a player standing there -- and turns a camera of its own through a circle so every material in view is
+compiled and uploaded; a site is left when `streamingPendingNow() == 0` (>= 1.5 s) or after 10 s, the whole tour
+after 60 s; (3) clears the focus, hands the view back and waits for the streamer to go quiet round the player.
+
+- **The player is never moved.** Only the focus and a camera travel: a carried body would be clamped by the host
+  as a speed hack in co-op, would fall, and would drag traffic and the crowd with it. The focus feeds ONLY the load /
+  unload decision (`streamDistXZ`); traffic, the crowd, AI and reclaim keep measuring to real players. The body is
+  held (`InputContext.HELD`) and invulnerable behind the cover. Local per peer.
+- **What it buys, and what it does not:** shader / pipeline compilation and the first disk read happen behind the
+  cover instead of as the hitch on the first visit. The toured zones are UNLOADED again, so their meshes and textures
+  are read back (from the OS file cache) when the player really goes there -- it does not hold VRAM. The hitch
+  reduction itself is NOT measured yet (it needs a windowed A/B of probe_walk_perf's worst frames with and without).
+- Cancel / B / Esc skips the tour. Off under a probe (`--script`), on the headless display, in DebugWorld (it only
+  starts for World.tscn), and with `OW_NO_WARMUP=1`; `OW_WARMUP=1` forces it.
+
+Gate: `probe_world_warmup.gd` 11/11 (cover up from the first frame to the end; the player moved 0.00 m; loaded zones
+110 -> peak 169 during the tour; held + invulnerable meanwhile; focus, hold and invulnerability gone at the end; the
+streamer quiet again) and `-- --control` (no sites: nothing beyond the player's own zones loads, 110 -> 110).

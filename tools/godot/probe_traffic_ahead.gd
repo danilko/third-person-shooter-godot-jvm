@@ -17,7 +17,10 @@ func _initialize() -> void:
 func _vehicles() -> Array:
 	var out := []
 	for n in get_nodes_in_group("characters"):
-		if n is RigidBody3D:
+		# ambient TRAFFIC only: ZoneManager sets its cars down under Characters. A world.ParkedVehicle (a car in a car
+		# park, a patrol car at a koban) is added under the scene root by its own proximity ring and is not "born
+		# ahead on the road" -- two of them 85 m off the line failed this gate on 2026-10-10.
+		if n is RigidBody3D and n.get_parent() != null and n.get_parent().name == "Characters":
 			out.append(n)
 	return out
 
@@ -72,7 +75,8 @@ func _run() -> void:
 			worst = minf(worst, dist)
 			if along > 0 and along < speed * 4.0 and lateral < 40.0 + along * 0.5:
 				ahead_close += 1
-				print("  born %.0f m ahead, %.0f m off the line" % [along, lateral])
+				print("  born %.0f m ahead, %.0f m off the line: %s under %s (%s)" % [along, lateral, v.name,
+					v.get_parent().name if v.get_parent() else "-", str(v.scene_file_path).get_file()])
 			if dist < 60:
 				near += 1
 	var fails := 0

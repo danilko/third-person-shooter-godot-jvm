@@ -328,6 +328,57 @@ whole config with its own `.tres` and `Vehicle._ready` builds a `CharacterInfo` 
 weight and are removed from the base scene. Do not put a JVM-scripted sub-resource back into a base scene that
 inherited scenes override.
 
+### Traffic by region, the idle-car recycle and the 210 m ring (user, 2026-10-10)
+
+**Reported:** "barely more than 3 cars even in the busy city / suburb, residential barely any; the west centre the
+most crowded". **Measured** (`tools/godot/probe_traffic_census.gd`: the player stood at each district, ambient cars
+counted every 2 s for 30-40 s): the budget was always FULL (10 alive) but the cars were not near the player --
+
+| site | within 100 m / 200 m before | after |
+|---|---|---|
+| downtown_core | 0.0 / 2.2 | 0.5 / 5.5 |
+| nightlife | 0.0 / 0.1 | 2.9 / 9.7 |
+| residential_north | 2.7 / 7.7 | 2.5 / 8.3 |
+| light industry (the "residential" site) | 2.7 / 5.0 | 3.1 / 6.3 |
+| suburb | 1.3 / 6.1 | 0.5 / 6.3 |
+| industry | 0.4 / 4.9 | 0.8 / 5.0 (west_centre site) |
+
+Two causes, two fixes, and one honest limit:
+1. **A far car that was WAITING held its slot for ever.** Only a car moving AWAY counted as "leaving" (the 2026-10-07
+   recycle rule), so a car at a far red light or in a far queue was never recycled and the ring filled with cars
+   200-300 m out. `ZoneManager.trafficIdleRecycleSeconds` (12): a car past `trafficRecycleDist` that has not come
+   closer to any player for that long is recycled too, under the same rules (out of this peer's view, one per
+   `trafficRecycleSeconds`, only while fewer than `trafficNearTarget` cars are within `trafficNearRadius`). 0 = the
+   old rule (the control).
+2. **The ring was wider than the street the player can see.** `trafficSimRadius` 250 -> 210, `trafficRecycleDist`
+   140 -> 110, the near target 6 within 200 m -> 7 within 140 m. A 150 m ring was MEASURED and is too small: the
+   spawn rules (never within 80 m, never in view nearer than 160 m) leave no legal entry -- one site had 0 cars and
+   7 714 refusals. The far tier's inner edge follows the ring.
+3. **The limit:** 10 cars in a 210 m ring is ~2 within 100 m of a player standing still, whatever the rules. More
+   cars near the player means a bigger budget, which is a CPU cost (a car is a body AND a seated driver) -- that is
+   the host's **World density** setting (docs/front-end.md), not a default.
+
+**The mix is per REGION now** (`game/traffic.json`, `world.TrafficMix`, `Tables.TRAFFIC`): a region of the places
+record (`Places.regionAt`, the boxes the buildings were placed by) takes the row whose key is the longest PREFIX of
+its name (`residential_north` -> `residential`), else `default`. `mix` = vehicle id -> weight, `scale` = the share
+of the budget kept while the busiest player stands there (farm 0.6, harbour 0.8, the housing 0.9). Industry and the
+harbour draw box trucks, crate trucks and kei trucks (BOT1 / CRT1 / POT1 / KET1), the farm kei trucks and kei cars,
+the nightlife and station fronts taxis. Simulated cars (`VehicleModels.trafficScene(faction, roll, region)`, the
+host's pick, replicated as the model index) and the far tier's placeholders both read it; police / military traffic
+keep their own cars. An unknown vehicle id or a non-positive weight is a DataTable problem (`TrafficMixTest`, which
+also asserts industry > 70 % trucks, the farm > 50 % kei trucks, downtown < 20 % trucks). COT1 (the 12 m container
+truck) is deliberately not in any mix: nobody has driven it through a junction as traffic yet.
+
+The three tiers, for the record (the user asked about "placeholder vehicles for the far ones" -- they exist):
+REAL cars within `dummyInDist` 70 m; the same cars ON RAILS (`Vehicle.setDummy`: no wheel physics) from
+`dummyOutDist` 90 m to the ring; `FarTraffic`'s 60 script-free MultiMesh cars from the ring + 20 m to 700 m, local
+per peer. Slowing traffic down does not make a car cheaper per tick; the on-rails tier is what does.
+
+Gates: `probe_traffic_census.gd -- --min-near=4` (every site >= 4 simulated cars within 200 m; in nightly_gates,
+slow), `probe_traffic_ahead.gd` (no car born ahead of a fast player; its control fails 2 -- it now counts ambient
+traffic only: two PARKED cars in a car park 85 m off the line had failed it), `probe_traffic_spawn`, `probe_far_traffic`,
+`probe_road_zones` PASS on the new ring.
+
 ### Terrain & seam alignment (ground is NOT a flat plane)
 
 Each district's real ground is a **DEM-derived heightfield** — originally imported via

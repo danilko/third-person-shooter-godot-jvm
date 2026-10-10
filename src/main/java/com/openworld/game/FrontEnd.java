@@ -43,6 +43,7 @@ public class FrontEnd extends Node {
     @Register
     @Override
     public void _process(double delta) {
+        startWarmup();
         if (pending == Action.NONE) return;
         Player me = null;
         for (Player p : PlayerRegistry.getPlayers()) if (GD.isInstanceValid(p) && p.isLocalOwnedPlayer()) me = p;
@@ -61,6 +62,26 @@ public class FrontEnd extends Node {
             default -> { }
         }
         GD.print("FrontEnd: " + lastRun);
+    }
+
+    private long warmedScene;
+
+    /** The island just came up: put the loading screen over it (game.WorldWarmup), once per world load. Not under a
+     *  probe (--script), not headless, not with OW_NO_WARMUP=1; OW_WARMUP=1 forces it (a probe of the screen itself). */
+    private void startWarmup() {
+        Node scene = getTree() != null ? getTree().getCurrentScene() : null;
+        if (scene == null || scene.getInstanceId() == warmedScene) return;
+        warmedScene = scene.getInstanceId();
+        if (!WORLD.equals(scene.getSceneFilePath())) return;
+        boolean force = "1".equals(godot.api.OS.getEnvironment("OW_WARMUP"));
+        if (!force) {
+            if ("1".equals(godot.api.OS.getEnvironment("OW_NO_WARMUP"))) return;
+            if ("headless".equals(godot.api.DisplayServer.getName())) return;
+            for (String a : godot.api.OS.getCmdlineArgs()) if ("--script".equals(a) || "-s".equals(a)) return;
+        }
+        WorldWarmup w = new WorldWarmup();
+        w.setName(new godot.core.StringName("WorldWarmup"));
+        scene.addChild(w);
     }
 
     /** Back to the title (the pause menu's "Quit to title"): leave any session first. */

@@ -53,6 +53,8 @@ public class QualitySettings extends Node {
     public boolean aimAssist = true;
     public double masterVolume = 1.0;        // linear 0..1
     public boolean hudMinimal = false;
+    /** How much the HOST simulates (cars, promoted peds, attackers at once): {@link WorldDensity}. Host-decided. */
+    public WorldDensity worldDensity = WorldDensity.NORMAL;
     /** Added to every on-foot and vehicle camera FOV (deg), never to a scope's declared FOV. -10..+20. */
     public double fovOffset = 0.0;
     public static final double FOV_OFFSET_MIN = -10.0, FOV_OFFSET_MAX = 20.0;
@@ -146,8 +148,42 @@ public class QualitySettings extends Node {
         Player me = localPlayer();
         appliedPlayer = me == null ? -1 : me.getInstanceId();
         if (me != null) applyLook(me);
+        applyDensity();
         applyWindow();
     }
+
+    private boolean probeRun() {
+        for (String a : godot.api.OS.getCmdlineArgs()) if ("--script".equals(a) || "-s".equals(a)) return true;
+        return false;
+    }
+
+    /**
+     * World density reaches the systems it scales -- on the AUTHORITY only (single player or the host): a client's
+     * value changes nothing in someone else's session. Not under a probe (--script): probes set their own budgets
+     * and must not inherit the player's settings.cfg; {@link #setWorldDensityNow} is their door.
+     */
+    private void applyDensity() {
+        if (!densityForced && probeRun()) return;
+        if (getNodeOrNull("/root/NetworkManager") instanceof com.openworld.net.NetworkManager n
+                && n.isNetworked() && !n.isServer()) return;
+        WorldDensity d = worldDensity == null ? WorldDensity.NORMAL : worldDensity;
+        if (getNodeOrNull("/root/ZoneManager") instanceof com.openworld.world.ZoneManager zm) {
+            zm.trafficBudget = d.trafficBudget;
+            zm.walkerBudget = d.walkerBudget;
+            zm.fighterBudget = d.fighterBudget;
+        }
+        EnforcementDispatch.attackTokenBonus = d.attackTokenBonus;
+    }
+
+    private boolean densityForced;
+
+    /** Probe / console: set the density and apply it now (also under --script). */
+    @Register public void setWorldDensityNow(String name) {
+        worldDensity = WorldDensity.of(name);
+        densityForced = true;
+        applyDensity();
+    }
+    @Register public String worldDensityNow() { return worldDensity.name(); }
 
     private String windowApplied = "";
 
@@ -240,6 +276,7 @@ public class QualitySettings extends Node {
         masterVolume = num(cf, "audio", "master", masterVolume);
         hudMinimal = "minimal".equals(String.valueOf(cf.getValue("hud", "mode", hudMinimal ? "minimal" : "full")));
         fovOffset = num(cf, "view", "fov_offset", fovOffset);
+        worldDensity = WorldDensity.of(String.valueOf(cf.getValue("world", "density", worldDensity.name())));
         try { windowMode = WindowMode.valueOf(String.valueOf(cf.getValue("display", "window_mode", windowMode.name()))); }
         catch (IllegalArgumentException e) { windowMode = WindowMode.WINDOWED; }
         resolution = String.valueOf(cf.getValue("display", "resolution", resolution));
@@ -260,6 +297,7 @@ public class QualitySettings extends Node {
         cf.setValue("audio", "master", masterVolume);
         cf.setValue("hud", "mode", hudMinimal ? "minimal" : "full");
         cf.setValue("view", "fov_offset", fovOffset);
+        cf.setValue("world", "density", worldDensity.name());
         cf.setValue("display", "window_mode", windowMode.name());
         cf.setValue("display", "resolution", resolution);
         cf.setValue("display", "vsync", vsync);

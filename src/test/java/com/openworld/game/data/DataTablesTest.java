@@ -27,7 +27,7 @@ class DataTablesTest {
         assertNotNull(Tables.CRIMES.get());
         List<String> names = new ArrayList<>();
         for (DataTable<?> t : Tables.all()) names.add(t.name);
-        assertEquals(List.of("crimes", "gangs", "economy", "supplies", "ammo_supply", "outfits"), names);
+        assertEquals(List.of("crimes", "gangs", "economy", "supplies", "ammo_supply", "traffic", "outfits"), names);
         assertEquals(List.of(), DataTable.validateAll());
     }
 

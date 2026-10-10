@@ -223,7 +223,9 @@ public class FarTraffic extends Node {
             c.s = s;
             c.target = targetSpeed(l);
             c.v = c.target;
-            c.model = model(VehicleModels.trafficScene("civilian", rng.nextDouble()));
+            Vector3 born = l.pointAtLength(s);
+            c.model = model(VehicleModels.trafficScene("civilian", rng.nextDouble(),
+                    born == null ? "" : Places.regionAt(born.getX(), born.getZ())));
             if (c.model >= 0) cars.add(c);
         }
     }

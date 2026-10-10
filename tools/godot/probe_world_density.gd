@@ -1,0 +1,36 @@
+extends SceneTree
+## WORLD DENSITY (game.WorldDensity, user 2026-10-10): the host's one setting for how much is simulated.
+##   stdbuf -oL <godot> --headless --path . --script tools/godot/probe_world_density.gd
+## Each level reaches the three things it scales -- ZoneManager's car and promoted-ped budgets and the dispatch's
+## attack-token bonus -- and NORMAL is exactly what the game shipped with (the Steam Deck baseline). Control: under a
+## probe the player's own settings.cfg is NOT applied (budgets stay the shipped ones until this probe asks).
+var fails := 0
+
+func _check(label: String, ok: bool, detail: String = "") -> void:
+	if not ok:
+		fails += 1
+	print("  %s  %-58s %s" % ["PASS" if ok else "FAIL", label, detail])
+
+func _initialize() -> void:
+	await process_frame
+	await process_frame
+	var q: Node = root.get_node_or_null("QualitySettings")
+	var zm: Node = root.get_node_or_null("ZoneManager")
+	var ed: Node = root.get_node_or_null("GameManager/EnforcementDispatch")
+	if q == null or zm == null or ed == null:
+		print("RESULT FAIL (QualitySettings / ZoneManager / EnforcementDispatch missing)")
+		quit(1)
+		return
+	_check("control: a probe starts on the shipped budgets, whatever settings.cfg says",
+		int(zm.get("traffic_budget")) == 10 and int(zm.get("walker_budget")) == 8 and int(ed.call("attack_token_bonus_now")) == 0,
+		"cars %d walkers %d tokens +%d" % [int(zm.get("traffic_budget")), int(zm.get("walker_budget")), int(ed.call("attack_token_bonus_now"))])
+	var want := {"HIGH": [16, 12, 8, 1], "ULTRA": [22, 16, 10, 2], "NORMAL": [10, 8, 6, 0]}
+	for level in ["HIGH", "ULTRA", "NORMAL"]:
+		q.call("set_world_density_now", level)
+		var got := [int(zm.get("traffic_budget")), int(zm.get("walker_budget")), int(zm.get("fighter_budget")), int(ed.call("attack_token_bonus_now"))]
+		_check("%s reaches the car / ped / fighter budgets and the tokens" % level, got == want[level], str(got))
+	q.call("set_world_density_now", "nonsense")
+	_check("an unknown level is NORMAL", str(q.call("world_density_now")) == "NORMAL", "")
+	print("")
+	print("PASS (0 failures)" if fails == 0 else "RESULT FAIL (%d failures)" % fails)
+	quit(1 if fails > 0 else 0)

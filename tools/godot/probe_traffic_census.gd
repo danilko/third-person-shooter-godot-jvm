@@ -42,6 +42,14 @@ func _run() -> void:
 	zm.set("debug_log", false)
 	if args.has("budget"):
 		zm.set("traffic_budget", int(args["budget"]))
+	if args.has("ring"):
+		zm.set("traffic_sim_radius", float(args["ring"]))
+	if args.has("idle"):
+		zm.set("traffic_idle_recycle_seconds", float(args["idle"]))
+	if args.has("recycle"):
+		zm.set("traffic_recycle_dist", float(args["recycle"]))
+	if args.has("near-radius"):
+		zm.set("traffic_near_radius", float(args["near-radius"]))
 	if args.has("near-target"):
 		zm.set("traffic_near_target", int(args["near-target"]))
 	var car := w.get_node_or_null("VehicleRoot")
@@ -56,7 +64,7 @@ func _run() -> void:
 	var fails := 0
 	print("budget %d, near target %d within %.0f m, sim ring %.0f m" % [int(zm.get("traffic_budget")),
 		int(zm.get("traffic_near_target")), float(zm.get("traffic_near_radius")), float(zm.get("traffic_sim_radius"))])
-	print("%-18s %6s %6s %6s %6s %6s %6s  %s" % ["site", "<60m", "<100m", "<200m", "alive", "far", "refuse", "models within 250 m at the end"])
+	print("%-18s %6s %6s %6s %6s %6s %6s  %s" % ["site", "<60m", "<100m", "<200m", "alive", "far", "refuse", "traffic models at the end"])
 	for site in SITES:
 		if not only.is_empty() and not only.has(site[0]):
 			continue
@@ -79,20 +87,18 @@ func _run() -> void:
 		for f in range(frames):
 			await physics_frame
 			if f % 120 == 119:
-				s60 += _cars(p.global_position, 60.0).size()
-				s100 += _cars(p.global_position, 100.0).size()
-				s200 += _cars(p.global_position, 200.0).size()
+				# ambient traffic only (ZoneManager's own cars): parked vehicles and police units are not traffic
+				s60 += int(zm.call("traffic_near_now", 60.0))
+				s100 += int(zm.call("traffic_near_now", 100.0))
+				s200 += int(zm.call("traffic_near_now", 200.0))
 				alive += int(zm.call("traffic_alive_now"))
 				far += int(zm.call("far_traffic_cars_now"))
 				n += 1
-		var models := {}
-		for v in _cars(p.global_position, 250.0):
-			var m: String = str(v.scene_file_path).get_file().get_basename()
-			models[m] = int(models.get(m, 0)) + 1
+		var models: String = str(zm.call("traffic_models_now")) if zm.has_method("traffic_models_now") else "?"
 		var d: int = maxi(n, 1)
 		print("%-18s %6.1f %6.1f %6.1f %6.1f %6.1f %6d  %s  (settled in %.0f s, region '%s')" % [site[0], s60 / d, s100 / d,
-			s200 / d, alive / d, far / d, int(zm.call("traffic_spawns_refused_now")) - refused0, str(models), waited / 60.0,
-			str(zm.call("region_at_now", p.global_position)) if zm.has_method("region_at_now") else "?"])
+			s200 / d, alive / d, far / d, int(zm.call("traffic_spawns_refused_now")) - refused0, models, waited / 60.0,
+			str(zm.call("traffic_region_now")) if zm.has_method("traffic_region_now") else "?"])
 		if min_near >= 0.0 and s200 / d < min_near:
 			fails += 1
 	if min_near >= 0.0:

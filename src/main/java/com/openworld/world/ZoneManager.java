@@ -149,7 +149,7 @@ public class ZoneManager extends Node {
 	 * trafficReclaimMargin} (the smaller of that and the zone's unload radius). 0 = the zone's radii alone (the old
 	 * behaviour, and the control).
 	 */
-	@Export public float trafficSimRadius = 250.0f;
+	@Export public float trafficSimRadius = 210.0f;
 	@Export public float trafficReclaimMargin = 50.0f;
 	/**
 	 * RECYCLE A CAR THAT IS LEAVING (user, 2026-10-07: "keep 10 cars around the player, recycle faster, a busy Japanese
@@ -158,15 +158,23 @@ public class ZoneManager extends Node {
 	 * player, OUT of this peer's camera view and further away than at the last eval tick, is reclaimed so its slot is
 	 * spawned again round the player (GTA's rule for the cars behind you). At most one a tick. 0 = off (the control).
 	 */
-	@Export public float trafficRecycleDist = 140.0f;
+	@Export public float trafficRecycleDist = 110.0f;
 	/** ...but only while fewer than this many cars are within {@code trafficNearRadius} of the player, and at most one
 	 *  every {@code trafficRecycleSeconds}: measured 2026-10-07, recycling freely doubled the cars near the player
 	 *  (0.6 -> 3.7 within 100 m) and the frames over 16.7 ms (10% -> 53%), from a recycle every ~second. */
-	@Export public int trafficNearTarget = 6;
-	@Export public float trafficNearRadius = 200.0f;
+	@Export public int trafficNearTarget = 7;
+	@Export public float trafficNearRadius = 140.0f;
 	@Export public float trafficRecycleSeconds = 2.0f;
 	private long lastRecycleMsec = 0;
 	private final java.util.Map<Long, Float> lastTrafficDist = new java.util.HashMap<>();
+	/**
+	 * A car past {@code trafficRecycleDist} that has not come closer to any player for this long (s) is recycled too,
+	 * under the same out-of-view, one-per-{@code trafficRecycleSeconds}, near-target rules. 0 = only cars moving away
+	 * (the rule before 2026-10-10, the control).
+	 */
+	@Export public float trafficIdleRecycleSeconds = 12.0f;
+	/** car -> {closest distance to a player so far, the time (s) it got there}. */
+	private final java.util.Map<Long, float[]> trafficClosest = new java.util.HashMap<>();
 	private int trafficRecycled = 0;
 
 	/** Probe readout: cars recycled for leaving (the rule above). */
@@ -248,7 +256,7 @@ public class ZoneManager extends Node {
 		for (ZoneMarker marker : markers) {
 			if (!GD.isInstanceValid(marker) || marker.zone == null) continue;
 			if (tasks.containsKey(marker)) continue;
-			float d = nearestPlayerDistXZ(marker.getGlobalPosition());
+			float d = streamDistXZ(marker.getGlobalPosition());
 			boolean isLoaded = loaded.containsKey(marker);
 			if (!isLoaded && d < marker.zone.loadRadius) n++;
 			else if (isLoaded && d > marker.zone.unloadRadius) n++;
@@ -312,8 +320,50 @@ public class ZoneManager extends Node {
 
 	/** Each dispatched car is a car + crew (two ambient cars' worth); each two bodies another. */
 	int effectiveTrafficBudget() {
-		if (trafficBudget <= 0 || !enforcementBalancing) return trafficBudget;
-		return Math.max(Math.min(trafficFloor, trafficBudget), trafficBudget - 2 * enforcementCars - enforcementBodies / 2);
+		if (trafficBudget <= 0) return trafficBudget;
+		int budget = regionTrafficBudget();
+		if (!enforcementBalancing) return budget;
+		return Math.max(Math.min(trafficFloor, budget), budget - 2 * enforcementCars - enforcementBodies / 2);
+	}
+
+	/**
+	 * The budget in the BUSIEST region any player stands in (game/traffic.json `scale`, world.TrafficMix): a farm
+	 * lane carries fewer cars than Chuo-dori. Host-decided like the budget itself -- the simulated cars are
+	 * replicated, so every peer gets the same street whatever its hardware. Never under 1.
+	 */
+	private int regionTrafficBudget() {
+		double best = -1.0;
+		TrafficMix mix = com.openworld.game.data.Tables.TRAFFIC.get();
+		for (Player pl : PlayerRegistry.getPlayers()) {
+			if (!GD.isInstanceValid(pl)) continue;
+			Vector3 p = pl.getGlobalPosition();
+			best = Math.max(best, mix.scale(Places.regionAt(p.getX(), p.getZ())));
+		}
+		return best < 0 ? trafficBudget : Math.max(1, (int) Math.round(trafficBudget * best));
+	}
+
+	/** Probe readout: the region of the first player, and the budget its row gives. */
+	@Register public String trafficRegionNow() {
+		for (Player pl : PlayerRegistry.getPlayers()) {
+			if (!GD.isInstanceValid(pl)) continue;
+			Vector3 p = pl.getGlobalPosition();
+			return Places.regionAt(p.getX(), p.getZ()) + " budget " + regionTrafficBudget();
+		}
+		return "";
+	}
+
+	/** Probe readout: the ambient cars alive now by model id, "KEC1 4, KET1 2". */
+	@Register public String trafficModelsNow() {
+		java.util.Map<String, Integer> n = new java.util.TreeMap<>();
+		for (LoadedZone lz : loaded.values())
+			for (Vehicle v : lz.vehicles) {
+				if (!GD.isInstanceValid(v)) continue;
+				String f = v.getSceneFilePath();
+				n.merge(f.substring(f.lastIndexOf('/') + 1).replace(".tscn", ""), 1, Integer::sum);
+			}
+		StringBuilder sb = new StringBuilder();
+		for (var e : n.entrySet()) sb.append(sb.length() == 0 ? "" : ", ").append(e.getKey()).append(' ').append(e.getValue());
+		return sb.toString();
 	}
 
 	int effectiveWalkerBudget() {
@@ -804,7 +854,7 @@ public class ZoneManager extends Node {
 		wantLoadKey.clear();
 		for (ZoneMarker marker : new ArrayList<>(markers)) {
 			if (!GD.isInstanceValid(marker) || marker.zone == null) continue;
-			float dist = nearestPlayerDistXZ(marker.getGlobalPosition());
+			float dist = streamDistXZ(marker.getGlobalPosition());
 			StreamTask task = tasks.get(marker);
 			if (task != null) {
 				// In flight — leave the pipeline to it. One exception: a player who turned around
@@ -1163,8 +1213,15 @@ public class ZoneManager extends Node {
 					float dn = nearestPlayerDistXZ(v.getGlobalPosition());
 					Float before = lastTrafficDist.get(key);
 					seenDist.put(key, dn);
-					leaving = !recycledThisTick && before != null && dn > trafficRecycleDist && dn > before + 1.0f
-							&& !inThisCameraView(v.getGlobalPosition());
+					// ... or one that has not come CLOSER for trafficIdleRecycleSeconds: a car waiting at a far light or
+					// in a far queue held its slot for as long as it sat there (census 2026-10-10: budget full, 0 cars
+					// within 100 m downtown), because only a car moving AWAY counted as leaving
+					long nowMs = godot.api.Time.INSTANCE.getTicksMsec();
+					float[] best = trafficClosest.get(key);
+					if (best == null || dn < best[0] - 2.0f) trafficClosest.put(key, best = new float[] {dn, nowMs / 1000f});
+					boolean idle = trafficIdleRecycleSeconds > 0f && nowMs / 1000f - best[1] > trafficIdleRecycleSeconds;
+					leaving = !recycledThisTick && before != null && dn > trafficRecycleDist
+							&& (dn > before + 1.0f || idle) && !inThisCameraView(v.getGlobalPosition());
 					if (leaving) { recycledThisTick = true; lastRecycleMsec = godot.api.Time.INSTANCE.getTicksMsec(); }
 				}
 				if (dead || fin || fell || far || unrouted || stalled || abandoned || leaving) {
@@ -1232,6 +1289,7 @@ public class ZoneManager extends Node {
 		}
 		lastTrafficDist.clear();
 		lastTrafficDist.putAll(seenDist);
+		trafficClosest.keySet().retainAll(seenDist.keySet());
 	}
 
 	/** Is this point (1 m up) inside this peer's current camera frustum? False with no camera (a headless host with no
@@ -1267,6 +1325,28 @@ public class ZoneManager extends Node {
 	}
 
 	/** Horizontal (XZ) distance to the nearest live player, or MAX_VALUE if none. */
+	/**
+	 * THE STREAMING FOCUS (game.WorldWarmup): a point the streamer treats as if a player stood there -- zones within
+	 * their load radius of it load, and unload when it moves on. ONLY the load / unload decision reads it: traffic,
+	 * the crowd, AI and reclaim keep measuring to real players, so nothing is spawned at a focus. Null = none.
+	 */
+	private Vector3 streamFocus;
+
+	public void setStreamFocus(Vector3 focus) { streamFocus = focus == null ? null : new Vector3(focus); }
+
+	@Register public int loadedZoneCountNow() { return loaded.size(); }
+	@Register public boolean hasStreamFocusNow() { return streamFocus != null; }
+	@Register public void setStreamFocusNow(Vector3 focus) { setStreamFocus(focus); }
+	@Register public void clearStreamFocusNow() { streamFocus = null; }
+
+	/** Distance (XZ) from {@code center} to the nearest player OR the streaming focus. */
+	private float streamDistXZ(Vector3 center) {
+		float d = nearestPlayerDistXZ(center);
+		if (streamFocus == null) return d;
+		float dx = (float) (streamFocus.getX() - center.getX()), dz = (float) (streamFocus.getZ() - center.getZ());
+		return Math.min(d, (float) Math.sqrt(dx * dx + dz * dz));
+	}
+
 	private float nearestPlayerDistXZ(Vector3 center) {
 		float min = Float.MAX_VALUE;
 		for (Player p : PlayerRegistry.getPlayers()) {
@@ -1344,7 +1424,7 @@ public class ZoneManager extends Node {
 				if (t.phase == Phase.GEO_WAIT) continue;   // still parsing on the worker
 			}
 			float rank = t.isLoad
-					? nearestPlayerDistXZ(t.marker.getGlobalPosition()) / Math.max(1f, t.marker.zone.loadRadius)
+					? streamDistXZ(t.marker.getGlobalPosition()) / Math.max(1f, t.marker.zone.loadRadius)
 					: UNLOAD_RANK;
 			if (rank < best) { best = rank; pick = t; }
 		}
@@ -2127,7 +2207,8 @@ public class ZoneManager extends Node {
 								 LoadedZone lz) {
 		Lane route = at.lane();
 		String scenePath = (vc.vehicleScenePath == null || vc.vehicleScenePath.isEmpty())
-				? com.openworld.carrier.vehicle.VehicleModels.trafficScene(vc.faction, GD.randf())
+				? com.openworld.carrier.vehicle.VehicleModels.trafficScene(vc.faction, GD.randf(),
+						Places.regionAt(at.position().getX(), at.position().getZ()))
 				: vc.vehicleScenePath;
 		Object loaded = GD.load(scenePath);
 		if (!(loaded instanceof PackedScene scene)) return null;

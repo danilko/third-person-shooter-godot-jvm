@@ -78,6 +78,18 @@ public final class VehicleModels {
         return CIVILIAN[(int) Math.min(CIVILIAN.length - 1, Math.max(0, roll) * CIVILIAN.length)];
     }
 
+    /**
+     * The same, for a car set down in {@code region} (world.Places.regionAt): civilians draw from that region's row
+     * of game/traffic.json (world.TrafficMix) -- trucks in the industry, kei trucks on the farm; the other factions
+     * keep their own cars, and a region with no usable row keeps the island-wide mix.
+     */
+    public static String trafficScene(String faction, double roll, String region) {
+        if ("police".equals(faction) || "military".equals(faction)) return trafficScene(faction, roll);
+        String id = com.openworld.game.data.Tables.TRAFFIC.get().pick(region, roll);
+        String scene = sceneOfId(id);
+        return scene != null ? scene : trafficScene(faction, roll);
+    }
+
     /** The index of a scene path, or {@link #DEFAULT} for a scene not in the list. */
     public static int indexOf(String scenePath) {
         int i = scenePath == null ? -1 : SCENES.indexOf(scenePath);

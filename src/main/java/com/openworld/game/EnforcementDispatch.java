@@ -61,6 +61,12 @@ import java.util.UUID;
 @Script(className = "EnforcementDispatch")
 public class EnforcementDispatch extends Node {
 
+    /** Extra units that may attack one player at once, on top of the table's tokens_by_stars: the host's
+     *  {@link WorldDensity} (QualitySettings.applyDensity). 0 = the table as authored. */
+    public static int attackTokenBonus = 0;
+    @Register public int attackTokenBonusNow() { return attackTokenBonus; }
+
+
     static final String AI_SCENE = "res://src/main/resources/com/openworld/character/AICharacter.tscn";
     private static final String POLICE = Faction.POLICE;
     private static final double TICK = 0.25;
@@ -582,6 +588,7 @@ public class EnforcementDispatch extends Node {
             DispatchRules r = POLICE.equals(first.side) ? police
                     : GangSystem.get() != null ? GangSystem.get().hunterRules() : null;
             int n = r == null || stars == null ? 0 : r.tokensFor(stars);
+            if (n > 0) n += attackTokenBonus;   // world density (host-decided); 0 stays "no limit"
             double[] dist = new double[g.size()], held = new double[g.size()], rest = new double[g.size()];
             for (int i = 0; i < g.size(); i++) {
                 Unit u = g.get(i);

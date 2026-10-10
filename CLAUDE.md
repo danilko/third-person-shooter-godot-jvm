@@ -215,7 +215,7 @@ means that section title in one of these files (`grep -l "<title>" docs/*.md`).
 | doc | what is in it |
 |---|---|
 | `docs/game-systems.md` | Part D: spatial grid, AI LOD, factions (presets, campaign layer), MissionDirector + ZoneTrigger, SaveSystem, the profile / economy / save v2, the garage, the authoring foundations (GameplayEvents, DataTable, MarkerRegistry, WorldLedger), RaceDirector; the AI FSM; EventBus; audio |
-| `docs/open-world-simulation.md` | Part E: zone streaming, ambient traffic + the lane graph, the old terrain/seam notes, StimulusManager, AISquad |
+| `docs/open-world-simulation.md` | Part E: zone streaming, ambient traffic + the lane graph, traffic by region (traffic.json) + the idle-car recycle + the three car tiers, the old terrain/seam notes, StimulusManager, AISquad |
 | `docs/combat.md` | weapons (spread, two-stage trace, the long-ray fix, networked shots/melee/projectiles, damage, VFX, throwables, the blocked-muzzle hint), glass, ladders |
 | `docs/enforcement.md` | wanted level, dispatch, gang hangouts, escalation, recovery outcomes, co-op correctness batch |
 | `docs/hud-and-map.md` | HUD layout, progress ring, damage indicator, GPS route + baked road map, rear-view mirror, the map's places and grid |
@@ -225,7 +225,7 @@ means that section title in one of these files (`grep -l "<title>" docs/*.md`).
 | `docs/island-world.md` | Terrain3D, the land redo, districts, land planning, block ground, safe-house start, the rebuild review batch, the airport, night lighting |
 | `docs/buildings.md` | building kits, the library, tones + shop windows, streamed cells, lots, civic plots, logistics, forecourts, interiors (mission + shops), sliding doors, stair ramps, vegetation, shop counters |
 | `docs/crowd.md` | the two-tier crowd, island population, the LOD ped body, the VAT tier, holster, gaits, crowd hits |
-| `docs/front-end.md` | the title screen (main scene), FrontEnd's after-load actions, QualitySettings (settings.cfg, presets, H3's client-local rule + fairness floors), the settings page |
+| `docs/front-end.md` | the title screen (main scene), FrontEnd's after-load actions, QualitySettings (settings.cfg, presets, H3's client-local rule + fairness floors), the settings page, World density (the host's simulation load), the loading screen + warm-up tour |
 | `docs/input.md` | the gamepad (F1): the one binding table, the device tracker, analog walk / look rate / aim assist, triggers as pedals, pause vs back, pad glyphs |
 | `docs/rail-and-stations.md` | rail reserve + rail mode, stations, signals, street names, paid areas, lifts, station forms, EMU1, boardable trains |
 

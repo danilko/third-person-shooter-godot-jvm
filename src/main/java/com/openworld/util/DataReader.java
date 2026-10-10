@@ -264,6 +264,9 @@ public final class DataReader {
         return out;
     }
 
+    /** A problem only the parser can see (an id that names nothing, a weight that must be positive). */
+    public void problem(String key, String message) { problems.add(at(key) + ": " + message); }
+
     /** The untyped value (a free-form part: an outfit's colour list or material path). Counts as read. */
     public Object raw(String key) { return take(key); }
 
