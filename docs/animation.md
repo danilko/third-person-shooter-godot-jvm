@@ -3884,6 +3884,23 @@ the pipeline and numbers. The three rules that make ARP safe in the CLIP-SOURCE 
   **9.7 deg outward**. It is now turned about its own grip PARALLEL to the right one (0.00 deg);
   `toeInDeg` (default 0) turns it inward to converge. Gate `tools/godot/probe_dual_pistol.gd` (`--control` =
   align off, fails at -9.69; `--toe-in=2.5` reads +2.50 inward).
+- **THE DUAL PAIR IS SYMMETRIC IN THE WORLD, NOT IN THE CHEST (2026-10-10, user: "in first person the dup sits toward
+  one side, though the copied animation should balance them").** The first clips mirrored the right arm's LOCAL
+  rotations under the pistol pose's BLADED spine, so the pair was symmetric about a turned chest. Measured in the
+  player's own camera (`tools/godot/measure_gun_screen.gd`, `--no-mods` = the clip alone): both barrels 4.8 deg right
+  and the guns 11.8 cm apart; the aim layer turned the upper body 4.8 deg back, which swung that narrow pair 5.6 cm
+  left -- in first person the right gun sat on the crosshair (+1.5 deg) and the left 12 cm out (-10.3 deg).
+  `make_dual_pistol_clips.py` now symmetrizes the BODY (every bone outside the two arm chains averaged with its
+  partner's mirror -- a square, isosceles stance), puts the right hand `HALF_SPAN` = 0.12 m to its side with the
+  bore turned straight ahead (read through Shino's `SocketPistol`), solves the arm to it, and only then X-flips the
+  arm (on a symmetric body the local mirror IS the world mirror); the carry gets the same minus the bore turn. Each
+  clip is then moved back onto the rig in FK (`arp_clips.move_to_arp`) so the rig and the export agree. Before the
+  re-run the four clips' body bones were checked byte-equal to their pistol sources, i.e. never hand-edited.
+  Result: clip alone 0.04 deg, first person right +9.5 / left -10.0 deg of the crosshair, 0.194 m apart, bores on the
+  aim. `alignLeftBore` no longer has anything to correct (the left barrel is parallel without it, even at a 3 m aim
+  point); it stays on as a safety net. `probe_dual_pistol` gains "the pair straddles the centre line" (centre within
+  2.5 cm, span >= 0.15 m) with `--pistol-clip-control` (the pistol clip under the pair: centre +0.063, fails), and
+  its `--control` is now a hidden 5 deg left toe-in (fails at +5.02) -- the old one passed once the clip was fixed.
 - **SNR1 is Quaternius `SniperRifle_3` again** (user, 2026-09-21): the conformed `SNR1.blend` / `.glb` / icon
   and scene markers of 686f4c0 are restored (1.124 m AWP / L96A1, grip -> rear 0.306 m, grip lifted 2 cm, the
   `Bolt` part and its `bolt_work` clip, SupportPoint 3.5 cm under the forend), keeping the `rifle` archetype.

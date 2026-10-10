@@ -519,6 +519,16 @@ back toward them). WorldBounds' two rescues run on every
 peer for every Player, so the host's own move of a client's puppet anchors it too (`NetworkManager.hostPlaced`). A
 teleport ONLY the owner makes (the debug console, a harness) is still clamped, by design: give it the host's half.
 
+**"The host dies on join" was an enemy rifle (PLAN.md 0.41, 2026-10-10).** The coop phase failed ~1 run in 6 with the
+host's player dead ("Player died", no damage logged) right around the joiner's spawn, the mission failed
+`player_hospitalized`, and "purchase accepted" / "mission on join" went with it. Not the spawn, not physics: DebugWorld's
+`enemy` patrol (E1-E3, ASR-1) shot the idle host from ~42 m (`Health: Player killed by 'ASR-1' (36.0) attacker='enemy
+2'`), and once the respawned client too. Gunshot damage was simply never logged. Two changes: `Health` now prints what
+killed a PLAYER (weapon, amount, attacker name / id / position -- one line per player death), and the coop phase's host
+makes `player` <-> `enemy` NEUTRAL on the campaign layer at start (it survives zone streaming and replicates to the
+joiner), because that phase tests co-op, not combat. Measured: 3 host deaths in 17 runs before, 0 in 12 after; the full
+gate PASSES.
+
 ### Hit detection, damage, and impact VFX
 
 `WeaponController.onWeaponFire()` collects hit data into a `HitInfo` and delegates entirely:

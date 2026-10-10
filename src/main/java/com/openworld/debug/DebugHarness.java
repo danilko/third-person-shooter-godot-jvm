@@ -729,6 +729,12 @@ public class DebugHarness extends Node {
         if (!client && !coopMissionStarted && coopT >= 1.0
                 && getNodeOrNull("/root/MissionManager") instanceof com.openworld.game.mission.MissionManager mm) {
             coopMissionStarted = true;
+            // this phase tests co-op, not combat (PLAN.md 0.41, 2026-10-10): DebugWorld's "enemy" patrol shot the idle
+            // host dead ~40 m from the spawn in ~1 run in 6 (and the respawned client once), failing the mission and
+            // the purchase. Campaign layer: it survives the zone streaming and replicates to the joiner.
+            if (getNodeOrNull("/root/FactionManager") instanceof com.openworld.character.FactionManager fm)
+                fm.setCampaignRelationship(com.openworld.character.Faction.PLAYER, com.openworld.character.Faction.ENEMY,
+                        com.openworld.character.FactionRules.NEUTRAL);
             var info = new com.openworld.game.mission.MissionInfo();
             info.missionId = "coop_baseline_test";
             info.objectiveType = com.openworld.game.mission.MissionObjectiveType.SCRIPTED;

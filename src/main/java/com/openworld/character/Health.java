@@ -223,6 +223,9 @@ public class Health extends Node {
         if (gangs != null && attackerId != null && !attackerId.isEmpty() && getOwner() instanceof Character gv)
             gangs.reportHit(gv, attackerId, killed);
         if (currentHealth <= 0) {
+            // a player's death names what dealt it (PLAN.md 0.41: the host's player died with nothing logged)
+            if (getOwner() instanceof Player) GD.print("Health: " + getOwner().getName() + " killed by '" + weaponName
+                    + "' (" + damage + ") attacker='" + attackerName + "' id='" + attackerId + "' from " + attackerPos);
             Node busNode = getNodeOrNull("/root/EventBus");
             if (busNode instanceof EventBus bus) {
                 Node owner = getOwner();
