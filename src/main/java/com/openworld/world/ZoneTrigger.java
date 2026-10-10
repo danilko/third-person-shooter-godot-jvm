@@ -185,6 +185,9 @@ public class ZoneTrigger extends Area3D {
 		triggerCount++;
 		firedLocally = true;
 		dir.triggerBeat(beatId);
+		if (by != null)
+			com.openworld.game.event.GameplayEvents.publish(new com.openworld.game.event.GameplayEvent.ZoneEntered(
+					com.openworld.game.event.Actors.of(by), com.openworld.game.event.Actors.at(getGlobalPosition()), beatId));
 		refreshDebugColor();
 		if (debugLog) {
 			GD.print("[ZoneTrigger] " + getName() + " fired '" + beatId + "'"

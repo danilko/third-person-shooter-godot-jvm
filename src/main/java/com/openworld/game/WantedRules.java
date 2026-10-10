@@ -1,6 +1,6 @@
 package com.openworld.game;
 
-import com.openworld.util.MiniJson;
+import com.openworld.util.DataReader;
 
 import java.util.HashMap;
 import java.util.List;
@@ -38,38 +38,26 @@ public final class WantedRules {
     }
 
     /** Parse {@code crimes.json}'s text. */
-    @SuppressWarnings("unchecked")
-    public static WantedRules parse(String json) {
-        Map<String, Object> doc = (Map<String, Object>) MiniJson.parse(json);
-        List<Object> at = (List<Object>) doc.get("stars_at");
-        double[] starsAt = new double[at.size()];
-        for (int i = 0; i < starsAt.length; i++) starsAt[i] = num(at.get(i));
+    public static WantedRules parse(String json) { return read(DataReader.of(json)); }
+
+    /** Read the wanted rules out of crimes.json (its {@code dispatch} and {@code fees} blocks are others'). */
+    public static WantedRules read(DataReader doc) {
+        double[] starsAt = doc.nums("stars_at");
+        if (starsAt == null) starsAt = new double[0];
         Map<String, Crime> crimes = new HashMap<>();
-        Map<String, Object> rows = (Map<String, Object>) doc.get("crimes");
-        for (Map.Entry<String, Object> e : rows.entrySet()) {
-            Map<String, Object> r = (Map<String, Object>) e.getValue();
-            crimes.put(e.getKey(), new Crime(e.getKey(), num(r.get("heat")),
-                    (int) num(r.getOrDefault("min_stars", 0)), Boolean.TRUE.equals(r.get("witness")),
-                    Boolean.TRUE.equals(r.get("lethal"))));
+        for (Map.Entry<String, DataReader> e : doc.rows("crimes").entrySet()) {
+            DataReader r = e.getValue();
+            crimes.put(e.getKey(), new Crime(e.getKey(), r.reqNum("heat", 0.0), r.integer("min_stars", 0),
+                    r.bool("witness", false), r.bool("lethal", false)));
         }
-        WantedRules w = new WantedRules(starsAt, num(doc.getOrDefault("calm_seconds", 12.0)),
-                num(doc.getOrDefault("calm_per_star", 6.0)), num(doc.getOrDefault("decay_per_second", 18.0)),
-                num(doc.getOrDefault("witness_radius", 45.0)), crimes);
-        if (doc.get("police_weapons") instanceof Map<?, ?> pw) {
-            w.normalWeapons = strings(pw.get("normal"));
-            w.lethalWeapons = strings(pw.get("lethal"));
+        WantedRules w = new WantedRules(starsAt, doc.num("calm_seconds", 12.0), doc.num("calm_per_star", 6.0),
+                doc.num("decay_per_second", 18.0), doc.num("witness_radius", 45.0), crimes);
+        DataReader pw = doc.child("police_weapons");
+        if (pw != null) {
+            w.normalWeapons = pw.strings("normal");
+            w.lethalWeapons = pw.strings("lethal");
         }
         return w;
-    }
-
-    private static List<String> strings(Object o) {
-        List<String> out = new java.util.ArrayList<>();
-        if (o instanceof List<?> l) for (Object x : l) out.add(String.valueOf(x));
-        return out;
-    }
-
-    private static double num(Object o) {
-        return o instanceof Number n ? n.doubleValue() : 0.0;
     }
 
     /** Stars for a heat (0..MAX_STARS). */

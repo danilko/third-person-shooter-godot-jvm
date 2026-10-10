@@ -24,16 +24,12 @@ public final class Outfits {
 
     public static final String TABLE = "res://src/main/resources/com/openworld/character/outfits.json";
 
-    private static Map<String, Map<String, Object>> table;
     private static final Map<String, Material> CACHE = new HashMap<>();
 
     private Outfits() {}
 
     private static Map<String, Map<String, Object>> table() {
-        if (table == null) {
-            table = FileAccess.fileExists(TABLE) ? OutfitTable.parse(FileAccess.getFileAsString(TABLE)) : new HashMap<>();
-        }
-        return table;
+        return com.openworld.game.data.Tables.OUTFITS.get();
     }
 
     public static boolean has(String outfit) { return outfit != null && table().containsKey(outfit); }
@@ -86,5 +82,5 @@ public final class Outfits {
     private static double f(Object o) { return o instanceof Number n ? n.doubleValue() : 0.5; }
 
     /** Static state holds Godot resources: cleared at shutdown (GameManager._exitTree, the IconRegistry rule). */
-    public static void clear() { CACHE.clear(); table = null; }
+    public static void clear() { CACHE.clear(); }
 }

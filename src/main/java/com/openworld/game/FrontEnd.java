@@ -29,6 +29,14 @@ public class FrontEnd extends Node {
     public static void start(Node from, Action a, String address) {
         pending = a == null ? Action.NONE : a;
         if (address != null && !address.isBlank()) joinAddress = address.trim();
+        // a world STARTS with an empty ledger (PLAN.md 2.0): Continue's load replaces it, a joiner's is the host's;
+        // and a NEW world (New game / Host) must not inherit the campaign of the session played before it in this
+        // process -- MissionDirector is an AutoLoad and kept its sets across Quit to title
+        WorldLedger.replace(null);
+        if (pending == Action.NONE || pending == Action.HOST) {
+            var director = com.openworld.game.mission.MissionDirector.get();
+            if (director != null) director.resetCampaign();
+        }
         from.getTree().changeSceneToFile(WORLD);
     }
 

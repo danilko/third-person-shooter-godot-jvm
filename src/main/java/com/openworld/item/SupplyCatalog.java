@@ -1,6 +1,6 @@
 package com.openworld.item;
 
-import com.openworld.util.MiniJson;
+import com.openworld.util.DataReader;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -16,30 +16,21 @@ public final class SupplyCatalog {
 
     public record Supply(String id, String name, String kind, float heal, int max) {}
 
-    private static Map<String, Supply> rows;
-
     private SupplyCatalog() {}
 
-    @SuppressWarnings("unchecked")
-    public static Map<String, Supply> parse(String json) {
+    public static Map<String, Supply> parse(String json) { return read(DataReader.of(json)); }
+
+    public static Map<String, Supply> read(DataReader doc) {
         Map<String, Supply> out = new LinkedHashMap<>();
-        Map<String, Object> doc = (Map<String, Object>) MiniJson.parse(json);
-        Map<String, Object> list = (Map<String, Object>) doc.get("supplies");
-        for (Map.Entry<String, Object> e : list.entrySet()) {
-            Map<String, Object> r = (Map<String, Object>) e.getValue();
-            out.put(e.getKey(), new Supply(e.getKey(), String.valueOf(r.getOrDefault("name", e.getKey())),
-                    String.valueOf(r.getOrDefault("kind", "food")), ((Number) r.get("heal")).floatValue(),
-                    ((Number) r.getOrDefault("max", 3)).intValue()));
+        for (Map.Entry<String, DataReader> e : doc.rows("supplies").entrySet()) {
+            DataReader r = e.getValue();
+            out.put(e.getKey(), new Supply(e.getKey(), r.str("name", e.getKey()), r.str("kind", "food"),
+                    (float) r.reqNum("heal", 0.0), r.integer("max", 3)));
         }
         return out;
     }
 
-    public static synchronized Map<String, Supply> load() {
-        if (rows != null) return rows;
-        rows = godot.api.FileAccess.fileExists(PATH)
-                ? parse(godot.api.FileAccess.getFileAsString(PATH)) : new LinkedHashMap<>();
-        return rows;
-    }
+    public static Map<String, Supply> load() { return com.openworld.game.data.Tables.SUPPLIES.get(); }
 
     public static Supply find(String id) { return load().get(id); }
 }

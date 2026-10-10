@@ -1,6 +1,6 @@
 package com.openworld.game;
 
-import com.openworld.util.MiniJson;
+import com.openworld.util.DataReader;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,23 +36,18 @@ public final class RecoveryRules {
     }
 
     /** From crimes.json's text ({@code fees}) and gangs.json's ({@code abduction}); either may be null. */
-    @SuppressWarnings("unchecked")
     public static RecoveryRules parse(String crimesJson, String gangsJson) {
-        Map<String, Object> fees = crimesJson == null ? Map.of()
-                : ((Map<String, Object>) MiniJson.parse(crimesJson)).get("fees") instanceof Map<?, ?> m
-                        ? (Map<String, Object>) m : Map.of();
-        Map<String, Object> ab = gangsJson == null ? Map.of()
-                : ((Map<String, Object>) MiniJson.parse(gangsJson)).get("abduction") instanceof Map<?, ?> m2
-                        ? (Map<String, Object>) m2 : Map.of();
-        List<String> w = new ArrayList<>();
-        if (ab.get("guard_weapons") instanceof List<?> l) for (Object o : l) w.add(String.valueOf(o));
-        return new RecoveryRules((int) num(fees, "hospital", 5000), (int) num(fees, "police_per_star", 10000),
-                (int) num(ab, "ransom_per_star", 100000), (int) num(ab, "guards", 3), num(ab, "escape_start", 15.0),
-                num(ab, "escape_free", 90.0), w);
+        return read(crimesJson == null ? null : DataReader.of(crimesJson).child("fees"),
+                gangsJson == null ? null : DataReader.of(gangsJson).child("abduction"));
     }
 
-    private static double num(Map<String, Object> m, String k, double dflt) {
-        return m.get(k) instanceof Number n ? n.doubleValue() : dflt;
+    /** From crimes.json's {@code fees} block and gangs.json's {@code abduction} block; either may be null. */
+    public static RecoveryRules read(DataReader fees, DataReader abduction) {
+        DataReader f = fees != null ? fees : DataReader.of("{}");
+        DataReader ab = abduction != null ? abduction : DataReader.of("{}");
+        return new RecoveryRules(f.integer("hospital", 5000), f.integer("police_per_star", 10000),
+                ab.integer("ransom_per_star", 100000), ab.integer("guards", 3), ab.num("escape_start", 15.0),
+                ab.num("escape_free", 90.0), ab.strings("guard_weapons"));
     }
 
     /** Where a player who went DOWN (died) wakes. */

@@ -70,6 +70,8 @@ GATES=(
   "garage|450|0|0|$HF --script $P/probe_garage.gd"
   "race|300|0|0|$HF --script $P/probe_race.gd"
   "minimal_hud|300|0|0|$HF --script $P/probe_minimal_hud.gd"
+  "gameplay_events|300|0|0|$HF --script $P/probe_gameplay_events.gd"
+  "markers|200|0|0|$H --script $P/probe_markers.gd"
   "stairs|900|0|0|$H --script $P/probe_stairs.gd"
   "building_nav|600|0|0|$H --script $P/check_building_nav.gd"
   "konbini_kill|600|1|0|$H --script $P/probe_konbini_mission.gd -- --case=kill"

@@ -153,9 +153,11 @@ public class FirearmItem extends WeaponItem {
 	sm.post(StimulusManager.Type.GUNSHOT, weaponMuzzle().getGlobalPosition(),
 		gunshotHearingRadius, owningCharacter, faction);
 	// the wanted level (PLAN.md W5): a player firing where someone can see it
-	com.openworld.game.WantedSystem wanted = com.openworld.game.WantedSystem.get();
-	if (wanted != null && owningCharacter instanceof com.openworld.character.Player p && p.characterInfo != null)
-	  wanted.report("gunfire", weaponMuzzle().getGlobalPosition(), p.characterInfo.characterId);
+	// -- one event, heard by the wanted level and whoever else cares (PLAN.md 2.0 / AR3)
+	if (owningCharacter instanceof Character shooter)
+	  com.openworld.game.event.GameplayEvents.publish(new com.openworld.game.event.GameplayEvent.WeaponFired(
+		  com.openworld.game.event.Actors.of(shooter),
+		  com.openworld.game.event.Actors.at(weaponMuzzle().getGlobalPosition()), weaponId));
   }
 
   /**

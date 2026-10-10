@@ -9,6 +9,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - Audio: every sound is a file (2026-09-29)
 - The player profile, the economy and save v2 (2026-10-10, under Performance Foundation)
 - Owned cars and the safe-house garage (2026-10-10, after it)
+- Authoring foundations: GameplayEvents, DataTable, MarkerRegistry, WorldLedger (PLAN.md 2.0, 2026-10-10, after it)
 
 ---
 
@@ -454,6 +455,103 @@ Gate: `tools/godot/probe_garage.gd` (in `nightly_gates.sh`), 15/15 on the real W
 and one bay from the start car; a dropped car is not kept (control); driven in at 60 % health it is kept with that
 condition; driven out the row loses its garage, back in it is one row again; written to the profile FILE, read back,
 and a second world load puts the same id in the bay at 60 %.
+
+### Authoring foundations (PLAN.md 2.0: AR3 + DataTable + MarkerRegistry + CR3, 2026-10-10)
+
+Four pieces every later system (activities 2.1, encounters 2.2, careers 3.3, surprise events 4.3b) stands on. All but
+`MarkerRegistry` are engine-free and unit-tested.
+
+**`game.event.GameplayEvents` -- the one typed action -> consequence stream (AR3).** `Health.applyDamage` used to call
+`WantedSystem.reportHit` and `GangSystem.reportHit` itself, `FirearmItem` called `report("gunfire")`, `ShopClerkSpot`
+called both systems twice: every new consequence meant another hook inside the seam. Now a seam PUBLISHES what
+happened and knows nothing of who cares:
+
+| event (`GameplayEvent`, a sealed interface of records) | published by |
+|---|---|
+| `Damaged` / `Killed` (actor, target, at, headshot, weapon) | `Health.applyDamage` |
+| `WeaponFired` (every shot, any character) | `FirearmItem.postGunshotStimulus` |
+| `Threatened` (actor, clerk, the protecting gang or "") | `ShopClerkSpot.react` |
+| `Theft` ("till", amount, the gang whose place it was or "") | `ShopClerkSpot.robTill` |
+| `ZoneEntered` (the trigger's beat id) | `ZoneTrigger.fire` |
+| `BalanceChanged` (from / to PLAYER ids, amount, reason) | `Economy.transfer`, bridged in `GameManager` |
+| `FlagChanged` (a world flag) | `WorldLedger.setFlag` / `clearFlag` |
+
+- **Authority only.** `publish` on a co-op client DROPS the event (a client's own shot runs the fire path too);
+  `GameManager` installs "single player or the host". `EventBus` is unchanged: untyped Godot signals for the UI.
+- **Order is by `Phase`, not by who subscribed first:** ACTIVITY -> CAREER -> ECONOMY -> WANTED -> GANG -> LEDGER ->
+  DIRECTOR -> OBSERVER. Each subscriber gets the event and its `Ruling`. An ACTIVITY-phase subscriber may
+  `sanction(by)` (the act is lawful in its context -- an officer shooting during an arrest: WANTED and GANG skip it),
+  `veto(by)` (no later phase hears it) or `sandbox(by)` (it happened inside a mission REPLAY, CR7: the ledger does
+  not record it; heat is ordinary and stays). An event published from inside a subscriber is queued and delivered
+  after the current one. A subscriber that throws is logged and does not silence the rest.
+- **`CrimeMap` says which crime an event is** (pure, `CrimeMapTest`; a test asserts every id it can return is a row
+  of crimes.json / gangs.json). `WantedSystem` (phase WANTED) and `GangSystem` (phase GANG) subscribe; nothing calls
+  into them to report a crime any more (`report` / `reportNow` remain as their own API and the probes' surface).
+  A new consequence is a subscriber; a new crime is a table row + one line in `CrimeMap`; a new kind of act is a new
+  record in `GameplayEvent`'s `permits` list + its publisher.
+- `Actor` (id, faction, PLAYER / AI / NONE, name, storyId) and `Spot` (x, y, z, placeId) are plain data;
+  `game.event.Actors` is the engine side (a body -> an Actor, an attacker known only by id -> a live player's body or
+  an AI of unknown faction). A STORY character's `storyId` is its characterId (`AICharacter.storyCharacter`), ""
+  for everyone else.
+- Not published yet (no consumer until 2.1 / 3.0 / 3.3): VehicleTaken, ItemDelivered, Interacted, ActivityOutcome,
+  CareerPushed / Popped, DebtOverdue. `car_theft`, `train_attack`, `bank_attack`, `attack_vip` are rows of
+  crimes.json that nothing reports yet (as before).
+
+**`util.DataTable<T>` + `util.DataReader` -- one loader, validated (the review's "typed records + one loader").**
+Eight tables were each walked by hand with casts and `getOrDefault`: a misspelt key silently kept the default.
+`DataReader` is a JSON object that remembers what was read from it -- `str / num / lng / integer / bool / strings /
+nums / ints / stringLists / child / rows / items`, `reqNum / reqStr` for a value that must be there -- and `finish()`
+names every key nobody asked for and every value of the wrong type with its path (`crimes.gunfire.min_star: unknown
+key`). A key named `note`, ending `_note` or starting `_` is a comment. Several parsers may read one file (crimes.json
+feeds the wanted rules, the dispatch and the recovery fees): a child object has ONE reader however many ask.
+`game.data.Tables` is THE list: `CRIMES` (wanted, dispatch, fees), `GANGS` (rules, hunters, bodies per gang, hangout,
+abduction), `ECONOMY`, `SUPPLIES`, `AMMO_SUPPLY`, `OUTFITS`, and `Tables.recovery()` (the two-file `RecoveryRules`).
+A table with problems still LOADS (defaults fill the gaps -- a typo must not stop the game on a player's machine) and
+logs each problem; the GATE refuses it: `DataTablesTest` loads every table from the source tree and fails on any
+problem (its control parses a table with a typo and gets exactly the three problems). `reload()` re-reads a file and
+tells its listeners -- `WantedSystem` / `GangSystem` re-derive their rules and keep the players' heat -- which is the
+debug hot reload (console: `tables reload`; `tables` lists them). Each parser keeps its `parse(String)` (the unit
+tests use it) beside `read(DataReader)`. Not in the list: the generated `weapon/weapon_catalog.json` and the baked
+world records (places, street names, sidewalks) -- build outputs, not tuning.
+
+**`world.MarkerRegistry` -- the one reader of level-design markers.** A building's `MARK_<kind>_<n>` Empties are
+baked into its scene as nodes in the group `mission_marker` with their props as metadata (`kind`, `team`, `weapon`,
+...; -Z is the way one faces). `ofKind(ctx, kind)`, `near(ctx, kind, at, radius)` (nearest first), `nearest(...)`,
+`under(buildingRoot, kind)` (one building's own, no tree-wide index) return typed `Marker`s (`position()`,
+`facing()`, `prop(key, def)`, `num`, `team()`). Buildings stream, so the index is rebuilt from the group when the
+tree's node count changed or after 1 s, and a freed marker is never returned. Queries are for events (a mission
+starting, a wave spawning), not every frame. `ShopClerkSpot.callResponders` (the gang's spawn points) is its first
+user; F6's encounters and cover points (2.2) are the next. Console: `markers`.
+
+**`game.WorldLedger` -- what the story changed in the WORLD for good (CR3).** The island is generated and streamed:
+nothing in a scene can remember that a boss is dead. The ledger does, keyed by ids that survive streaming and
+rebuilds: WORLD FLAGS (`setFlag / clearFlag / flag / isSet` -- a fact about the place, never a player's choice),
+DEAD STORY CHARACTERS (`markDead / isDead`) and PLACE OVERRIDES (`setPlace(placeId, owner, state)`, `ownerOf(placeId,
+generated)`). It is the HOST's (the co-op model: the world is the host's, the story is each player's), saved in the
+world slot as `ledger` (`toMap` / `fromMap`, an old slot reads as empty), and a change marks the world dirty for the
+coalesced autosave. CR3's fourth part, faction-baseline overrides, is `FactionManager`'s campaign layer (0.35): it
+already has its owner, its save key and its replication, so it is not duplicated.
+- A story character is DEAD once the ledger's subscriber (phase LEDGER) hears `Killed` with a `storyId` -- not inside
+  a sandbox. `ZoneManager.spawnNamed` does not build one that is dead; a HAND-PLACED one (`storyCharacter` ticked in
+  a scene) frees itself in `AICharacter._ready`; a load replaces the ledger FIRST and sweeps the live story
+  characters it says are dead (`MissionDirector.removeDeadStoryCharacters`).
+- A world STARTS with an empty ledger: `FrontEnd.start` resets it (Continue's load then replaces it), and for New
+  game / Host also calls `MissionDirector.resetCampaign()` -- the director is an AutoLoad and used to carry the
+  previous session's completed / unlocked sets into a new game started from the title in the same process.
+  `GameManager.restartLevel` resets it with the factions.
+- NOT yet: replication to clients (AR5's join baseline, 2.4 -- a client's ledger is empty, which is harmless today
+  because only the host spawns AI and evaluates requirements); a consumer of place overrides (the first mission that
+  changes a shop's owner reads `ownerOf`); typed `Flag<T>` keys with a declared scope (CR1, 2.1 -- they wrap this).
+  Console: `ledger`, `ledger flag <id> [value]`, `ledger dead <storyId>`.
+
+Gates: unit `DataReaderTest`, `DataTablesTest`, `GameplayEventsTest`, `CrimeMapTest`, `WorldLedgerTest`;
+`probe_gameplay_events.gd` 21/21 (the tables load clean in the engine; a player's hit on a civilian is a star and on
+a gang member a gang star with only the event between them -- controls: the same hit SANCTIONED gives none, an AI's
+hit gives the player none; a transfer is an event; a killed story character is in the ledger and removed when
+spawned again, an ambient one is not recorded, with the ledger reset the same boss lives; save -> reset -> load
+brings the death, a flag and a place override back and sweeps the live boss); `probe_markers.gd` 15/15 (two Koban,
+expected counts read from the scene file's TEXT; by kind, near, under, the facing of a turned building; one freed ->
+its markers are gone). Both are in `tools/nightly_gates.sh`.
 
 ### Street races — `game.mission.RaceDirector` + `world.RaceCheckpoint` (R2, AutoLoad, 2026-09-17)
 

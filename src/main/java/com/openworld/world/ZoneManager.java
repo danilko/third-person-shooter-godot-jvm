@@ -1866,6 +1866,8 @@ public class ZoneManager extends Node {
 	/** One named story AI (extracted from the old synchronous load loop, one work item). */
 	private void spawnNamed(LoadedZone lz, NamedCharacterConfig nc, Vector3 center, Node container) {
 		if (!GD.isInstanceValid(container)) return;
+		// a story character killed in this world stays dead (PLAN.md 2.0 / CR3, game.WorldLedger)
+		if (!nc.characterId.isEmpty() && com.openworld.game.WorldLedger.get().isDead(nc.characterId)) return;
 		AICharacter ai = instantiateNamed(nc);
 		if (ai == null) return;
 

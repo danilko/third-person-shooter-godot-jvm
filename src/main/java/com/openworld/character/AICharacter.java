@@ -265,6 +265,13 @@ public class AICharacter extends Character {
         // Story AI announce themselves to the director (F1). Registration is here, in the body's own
         // _ready(), so an editor-placed named AI and a zone-spawned one take the identical path.
         if (storyCharacter) {
+            // a HAND-PLACED story character killed in this world stays dead (PLAN.md 2.0 / CR3): the scene still
+            // carries the node, the ledger says it is gone. A zone-spawned one is never built (ZoneManager.spawnNamed).
+            if (characterInfo != null && com.openworld.game.WorldLedger.get().isDead(characterInfo.characterId)) {
+                setVisible(false);
+                queueFree();
+                return;
+            }
             MissionDirector director = MissionDirector.get();
             if (director != null) director.registerNamedCharacter(this);
         }

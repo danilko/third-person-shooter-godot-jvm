@@ -184,6 +184,18 @@ public class MissionDirector extends Node {
         if (id != null && named.get(id) == ai) named.remove(id);
     }
 
+    /** After a load replaced the world's ledger: free every LIVE story character it says is dead. Returns how many. */
+    public int removeDeadStoryCharacters(java.util.function.Predicate<String> isDead) {
+        int n = 0;
+        for (Map.Entry<String, AICharacter> e : new java.util.ArrayList<>(named.entrySet())) {
+            if (!isDead.test(e.getKey()) || !GD.isInstanceValid(e.getValue())) continue;
+            named.remove(e.getKey());
+            e.getValue().queueFree();
+            n++;
+        }
+        return n;
+    }
+
     /** The live story AI with this id, or null when it is not loaded (or has been freed). */
     public AICharacter getNamedCharacter(String characterId) {
         AICharacter ai = named.get(characterId);

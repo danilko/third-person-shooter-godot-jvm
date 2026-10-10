@@ -1,6 +1,6 @@
 package com.openworld.game.profile;
 
-import com.openworld.util.MiniJson;
+import com.openworld.util.DataReader;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -27,42 +27,29 @@ public final class EconomyTable {
     public final List<Long> raceByPlace = new ArrayList<>();
     private final Set<String> unpricedLogged = new LinkedHashSet<>();
 
-    private static EconomyTable instance;
-
     /** The game's table (an empty one -- everything free -- when the file is missing or unreadable). */
-    public static synchronized EconomyTable get() {
-        if (instance == null) {
-            String text = godot.api.FileAccess.fileExists(PATH) ? godot.api.FileAccess.getFileAsString(PATH) : null;
-            try {
-                instance = text == null ? new EconomyTable() : parse(text);
-            } catch (RuntimeException e) {
-                godot.global.GD.printErr("EconomyTable: " + PATH + " unreadable (" + e.getMessage() + ") -- everything is free");
-                instance = new EconomyTable();
-            }
-        }
-        return instance;
-    }
+    public static EconomyTable get() { return com.openworld.game.data.Tables.ECONOMY.get(); }
 
-    public static EconomyTable parse(String json) {
-        Map<String, Object> d = Maps.map(MiniJson.parse(json));
+    public static EconomyTable parse(String json) { return read(DataReader.of(json)); }
+
+    public static EconomyTable read(DataReader d) {
         EconomyTable t = new EconomyTable();
-        if (d == null) return t;
-        t.startingCash = Maps.lng(d, "starting_cash", 0);
-        t.refillFraction = Math.max(0.0, Maps.num(d, "refill_fraction", 0.2));
-        readLongs(Maps.map(d.get("weapons")), t.weapons);
-        readLongs(Maps.map(d.get("supplies_per_unit")), t.suppliesPerUnit);
-        Map<String, Object> r = Maps.map(d.get("rewards"));
+        t.startingCash = d.lng("starting_cash", 0);
+        t.refillFraction = Math.max(0.0, d.num("refill_fraction", 0.2));
+        readLongs(d.child("weapons"), t.weapons);
+        readLongs(d.child("supplies_per_unit"), t.suppliesPerUnit);
+        DataReader r = d.child("rewards");
         if (r != null) {
-            t.missionDefault = Maps.lng(r, "mission_default", 0);
-            readLongs(Maps.map(r.get("missions")), t.missions);
-            for (Object o : Maps.list(r, "race_by_place")) if (o instanceof Number n) t.raceByPlace.add(n.longValue());
+            t.missionDefault = r.lng("mission_default", 0);
+            readLongs(r.child("missions"), t.missions);
+            t.raceByPlace.addAll(r.longs("race_by_place"));
         }
         return t;
     }
 
-    private static void readLongs(Map<String, Object> m, Map<String, Long> out) {
+    private static void readLongs(DataReader m, Map<String, Long> out) {
         if (m == null) return;
-        for (String k : m.keySet()) out.put(k, Maps.lng(m, k, 0));
+        for (String k : m.keys()) out.put(k, m.lng(k, 0));
     }
 
     /** A weapon's price; {@code carried} = a refill of one already in the inventory. Null = not priced (free). */

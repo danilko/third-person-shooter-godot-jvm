@@ -93,6 +93,62 @@ public class GameManager extends Node {
         com.openworld.control.InputDevice.force(com.openworld.control.InputDevice.Kind.valueOf(kind));
     }
 
+    /** Single player or the host: where consequences are decided (GameplayEvents is authority-only). */
+    private boolean isAuthority() {
+        return !(getNodeOrNull("/root/NetworkManager") instanceof com.openworld.net.NetworkManager n)
+                || !n.isNetworked() || n.isServer();
+    }
+
+    /** Every applied money transfer is also a gameplay event (PLAN.md 2.0 / AR3). */
+    private final java.util.function.Consumer<com.openworld.game.profile.Economy.Transfer> economyToEvents = t ->
+            com.openworld.game.event.GameplayEvents.publish(new com.openworld.game.event.GameplayEvent.BalanceChanged(
+                    t.from() == null ? "" : t.from().playerId, t.to() == null ? "" : t.to().playerId,
+                    t.amount(), t.reason().name()));
+
+    // ── probe surface: the gameplay event stream (tools/godot/probe_gameplay_events.gd) ──
+    private final java.util.List<String> eventLog = new java.util.ArrayList<>();
+    private com.openworld.game.event.GameplayEvents.Subscriber eventTap, eventSanction;
+
+    /** Record every event's kind + actor kind from now on (OBSERVER), or stop. */
+    @Register public void tapGameplayEventsNow(boolean on) {
+        if (eventTap != null) com.openworld.game.event.GameplayEvents.unsubscribe(eventTap);
+        eventTap = null;
+        eventLog.clear();
+        if (!on) return;
+        eventTap = (e, r) -> eventLog.add(e.getClass().getSimpleName() + ":" + e.actor().kind()
+                + (r.sanctioned() ? ":sanctioned" : ""));
+        com.openworld.game.event.GameplayEvents.subscribe(com.openworld.game.event.GameplayEvents.Phase.OBSERVER, eventTap);
+    }
+    @Register public String gameplayEventLogNow() { return String.join(",", eventLog); }
+    @Register public long gameplayEventsPublishedNow() { return com.openworld.game.event.GameplayEvents.publishedCount(); }
+    /** The probe's stand-in for an activity's rules: sanction every act (ACTIVITY phase), or stop. */
+    @Register public void sanctionGameplayEventsNow(boolean on) {
+        if (eventSanction != null) com.openworld.game.event.GameplayEvents.unsubscribe(eventSanction);
+        eventSanction = null;
+        if (!on) return;
+        eventSanction = (e, r) -> r.sanction("probe");
+        com.openworld.game.event.GameplayEvents.subscribe(com.openworld.game.event.GameplayEvents.Phase.ACTIVITY, eventSanction);
+    }
+    // ── probe surface: the level-design markers (tools/godot/probe_markers.gd) ──
+    @Register public int markerCountNow(String kind) { return com.openworld.world.MarkerRegistry.count(this, kind); }
+    @Register public String markerKindsNow() { return String.join(",", com.openworld.world.MarkerRegistry.kinds(this)); }
+    @Register public int markersNearNow(String kind, Vector3 at, double radius) {
+        return com.openworld.world.MarkerRegistry.near(this, kind, at, radius).size();
+    }
+    /** The nearest marker of a kind as "name|team|x,y,z|facing x,z", "" none. */
+    @Register public String nearestMarkerNow(String kind, Vector3 at, double radius) {
+        var m = com.openworld.world.MarkerRegistry.nearest(this, kind, at, radius);
+        if (m == null) return "";
+        Vector3 p = m.position(), f = m.facing();
+        return String.format(java.util.Locale.ROOT, "%s|%s|%.2f,%.2f,%.2f|%.2f,%.2f", m.node.getName(), m.team(),
+                p.getX(), p.getY(), p.getZ(), f.getX(), f.getZ());
+    }
+    @Register public int markersUnderNow(Node root, String kind) { return com.openworld.world.MarkerRegistry.under(root, kind).size(); }
+    @Register public int markerRebuildsNow() { return com.openworld.world.MarkerRegistry.rebuildCount(); }
+
+    @Register public String dataTableProblemsNow() { com.openworld.game.data.Tables.all(); return String.join("\n", com.openworld.util.DataTable.validateAll()); }
+    @Register public String reloadDataTablesNow() { return String.join("\n", com.openworld.util.DataTable.reloadAll()); }
+
     @Register
     @Override
     public void _ready() {
@@ -115,6 +171,13 @@ public class GameManager extends Node {
         // their in-flight reload/fire AudioStreamPlaybackWAV leaks ("Resource still in use:
         // Rifle_reload.wav" / leaked ObjectDB instances). The root Window's close_requested fires
         // first, while everything is valid, so it is the one reliable place to silence them.
+        // the data tables' problems and the gameplay event stream (PLAN.md 2.0): authority-only, told to the log
+        com.openworld.util.DataTable.setLog((t, m) -> GD.printErr("DataTable " + t.name + " (" + t.path + "): " + m));
+        com.openworld.game.event.GameplayEvents.setAuthority(this::isAuthority);
+        com.openworld.game.event.GameplayEvents.setErrorLog((s, e) -> GD.printErr("GameplayEvents: " + s + " threw " + e));
+        com.openworld.game.profile.Economy.listen(economyToEvents);
+        com.openworld.game.event.GameplayEvents.subscribe(com.openworld.game.event.GameplayEvents.Phase.LEDGER,
+                WorldLedger.SUBSCRIBER);
         // the wanted level and the jail respawn (PLAN.md W5): children of this AutoLoad, built in code
         if (getNodeOrNull("WantedSystem") == null) {
             WantedSystem ws = new WantedSystem();
@@ -212,6 +275,9 @@ public class GameManager extends Node {
     @Register
     @Override
     public void _exitTree() {
+        com.openworld.game.profile.Economy.unlisten(economyToEvents);
+        com.openworld.game.event.GameplayEvents.reset();
+        com.openworld.world.MarkerRegistry.clear();
         IconRegistry.clear();
         com.openworld.world.InteriorNav.clear();
         com.openworld.carrier.vehicle.Vehicle.clearLampCaches();
@@ -277,6 +343,7 @@ public class GameManager extends Node {
         // shipped DefaultFactions.tres so a restart is a clean slate.
         com.openworld.character.FactionManager factions = getFactionManager();
         if (factions != null) factions.reset();
+        WorldLedger.replace(null);   // ... and so does the world's ledger (dead story characters, world flags)
         // End any live network session before reloading: NetworkManager is an AutoLoad and
         // survives reloadCurrentScene, so without this a "restart" would carry a stale ENet
         // connection into the fresh scene. After leaveSession the reload comes up single-player.

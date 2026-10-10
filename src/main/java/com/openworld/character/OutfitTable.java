@@ -1,6 +1,6 @@
 package com.openworld.character;
 
-import com.openworld.util.MiniJson;
+import com.openworld.util.DataReader;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -20,12 +20,17 @@ public final class OutfitTable {
     }
 
     /** Parse the table's text: outfit -> part -> colour list or material path. */
-    @SuppressWarnings("unchecked")
-    public static Map<String, Map<String, Object>> parse(String json) {
+    public static Map<String, Map<String, Object>> parse(String json) { return read(DataReader.of(json)); }
+
+    /** An outfit's parts are free-form (the part names come from each body's material names), so they are not
+     *  checked key by key; a value must be a colour list or a material path. */
+    public static Map<String, Map<String, Object>> read(DataReader doc) {
         Map<String, Map<String, Object>> out = new HashMap<>();
-        if (!(MiniJson.parse(json) instanceof Map<?, ?> doc) || !(doc.get("outfits") instanceof Map<?, ?> o)) return out;
-        for (var e : ((Map<String, Object>) o).entrySet())
-            if (e.getValue() instanceof Map<?, ?> parts) out.put(e.getKey(), (Map<String, Object>) parts);
+        for (Map.Entry<String, DataReader> e : doc.rows("outfits").entrySet()) {
+            Map<String, Object> parts = new HashMap<>();
+            for (String part : e.getValue().keys()) parts.put(part, e.getValue().raw(part));
+            out.put(e.getKey(), parts);
+        }
         return out;
     }
 

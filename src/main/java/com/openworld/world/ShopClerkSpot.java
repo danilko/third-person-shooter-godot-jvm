@@ -200,9 +200,10 @@ public class ShopClerkSpot extends Node3D {
 
     private void react(Player who) {
         // a threatened clerk is a crime (police respond); a gray-area shop also calls its gang
-        com.openworld.game.WantedSystem ws = com.openworld.game.WantedSystem.get();
         String pid = who.getCharacterInfo() != null ? who.getCharacterInfo().characterId : "";
-        if (ws != null) ws.report("threaten_clerk", clerk.getGlobalPosition(), pid);
+        com.openworld.game.event.GameplayEvents.publish(new com.openworld.game.event.GameplayEvent.Threatened(
+                com.openworld.game.event.Actors.of(who), com.openworld.game.event.Actors.of(clerk),
+                com.openworld.game.event.Actors.at(clerk.getGlobalPosition()), gang()));
         if (!responders.isBlank()) callResponders(pid);
         if (rollsSurrender(clerk.characterInfo.characterId, surrender)) {
             state = 1;
@@ -232,15 +233,10 @@ public class ShopClerkSpot extends Node3D {
         String gang = parts[0].trim();
         int n = Math.max(0, Integer.parseInt(parts[1].trim()));
         String[] guns = parts.length > 2 ? parts[2].split(",") : new String[] {"SMG1"};
-        com.openworld.game.GangSystem gs = com.openworld.game.GangSystem.get();
-        if (gs != null) gs.report(gang, "threaten_clerk", playerId);
         java.util.List<Vector3> spots = new java.util.ArrayList<>();
-        if (getParent() != null) {
-            for (Node m : getParent().getChildren()) {
-                if (m instanceof Node3D m3 && "gang".equals(String.valueOf(m3.getMeta(new godot.core.StringName("team"), ""))))
-                    spots.add(m3.getGlobalPosition());
-            }
-        }
+        // the building's own markers with team = gang (its MARK_spawn points), through the one marker reader
+        for (MarkerRegistry.Marker m : MarkerRegistry.under(getParent(), null))
+            if ("gang".equals(m.team())) spots.add(m.position());
         if (!(GD.load(AI_SCENE) instanceof PackedScene ps) || getTree().getCurrentScene() == null) return;
         Node container = getTree().getCurrentScene().getNodeOrNull("Characters");
         if (container == null) container = getTree().getCurrentScene();
@@ -289,13 +285,11 @@ public class ShopClerkSpot extends Node3D {
         if (!robbable() || who == null) return 0;
         tillTaken = true;
         com.openworld.game.profile.Economy.transfer(null, com.openworld.game.profile.Profiles.of(who), till, com.openworld.game.profile.Economy.Reason.ROBBERY);
-        com.openworld.game.WantedSystem ws = com.openworld.game.WantedSystem.get();
-        // police treat every store the same (user, 2026-10-03); a gray-area shop adds its gang's heat on top
-        if (ws != null && who.getCharacterInfo() != null)
-            ws.report("rob_store", getGlobalPosition(), who.getCharacterInfo().characterId);
-        com.openworld.game.GangSystem gs = com.openworld.game.GangSystem.get();
-        if (gs != null && grayArea() && who.getCharacterInfo() != null)
-            gs.report(gang(), "rob_gray", who.getCharacterInfo().characterId);
+        // police treat every store the same (user, 2026-10-03); a gray-area shop adds its gang's heat on top --
+        // both hear the one event (PLAN.md 2.0 / AR3)
+        com.openworld.game.event.GameplayEvents.publish(new com.openworld.game.event.GameplayEvent.Theft(
+                com.openworld.game.event.Actors.of(who), com.openworld.game.event.Actors.at(getGlobalPosition()),
+                "till", till, grayArea() ? gang() : ""));
         return till;
     }
 

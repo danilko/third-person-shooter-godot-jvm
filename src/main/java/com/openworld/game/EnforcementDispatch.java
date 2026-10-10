@@ -1350,9 +1350,8 @@ public class EnforcementDispatch extends Node {
             rows = ws != null && ws.dispatchRules() != null ? ws.dispatchRules().bodies : null;
         } else {
             if (gangBodies == null) {
-                gangBodies = godot.api.FileAccess.fileExists(GangSystem.TABLE)
-                        ? DispatchRules.parseGangBodies(godot.api.FileAccess.getFileAsString(GangSystem.TABLE))
-                        : new java.util.HashMap<>();
+                com.openworld.game.data.Tables.Gangs g = com.openworld.game.data.Tables.GANGS.get();
+                gangBodies = g != null ? g.bodies() : new java.util.HashMap<>();
             }
             rows = gangBodies.get(side);
         }

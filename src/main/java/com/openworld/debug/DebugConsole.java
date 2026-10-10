@@ -154,6 +154,9 @@ public class DebugConsole extends CanvasLayer {
                 print("unlock <missionId> [requiredKey]       declare / query an unlock predicate");
                 print("race [add <characterId>]              race status, or enrol a racer");
                 print("weapons                                list every weapon id (weapon_catalog.json)");
+                print("tables [reload]                        the data tables and their problems; reload re-reads them");
+                print("markers                                level-design markers loaded now, by kind");
+                print("ledger [flag <id> [value]|dead <id>]   the world's ledger: show / set a world flag / mark dead");
                 print("give <id>                              put a weapon in your hands (the pickup path)");
                 print("drop <id>|all                          lay pickups in a row in front of you");
                 print("ammo                                   refill every weapon you carry");
@@ -226,6 +229,31 @@ public class DebugConsole extends CanvasLayer {
                 print(race.statusLine());
             }
             case "weapons" -> print("weapons: " + String.join(" ", WeaponCatalog.spawnableIds()));
+            case "tables" -> {
+                // PLAN.md 2.0: the data tables -- `tables` lists them with their problems, `tables reload` re-reads
+                // every file (the systems that keep a derived copy re-derive it: the debug hot reload)
+                com.openworld.game.data.Tables.all();
+                java.util.List<String> bad = a.length >= 2 && a[1].equals("reload")
+                        ? com.openworld.util.DataTable.reloadAll() : com.openworld.util.DataTable.validateAll();
+                for (com.openworld.util.DataTable<?> t : com.openworld.util.DataTable.all())
+                    print(t.name + "  v" + t.version() + "  " + t.path);
+                print(bad.isEmpty() ? "no problems" : String.join("\n", bad));
+            }
+            case "markers" -> {
+                // every level-design marker loaded now, by kind (world.MarkerRegistry)
+                StringBuilder sb = new StringBuilder();
+                for (String k : com.openworld.world.MarkerRegistry.kinds(this))
+                    sb.append(k).append(' ').append(com.openworld.world.MarkerRegistry.count(this, k)).append("  ");
+                print(sb.length() == 0 ? "no markers loaded" : sb.toString().trim());
+            }
+            case "ledger" -> {
+                // the world's ledger (game.WorldLedger): `ledger`, `ledger flag <id> [value]`, `ledger dead <storyId>`
+                com.openworld.game.WorldLedger l = com.openworld.game.WorldLedger.get();
+                if (a.length >= 3 && a[1].equals("flag")) {
+                    if (a.length >= 4) l.setFlag(a[2], a[3]); else l.clearFlag(a[2]);
+                } else if (a.length >= 3 && a[1].equals("dead")) l.markDead(a[2]);
+                print(com.openworld.util.MiniJson.write(l.toMap()));
+            }
             case "give" -> give(a);
             case "drop" -> drop(a);
             case "ammo" -> ammo();

@@ -2,6 +2,10 @@ package com.openworld.game;
 
 import com.openworld.character.Character;
 import com.openworld.character.Player;
+import com.openworld.game.data.Tables;
+import com.openworld.game.event.CrimeMap;
+import com.openworld.game.event.GameplayEvent;
+import com.openworld.game.event.GameplayEvents;
 import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.api.FileAccess;
@@ -52,22 +56,32 @@ public class GangSystem extends Node {
     private final FactionFlips flips = new FactionFlips();
     private double now, flipIn;
 
+    private final Runnable onTable = this::readTable;
+
+    /** gangs.json through {@link Tables#GANGS} (again after a debug reload: the standings keep their heat). */
+    private void readTable() {
+        Tables.Gangs g = Tables.GANGS.get();
+        rules = g == null ? null : g.rules();
+        hunters = g == null ? null : g.hunters();
+        recovery = g == null ? null : Tables.recovery();
+    }
+
     @Register
     @Override
     public void _ready() {
         instance = this;
-        if (FileAccess.fileExists(TABLE)) {
-            String text = FileAccess.getFileAsString(TABLE);
-            rules = GangRules.parse(text);
-            hunters = DispatchRules.parse(text, "hunters");
-            String crimes = FileAccess.fileExists(WantedSystem.TABLE) ? FileAccess.getFileAsString(WantedSystem.TABLE) : null;
-            recovery = RecoveryRules.parse(crimes, text);
-        }
+        readTable();
+        Tables.GANGS.onReload(onTable);
+        GameplayEvents.subscribe(GameplayEvents.Phase.GANG, onEvent);
+        Tables.CRIMES.onReload(onTable);
     }
 
     @Register
     @Override
     public void _exitTree() {
+        Tables.GANGS.offReload(onTable);
+        GameplayEvents.unsubscribe(onEvent);
+        Tables.CRIMES.offReload(onTable);
         if (instance == this) instance = null;
         states.clear();
     }
@@ -108,17 +122,14 @@ public class GangSystem extends Node {
         return ok;
     }
 
-    /** Health's seam: a gang member was hurt / killed by someone (only a player's hit counts). */
-    public void reportHit(Character victim, String attackerId, boolean killed) {
-        if (victim == null || victim instanceof Player || victim.getCharacterInfo() == null) return;
-        String f = victim.getCharacterInfo().faction;
-        if (!isGang(f)) return;
-        for (Player p : PlayerRegistry.getPlayers()) {
-            if (p.getCharacterInfo() != null && attackerId.equals(p.getCharacterInfo().characterId)) {
-                report(f, killed ? "kill_member" : "hit_member", attackerId);
-                return;
-            }
-        }
+    private final GameplayEvents.Subscriber onEvent = this::onGameplayEvent;
+
+    /** The seam (PLAN.md 2.0 / AR3): a member hurt or killed, a protected clerk threatened, a gray till robbed --
+     *  by a player, and not sanctioned by an activity. */
+    private void onGameplayEvent(GameplayEvent e, GameplayEvents.Ruling ruling) {
+        if (ruling.sanctioned()) return;
+        CrimeMap.GangCrime c = CrimeMap.gang(e, this::isGang);
+        if (c != null) report(c.gang(), c.crimeId(), e.actor().id());
     }
 
     public int starsOf(String playerId, String gang) {

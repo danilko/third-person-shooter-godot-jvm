@@ -1,6 +1,6 @@
 package com.openworld.game;
 
-import com.openworld.util.MiniJson;
+import com.openworld.util.DataReader;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,36 +47,39 @@ public final class DispatchRules {
     }
 
     /** Parse one block ({@code dispatch} or {@code hunters}) out of a table's text; null when the block is absent. */
-    @SuppressWarnings("unchecked")
-    public static DispatchRules parse(String json, String block) {
-        Map<String, Object> doc = (Map<String, Object>) MiniJson.parse(json);
-        if (!(doc.get(block) instanceof Map<?, ?> m0)) return null;
-        Map<String, Object> m = (Map<String, Object>) m0;
-        List<String> w = new ArrayList<>();
-        if (m.get("weapons") instanceof List<?> l) for (Object o : l) w.add(String.valueOf(o));
-        DispatchRules r = new DispatchRules((int) num(m, "shoot_at", 0), ints(m.get("foot_by_stars")),
-                ints(m.get("cars_by_stars")), (int) num(m, "car_crew", 2), num(m, "foot_min", 45),
-                num(m, "foot_max", 75), num(m, "car_min", 140), num(m, "car_max", 280), num(m, "arrive_dist", 35),
-                num(m, "despawn_far", 180),
-                num(m, "seen_reach", 60), num(m, "spawn_interval", 1.5), w);
-        r.weaponsByStars = lists(m.get("weapons_by_stars"));
-        r.vehiclesByStars = lists(m.get("vehicles_by_stars"));
-        if (m.get("snipers_by_stars") != null) r.snipersByStars = ints(m.get("snipers_by_stars"));
-        if (m.get("helis_by_stars") != null) r.helisByStars = ints(m.get("helis_by_stars"));
-        r.ramAt = (int) num(m, "ram_at", 0);
-        if (m.get("tokens_by_stars") != null) r.tokensByStars = ints(m.get("tokens_by_stars"));
-        if (m.get("regroup_seconds_by_stars") != null) r.regroupByStars = ints(m.get("regroup_seconds_by_stars"));
-        r.supplyReach = num(m, "supply_reach", 60.0);
-        r.bodies = parseBodies(m.get("bodies"));
-        if (m.get("gun") instanceof Map<?, ?> g0) {
-            Map<String, Object> g = (Map<String, Object>) g0;
-            if (g.get("vehicles") instanceof List<?> l) for (Object o : l) r.gunVehicles.add(String.valueOf(o));
-            r.gunInterval = num(g, "interval", 4.0);
-            r.gunRange = num(g, "range", 220.0);
-            r.gunDamage = num(g, "damage", 320.0);
-            r.gunRadius = num(g, "radius", 7.0);
+    public static DispatchRules parse(String json, String block) { return read(DataReader.of(json).child(block)); }
+
+    /** Read one block ({@code dispatch} / {@code hunters}); null for null. */
+    public static DispatchRules read(DataReader m) {
+        if (m == null) return null;
+        DispatchRules r = new DispatchRules(m.integer("shoot_at", 0), intsOr(m, "foot_by_stars"),
+                intsOr(m, "cars_by_stars"), m.integer("car_crew", 2), m.num("foot_min", 45),
+                m.num("foot_max", 75), m.num("car_min", 140), m.num("car_max", 280), m.num("arrive_dist", 35),
+                m.num("despawn_far", 180),
+                m.num("seen_reach", 60), m.num("spawn_interval", 1.5), m.strings("weapons"));
+        r.weaponsByStars = m.stringLists("weapons_by_stars");
+        r.vehiclesByStars = m.stringLists("vehicles_by_stars");
+        if (m.has("snipers_by_stars")) r.snipersByStars = intsOr(m, "snipers_by_stars");
+        if (m.has("helis_by_stars")) r.helisByStars = intsOr(m, "helis_by_stars");
+        r.ramAt = m.integer("ram_at", 0);
+        if (m.has("tokens_by_stars")) r.tokensByStars = intsOr(m, "tokens_by_stars");
+        if (m.has("regroup_seconds_by_stars")) r.regroupByStars = intsOr(m, "regroup_seconds_by_stars");
+        r.supplyReach = m.num("supply_reach", 60.0);
+        r.bodies = readBodies(m.items("bodies"));
+        DataReader g = m.child("gun");
+        if (g != null) {
+            r.gunVehicles.addAll(g.strings("vehicles"));
+            r.gunInterval = g.num("interval", 4.0);
+            r.gunRange = g.num("range", 220.0);
+            r.gunDamage = g.num("damage", 320.0);
+            r.gunRadius = g.num("radius", 7.0);
         }
         return r;
+    }
+
+    private static int[] intsOr(DataReader m, String key) {
+        int[] v = m.ints(key);
+        return v == null || v.length == 0 ? new int[] {0} : v;
     }
 
     // ── BODIES (PLAN.md 1g c): who a unit IS -- which body and which uniform ──
@@ -96,32 +99,26 @@ public final class DispatchRules {
      *  AICharacter scene's own body, as before. */
     public List<BodyPick> bodies = new ArrayList<>();
 
-    @SuppressWarnings("unchecked")
-    static List<BodyPick> parseBodies(Object o) {
+    static List<BodyPick> readBodies(List<DataReader> rows) {
         List<BodyPick> out = new ArrayList<>();
-        if (!(o instanceof List<?> l)) return out;
-        for (Object row : l) {
-            if (!(row instanceof Map<?, ?> r0)) continue;
-            Map<String, Object> r = (Map<String, Object>) r0;
-            Object body = r.get("body");
+        for (DataReader r : rows) {
+            String body = r.reqStr("body", null);
+            String outfit = r.str("outfit", "");
+            double weight = r.num("weight", 1.0);
+            int min = r.integer("min_stars", 0), max = r.integer("max_stars", 0);
+            List<String> extra = r.strings("extra_weapons");
             if (body == null) continue;
-            Object outfit = r.get("outfit");
-            List<String> extra = new ArrayList<>();
-            if (r.get("extra_weapons") instanceof List<?> xs) for (Object x : xs) extra.add(String.valueOf(x));
-            out.add(new BodyPick(String.valueOf(body), outfit == null ? "" : String.valueOf(outfit),
-                    num(r, "weight", 1.0), (int) num(r, "min_stars", 0), (int) num(r, "max_stars", 0),
-                    List.copyOf(extra)));
+            out.add(new BodyPick(body, outfit, weight, min, max, List.copyOf(extra)));
         }
         return out;
     }
 
     /** Each gang's body table ({@code gangs.<id>.bodies} in gangs.json). */
-    @SuppressWarnings("unchecked")
-    public static Map<String, List<BodyPick>> parseGangBodies(String json) {
+    public static Map<String, List<BodyPick>> parseGangBodies(String json) { return readGangBodies(DataReader.of(json)); }
+
+    public static Map<String, List<BodyPick>> readGangBodies(DataReader doc) {
         Map<String, List<BodyPick>> out = new java.util.HashMap<>();
-        if (!(MiniJson.parse(json) instanceof Map<?, ?> doc) || !(doc.get("gangs") instanceof Map<?, ?> g)) return out;
-        for (var e : ((Map<String, Object>) g).entrySet())
-            if (e.getValue() instanceof Map<?, ?> gang) out.put(e.getKey(), parseBodies(gang.get("bodies")));
+        for (var e : doc.rows("gangs").entrySet()) out.put(e.getKey(), readBodies(e.getValue().items("bodies")));
         return out;
     }
 
@@ -139,17 +136,6 @@ public final class DispatchRules {
             if ((t -= b.weight()) < 0) return b;
         }
         return last;
-    }
-
-    private static List<List<String>> lists(Object o) {
-        List<List<String>> out = new ArrayList<>();
-        if (!(o instanceof List<?> l)) return out;
-        for (Object row : l) {
-            List<String> r = new ArrayList<>();
-            if (row instanceof List<?> rl) for (Object x : rl) r.add(String.valueOf(x));
-            out.add(r);
-        }
-        return out;
     }
 
     private static <T> List<T> rowAt(List<List<T>> rows, int stars) {
@@ -207,17 +193,6 @@ public final class DispatchRules {
 
     /** Does this vehicle model fire a main gun? */
     public boolean hasGun(String model) { return gunVehicles.contains(model); }
-
-    private static double num(Map<String, Object> m, String k, double dflt) {
-        return m.get(k) instanceof Number n ? n.doubleValue() : dflt;
-    }
-
-    private static int[] ints(Object o) {
-        if (!(o instanceof List<?> l)) return new int[] {0};
-        int[] out = new int[l.size()];
-        for (int i = 0; i < out.length; i++) out[i] = l.get(i) instanceof Number n ? n.intValue() : 0;
-        return out;
-    }
 
     private static int at(int[] a, int stars) {
         if (stars <= 0 || a.length == 0) return 0;

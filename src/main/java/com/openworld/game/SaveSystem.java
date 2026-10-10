@@ -133,6 +133,8 @@ public class SaveSystem extends Node {
 
     /** Records whose player body was not live when the slot was loaded — applied as bodies appear. */
     private final Map<String, PlayerRecord> pendingPlayers = new LinkedHashMap<>();
+    /** The ledger's revision as last written (or loaded): it differs = there is something to save. */
+    private long ledgerSaved;
 
     private int saveCount = 0;
     private int loadCount = 0;
@@ -194,6 +196,8 @@ public class SaveSystem extends Node {
         }
         sinceWorldWrite += delta;
         sinceProfileWrite += delta;
+        // a ledger change is world state to save (a dead story character, a world flag): coalesced like a beat
+        if (WorldLedger.get().revision() != ledgerSaved) worldDirty = true;
         if (worldDirty && sinceWorldWrite >= autosaveMinSeconds) autosaveNow("coalesced");
         if (com.openworld.game.profile.Profiles.dirty() && sinceProfileWrite >= autosaveMinSeconds) flushProfile();
     }
@@ -288,6 +292,10 @@ public class SaveSystem extends Node {
         }
         doc.endArray();
 
+        // the world's ledger (PLAN.md 2.0 / CR3): world flags, dead story characters, place overrides
+        doc.raw("ledger", com.openworld.util.MiniJson.write(WorldLedger.get().toMap()));
+        ledgerSaved = WorldLedger.get().revision();
+
         doc.key("mission").begin();
         MissionManager missions = missionManager();
         MissionInfo active = missions != null && missions.isActive() ? missions.getActiveMission() : null;
@@ -362,6 +370,11 @@ public class SaveSystem extends Node {
                     + currentScenePath() + "'");
         }
 
+        // the ledger first: what spawns while the rest restores must already know who is dead (an old slot has none)
+        WorldLedger.replace(WorldLedger.fromMap(com.openworld.game.profile.Maps.map(migrated.get("ledger"))));
+        ledgerSaved = WorldLedger.get().revision();
+        MissionDirector dir = MissionDirector.get();
+        if (dir != null) dir.removeDeadStoryCharacters(WorldLedger.get()::isDead);
         restoreCampaign(doc);
         restoreFactions(doc);
         restorePlayers(doc);
@@ -518,12 +531,29 @@ public class SaveSystem extends Node {
 
     private void autosaveNow(String why) {
         worldDirty = false;
-        if (!autosaveEnabled || isNetworkedClient()) return;
+        if (!autosaveEnabled || isNetworkedClient()) {
+            ledgerSaved = WorldLedger.get().revision();   // nothing will be written: do not ask again every frame
+            return;
+        }
         sinceWorldWrite = 0;
         if (saveSlot(autosaveSlot) && debugLog) GD.print("SaveSystem: autosaved after " + why);
     }
 
     // ── Probe / console readouts ──────────────────────────────────────────────
+
+    // the world's ledger, for probes and the console (tools/godot/probe_world_ledger.gd)
+    @Register public boolean ledgerSetFlagNow(String id, String value) {
+        return value == null || value.isEmpty() ? WorldLedger.get().clearFlag(id) : WorldLedger.get().setFlag(id, value);
+    }
+    @Register public String ledgerFlagNow(String id) { return WorldLedger.get().flag(id, ""); }
+    @Register public boolean ledgerDeadNow(String storyId) { return WorldLedger.get().isDead(storyId); }
+    @Register public boolean ledgerMarkDeadNow(String storyId) { return WorldLedger.get().markDead(storyId); }
+    @Register public boolean ledgerSetPlaceNow(String placeId, String owner, String state) {
+        return WorldLedger.get().setPlace(placeId, owner, state);
+    }
+    @Register public String ledgerOwnerNow(String placeId, String generated) { return WorldLedger.get().ownerOf(placeId, generated); }
+    @Register public String ledgerJsonNow() { return com.openworld.util.MiniJson.write(WorldLedger.get().toMap()); }
+    @Register public void ledgerResetNow() { WorldLedger.replace(null); ledgerSaved = 0; }
 
     @Register public int savesWritten() { return saveCount; }
     @Register public int loadsApplied() { return loadCount; }
@@ -730,6 +760,9 @@ public class SaveSystem extends Node {
             firstInScope = false;
             return this;
         }
+
+        /** {@code json} is already JSON text (an engine-free part's own shape: the ledger's). */
+        Json raw(String k, String json) { key(k); sb.append(json); firstInScope = false; return this; }
 
         Json strings(String k, List<String> values) {
             key(k).beginArray();

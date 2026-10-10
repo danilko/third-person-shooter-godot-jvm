@@ -5,7 +5,6 @@ import com.openworld.character.Player;
 import com.openworld.game.GameManager;
 import com.openworld.net.NetworkManager;
 import com.openworld.util.CollisionLayers;
-import com.openworld.util.MiniJson;
 import com.openworld.weapon.WeaponController;
 import com.openworld.weapon.WeaponItem;
 import com.openworld.weapon.WeaponType;
@@ -53,17 +52,12 @@ public class AmmoSupply extends Area3D implements com.openworld.control.Interact
     private static Map<String, Integer> stockById;
     private static double reach = 2.2, restockSeconds = 2.0;
 
-    @SuppressWarnings("unchecked")
-    private static synchronized void load() {
-        if (stockById != null) return;
-        stockById = new HashMap<>();
-        if (!godot.api.FileAccess.fileExists(PATH)) return;
-        Map<String, Object> doc = (Map<String, Object>) MiniJson.parse(godot.api.FileAccess.getFileAsString(PATH));
-        reach = ((Number) doc.getOrDefault("reach", 2.2)).doubleValue();
-        restockSeconds = ((Number) doc.getOrDefault("restock_seconds", 2.0)).doubleValue();
-        Map<String, Object> v = (Map<String, Object>) doc.getOrDefault("vehicles", Map.of());
-        for (Map.Entry<String, Object> e : v.entrySet())
-            stockById.put(e.getKey(), ((Number) ((Map<String, Object>) e.getValue()).getOrDefault("stock", 0)).intValue());
+    /** item/ammo_supply.json through {@link com.openworld.game.data.Tables#AMMO_SUPPLY}. */
+    private static void load() {
+        com.openworld.game.data.Tables.AmmoSupplies t = com.openworld.game.data.Tables.AMMO_SUPPLY.get();
+        stockById = t.stockByVehicle();
+        reach = t.reach();
+        restockSeconds = t.restockSeconds();
     }
 
     public static double reach() { load(); return reach; }

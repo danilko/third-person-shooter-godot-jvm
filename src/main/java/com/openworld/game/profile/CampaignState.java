@@ -7,9 +7,9 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * CR1's per-player campaign DATA (PLAN.md 1.4 carries it; the CampaignGraph that derives unlocks from it comes with
- * AR1 in 2.1, when MissionDirector's one global copy moves here): typed-by-id flags, achieved (activity, variant)
- * keys, chapter / phase (incl. POST_ENDING), endings seen, the campaign checkpoint id, and the content version the
+ * CR1's per-player campaign DATA (PLAN.md 1.4 carries it; {@code game.campaign.CampaignGraph} derives unlocks from
+ * it through {@code LiveCampaign}; MissionDirector's one global copy moves here with the Activity runtime, 2.1):
+ * flags declared as {@code FlagKey}s, achieved {@code "activity#variant"} keys, the sticky unlocks, chapter / phase (incl. POST_ENDING), endings seen, the campaign checkpoint id, and the content version the
  * migrations run from.
  */
 public final class CampaignState {
@@ -18,6 +18,8 @@ public final class CampaignState {
     public String chapter = "";
     public String phase = "";
     public final Set<String> endingsSeen = new LinkedHashSet<>();
+    /** STICKY activities that have been available once (CampaignGraph: they stay open). */
+    public final Set<String> sticky = new LinkedHashSet<>();
     public String checkpoint = "";
     public long contentVersion;
 
@@ -28,6 +30,7 @@ public final class CampaignState {
         m.put("chapter", chapter);
         m.put("phase", phase);
         m.put("endings_seen", new ArrayList<>(endingsSeen));
+        m.put("sticky", new ArrayList<>(sticky));
         m.put("checkpoint", checkpoint);
         m.put("content_version", contentVersion);
         return m;
@@ -37,6 +40,7 @@ public final class CampaignState {
         flags.clear();
         achieved.clear();
         endingsSeen.clear();
+        sticky.clear();
         chapter = phase = checkpoint = "";
         contentVersion = 0;
         if (m == null) return;
@@ -44,6 +48,7 @@ public final class CampaignState {
         if (f != null) for (Map.Entry<String, Object> e : f.entrySet()) flags.put(e.getKey(), String.valueOf(e.getValue()));
         for (Object o : Maps.list(m, "achieved")) if (o instanceof String s) achieved.add(s);
         for (Object o : Maps.list(m, "endings_seen")) if (o instanceof String s) endingsSeen.add(s);
+        for (Object o : Maps.list(m, "sticky")) if (o instanceof String s) sticky.add(s);
         chapter = Maps.str(m, "chapter", "");
         phase = Maps.str(m, "phase", "");
         checkpoint = Maps.str(m, "checkpoint", "");

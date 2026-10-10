@@ -14,7 +14,6 @@ import godot.api.PhysicsRayQueryParameters3D;
 import godot.core.Dictionary;
 import godot.core.Vector3;
 import godot.global.GD;
-import com.openworld.util.MiniJson;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -70,21 +69,17 @@ public class GangHangouts extends Node {
     @Override
     public void _ready() {
         instance = this;
-        if (!FileAccess.fileExists(GangSystem.TABLE)) return;
-        Object doc = MiniJson.parse(FileAccess.getFileAsString(GangSystem.TABLE));
-        if (!(doc instanceof Map<?, ?> m) || !(m.get("hangout") instanceof Map<?, ?> h)) return;
-        count = (int) num(h.get("count"), count);
-        near = num(h.get("near"), near);
-        far = num(h.get("far"), far);
-        if (h.get("ring") instanceof List<?> ring && ring.size() == 2) {
-            ringMin = num(ring.get(0), ringMin);
-            ringMax = num(ring.get(1), ringMax);
-        }
-        patrolRadius = num(h.get("patrol_radius"), patrolRadius);
-        if (h.get("weapons") instanceof List<?> w && !w.isEmpty()) {
-            weapons.clear();
-            for (Object o : w) weapons.add(String.valueOf(o));
-        }
+        com.openworld.game.data.Tables.Gangs g = com.openworld.game.data.Tables.GANGS.get();
+        if (g == null) return;
+        com.openworld.game.data.Tables.Hangout h = g.hangout();
+        count = h.count();
+        near = h.near();
+        far = h.far();
+        ringMin = h.ringMin();
+        ringMax = h.ringMax();
+        patrolRadius = h.patrolRadius();
+        weapons.clear();
+        weapons.addAll(h.weapons());
     }
 
     @Register
@@ -188,7 +183,6 @@ public class GangHangouts extends Node {
         return Math.abs(g.getY() - doorY) < 1.2 ? g : null;
     }
 
-    private static double num(Object o, double def) { return o instanceof Number n ? n.doubleValue() : def; }
 
     private static double flat(Vector3 a, Vector3 b) {
         double dx = a.getX() - b.getX(), dz = a.getZ() - b.getZ();

@@ -85,6 +85,7 @@ src/main/java/com/openworld/
                   #   ThrowableItem, ProjectileItem, RocketProjectile, T1Projectile, Detonatable,
                   #   IconRegistry
   world/          # world types: HitInfo, HittableBody, SurfaceType, SpatialEntityGrid (AutoLoad),
+                  #   MarkerRegistry (every MARK_ level-design marker by kind / distance / building),
                   #   WaterVolume (swim/float Area3D), WorldBounds (the logic wall),
                   #   ZoneTrigger (fires one story beat, F3), RaceCheckpoint (a race gate, R2)
     manager/      #   world-level singleton systems: Impact/Particle/Decal/Explosion/BulletTracer
@@ -93,6 +94,11 @@ src/main/java/com/openworld/
   carrier/vehicle/ # Vehicle, VehicleWheel, VehicleConfig, VehicleWeaponMode
   game/           # EventBus (AutoLoad signals), GameManager (PLAYING/PAUSED/GAME_OVER FSM),
                   #   PlayerRegistry (AutoLoad — live Player list for AI LOD)
+                  #   WorldLedger (world flags, dead story characters, place overrides — the host's)
+    event/        #   GameplayEvents (the typed action -> consequence stream, authority only),
+                  #   GameplayEvent records, Actor/Spot, CrimeMap — a seam PUBLISHES, systems subscribe
+    data/         #   Tables: THE list of data tables (util.DataTable + DataReader: unknown keys are errors)
+    profile/      #   PlayerProfile, Economy.transfer, EconomyTable, SafeSave, SaveMigrations
     mission/      #   MissionInfo, MissionManager, MissionObjectiveType, MissionDirector
                   #   (story, F1), ScriptCommand, RaceDirector (R2 street races)
   net/            # NetworkManager (AutoLoad RPC), NetMessageCodec, NetworkController,
@@ -208,7 +214,7 @@ means that section title in one of these files (`grep -l "<title>" docs/*.md`).
 
 | doc | what is in it |
 |---|---|
-| `docs/game-systems.md` | Part D: spatial grid, AI LOD, factions (presets, campaign layer), MissionDirector + ZoneTrigger, SaveSystem, RaceDirector; the AI FSM; EventBus; audio |
+| `docs/game-systems.md` | Part D: spatial grid, AI LOD, factions (presets, campaign layer), MissionDirector + ZoneTrigger, SaveSystem, the profile / economy / save v2, the garage, the authoring foundations (GameplayEvents, DataTable, MarkerRegistry, WorldLedger), RaceDirector; the AI FSM; EventBus; audio |
 | `docs/open-world-simulation.md` | Part E: zone streaming, ambient traffic + the lane graph, the old terrain/seam notes, StimulusManager, AISquad |
 | `docs/combat.md` | weapons (spread, two-stage trace, the long-ray fix, networked shots/melee/projectiles, damage, VFX, throwables, the blocked-muzzle hint), glass, ladders |
 | `docs/enforcement.md` | wanted level, dispatch, gang hangouts, escalation, recovery outcomes, co-op correctness batch |

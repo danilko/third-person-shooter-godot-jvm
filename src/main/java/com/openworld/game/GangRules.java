@@ -1,6 +1,6 @@
 package com.openworld.game;
 
-import com.openworld.util.MiniJson;
+import com.openworld.util.DataReader;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,28 +34,24 @@ public final class GangRules {
         this.gangs = gangs;
     }
 
-    @SuppressWarnings("unchecked")
-    public static GangRules parse(String json) {
-        Map<String, Object> doc = (Map<String, Object>) MiniJson.parse(json);
-        List<Object> at = (List<Object>) doc.get("stars_at");
-        double[] starsAt = new double[at.size()];
-        for (int i = 0; i < starsAt.length; i++) starsAt[i] = num(at.get(i));
-        Map<String, Double> crimes = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> e : ((Map<String, Object>) doc.get("crimes")).entrySet())
-            crimes.put(e.getKey(), num(((Map<String, Object>) e.getValue()).get("heat")));
-        Map<String, Gang> gangs = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> e : ((Map<String, Object>) doc.get("gangs")).entrySet()) {
-            Map<String, Object> g = (Map<String, Object>) e.getValue();
-            gangs.put(e.getKey(), new Gang(e.getKey(), String.valueOf(g.getOrDefault("name", e.getKey())),
-                    String.valueOf(g.getOrDefault("name_ja", "")), (int) num(g.getOrDefault("fee_per_star", 50000))));
-        }
-        return new GangRules(starsAt, (int) num(doc.getOrDefault("attack_at", 1)), (int) num(doc.getOrDefault("chase_at", 3)),
-                (int) num(doc.getOrDefault("pay_at", 2)), num(doc.getOrDefault("calm_seconds", 30.0)),
-                num(doc.getOrDefault("decay_per_second", 4.0)), crimes, gangs);
-    }
+    public static GangRules parse(String json) { return read(DataReader.of(json)); }
 
-    private static double num(Object o) {
-        return o instanceof Number n ? n.doubleValue() : 0.0;
+    /** Read the gang rules out of gangs.json (its {@code hunters}, {@code hangout}, {@code abduction} and each
+     *  gang's {@code bodies} are others'). */
+    public static GangRules read(DataReader doc) {
+        double[] starsAt = doc.nums("stars_at");
+        if (starsAt == null) starsAt = new double[0];
+        Map<String, Double> crimes = new LinkedHashMap<>();
+        for (Map.Entry<String, DataReader> e : doc.rows("crimes").entrySet())
+            crimes.put(e.getKey(), e.getValue().reqNum("heat", 0.0));
+        Map<String, Gang> gangs = new LinkedHashMap<>();
+        for (Map.Entry<String, DataReader> e : doc.rows("gangs").entrySet()) {
+            DataReader g = e.getValue();
+            gangs.put(e.getKey(), new Gang(e.getKey(), g.str("name", e.getKey()), g.str("name_ja", ""),
+                    g.integer("fee_per_star", 50000)));
+        }
+        return new GangRules(starsAt, doc.integer("attack_at", 1), doc.integer("chase_at", 3),
+                doc.integer("pay_at", 2), doc.num("calm_seconds", 30.0), doc.num("decay_per_second", 4.0), crimes, gangs);
     }
 
     public int starsFor(double heat) {

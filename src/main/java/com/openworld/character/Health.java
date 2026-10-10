@@ -216,12 +216,15 @@ public class Health extends Node {
         // (covers host-originated AND client-relayed damage; the relay path flows through here too).
         maybeBroadcastDamageCue(damage, attackerPos, attackerId, headshot, killed);
         // the wanted level (PLAN.md W5): a player hurting a police officer or a civilian is a crime
-        com.openworld.game.WantedSystem wanted = com.openworld.game.WantedSystem.get();
-        if (wanted != null && attackerId != null && !attackerId.isEmpty() && getOwner() instanceof Character victim)
-            wanted.reportHit(victim, attackerId, killed);
-        com.openworld.game.GangSystem gangs = com.openworld.game.GangSystem.get();
-        if (gangs != null && attackerId != null && !attackerId.isEmpty() && getOwner() instanceof Character gv)
-            gangs.reportHit(gv, attackerId, killed);
+        // -- and so is anything else that follows from a hit: ONE event, heard by whoever cares (PLAN.md 2.0 / AR3)
+        if (getOwner() instanceof Character victim) {
+            com.openworld.game.event.Actor by = com.openworld.game.event.Actors.byId(attackerId, attackerName);
+            com.openworld.game.event.Actor to = com.openworld.game.event.Actors.of(victim);
+            com.openworld.game.event.Spot at = com.openworld.game.event.Actors.at(victim.getGlobalPosition());
+            com.openworld.game.event.GameplayEvents.publish(killed
+                    ? new com.openworld.game.event.GameplayEvent.Killed(by, to, at, headshot, weaponName)
+                    : new com.openworld.game.event.GameplayEvent.Damaged(by, to, at, damage, headshot, weaponName));
+        }
         if (currentHealth <= 0) {
             // a player's death names what dealt it (PLAN.md 0.41: the host's player died with nothing logged)
             if (getOwner() instanceof Player) GD.print("Health: " + getOwner().getName() + " killed by '" + weaponName

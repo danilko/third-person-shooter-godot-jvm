@@ -3,6 +3,11 @@ package com.openworld.game;
 import com.openworld.character.Character;
 import com.openworld.character.Faction;
 import com.openworld.character.Player;
+import com.openworld.game.data.Tables;
+import com.openworld.game.event.Actors;
+import com.openworld.game.event.CrimeMap;
+import com.openworld.game.event.GameplayEvent;
+import com.openworld.game.event.GameplayEvents;
 import com.openworld.world.SpatialEntityGrid;
 import godot.annotation.Register;
 import godot.annotation.Script;
@@ -24,8 +29,10 @@ import java.util.Map;
  * <p>Owned by the AUTHORITATIVE peer (single player or the host), where damage is applied: the seams that report a
  * crime run only there. Built in code by {@link GameManager} (a child of the AutoLoad), reached through {@link #get()}.
  *
- * <p>Seams today: damage to a police officer or a civilian by a player ({@code Health.applyDamage}), a player's
- * gunshot ({@code StimulusManager.post}). Adding a crime = one row in the table + one {@link #report} call.
+ * <p>Seams (PLAN.md 2.0 / AR3): this node SUBSCRIBES to {@link GameplayEvents} (phase WANTED) and {@link CrimeMap}
+ * says which crime an event is -- a hit on police or a civilian, a gunshot, a threatened clerk, a robbed till. Nothing
+ * calls in here to report a crime any more; a new crime = one row in the table + one line in CrimeMap (and, if nothing
+ * publishes the act yet, its event). An act an activity sanctioned is skipped.
  *
  * <p>LETHAL crimes (a robbery, a dead policeman) make police shoot the player on sight until the heat is gone
  * (`applyHostility`), and no arrest is offered meanwhile. Gangs are a separate standing: {@link GangSystem}.
@@ -63,20 +70,30 @@ public class WantedSystem extends Node {
     /** Host: what was last sent per player. Client: the host's mirror. */
     private final Map<String, Shown> shown = new HashMap<>();
 
+    private final Runnable onTable = this::readTable;
+
+    /** crimes.json through {@link Tables#CRIMES} (again after a debug reload: the states keep their heat). */
+    private void readTable() {
+        Tables.Crimes c = Tables.CRIMES.get();
+        rules = c == null ? null : c.wanted();
+        dispatch = c == null ? null : c.dispatch();
+    }
+
     @Register
     @Override
     public void _ready() {
         instance = this;
-        if (FileAccess.fileExists(TABLE)) {
-            String text = FileAccess.getFileAsString(TABLE);
-            rules = WantedRules.parse(text);
-            dispatch = DispatchRules.parse(text, "dispatch");
-        } else GD.print("WantedSystem: no crime table at " + TABLE);
+        readTable();
+        Tables.CRIMES.onReload(onTable);
+        GameplayEvents.subscribe(GameplayEvents.Phase.WANTED, onEvent);
+        if (rules == null) GD.print("WantedSystem: no crime table at " + TABLE);
     }
 
     @Register
     @Override
     public void _exitTree() {
+        Tables.CRIMES.offReload(onTable);
+        GameplayEvents.unsubscribe(onEvent);
         if (instance == this) instance = null;
         states.clear();
         shown.clear();
@@ -200,20 +217,13 @@ public class WantedSystem extends Node {
         return ok;
     }
 
-    /** The crime a hit on {@code victim} by a player is ("" none): police and civilians only. */
-    public static String crimeForHit(Character victim, boolean killed) {
-        if (victim == null || victim instanceof Player || victim.getCharacterInfo() == null) return "";
-        String f = victim.getCharacterInfo().faction;
-        if (Faction.POLICE.equals(f)) return killed ? "kill_police" : "assault_police";
-        if (Faction.NEUTRAL.equals(f) || Faction.CIVILIAN.equals(f)) return killed ? "murder" : "assault";
-        return "";
-    }
+    private final GameplayEvents.Subscriber onEvent = this::onGameplayEvent;
 
-    /** Health's seam: a hit was applied (authority). */
-    public void reportHit(Character victim, String attackerId, boolean killed) {
-        String crime = crimeForHit(victim, killed);
-        if (crime.isEmpty()) return;
-        report(crime, victim.getGlobalPosition(), attackerId);
+    /** The seam (PLAN.md 2.0 / AR3): every crime arrives as an event. One an activity SANCTIONED is not a crime. */
+    private void onGameplayEvent(GameplayEvent e, GameplayEvents.Ruling ruling) {
+        if (ruling.sanctioned()) return;
+        String crime = CrimeMap.police(e);
+        if (!crime.isEmpty()) report(crime, Actors.vec(e.at()), e.actor().id());
     }
 
     /** Anyone but the offender within the witness radius saw it (a living, non-player character). */
