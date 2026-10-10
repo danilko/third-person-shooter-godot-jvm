@@ -2237,6 +2237,8 @@ public class ZoneManager extends Node {
 
 	/** True when the director has claimed this node for the active mission (absent director → false). */
 	private static boolean missionProtected(Node node) {
+		// an OWNED car (PLAN.md 1.4 / F4: kept in a garage, Garage.OWNED_GROUP) is protected like a mission entity
+		if (Garage.owned(node)) return true;
 		com.openworld.game.mission.MissionDirector d = com.openworld.game.mission.MissionDirector.get();
 		return d != null && d.isMissionProtected(node);
 	}

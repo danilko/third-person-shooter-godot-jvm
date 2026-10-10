@@ -67,6 +67,7 @@ GATES=(
   "front_end|600|0|0|$HF --script $P/probe_front_end.gd"
   "title_continue|600|0|0|$HF --script $P/probe_title_actions.gd -- --role=continue"
   "profile|300|0|0|$HF --script $P/probe_profile.gd"
+  "garage|450|0|0|$HF --script $P/probe_garage.gd"
   "race|300|0|0|$HF --script $P/probe_race.gd"
   "minimal_hud|300|0|0|$HF --script $P/probe_minimal_hud.gd"
   "stairs|900|0|0|$H --script $P/probe_stairs.gd"

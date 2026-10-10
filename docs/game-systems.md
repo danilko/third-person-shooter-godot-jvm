@@ -8,6 +8,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - MovementController flags (Player vs AICharacter)
 - Audio: every sound is a file (2026-09-29)
 - The player profile, the economy and save v2 (2026-10-10, under Performance Foundation)
+- Owned cars and the safe-house garage (2026-10-10, after it)
 
 ---
 
@@ -420,6 +421,39 @@ price taken; the refill price); `probe_race` (first place +8 000, once);
 `tools/net/run_title_coop.sh` now also runs the handshake (the joiner's 4321 yen held by the host, the host pays the
 joiner's body 1000, the joiner gets 5321 back and saves it). Unit: `PlayerProfileTest`, `EconomyTest`, `SafeSaveTest`,
 `SaveMigrationsTest`. Both processes of the co-op test share `user://test/` (one machine); harmless today.
+
+### Owned cars and the safe-house garage -- `world.Garage` (PLAN.md 1.4 / F4, 2026-10-10)
+
+GTA San Andreas' rule: **drive a car into the bay, get out, and it is yours.** `Garage` records it in the driver's
+`PlayerProfile.vehicles` (`VehicleInstanceData`: its id, its scene, `condition` = hull health 0..1, `garage = "home"`),
+adds it to the group `owned_vehicle`, and puts it back in the bay the next time a world loads.
+
+- **Where the bay is: derived, not authored.** World.tscn is generated (`island_buildings.patch_start` owns the start),
+  so `Garage.ensureHome(scene)` -- called by `SaveSystem._process` once per scene -- takes the starting car
+  (`VehicleRoot`, parked nose-in) and tries the bay 2.5 m to its side, then the other side, then two over, taking the
+  first whose box holds no WORLD / VEHICLE collider. No `VehicleRoot`: no garage. The same rule gives DebugWorld one.
+- **The player learns it from the world**, not the HUD: a yellow painted outline on the ground (four unshaded strips
+  built in `_ready`, no collision). There is no prompt and no message.
+- **Kept only when DRIVEN in.** A car is stored when a `Player` was seen driving it inside the bay and it is now empty
+  and slower than 0.6 m/s. A car that merely ends up in the bay (pushed, spawned) is not taken -- the probe's control.
+- **One car per bay**: a second car stored there drops the older row. **Driven (or pushed) out**, the row stays but
+  `garage` becomes `""`: it is the player's while it exists, and it is NOT restored after a reload. Brought back, it
+  is stored again in the same row.
+- **Reclaim**: `Garage.owned(node)` is checked by `ZoneManager.missionProtected` (all three reclaim paths) and by
+  `ParkedVehicle.untouched`, so streaming never takes an owned car.
+- **Identity**: the restored car gets a fresh `CharacterInfo` in code carrying the stored id (the shared sub-resource
+  rule); the paint is derived from that id, so the same id is the same colour. `VehicleInstanceData.paint` and
+  `.upgrades` are carried and saved but nothing writes them yet (respray / NOS come with 3.3).
+- **Authority**: the host stores and restores. A co-op guest's car goes into the host's session copy of the guest's
+  profile and reaches the guest's file through the profile deltas; RESTORING is for this machine's own profile only,
+  so a guest's garage car comes back when they host. A restored car is announced like any spawned vehicle.
+- **Not done**: a damaged car is restored damaged (no free repair); a car wrecked while its row still says `home` is
+  rebuilt at no less than 5 % health; only one garage (`home`) exists; the two-peer store path has no gate of its own.
+
+Gate: `tools/godot/probe_garage.gd` (in `nightly_gates.sh`), 15/15 on the real World.tscn -- the bay exists, is marked
+and one bay from the start car; a dropped car is not kept (control); driven in at 60 % health it is kept with that
+condition; driven out the row loses its garage, back in it is one row again; written to the profile FILE, read back,
+and a second world load puts the same id in the bay at 60 %.
 
 ### Street races — `game.mission.RaceDirector` + `world.RaceCheckpoint` (R2, AutoLoad, 2026-09-17)
 

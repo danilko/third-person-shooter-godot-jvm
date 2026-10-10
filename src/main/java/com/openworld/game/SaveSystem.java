@@ -105,6 +105,7 @@ public class SaveSystem extends Node {
     public double getAutosaveMinSeconds() { return autosaveMinSeconds; }
     public void setAutosaveMinSeconds(double v) { autosaveMinSeconds = v; }
     private boolean worldDirty;
+    private long garageScene = -1;
     private double sinceWorldWrite = 1e9, sinceProfileWrite = 1e9;
     private int profileWrites;
 
@@ -185,6 +186,12 @@ public class SaveSystem extends Node {
     @Override
     public void _process(double delta) {
         if (!pendingPlayers.isEmpty()) applyPendingPlayers();
+        // F4: the safe house's garage, derived once per world from the starting car (Garage.ensureHome)
+        Node scene = getTree() != null ? getTree().getCurrentScene() : null;
+        if (scene != null && scene.getInstanceId() != garageScene) {
+            garageScene = scene.getInstanceId();
+            com.openworld.world.Garage.ensureHome(scene);
+        }
         sinceWorldWrite += delta;
         sinceProfileWrite += delta;
         if (worldDirty && sinceWorldWrite >= autosaveMinSeconds) autosaveNow("coalesced");
@@ -552,6 +559,14 @@ public class SaveSystem extends Node {
         StringBuilder b = new StringBuilder();
         for (var e : com.openworld.game.profile.Profiles.remotes().entrySet())
             b.append(b.length() == 0 ? "" : ";").append(e.getKey()).append('=').append(e.getValue().balance);
+        return b.toString();
+    }
+    /** This install's owned cars, "id|model|garage|condition;..." (probes). */
+    @Register public String profileVehiclesNow() {
+        StringBuilder b = new StringBuilder();
+        for (var v : com.openworld.game.profile.Profiles.local().vehicles)
+            b.append(b.length() == 0 ? "" : ";").append(v.instanceId).append('|').append(v.model).append('|')
+             .append(v.garageId).append('|').append(String.format(java.util.Locale.ROOT, "%.2f", v.condition));
         return b.toString();
     }
     @Register public String localPlayerIdNow() { return com.openworld.game.profile.Profiles.local().playerId; }

@@ -101,7 +101,7 @@ public class ParkedVehicle extends Node3D {
     }
 
     private boolean untouched(Vehicle v, Vector3 spot) {
-        if (v.getOccupant() != null || v.getGlobalPosition().distanceTo(spot) > 1.5) return false;
+        if (v.getOccupant() != null || Garage.owned(v) || v.getGlobalPosition().distanceTo(spot) > 1.5) return false;
         return !(v.getNodeOrNull("Health") instanceof com.openworld.character.Health h) || h.getCurrentHealth() >= h.maxHealth;
     }
 
