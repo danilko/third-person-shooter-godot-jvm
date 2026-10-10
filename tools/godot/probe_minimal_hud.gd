@@ -27,6 +27,14 @@ func _tick(n: int) -> void:
 func _a(id: String) -> float:
 	return float(hud.call("reveal_alpha_now", id))
 
+func _yen(v: int) -> String:
+	var t := str(absi(v))
+	var out := ""
+	while t.length() > 3:
+		out = "," + t.substr(t.length() - 3) + out
+		t = t.substr(0, t.length() - 3)
+	return ("-¥" if v < 0 else "¥") + t + out
+
 func _all() -> String:
 	return "health %.2f weapon %.2f minimap %.2f clock %.2f" % [_a("health"), _a("weapon"), _a("minimap"), _a("clock")]
 
@@ -85,6 +93,28 @@ func _initialize() -> void:
 	Input.action_release("holster")
 	await _tick(30)
 	_check("a weapon change brings the weapon panel back", _a("weapon") == 1.0, "%.2f -> %.2f" % [before, _a("weapon")])
+
+	# the money row (user, 2026-10-10): shown on change with the amount moved, faded after the hold, kept up in debt
+	var saves: Node = root.get_node("SaveSystem")
+	var cash: Node = hud.get_node("CashReadout")
+	saves.call("grant_profile_now", 5000)
+	await _tick(20)
+	_check("cash: income brings it up, with the amount", _a("cash") == 1.0 and String(cash.call("cash_text_now")).begins_with("+¥5,000  "),
+		String(cash.call("cash_text_now")))
+	await _tick(360)
+	var bal := int(saves.call("profile_balance_now"))
+	_check("cash: faded when nothing changed", _a("cash") == 0.0, "%.2f '%s'" % [_a("cash"), cash.call("cash_text_now")])
+	saves.call("bill_profile_now", 1500)
+	await _tick(20)
+	_check("cash: a bill brings it back, with the amount", _a("cash") == 1.0
+		and String(cash.call("cash_text_now")) == "-¥1,500  %s" % _yen(bal - 1500), String(cash.call("cash_text_now")))
+	await _tick(360)
+	_check("cash:  ... and it fades, the amount gone", _a("cash") == 0.0 and String(cash.call("cash_text_now")) == _yen(bal - 1500),
+		"%.2f '%s'" % [_a("cash"), cash.call("cash_text_now")])
+	saves.call("bill_profile_now", bal)
+	await _tick(360)
+	_check("cash: in DEBT it stays up", _a("cash") == 1.0 and String(cash.call("cash_text_now")) == "-¥1,500",
+		"%.2f '%s'" % [_a("cash"), cash.call("cash_text_now")])
 
 	qs.call("set_hud_minimal_now", was_minimal)
 	print("")

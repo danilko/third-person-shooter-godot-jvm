@@ -115,6 +115,8 @@ func _initialize() -> void:
 	await _tick(10)
 	card = String(rs.call("card_text_now"))
 	_check(card.begins_with("逮捕 ARRESTED"), "an arrest shows the arrested card (%s)" % card.replace("\n", " "))
+	# user, 2026-10-10: the card never carries money (the bill line pushed the English up into the kanji)
+	_check(card == "逮捕 ARRESTED", "... and nothing else: no bill on the card")
 	for i in 60 * 6:
 		await physics_frame
 		if int(rs.call("respawns_now")) > 1:

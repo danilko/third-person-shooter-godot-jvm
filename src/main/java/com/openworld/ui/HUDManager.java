@@ -152,9 +152,14 @@ public class HUDManager extends CanvasLayer {
 	characterHUDs.remove(characterId);
   }
 
-  /** Where the one feed starts: under the clock and both star rows (WantedStars' second row is the gang's). */
+  /** Where the cash row sits: under the clock and both star rows (WantedStars' second row is the gang's). */
+  public static float cashTop() {
+	return GameClock.MARGIN + (GameClock.H - WantedStars.STAR) * 0.5f + 2f * WantedStars.STAR + 6f + 6f;
+  }
+
+  /** Where the one feed starts: under the cash row. */
   public static float feedTop() {
-	return GameClock.MARGIN + (GameClock.H - WantedStars.STAR) * 0.5f + 2f * WantedStars.STAR + 6f + 10f;
+	return cashTop() + CashReadout.H + 6f;
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -182,6 +187,12 @@ public class HUDManager extends CanvasLayer {
 	  WantedStars ws = new WantedStars();
 	  ws.setName(new godot.core.StringName("WantedStars"));
 	  addChild(ws);
+	}
+	// the money, one row under them (user, 2026-10-10)
+	if (getNodeOrNull("CashReadout") == null) {
+	  CashReadout cash = new CashReadout();
+	  cash.setName(new godot.core.StringName("CashReadout"));
+	  addChild(cash);
 	}
 	// ONE feed (user, 2026-10-08): kill lines and status lines (pickups, missions, radio) share the top-right column,
 	// BELOW the clock and both star rows (police, then the worst gang), so nothing there overlaps
@@ -272,7 +283,7 @@ public class HUDManager extends CanvasLayer {
 		  || name.equals("ScopeOverlay") || name.equals("AreaWarning") || name.equals("HitMarker")
 		  || name.equals("Minimap") || name.equals("WorldMap") || name.equals("GpsArrow")
 		  || name.equals("RaceHUD") || name.equals("GameClock")
-		  || name.equals("WantedStars") || name.equals("RearViewMirror")) continue;
+		  || name.equals("WantedStars") || name.equals("RearViewMirror") || name.equals("CashReadout")) continue;
 	  widgets.put(name, c);
 	  if (c instanceof WeaponSlotsUI ws) weaponSlotsUI = ws;
 	  if (c instanceof WeaponHUD wh) weaponHud = wh;
@@ -418,6 +429,8 @@ public class HUDManager extends CanvasLayer {
 	reveal("minimap", minimap, minimal, delta, "",
 		currentVehicle != null || (me != null && me.hasWaypointNow()) || wanted);
 	reveal("clock", getNodeOrNull("GameClock") instanceof Control gc ? gc : null, minimal, delta, "", false);
+	CashReadout cash = getNodeOrNull("CashReadout") instanceof CashReadout cr ? cr : null;
+	reveal("cash", cash, minimal, delta, cash == null ? "" : String.valueOf(cash.balanceShown()), cash != null && cash.inDebt());
   }
 
   /** One widget's fade: back to full on a new signature or while {@code hold}, else down after HOLD_SECONDS. */
@@ -436,7 +449,7 @@ public class HUDManager extends CanvasLayer {
 	w.setModulate(new godot.core.Color(m.getR(), m.getG(), m.getB(), a));
   }
 
-  /** A widget's minimal-HUD alpha ("health", "weapon", "minimap", "clock"; probe readout). */
+  /** A widget's minimal-HUD alpha ("health", "weapon", "minimap", "clock", "cash"; probe readout). */
   @Register
   public double revealAlphaNow(String id) { return revealAlpha.getOrDefault(id, 1.0); }
 

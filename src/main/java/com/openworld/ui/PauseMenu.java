@@ -39,6 +39,26 @@ public class PauseMenu extends Control {
         }
     }
 
+    /** The balance under the title, refreshed while the menu is up (a menu may be as rich as needed). */
+    @Register
+    @Override
+    public void _process(double delta) {
+        if (!isVisibleInTree()) return;
+        Node box = getNodeOrNull("CenterContainer/Panel/VBoxContainer");
+        if (box == null) return;
+        godot.api.Label cash = box.getNodeOrNull("Cash") instanceof godot.api.Label l ? l : null;
+        if (cash == null) {
+            cash = new godot.api.Label();
+            cash.setName("Cash");
+            cash.setHorizontalAlignment(godot.core.HorizontalAlignment.CENTER);
+            box.addChild(cash);
+            Node title = box.getNodeOrNull("Title");
+            box.moveChild(cash, title != null ? title.getIndex() + 1 : 0);
+        }
+        String t = CashReadout.yen(com.openworld.game.profile.Profiles.local().balance);
+        if (!t.equals(cash.getText())) cash.setText(t);
+    }
+
     @Register
     public void onQuitToTitlePressed() {
         com.openworld.audio.Sounds.ui(this, com.openworld.audio.Sound.UI_CLICK);

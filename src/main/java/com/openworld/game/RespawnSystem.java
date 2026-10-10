@@ -95,8 +95,6 @@ public class RespawnSystem extends Node {
     private double clientWait = -1;
     private String localDeadId = "";
     private Reason reason = Reason.HOSPITALIZED;
-    /** The bill line under the card ("¥15,000", or the ransom). */
-    private String cardBill = "";
     /** The captive's prompt (pay the ransom, or run). */
     private Label captivePrompt;
     private Player fresh;
@@ -221,8 +219,6 @@ public class RespawnSystem extends Node {
             cardLeft = cardSeconds;
             streamWait = -1;            // a previous respawn's fade still pending must not hide THIS card
             fadeIn = -1;
-            cardBill = why == Reason.ABDUCTED ? "身代金 ransom ¥" + String.format("%,d", recovery().ransom(j.gangStars))
-                    : j.charged > 0 ? "¥" + String.format("%,d", j.charged) : "";
             showCard(true);
         }
         // a hospitalisation or an arrest ends the running mission (user, 2026-10-03); the host decides
@@ -444,7 +440,9 @@ public class RespawnSystem extends Node {
                 default -> new Color(0.62f, 0.86f, 1f, 1f);
             };
             card.setText(switch (reason) { case ARRESTED -> "逮捕"; case ABDUCTED -> "拉致"; default -> "入院"; });
-            cardEn.setText(reason.name() + (cardBill.isEmpty() ? "" : "\n\n" + cardBill));
+            // the card never carries money (user, 2026-10-10: a bill line pushed the English up into the kanji);
+            // the bill is told by ui.CashReadout's change line
+            cardEn.setText(reason.name());
             card.addThemeColorOverride(new StringName("font_color"), c);
             cardEn.addThemeColorOverride(new StringName("font_color"), c);
         }

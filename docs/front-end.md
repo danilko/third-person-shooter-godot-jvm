@@ -105,7 +105,17 @@ aiming), the minimap (held in a vehicle, with a waypoint, or wanted), the game c
 light tells the time, the map shows it). The rest was already show-on-change or self-gated (stars hidden at zero and
 flashing on a change, the slots column on a switch, the feed, hit marker, damage indicator, prompts). A fade is a
 MODULATE under the situation table's visibility, so they never fight; `full` = alpha 1, the HUD exactly as before.
-Gate `tools/godot/probe_minimal_hud.gd` 6/6 (control: FULL keeps all four up).
+Gate `tools/godot/probe_minimal_hud.gd` 11/11 (control: FULL keeps all four up).
+
+**The money row -- `ui.CashReadout` (user, 2026-10-10).** The balance had no display outside the shop menu, and the
+hospital / arrest card carried the bill as a third line that pushed the English up into the kanji. Now: the respawn
+card is the two words only (`入院 HOSPITALIZED`, `逮捕 ARRESTED`, `拉致 ABDUCTED` -- never money;
+`probe_wanted_respawn` asserts the exact text), and the money is its own right-aligned row under the clock and the two
+star rows (`HUDManager.cashTop()`; the feed starts under it). It reads `Profiles.local().balance`. On a change the
+amount moved is drawn left of the balance for 4 s (`-¥15,000  ¥5,000`, red out / green in; two changes inside the 4 s
+are summed), so that is where a bill is told. A negative balance (a debt, CR4) is red. Full HUD: always up; minimal:
+fade id `cash`, back on a change, held while in debt. The pause menu shows the balance under its title at all times.
+The captive's ransom prompt keeps its amounts (it is a decision, not a card).
 
 ## Debug keys are DebugWorld's only (user, 2026-10-09)
 
