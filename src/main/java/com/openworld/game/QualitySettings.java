@@ -292,7 +292,9 @@ public class QualitySettings extends Node {
     @Register public void setFovOffsetNow(double deg) { fovOffset = clamp(deg, FOV_OFFSET_MIN, FOV_OFFSET_MAX); apply(); }
     @Register public boolean rebindNow(String row, String spec) { return com.openworld.control.KeyBindings.rebind(row, spec); }
     @Register public String bindingNow(String row) { return com.openworld.control.KeyBindings.specNow(row); }
-    @Register public void resetBindingsNow() { com.openworld.control.KeyBindings.resetDefaults(); }
+    @Register public void resetBindingsNow() { com.openworld.control.KeyBindings.resetDefaults(); com.openworld.control.KeyBindings.resetPadDefaults(); }
+    @Register public boolean rebindPadNow(String row, String spec) { return com.openworld.control.KeyBindings.rebindPad(row, spec); }
+    @Register public String padBindingNow(String row) { return com.openworld.control.KeyBindings.padSpecNow(row); }
     @Register public boolean saveNow() { return save(); }
     @Register public void reloadNow() { load(); apply(); }
 }

@@ -140,8 +140,12 @@ public class CharacterHUD extends Control {
   /** The keycap glyph for {@code key}, or null when none is shipped (then the prompt spells it as text). */
   private static godot.api.Texture2D glyph(String key) {
     boolean pad = com.openworld.control.InputDevice.pad();
-    return GLYPHS.computeIfAbsent((pad ? "pad:" : "") + key, k -> {
-      String path = KeyGlyph.texturePath(key, pad);
+    // a pad prompt shows the input BOUND NOW to the key's action (KeyBindings' pad table); a key shows its keycap
+    String padSpec = pad ? com.openworld.control.KeyBindings.padSpecForPrompt(key) : null;
+    String padName = com.openworld.control.BindingTable.padGlyph(padSpec);
+    return GLYPHS.computeIfAbsent(pad ? "pad:" + padSpec : key, k -> {
+      String path = !pad || padSpec == null ? KeyGlyph.texturePath(key)
+          : padName != null ? "res://assets/ui/prompts/steamdeck_" + padName + ".png" : "";
       return godot.api.ResourceLoader.INSTANCE.exists(path, "") && godot.global.GD.load(path) instanceof godot.api.Texture2D t
           ? t : null;
     });
@@ -219,9 +223,13 @@ public class CharacterHUD extends Control {
       // key, E. The key is drawn as a keycap glyph (Kenney Input Prompts) left of the text, else as "[ X ]".
       KeyGlyph.Prompt p = KeyGlyph.parse(label);
       // a pad shows the action's pad glyph (fixed layout); a keyboard shows the key BOUND NOW (KeyBindings, F2)
-      String shown = com.openworld.control.InputDevice.pad() ? p.key() : com.openworld.control.KeyBindings.shownKey(p.key());
+      boolean onPad = com.openworld.control.InputDevice.pad();
+      String shown = onPad ? p.key() : com.openworld.control.KeyBindings.shownKey(p.key());
       godot.api.Texture2D glyph = glyph(shown);
-      interactPromptLabel.setText(glyph != null ? p.text() : "[ " + shown + " ]  " + p.text());
+      // no glyph shipped for it: spell the input -- on a pad, the button bound now ("[ LB ]"), not the keyboard letter
+      String padSpec = onPad ? com.openworld.control.KeyBindings.padSpecForPrompt(p.key()) : null;
+      String spelled = padSpec != null ? com.openworld.control.BindingTable.label(padSpec, k -> "?") : shown;
+      interactPromptLabel.setText(glyph != null ? p.text() : "[ " + spelled + " ]  " + p.text());
       interactPromptLabel.setVisible(true);
       if (interactKey != null) {
         promptKey = shown;

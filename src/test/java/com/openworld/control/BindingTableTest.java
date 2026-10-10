@@ -61,4 +61,22 @@ class BindingTableTest {
         assertEquals("RMB", BindingTable.label("mouse:2", k -> "x"));
         assertEquals("T", BindingTable.label("key:84", k -> k == 84 ? "T" : "?"));
     }
+
+    @Test
+    void thePadTableSwapsLikeTheKeyboardAndKeepsStartForPause() {
+        BindingTable t = new BindingTable(BindingTable.PAD_ROWS);
+        t.set("jump", "pad:0");
+        t.set("fire", "trig:5");
+        t.set("reload", "pad:2");
+        assertEquals(2, t.rebind("jump", "pad:2").size());            // X was reload's: swapped
+        assertEquals("pad:0", t.keyOf("reload"));
+        assertEquals(1, t.rebind("fire", "pad:10").size());           // a trigger row may take a button
+        assertTrue(t.rebind("jump", "pad:6").isEmpty());              // Start is pause
+        assertTrue(t.rebind("forward", "pad:1").isEmpty());           // a keyboard-only row is not a pad row
+        Set<String> seen = new HashSet<>();
+        for (BindingTable.Row r : BindingTable.PAD_ROWS)
+            for (String a : r.actions()) assertTrue(seen.add(a), "action in two pad rows: " + a);
+        assertEquals("RT", BindingTable.label("trig:5", k -> "x"));
+        assertEquals("button_r1", BindingTable.padGlyph("pad:10"));
+    }
 }

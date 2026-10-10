@@ -37,6 +37,7 @@ public final class KeyBindings {
 
     /** Read every row's DEFAULT key off the InputMap (project.godot), once, before any user binding is applied. */
     public static void init() {
+        initPad();
         if (initialised) return;
         initialised = true;
         for (BindingTable.Row r : BindingTable.ROWS) {
@@ -133,6 +134,7 @@ public final class KeyBindings {
             String spec = v == null ? "" : String.valueOf(v);
             if (!spec.isEmpty() && eventOf(spec) != null) rebind(r.id(), spec);
         }
+        loadPad(cf);
     }
 
     /** Write the rows that differ from the default into {@code [bindings]}. */
@@ -142,6 +144,7 @@ public final class KeyBindings {
             String now = TABLE.keyOf(r.id());
             if (now != null && !now.equals(DEFAULTS.get(r.id()))) cf.setValue("bindings", r.id(), now);
         }
+        savePad(cf);
     }
 
     /** The row's key now, as a label ("E", "Space", "RMB"). */
@@ -179,5 +182,135 @@ public final class KeyBindings {
             }
         }
         return defaultLetter;
+    }
+
+    // ── the controller (user, 2026-10-10): the same model on BindingTable.PAD_ROWS, saved under [pad_bindings] ──
+
+    private static final BindingTable PAD = new BindingTable(BindingTable.PAD_ROWS);
+    private static final Map<String, String> PAD_DEFAULTS = new LinkedHashMap<>();
+    private static boolean padInitialised;
+
+    private static void initPad() {
+        if (padInitialised) return;
+        padInitialised = true;
+        for (BindingTable.Row r : BindingTable.PAD_ROWS) {
+            String spec = firstPadSpec(r.actions().get(0));
+            PAD_DEFAULTS.put(r.id(), spec);
+            PAD.set(r.id(), spec);
+        }
+    }
+
+    /**
+     * The spec of a pad event that can be bound: a button ({@code pad:<index>}) or a trigger pulled past half
+     * ({@code trig:<axis 4|5>}). Null for the sticks -- move and look are not rebound -- and for anything else.
+     */
+    public static String padSpecOf(InputEvent e) {
+        if (e instanceof godot.api.InputEventJoypadButton b) return "pad:" + b.getButtonIndex().getValue();
+        if (e instanceof godot.api.InputEventJoypadMotion m) {
+            long axis = m.getAxis().getValue();
+            if ((axis == 4 || axis == 5) && m.getAxisValue() > 0.5) return "trig:" + axis;
+        }
+        return null;
+    }
+
+    private static InputEvent padEventOf(String spec) {
+        if (spec == null) return null;
+        try {
+            if (spec.startsWith("pad:")) {
+                godot.api.InputEventJoypadButton b = new godot.api.InputEventJoypadButton();
+                b.setButtonIndex(godot.core.JoyButton.Companion.from(Long.parseLong(spec.substring(4))));
+                b.setPressed(true);
+                return b;
+            }
+            if (spec.startsWith("trig:")) {
+                godot.api.InputEventJoypadMotion m = new godot.api.InputEventJoypadMotion();
+                m.setAxis(godot.core.JoyAxis.Companion.from(Long.parseLong(spec.substring(5))));
+                m.setAxisValue(1.0f);
+                return m;
+            }
+        } catch (RuntimeException e) {
+            return null;
+        }
+        return null;
+    }
+
+    private static String firstPadSpec(String action) {
+        if (!InputMap.hasAction(action)) return null;
+        VariantArray<InputEvent> events = InputMap.actionGetEvents(action);
+        for (int i = 0; i < events.size(); i++) {
+            String s = padSpecOf(events.get(i));
+            if (s != null) return s;
+        }
+        return null;
+    }
+
+    /** Give pad row {@code rowId} the button / trigger {@code spec} (swapping with the row that held it). */
+    public static boolean rebindPad(String rowId, String spec) {
+        initPad();
+        List<BindingTable.Change> changes = PAD.rebind(rowId, spec);
+        if (changes.isEmpty()) return false;
+        Set<String> actions = new LinkedHashSet<>();
+        for (BindingTable.Change c : changes) actions.addAll(BindingTable.row(BindingTable.PAD_ROWS, c.rowId()).actions());
+        for (String a : actions) rebuildPad(a);
+        return true;
+    }
+
+    /** An action's pad buttons / triggers = its pad row's input; its stick and keyboard / mouse events are kept. */
+    private static void rebuildPad(String action) {
+        if (!InputMap.hasAction(action)) return;
+        VariantArray<InputEvent> events = InputMap.actionGetEvents(action);
+        List<InputEvent> keep = new ArrayList<>();
+        for (int i = 0; i < events.size(); i++) if (padSpecOf(events.get(i)) == null) keep.add(events.get(i));
+        InputMap.actionEraseEvents(action);
+        for (InputEvent e : keep) InputMap.actionAddEvent(action, e);
+        for (BindingTable.Row r : BindingTable.PAD_ROWS) {
+            if (!r.actions().contains(action) || PAD.keyOf(r.id()) == null) continue;
+            InputEvent e = padEventOf(PAD.keyOf(r.id()));
+            if (e != null) InputMap.actionAddEvent(action, e);
+        }
+    }
+
+    public static void resetPadDefaults() {
+        initPad();
+        Set<String> actions = new LinkedHashSet<>();
+        for (BindingTable.Row r : BindingTable.PAD_ROWS) {
+            PAD.set(r.id(), PAD_DEFAULTS.get(r.id()));
+            actions.addAll(r.actions());
+        }
+        for (String a : actions) rebuildPad(a);
+    }
+
+    private static void loadPad(ConfigFile cf) {
+        initPad();
+        for (BindingTable.Row r : BindingTable.PAD_ROWS) {
+            Object v = cf.getValue("pad_bindings", r.id(), "");
+            String spec = v == null ? "" : String.valueOf(v);
+            if (!spec.isEmpty() && padEventOf(spec) != null) rebindPad(r.id(), spec);
+        }
+    }
+
+    private static void savePad(ConfigFile cf) {
+        initPad();
+        for (BindingTable.Row r : BindingTable.PAD_ROWS) {
+            String now = PAD.keyOf(r.id());
+            if (now != null && !now.equals(PAD_DEFAULTS.get(r.id()))) cf.setValue("pad_bindings", r.id(), now);
+        }
+    }
+
+    /** The pad row's input now, as a label ("A", "RT", "D-pad left"). */
+    public static String padLabel(String rowId) {
+        initPad();
+        return BindingTable.label(PAD.keyOf(rowId), k -> "?");
+    }
+
+    public static String padSpecNow(String rowId) { initPad(); return PAD.keyOf(rowId); }
+
+    /** The pad input bound NOW to the action a prompt's default letter names, as a spec; null when it has none. */
+    public static String padSpecForPrompt(String defaultLetter) {
+        initPad();
+        String action = com.openworld.ui.KeyGlyph.actionOf(defaultLetter);
+        if (action == null) return null;
+        for (BindingTable.Row r : BindingTable.PAD_ROWS) if (r.actions().contains(action)) return PAD.keyOf(r.id());
+        return null;
     }
 }

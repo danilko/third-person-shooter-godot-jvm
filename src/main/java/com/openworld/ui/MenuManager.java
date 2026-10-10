@@ -59,7 +59,9 @@ public class MenuManager extends CanvasLayer {
     public void _input(InputEvent event) {
         // "pause" (Esc / Start) opens and closes the pause menu; "ui_cancel" (Esc / pad B) only ever BACKS OUT -- of the
         // store, of the pause menu. Pad B is crouch in play, so it must never open a menu (PLAN.md 1.1 / F1).
-        if (getNodeOrNull("SettingsMenu") != null) return;   // the settings page owns the keys until it closes
+        // a binding button waiting for its key owns the next press (GameMenu handles it first: children get _input
+        // before their parent, and it marks the event handled)
+        if (pauseMenu != null && pauseMenu.isCapturing()) return;
         boolean pausePressed = event.isActionPressed("pause", false);
         boolean backPressed = event.isActionPressed("ui_cancel", false)
                 && (ShopMenu.isOpen() || (pauseMenu != null && pauseMenu.isVisible()));

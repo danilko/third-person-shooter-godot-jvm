@@ -11,8 +11,8 @@ import java.util.Map;
  * Space is {@code jump}, {@code upright}, {@code handbrake} and {@code drift} -- because project.godot binds them to
  * the same key on purpose (on foot vs in a car are never live together). Rebinding a row moves the key on EVERY action
  * in it, so the car and the body never drift apart. A key a different row already holds is SWAPPED to the row that
- * gave it up (the CS / most PC games rule) rather than double-bound. The pad is not rebound here: Steam Input remaps a
- * pad on the Deck, and the pad prompts read {@code tools/input/joypad_bindings.py}'s fixed table.
+ * gave it up (the CS / most PC games rule) rather than double-bound. The controller has its own rows
+ * ({@link #PAD_ROWS}) on the same model.
  *
  * <p>A key is a spec string: {@code key:<physical keycode>} or {@code mouse:<button index>}. Unit-tested
  * ({@code BindingTableTest}); {@link KeyBindings} applies it to the InputMap.
@@ -47,15 +47,50 @@ public final class BindingTable {
             new Row("rear_view", "Look back (vehicle)", List.of("rear_view")),
             new Row("scope_zoom", "Scope zoom", List.of("scope_zoom")));
 
-    /** Keys nobody may take: Esc is pause / back on every page. */
-    public static boolean reserved(String spec) { return "key:4194305".equals(spec); }
+    /**
+     * The CONTROLLER's rebindable rows (user, 2026-10-10: "no game pad setting"). Its own table, because a pad groups
+     * actions differently from the keyboard: RT is fire on foot and the throttle in a car, RB is the scope, the
+     * detonator and the car's gun. A row's input is a button ({@code pad:<JoyButton>}) or a trigger
+     * ({@code trig:<axis 4|5>}); the sticks (move, look), Start (pause) and the menus' A / B are fixed. The defaults are
+     * read off project.godot, which {@code tools/input/joypad_bindings.py} writes.
+     */
+    public static final List<Row> PAD_ROWS = List.of(
+            new Row("fire", "Fire / throttle", List.of("fire", "throttle")),
+            new Row("aim", "Aim / reverse", List.of("aim", "reverse")),
+            new Row("jump", "Jump / handbrake", List.of("jump", "upright", "handbrake", "drift")),
+            new Row("crouch", "Crouch", List.of("crouch")),
+            new Row("crawl", "Crawl", List.of("crawl")),
+            new Row("reload", "Reload", List.of("reload")),
+            new Row("use_carrier", "Enter / leave vehicle", List.of("use_carrier")),
+            new Row("interact", "Use", List.of("interact")),
+            new Row("walk", "Walk / breath / boost", List.of("walk", "hold_breath", "sprint")),
+            new Row("shoulder", "Swap shoulder / look back", List.of("shoulder", "rear_view")),
+            new Row("radialmenu", "Weapon wheel", List.of("radialmenu")),
+            new Row("scope_zoom", "Scope / detonate / car gun", List.of("scope_zoom", "detonate", "vehicle_fire")),
+            new Row("holster", "Holster", List.of("holster")),
+            new Row("map", "Map", List.of("map")),
+            new Row("view", "First / third person", List.of("view")));
 
-    public static Row row(String id) {
-        for (Row r : ROWS) if (r.id.equals(id)) return r;
+    /** Keys nobody may take: Esc is pause / back on every page, Start is pause on a pad. */
+    public static boolean reserved(String spec) { return "key:4194305".equals(spec) || "pad:6".equals(spec); }
+
+    /** A KEYBOARD row by id. */
+    public static Row row(String id) { return row(ROWS, id); }
+
+    public static Row row(List<Row> rows, String id) {
+        for (Row r : rows) if (r.id.equals(id)) return r;
         return null;
     }
 
+    private final List<Row> rows;
     private final Map<String, String> current = new LinkedHashMap<>();
+
+    /** The keyboard table. */
+    public BindingTable() { this(ROWS); }
+
+    public BindingTable(List<Row> rows) { this.rows = rows; }
+
+    public List<Row> rows() { return rows; }
 
     /** The row's key now, or null when it has none. */
     public String keyOf(String rowId) { return current.get(rowId); }
@@ -79,7 +114,7 @@ public final class BindingTable {
      */
     public List<Change> rebind(String rowId, String spec) {
         List<Change> out = new ArrayList<>();
-        if (row(rowId) == null || spec == null || reserved(spec)) return out;
+        if (row(rows, rowId) == null || spec == null || reserved(spec)) return out;
         String old = current.get(rowId);
         if (spec.equals(old)) return out;
         String other = holder(spec);
@@ -90,6 +125,32 @@ public final class BindingTable {
             set(other, old);
         }
         return out;
+    }
+
+    /**
+     * The Kenney Steam Deck glyph name for a pad spec ({@code steamdeck_<name>.png}); the caller shows the label as
+     * text when that file is not shipped.
+     */
+    public static String padGlyph(String spec) {
+        if (spec == null) return null;
+        return switch (spec) {
+            case "pad:0" -> "button_a";
+            case "pad:1" -> "button_b";
+            case "pad:2" -> "button_x";
+            case "pad:3" -> "button_y";
+            case "pad:4" -> "button_view";
+            case "pad:7" -> "button_l3";
+            case "pad:8" -> "button_r3";
+            case "pad:9" -> "button_l1";
+            case "pad:10" -> "button_r1";
+            case "pad:11" -> "dpad_up";
+            case "pad:12" -> "dpad_down";
+            case "pad:13" -> "dpad_left";
+            case "pad:14" -> "dpad_right";
+            case "trig:4" -> "button_l2";
+            case "trig:5" -> "button_r2";
+            default -> null;
+        };
     }
 
     /** A copy of every row's key (for saving / probes). */
@@ -110,6 +171,26 @@ public final class BindingTable {
                 default -> "Mouse " + spec.substring(6);
             };
         }
+        if (spec.startsWith("pad:")) {
+            return switch (spec.substring(4)) {
+                case "0" -> "A";
+                case "1" -> "B";
+                case "2" -> "X";
+                case "3" -> "Y";
+                case "4" -> "Back";
+                case "6" -> "Start";
+                case "7" -> "L3";
+                case "8" -> "R3";
+                case "9" -> "LB";
+                case "10" -> "RB";
+                case "11" -> "D-pad up";
+                case "12" -> "D-pad down";
+                case "13" -> "D-pad left";
+                case "14" -> "D-pad right";
+                default -> "Button " + spec.substring(4);
+            };
+        }
+        if (spec.startsWith("trig:")) return "4".equals(spec.substring(5)) ? "LT" : "5".equals(spec.substring(5)) ? "RT" : "?";
         if (spec.startsWith("key:")) {
             try { return keyName.apply(Long.parseLong(spec.substring(4))); }
             catch (NumberFormatException e) { return "?"; }

@@ -17,6 +17,12 @@ const CFG := "user://settings.cfg"
 
 var fails := 0
 
+func _count(n: Node, cls: String) -> int:
+	var c := 1 if n.is_class(cls) else 0
+	for k in n.get_children():
+		c += _count(k, cls)
+	return c
+
 func _check(label: String, ok: bool, detail: String = "") -> void:
 	if not ok:
 		fails += 1
@@ -92,21 +98,33 @@ func _initialize() -> void:
 	_check("HIGH: shadows 600 m, render scale 1.0", is_equal_approx(_sun().directional_shadow_max_distance, 600.0)
 		and is_equal_approx(root.scaling_3d_scale, 1.0), "%s / %s" % [_sun().directional_shadow_max_distance, root.scaling_3d_scale])
 
-	print("=== 4. settings from the pause menu ===")
+	print("=== 4. the full-screen pause menu ===")
 	var pm := _find(current_scene, "PauseMenu")
-	_check("the pause menu has Settings and Quit to title", pm != null and _find(pm, "Settings") is Button
-		and _find(pm, "QuitToTitle") is Button)
-	pm.call("on_settings_pressed")
+	_check("the pause menu has the four tabs", pm != null and String(pm.call("tabs_now")) == "STATUS,CONTROLS,DISPLAY,GAME",
+		String(pm.call("tabs_now")) if pm else "-")
+	_check("... and Resume / Quit to title on GAME", _find(pm, "Resume") is Button and _find(pm, "QuitToTitle") is Button)
+	_check("... ONE backdrop, no stacked panels", _find(pm, "Backdrop") is ColorRect and _count(pm, "PanelContainer") == 0,
+		"%d panels" % _count(pm, "PanelContainer"))
+	pm.show()
 	await _frames(3)
-	var sm := _find(current_scene, "SettingsMenu")
-	_check("Settings opens", sm != null)
+	_check("it opens on STATUS, which names the player's money", String(pm.call("tab_now")) == "STATUS"
+		and String(pm.call("status_text_now")).contains("Money=¥"), String(pm.call("status_text_now")))
+	_check("only the selected page is shown", (_find(pm, "Page_STATUS") as Control).visible and not (_find(pm, "Page_DISPLAY") as Control).visible)
+	pm.call("select_tab_now", "DISPLAY")
+	await _frames(2)
+	_check("DISPLAY is a tab away", (_find(pm, "Page_DISPLAY") as Control).visible and not (_find(pm, "Page_STATUS") as Control).visible)
 	if FileAccess.file_exists(CFG):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(CFG))
-	if sm:
-		sm.call("close")
+	pm.hide()
+	await _frames(3)
+	_check("control: closing with nothing changed writes no settings.cfg", not FileAccess.file_exists(CFG))
+	pm.show()
+	await _frames(2)
+	pm.call("on_preset", 2)   # the preset box's own handler: HIGH
+	pm.hide()
 	await _frames(3)
 	var cf := ConfigFile.new()
-	_check("closing it writes settings.cfg", cf.load(CFG) == OK and String(cf.get_value("graphics", "preset", "")) == "HIGH",
+	_check("a changed setting is written when the menu closes", cf.load(CFG) == OK and String(cf.get_value("graphics", "preset", "")) == "HIGH",
 		String(cf.get_value("graphics", "preset", "-")))
 
 	print("=== 5. quit to title ===")

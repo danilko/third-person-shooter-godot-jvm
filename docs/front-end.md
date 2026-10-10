@@ -7,6 +7,7 @@ The title screen, the settings and what they may touch (PLAN.md 1.3: F2 + H3, st
 - What a setting may touch (H3) and the fairness floors
 - The settings page
 - Key rebinding, FOV, window (2026-10-10)
+- The full-screen menu (GameMenu) and controller rebinding
 - The minimal HUD (F13)
 - Debug keys are DebugWorld's only
 - Gate
@@ -59,6 +60,40 @@ shadow round a corner must not be a high-settings advantage).
 CheckButtons), built in code; from the pause menu (a "Settings" button PauseMenu adds above Quit) and from the title.
 Back or ui_cancel (Esc / pad B) saves and closes; while it is open MenuManager ignores pause / back. On a pad: D-pad
 up / down moves, left / right moves a slider or the preset, A toggles.
+
+## The full-screen menu -- `ui.GameMenu` (user, 2026-10-10; REPLACES "The settings page" above and "The page" below)
+
+The pause menu, the settings page and the key-bindings sub-page were three small centred `PanelContainer`s, each
+translucent, opened over one another: hard to read and their transparencies stacked. They are ONE full-screen menu now,
+built in code: one backdrop (`Backdrop`, alpha 0.96 in game, opaque on the title -- nothing translucent is ever put on
+it, and there is no `PanelContainer` in it), tabs along the top, each tab a whole-screen page of two columns at font 22
+(headings 28, rows 42 px).
+
+| tab | what |
+|---|---|
+| STATUS (in game only) | PLAYER: name, faction, health, money (red in debt), loans, police / gang stars. WEAPONS: every slot with magazine / reserve, the held one marked. CARS OWNED: model, condition, in garage / out. Rebuilt each time the tab is shown. |
+| CONTROLS | KEYBOARD & MOUSE (sensitivity, the 22 `BindingTable.ROWS`) beside CONTROLLER (look speed, invert Y, aim assist, the 15 `BindingTable.PAD_ROWS`), and one "Reset keyboard and controller to defaults". |
+| DISPLAY | GRAPHICS (preset, render scale, shadow / view distance, FOV) beside WINDOW (mode, resolution, vsync). |
+| GAME | OPTIONS (master volume, minimal HUD) beside SESSION (Resume / Restart / Quit to title / Quit game; on the title only Back). |
+
+`PauseMenu` (`inGame`, the scene is its root node only) and `SettingsMenu` (the title's: CONTROLS / DISPLAY / GAME,
+`SettingsMenu.open`) are thin subclasses. Tabs: click, LB / RB, PageUp / PageDown. Sliders show their value, switches
+spell On / Off. MenuManager still owns pause / resume; Esc / pad B backs out. settings.cfg is written when the menu is
+hidden or closed, and ONLY if something changed (a menu merely opened and closed writes nothing -- probes toggle pause).
+Pictures: `tools/godot/shot_menu.gd` (xvfb). Probe readouts: `tabs_now`, `tab_now`, `select_tab_now`,
+`status_text_now`, `capturing_now`.
+
+**The controller is rebindable** (same request: "no game pad setting"). `BindingTable.PAD_ROWS` is the pad's OWN row
+table, because a pad groups actions differently from the keyboard (RT = `fire` + `throttle`, LT = `aim` + `reverse`,
+RB = `scope_zoom` + `detonate` + `vehicle_fire`, LS = `walk` + `hold_breath` + `sprint`); an action is in exactly one
+pad row (unit-tested). A row's input is a button (`pad:<JoyButton>`) or a trigger (`trig:<4|5>`, captured past half
+pull); a taken input is swapped, as on the keyboard. Fixed: the sticks (move, look), Start (reserved: pause), and the
+menus' own A / B (`ui_accept` / `ui_cancel` are separate actions, so rebinding crouch off B does not break menus).
+`KeyBindings.rebindPad` rebuilds only an action's pad button / trigger events -- its stick and keyboard events are kept
+-- and `[pad_bindings] <row> = pad:<n> | trig:<axis>` stores rows that differ from project.godot (still written by
+`joypad_bindings.py`, which stays the DEFAULT layout). HUD prompts on a pad now show the input bound NOW
+(`KeyBindings.padSpecForPrompt` -> `BindingTable.padGlyph`), as a glyph when one ships (only l1 / r1 / x / y / dpad
+left / right / up do), else spelled ("[ LT ]").
 
 ## Key rebinding, FOV, window (PLAN.md 1.3 rest, 2026-10-10)
 
