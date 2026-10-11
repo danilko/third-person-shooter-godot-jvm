@@ -587,8 +587,9 @@ public class NetworkManager extends Node {
                 Character occupant = v.getSeatOccupant(seat);
                 String occupantId = occupant != null && occupant.characterInfo != null
                         ? occupant.characterInfo.characterId : "";
+                // quiet: a re-send that finds a seat diverged mends it without swinging a door
                 broadcastVehicleOccupancy(v.getCharacterInfo().characterId, occupantId,
-                        v.getCharacterInfo().ownerPeerId, !occupantId.isEmpty(), seat);
+                        v.getCharacterInfo().ownerPeerId, !occupantId.isEmpty(), seat, true);
             }
         }
     }
@@ -1255,17 +1256,24 @@ public class NetworkManager extends Node {
     /** Host → all: the authoritative seat state + locomotion owner for one vehicle seat. */
     public void broadcastVehicleOccupancy(String vehicleId, String occupantCharacterId, int ownerPeerId,
             boolean entering, int seatIndex) {
+        broadcastVehicleOccupancy(vehicleId, occupantCharacterId, ownerPeerId, entering, seatIndex, false);
+    }
+
+    /** {@code quiet}: every peer seats / unseats without the door (Vehicle.seatQuietly). */
+    public void broadcastVehicleOccupancy(String vehicleId, String occupantCharacterId, int ownerPeerId,
+            boolean entering, int seatIndex, boolean quiet) {
         if (!isNetworked() || !isServer()) return;
         broadcastMessage(NetMessageCodec.encodeVehicleOccupancy(MSG_VEHICLE_OCCUPANCY,
-                vehicleId, occupantCharacterId, ownerPeerId, entering, seatIndex), null);
+                vehicleId, occupantCharacterId, ownerPeerId, entering, seatIndex, quiet), null);
     }
 
     /** Host → one peer: late-join occupancy baseline entry for a single occupied seat. */
     public void sendVehicleOccupancy(int targetPeerId, String vehicleId, String occupantCharacterId,
             int ownerPeerId, boolean entering, int seatIndex) {
         if (!isNetworked() || !isServer()) return;
+        // the late-join baseline: the rider was seated long ago, the joiner sees no door
         sendMessage(targetPeerId, NetMessageCodec.encodeVehicleOccupancy(MSG_VEHICLE_OCCUPANCY,
-                vehicleId, occupantCharacterId, ownerPeerId, entering, seatIndex));
+                vehicleId, occupantCharacterId, ownerPeerId, entering, seatIndex, true));
     }
 
     /** Host-side seat arbitration entry — decode/validate here, grant logic in GameManager (the established split). */
@@ -1295,7 +1303,7 @@ public class NetworkManager extends Node {
         GameManager manager = gameManager();
         if (manager != null) {
             manager.applyVehicleOccupancy(occ.vehicleId(), occ.occupantCharacterId(), occ.ownerPeerId(),
-                    occ.entering(), occ.seatIndex());
+                    occ.entering(), occ.seatIndex(), occ.quiet());
         }
     }
 

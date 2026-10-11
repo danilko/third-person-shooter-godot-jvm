@@ -1526,9 +1526,11 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         if (cfg.vehicleCollisionMinSpeed <= 0) return;
 
         java.util.HashSet<Character> currentContacts = new java.util.HashSet<>();
+        boolean touchedByBody = false;
 
         for (int i = 0; i < count; i++) {
             Object obj = state.getContactColliderObject(i);
+            if (obj instanceof godot.api.RigidBody3D) touchedByBody = true;
             Character character = null;
             if (obj instanceof Character c) {
                 character = c;
@@ -1538,6 +1540,18 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             }
             if (character == null || character == occupant || !character.isAlive()) continue;
             currentContacts.add(character);
+        }
+
+        // A PERSON NEVER MOVES AN EMPTY CAR (PLAN.md V4). The park lock above holds a candidate below
+        // parkSpeedThreshold; a body LANDING on the hull or jumping into its side gives it more than that in one
+        // step, the car unparks, and on its zero-friction body it slides (measured: SPC1 5.6 m, TAX1 2.9 m from a
+        // player jumping at it; walking and sprinting into it 0.00-0.02 m). So: nobody aboard, no brain, no input,
+        // touched by a character and by no other rigid body this step -> what the touch gave it is taken back.
+        // A car's ram, a blast and a slope it is rolling down are all faster or touch-free and are left alone.
+        if (heldWhenEmpty && !currentContacts.isEmpty() && !touchedByBody && lastGrounded && !hasAnyOccupant()
+                && !isAiDriven() && isIdleInput() && state.getLinearVelocity().length() < HELD_EMPTY_MAX_SPEED) {
+            state.setLinearVelocity(Vector3.Companion.getZERO());
+            state.setAngularVelocity(Vector3.Companion.getZERO());
         }
 
         float speed = (float) GD.abs(getGlobalBasis().getZ().dot(getLinearVelocity()));
@@ -1565,6 +1579,18 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
 
         activeCollisions.clear();
         activeCollisions.addAll(currentContacts);
+    }
+
+    /** Off = an empty car a person lands on slides again (probe_car_push --park-control). */
+    @Export public boolean heldWhenEmpty = true;
+    public boolean isHeldWhenEmpty() { return heldWhenEmpty; }
+    public void setHeldWhenEmpty(boolean v) { heldWhenEmpty = v; }
+    /** Above this an empty car is moving for a reason of its own (rolling, rammed, blown): the hold lets it be (m/s). */
+    private static final double HELD_EMPTY_MAX_SPEED = 3.0;
+
+    private boolean hasAnyOccupant() {
+        for (Character c : seatOccupants) if (c != null) return true;
+        return false;
     }
 
     /**
@@ -2161,14 +2187,47 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     public void tryEnter(Character c) { tryEnter(c, 0); }
 
     /** Seat-aware enter — seat 0 is the driver (full hot-swap path below); higher seats are passengers. */
-    public void tryEnter(Character c, int seatIndex) {
+    public void tryEnter(Character c, int seatIndex) { tryEnter(c, seatIndex, false); }
+
+    /**
+     * BORN IN THE SEAT (PLAN.md V1 / V2, user 2026-10-11: "a driver appearing opens the door, and the car beside it
+     * is thrown aside"). A traffic car's driver is made when the car comes within ~70 m of a player and freed when it
+     * leaves (ZoneManager.trafficLazyDrivers), and a dispatch car is built with its crew aboard: nobody GOT IN, so
+     * nothing may show it. {@code quiet} = no door (an opened door is a solid kinematic box out into the next
+     * lane). {@code unarmed} = the body sits with its hands empty (holstered, not in the combat state: a civilian
+     * at the wheel has no weapon out; it draws when its own brain engages after it is thrown out or gets out).
+     */
+    public void seatQuietly(Character c, int seatIndex, boolean unarmed) {
+        tryEnter(c, seatIndex, true);
+        if (unarmed && quietSeats && seatIndex < seatOccupants.length && seatOccupants[seatIndex] == c) sitUnarmed(c);
+    }
+
+    /** Off = a quiet seat / release behaves like a real enter / exit again (probe control). */
+    @Export public boolean quietSeats = true;
+    public boolean isQuietSeats() { return quietSeats; }
+    public void setQuietSeats(boolean v) { quietSeats = v; }
+
+    public void tryEnter(Character c, int seatIndex, boolean quiet) {
         if (c == null || seatIndex < 0 || seatIndex >= seatOccupants.length) return;
         if (seatOccupants[seatIndex] != null) return;
-        openDoorForSeat(seatIndex);
+        quiet = quiet && quietSeats;
+        if (!quiet) openDoorForSeat(seatIndex);
         if (seatIndex != 0) {
             enterPassenger(c, seatIndex);
             return;
         }
+        tryEnterDriver(c);
+    }
+
+    /** A body born in its seat rides with empty hands (V2). */
+    private static void sitUnarmed(Character c) {
+        if (c instanceof Player) return;
+        c.setSeatedCombat(false);
+        if (c.getNodeOrNull("WeaponController") instanceof WeaponController wc && wc.getReplicatedActiveSlot() == 0)
+            wc.setHolstered(true);
+    }
+
+    private void tryEnterDriver(Character c) {
         occupant    = c;
         seatOccupants[0] = c;
         cockpitCalibrateIn = COCKPIT_CALIBRATE_SECONDS;   // put the cockpit view at THIS driver's eye
@@ -2284,7 +2343,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         if (c == null) return false;
         for (int i = 0; i < seatOccupants.length; i++) {
             if (seatOccupants[i] == c) {
-                tryExit(i);
+                tryExit(i, true);
                 return true;
             }
         }
@@ -2292,12 +2351,20 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     }
 
     /** Seat-aware exit — placement mirrors the seat's side; passengers skip the driver-only teardown. */
-    public void tryExit(int seatIndex) {
+    public void tryExit(int seatIndex) { tryExit(seatIndex, false); }
+
+    /**
+     * {@code quiet} = the body is leaving the WORLD, not the car ({@link #releaseOccupant}: it is freed by the
+     * caller in the same call): no door, and it is never stood beside the car -- a body placed 1.5 m out, solid
+     * again, is inside the car in the next lane (PLAN.md V1).
+     */
+    public void tryExit(int seatIndex, boolean quiet) {
         if (seatIndex < 0 || seatIndex >= seatOccupants.length) return;
         if (seatOccupants[seatIndex] == null) return;
-        openDoorForSeat(seatIndex);
+        quiet = quiet && quietSeats;
+        if (!quiet) openDoorForSeat(seatIndex);
         if (seatIndex != 0) {
-            exitPassenger(seatIndex);
+            exitPassenger(seatIndex, quiet);
             return;
         }
         Character c = occupant;
@@ -2313,9 +2380,10 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             if (wc instanceof WeaponController wcn) wcn.restoreAimRay();
         }
 
-        c.setGlobalPosition(seatExitPosition(seatIndex));
+        if (!quiet) c.setGlobalPosition(seatExitPosition(seatIndex));
 
         c.exitDriveState();
+        if (quiet) c.setCollisionLayer(0);
 
         // Only hand back what tryEnter hot-swapped in. A VehicleNetworkController stays (it belongs to
         // the vehicle's replication). A VehicleAIController also stays — it is the car's OWN lane-follow
@@ -2338,20 +2406,21 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             }
             c.makeCameraActive();
         }
-        activeCollisions.add(c);
+        if (!quiet) activeCollisions.add(c);
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) bus.vehicleExited.emit(c.characterInfo);
         nameplateChanged.emit();   // seat now empty → carrier plate falls back to neutral
     }
 
     /** Passenger unseat — restore + place; no controller/camera/ownership teardown to undo. */
-    private void exitPassenger(int seatIndex) {
+    private void exitPassenger(int seatIndex, boolean quiet) {
         Character c = seatOccupants[seatIndex];
         seatOccupants[seatIndex] = null;
         resetSeatPosture(seatIndex);
         setOccupantAimExceptions(c, false);
-        c.setGlobalPosition(seatExitPosition(seatIndex));
+        if (!quiet) c.setGlobalPosition(seatExitPosition(seatIndex));
         c.exitDriveState();
+        if (quiet) c.setCollisionLayer(0);
         if (c == localPassenger) {
             localPassenger = null;
             if (camController != null) {
@@ -2360,7 +2429,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             }
             c.makeCameraActive();
         }
-        activeCollisions.add(c);
+        if (!quiet) activeCollisions.add(c);
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) bus.vehicleExited.emit(c.characterInfo);
         nameplateChanged.emit();

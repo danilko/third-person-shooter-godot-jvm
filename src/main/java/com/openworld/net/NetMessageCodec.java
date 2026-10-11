@@ -1118,7 +1118,7 @@ public final class NetMessageCodec {
     // ── MSG_VEHICLE_SEAT_REQUEST / MSG_VEHICLE_OCCUPANCY (Round 11 N3) ────────
     //
     // Request:   [tag u8][vehicleId utf8][characterId utf8][entering u8][seatIndex u8]   client → host
-    // Occupancy: [tag u8][vehicleId utf8][occupantCharacterId utf8][ownerPeerId i32][entering u8][seatIndex u8]   host → all
+    // Occupancy: [tag u8][vehicleId utf8][occupantCharacterId utf8][ownerPeerId i32][entering u8: bit0 entering, bit1 quiet][seatIndex u8]   host → all
     //
     // seatIndex (multi-seat): 255 = SEAT_AUTO on a request ("host picks" — the one enter key);
     // occupancy always carries the host-resolved concrete seat. One seat per message — the
@@ -1155,14 +1155,23 @@ public final class NetMessageCodec {
     public record DecodedVehicleSeatRequest(String vehicleId, String characterId, boolean entering,
             int seatIndex) { }
 
+    /** Bit 1 of the occupancy message's `entering` byte: the seat change is QUIET (no door: a body born in its
+     *  seat, a self-heal re-send). An older reader takes the byte as "non-zero = entering", so bit 0 keeps that. */
+    public static final int OCCUPANCY_QUIET = 2;
+
     public static PackedByteArray encodeVehicleOccupancy(int msgType, String vehicleId,
             String occupantCharacterId, int ownerPeerId, boolean entering, int seatIndex) {
+        return encodeVehicleOccupancy(msgType, vehicleId, occupantCharacterId, ownerPeerId, entering, seatIndex, false);
+    }
+
+    public static PackedByteArray encodeVehicleOccupancy(int msgType, String vehicleId,
+            String occupantCharacterId, int ownerPeerId, boolean entering, int seatIndex, boolean quiet) {
         StreamPeerBuffer buf = new StreamPeerBuffer();
         buf.put8(msgType);
         buf.putUtf8String(vehicleId);
         buf.putUtf8String(occupantCharacterId);
         buf.put32(ownerPeerId);
-        buf.put8(entering ? 1 : 0);
+        buf.put8((entering ? 1 : 0) | (quiet ? OCCUPANCY_QUIET : 0));
         buf.put8(seatIndex & 0xFF);   // concrete seat (host-resolved), one seat per message
         return buf.getDataArray();
     }
@@ -1172,14 +1181,15 @@ public final class NetMessageCodec {
         String vehicleId = buf.getUtf8String();
         String occupantCharacterId = buf.getUtf8String();
         int ownerPeerId = buf.get32();
-        boolean entering = buf.getU8() != 0;
+        int flags = buf.getU8();
         int seatIndex = buf.getU8();
-        return new DecodedVehicleOccupancy(vehicleId, occupantCharacterId, ownerPeerId, entering, seatIndex);
+        return new DecodedVehicleOccupancy(vehicleId, occupantCharacterId, ownerPeerId, (flags & 1) != 0, seatIndex,
+                (flags & OCCUPANCY_QUIET) != 0);
     }
 
     /** Carrier for a decoded MSG_VEHICLE_OCCUPANCY — the host's authoritative seat state (occupant empty = vacant). */
     public record DecodedVehicleOccupancy(String vehicleId, String occupantCharacterId,
-            int ownerPeerId, boolean entering, int seatIndex) { }
+            int ownerPeerId, boolean entering, int seatIndex, boolean quiet) { }
 
     // ── MSG_VEHICLE_SPAWN (host → all, reliable — streamed ambient traffic, I3b) ──
     //

@@ -27,6 +27,32 @@ public class VehicleProbeHelper extends Node {
         if (v instanceof Vehicle car && ai instanceof Character a) car.tryEnter(a);
     }
 
+    /** The traffic-driver path: born in the seat, no door, hands empty (probe_lazy_driver_seat.gd). */
+    @Register
+    public void seatDriverQuietly(Node v, Node ai) {
+        if (v instanceof Vehicle car && ai instanceof Character a) car.seatQuietly(a, 0, true);
+    }
+
+    /** The stow path: the driver leaves the WORLD (the caller frees it). */
+    @Register
+    public void releaseDriver(Node v, Node ai) {
+        if (v instanceof Vehicle car && ai instanceof Character a) car.releaseOccupant(a);
+    }
+
+    /** Walk {@code c} (an AICharacter: its brain is replaced by a scripted one) along {@code dir}; ZERO stops it. */
+    @Register
+    public void scriptedWalk(Node c, godot.core.Vector3 dir, boolean sprint) {
+        if (!(c instanceof Character ch)) return;
+        ScriptedInputController sc;
+        if (ch.getController() instanceof ScriptedInputController have) sc = have;
+        else { sc = new ScriptedInputController(); ch.attachController(sc); }
+        boolean still = dir.length() < 0.01;
+        sc.move = dir;
+        sc.movementType = still ? com.openworld.movement.character.MovementType.IDLE
+                : sprint ? com.openworld.movement.character.MovementType.SPRINT
+                : com.openworld.movement.character.MovementType.WALK;
+    }
+
     /** Kill {@code c} outright through its own Health, the way a shot would. */
     @Register
     public void kill(Node c) {

@@ -1082,14 +1082,16 @@ public class EnforcementDispatch extends Node {
             String w = weaponFor(side, pid, r, ws, stars);
             if (!w.isEmpty()) WeaponGrant.grant(drv, w, this);
             drv.setSquad(sq);
+            // a traffic driver is seated with empty hands (Vehicle.seatQuietly); one on a call rides ready
+            drv.setSeatedCombat(true);
         }
         for (int seat = 1; seat < Math.min(r.carCrew, v.getSeatCount()); seat++) {
             AICharacter mate = spawnBody(side, v.getGlobalPosition(), weaponFor(side, pid, r, ws, stars));
             if (mate == null) break;
-            v.tryEnter(mate, seat);
+            v.seatQuietly(mate, seat, false);   // the car is built with its crew aboard: no door
             if (getNodeOrNull("/root/NetworkManager") instanceof NetworkManager net && v.getCharacterInfo() != null)
                 net.broadcastVehicleOccupancy(v.getCharacterInfo().characterId, mate.getCharacterInfo().characterId,
-                        v.getCharacterInfo().ownerPeerId, true, seat);
+                        v.getCharacterInfo().ownerPeerId, true, seat, true);
         }
         Car c = new Car();
         c.car = v;

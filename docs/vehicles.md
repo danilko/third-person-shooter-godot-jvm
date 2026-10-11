@@ -6,6 +6,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - A car stops for a person in the road (user, 2026-09-20)
 - Sliding shop doors, and the cars' top speed (user, 2026-09-20)
 - Armour, a helicopter that can be shot down, rotors on their hubs (2026-10-07, user-reported)
+- Traffic car bugs V1-V6: a driver born in its seat, the door that threw the next car, a person never moves an empty car (2026-10-11, user-reported)
 
 ---
 
@@ -282,3 +283,40 @@ so anyone not dead ahead was invisible. Both halves are fixed in `VehicleAIContr
   to tail, TNK-1 12.1 m with its gun, character 1.65 m): `tools/godot/shot_vehicle_scale.gd` (display) is the picture.
 - **A body killed lying prone keeps its pose** (no clip, no ragdoll); standing up to fall back read as "crawls, then dies".
 
+
+## Traffic car bugs V1-V6: a driver born in its seat, the door that threw the next car, a person never moves an empty car (2026-10-11, user-reported)
+
+All from play after near-only drivers shipped (`ZoneManager.trafficLazyDrivers`). Each was reproduced by a probe with
+its control before anything was changed.
+
+- **V1, "a driver appearing opens the door, and the car beside it is thrown aside".** MEASURED
+  (`tools/godot/probe_lazy_driver_seat.gd -- --control`, three SPC1 side by side): seating a driver swung the door
+  65 deg and threw the neighbour **11.1 m at a 0.5 m hull gap, 3.9 m at 1.0 m**, nothing at 1.5 m; STOWING did the same
+  (7.1 m / 2.7 m) -- the plan's reading "stowing is already quiet" was wrong, `releaseOccupant` went through the whole
+  `tryExit` (door, body stood 1.5 m beside the car and made solid). The cause is the DOOR, not the driver's body: an
+  open door is a kinematic `AnimatableBody3D`, it was on the VEHICLE layer, and a rigid car cannot push a kinematic
+  box back, so it takes the whole penetration as velocity. Two fixes, one for each half:
+  * **Born in the seat**: `Vehicle.seatQuietly(c, seat, unarmed)` (no door) and a quiet `releaseOccupant` (no door,
+    never stood beside the car, never made solid: the caller frees the body in the same call). ZoneManager's traffic
+    driver, EnforcementDispatch's crew riding in a dispatched car, and every despawn of a seated body use them. The
+    occupancy message's `entering` byte carries the flag in bit 1 (`NetMessageCodec.OCCUPANCY_QUIET`; bit 0 is still
+    "entering", so the layout did not change), and the 1 Hz occupancy sweep and the late-join baseline are always
+    quiet: a self-heal or a joiner never sees a door swing for someone who sat down long ago.
+  * **An open door does not touch another car** (`VehicleDamageModel.DOOR_LAYER` = HITBOX | STAIR_RAMP: bullets see
+    HITBOX, character bodies see STAIR_RAMP, a vehicle's mask 51 sees neither). This is the real enter / exit beside
+    another car -- the same defect, which a player getting out in traffic hit too. `--real-door`: the door swings
+    65 deg, the neighbour moves 0.003 m at every gap. `probe_component_car` section 7 (the open door is solid to a
+    person, takes a bullet) unchanged.
+  NOT measured: two peers (the flag is exercised by `run_net_debugworld.sh` only as far as "the coop gate passes").
+- **V2, the driver sits with empty hands.** `CharacterDriveState.enter` puts every seated body in the combat state
+  ("still holds their weapon visually while riding"); `seatQuietly(…, unarmed = true)` takes a non-player back out of
+  it and holsters fists (`Character.setSeatedCombat`). A unit on a call is armed AFTER it is seated and set back to
+  ready (`EnforcementDispatch`). The body's own brain draws when it engages after it is thrown out.
+- **V4, "a character shoves an empty car far in some setups and not in others".** `probe_car_push.gd` gained the axes
+  (`--state=asleep|vacated|fresh`, `--pusher=player|ai`, `--move=sprint|jump|roof`, `--car=`, `--all`). Walking and
+  sprinting into a car in any state, by a player or an AI, on ten models: 0.00-0.02 m (the 09-28 fix holds). **JUMPING
+  at it: SPC1 5.6 m (the side), TAX1 2.9 m (the nose)** -- a body landing on the hull gives the car more than
+  `parkSpeedThreshold` in one step, the car unparks, the park lock lets go, and it slides on its zero-friction body.
+  Rule, in one place (`Vehicle._integrateForces`, `heldWhenEmpty`): nobody aboard, no brain, no input, touched by a
+  character and by NO other rigid body this step, under 3 m/s -> the velocity is taken back. A ram, a blast and a
+  car rolling by itself are untouched. `--park-control` reproduces both numbers.

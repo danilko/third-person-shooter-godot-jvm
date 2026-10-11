@@ -756,7 +756,7 @@ public class GameManager extends Node {
     /** Keyed "vehicleId#seatIndex" — one deferred entry per seat, so a car can wait on several occupants. */
     private final java.util.Map<String, PendingSeat> pendingSeats = new java.util.HashMap<>();
     private record PendingSeat(String vehicleId, String occupantCharacterId, int ownerPeerId,
-            boolean entering, int seatIndex) {}
+            boolean entering, int seatIndex, boolean quiet) {}
 
     /** Resolves a vehicleId to its live Vehicle via the "characters" group — mirrors findCharacterById. */
     private com.openworld.carrier.vehicle.Vehicle findVehicleById(String vehicleId) {
@@ -892,12 +892,13 @@ public class GameManager extends Node {
      */
     public void seatTrafficDriver(Vehicle vehicle, AICharacter driver) {
         if (vehicle == null || driver == null || vehicle.getOccupant() != null) return;
-        vehicle.tryEnter(driver);
+        // born in the seat: no door, hands empty (PLAN.md V1 / V2)
+        vehicle.seatQuietly(driver, 0, true);
         NetworkManager net = getNetworkManager();
         if (net != null && net.isNetworked() && net.isServer()
                 && vehicle.getCharacterInfo() != null && driver.characterInfo != null) {
             net.broadcastVehicleOccupancy(vehicle.getCharacterInfo().characterId,
-                    driver.characterInfo.characterId, vehicle.getCharacterInfo().ownerPeerId, true, 0);
+                    driver.characterInfo.characterId, vehicle.getCharacterInfo().ownerPeerId, true, 0, true);
         }
     }
 
@@ -909,6 +910,11 @@ public class GameManager extends Node {
      */
     public void applyVehicleOccupancy(String vehicleId, String occupantCharacterId, int ownerPeerId,
             boolean entering, int seatIndex) {
+        applyVehicleOccupancy(vehicleId, occupantCharacterId, ownerPeerId, entering, seatIndex, false);
+    }
+
+    public void applyVehicleOccupancy(String vehicleId, String occupantCharacterId, int ownerPeerId,
+            boolean entering, int seatIndex, boolean quiet) {
         com.openworld.carrier.vehicle.Vehicle vehicle = findVehicleById(vehicleId);
         Character character = entering ? findCharacterById(occupantCharacterId) : null;
 
@@ -922,7 +928,7 @@ public class GameManager extends Node {
                 vehicle.applyAuthorityState();
             }
             pendingSeats.put(vehicleId + "#" + seatIndex,
-                    new PendingSeat(vehicleId, occupantCharacterId, ownerPeerId, entering, seatIndex));
+                    new PendingSeat(vehicleId, occupantCharacterId, ownerPeerId, entering, seatIndex, quiet));
             GD.print("GameManager: VEHICLE_OCCUPANCY deferred for '" + vehicleId + "' seat " + seatIndex
                     + " — waiting on " + (vehicle == null ? "vehicle" : "occupant " + occupantCharacterId)
                     + " spawn");
@@ -938,7 +944,7 @@ public class GameManager extends Node {
                 // Authority first (see processVehicleSeatRequest): on the requester this frees
                 // the puppet controller — seeding coast velocities — before the live hot-swap.
                 if (seat == 0) vehicle.applyAuthorityState();
-                vehicle.tryEnter(character, seat);
+                vehicle.tryEnter(character, seat, quiet);
             } else if (seat == 0) {
                 vehicle.applyAuthorityState();   // already seated — ownership converge only
             }
@@ -959,7 +965,7 @@ public class GameManager extends Node {
                 new java.util.ArrayList<>(pendingSeats.entrySet())) {
             PendingSeat seat = e.getValue();
             applyVehicleOccupancy(seat.vehicleId(), seat.occupantCharacterId(), seat.ownerPeerId(),
-                    seat.entering(), seat.seatIndex());
+                    seat.entering(), seat.seatIndex(), seat.quiet());
         }
     }
 

@@ -2406,7 +2406,7 @@ public class ZoneManager extends Node {
 		if (net != null) net.announceSpawn(ai);
 
 		if (getNodeOrNull("/root/GameManager") instanceof GameManager gm) gm.seatTrafficDriver(v, ai);
-		else v.tryEnter(ai);   // SP fallback if the GameManager AutoLoad is somehow absent (test scenes)
+		else v.seatQuietly(ai, 0, true);   // SP fallback if the GameManager AutoLoad is somehow absent (test scenes)
 		return ai;
 	}
 

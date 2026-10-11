@@ -957,6 +957,13 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         changedCombatState.emit(combatStates.get(resolveCombatKey(null)));
     }
 
+    /** A SEATED body's combat state, set by what seated it (a driver's applyInput does not run): a traffic driver
+     *  rides with empty hands, a unit on a call rides ready (Vehicle.seatQuietly, EnforcementDispatch). */
+    public void setSeatedCombat(boolean on) {
+        combat = on;
+        setCombatState();
+    }
+
     // ── Replication apply (bodies extracted to CharacterReplication — WS5 god-class split) ──
     //
     // Non-authority bodies never run gatherInput/applyInput/physics (see the early return in
