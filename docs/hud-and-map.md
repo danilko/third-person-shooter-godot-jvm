@@ -7,6 +7,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - The map says where you are (PLAN.md 3.18n, 2026-09-21)
 - The minimap turns with you, and the route is drawn on the road (user, 2026-09-20)
 - The map shows the city: buildings, typed places, every grid code, north; one ground fill; square turnarounds (2026-09-22)
+- The map key, redone: what a player DOES something at; the police search disc (user, 2026-10-11)
 
 ---
 
