@@ -1,7 +1,7 @@
 # CLAUDE.md — Codebase Reference
 
 Third-person shooter experiment using **Godot 4.7** with the **[godot-jvm](https://github.com/utopia-rise/godot-jvm)** binding
-(`1.0.0-rc1`, shipped as the in-project `addons/jvm/` GDExtension; docs: https://godot-jvm.dev/en/1.0/).
+(`1.0.0-rc2`, shipped as the in-project `addons/jvm/` GDExtension; docs: https://godot-jvm.dev/en/1.0/).
 All game logic is written in **Java** (a few stubs in Kotlin). **GDScript is used for EDITOR TOOLING
 ONLY** (decided 2026-09-13): godot-jvm rc1 ships `@Tool` but no editor API (0 `godot/api/Editor*`
 classes), so editor plugins, docks and gizmos are GDScript — `addons/road_kit/` is the first — and
@@ -20,13 +20,14 @@ Open `project.godot` with the **stock Godot 4.7.2 editor** —
 default (`blender/tools/env.sh`) and what every headless check must run under. JVM toolchain:
 **JDK 17**.
 
-godot-jvm **`1.0.0-rc1`** is a **GDExtension add-on** that ships with the project in `addons/jvm/`,
+godot-jvm **`1.0.0-rc2`** (since 2026-10-10; rc1 before) is a **GDExtension add-on** that ships with the project in `addons/jvm/`,
 so the **standard Godot editor** is all that is needed — no custom engine build. Keep the Gradle
 plugin (`build.gradle.kts`: `com.utopia-rise.godot-jvm`) and the `addons/jvm/` add-on on the same
-version (both `1.0.0-rc1`) and upgrade them together.
+version (both `1.0.0-rc2`) and upgrade them together -- then `./gradlew build` and one headless probe before anything else
+(the rc1 -> rc2 step broke ~100 call sites; see "rc2" under Godot-JVM Specifics).
 
 Scenes/resources reference scripts by their **source `.java` path**
-(`res://src/main/java/com/openworld/.../X.java`). Under godot-jvm `1.0.0-rc1` that is the *only* way for a
+(`res://src/main/java/com/openworld/.../X.java`). Under godot-jvm `1.0.0-rc1` and later that is the *only* way for a
 project class: `.gdj` registration files are now emitted **only for registered classes coming
 from external dependencies**, of which this project has none — so `gdj/` stays empty and is not
 a fallback. Source of truth is always `src/main/java/` — never edit generated files.
@@ -62,7 +63,7 @@ rewriting it would make the record lie about what was actually built. New writin
 
 All code lives under the **`com.openworld`** root, organized **by domain/concern** (not layer-first).
 Scripts are referenced from scenes by `.java` path (`res://src/main/java/com/openworld/.../X.java`);
-`.gdj` is dependency-only under godot-jvm `1.0.0-rc1` and unused here. The two reorg scripts (`tools/reorg_stage1.py`, `tools/reorg_stage2.py`)
+`.gdj` is dependency-only under godot-jvm `1.0.0-rc1`+ and unused here. The two reorg scripts (`tools/reorg_stage1.py`, `tools/reorg_stage2.py`)
 and `tools/REORG_PROGRESS.md` document the move; reuse their pattern for future moves.
 
 ```
@@ -237,7 +238,7 @@ means that section title in one of these files (`grep -l "<title>" docs/*.md`).
 
 ## Godot-JVM Specifics
 
-- **Annotations (godot-jvm `1.0.0-rc1` API — the older `@Register*` family is gone).** The plugin runs in the
+- **Annotations (godot-jvm `1.0.0-rc1`+ API — the older `@Register*` family is gone).** The plugin runs in the
   default `Inferred` mode, where an annotation implies what it needs:
 
   | intent | annotation | replaced |
@@ -252,6 +253,12 @@ means that section title in one of these files (`grep -l "<title>" docs/*.md`).
   positional annotation arguments), it must be `@Script(className = "X")`. Do not use
   `import godot.annotation.*;` alongside `import godot.api.*;`: **`godot.api.Script` exists**, and
   two on-demand imports make `@Script` ambiguous. Import the annotations explicitly.
+- **rc2 (2026-10-10) moved two things every `connect` touches.** `ConnectFlags` is `godot.core.ConnectFlags` (it was
+  the nested `godot.api.Object.ConnectFlags`), and `Object.connect(StringName, Callable)` is gone: the two-argument
+  form takes a **`String`** (`connect("body_entered", callable)`); the `StringName` overload needs the flags too.
+  `signal.connectUnsafe(callable, flags)` is unchanged apart from the flags' package. The quirks below that are
+  labelled rc1 (`Transform3D.times`, `Dictionary.put`, the stale `@Export` wrapper, bound Callables) were NOT
+  re-measured on rc2: keep obeying them until one is.
 - Signal declarations: `Signal0 / Signal1<T> / … / Signal7<…>` declared as `public final` fields —
   **registered automatically**, no annotation. The registrar names the signal after the *field*
   (`playerDied` → `player_died`, via `convertToSnakeCase`), which is why the field name and the

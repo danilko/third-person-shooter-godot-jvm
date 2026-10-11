@@ -527,7 +527,7 @@ public class VehicleDamageModel extends Node {
         body.setLinearVelocity(lastVel.plus(away.times(1.5)).plus(new Vector3(0, 1.2, 0)).plus(kick));
         body.setAngularVelocity(new Vector3(GD.randfRange(-3f, 3f), GD.randfRange(-3f, 3f), GD.randfRange(-3f, 3f)));
         SceneTreeTimer t = getTree().createTimer(debrisLifetime, false, true, false);
-        t.connect(new StringName("timeout"), MethodCallable.createUnsafe(body, "queue_free"));
+        t.connect("timeout", MethodCallable.createUnsafe(body, "queue_free"));
         DEBRIS.addLast(body);
         while (DEBRIS.size() > MAX_DEBRIS) {
             RigidBody3D old = DEBRIS.pollFirst();

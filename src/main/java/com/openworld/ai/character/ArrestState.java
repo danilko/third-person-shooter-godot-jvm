@@ -48,6 +48,25 @@ public class ArrestState implements AIState {
     public AIState update(AICharacter body, AIController ctrl, UserCommand cmd, double delta) {
         Character p = ctrl.getPursuit();
         if (p == null || !p.isAlive()) return PatrolState.INSTANCE;
+        if (ctrl.pursuitSearch && ctrl.pursuitPoint != null && !ctrl.pursuitAway) {
+            // SEARCHING: the pursuit is lost. To this body's own search point and no further -- a FIXED goal, so the
+            // navigation path is asked for once a point, not re-planned at a moving player every tick
+            Vector3 sg = ctrl.pursuitPoint;
+            if (body.getNavAgent() != null && ctrl.shouldUpdateNav(sg)) {
+                body.getNavAgent().setTargetPosition(sg);
+                ctrl.recordNavTarget(new Vector3(sg));
+            }
+            Vector3 ds = sg.minus(body.getGlobalPosition());
+            ds.setY(0f);
+            if (ds.length() <= SLOT_REACHED) { cmd.movementType = MovementType.IDLE; return this; }
+            cmd.movementType = ds.length() > WALK_INSIDE ? MovementType.SPRINT : MovementType.WALK;
+            Vector3 sdir = ctrl.pursuitDirect ? ds.normalized() : ScriptedMoveState.steerDirection(body, sg);
+            if (sdir != null) {
+                cmd.movementDirection.setX(sdir.getX());
+                cmd.movementDirection.setZ(sdir.getZ());
+            }
+            return this;
+        }
         Vector3 at = p.getGlobalPosition();
         // this body's own approach slot round the pursuit (the dispatcher's), until it is there
         Vector3 goal = at;

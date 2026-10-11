@@ -163,6 +163,8 @@ public class AIController extends Controller {
         pursuit = null;
         pursuitAway = false;
         pursuitStand = false;
+        pursuitSearch = false;
+        pursuitPoint = null;
         pursuitVia.clear();
         lastCmd = null;
         thinkDebt = 0.0;
@@ -235,6 +237,11 @@ public class AIController extends Controller {
     public boolean pursuitAway;
     /** Stand and cover the pursuit, weapon on them (a gang guard over a captive). */
     public boolean pursuitStand;
+    /** SEARCHING (user, 2026-10-10: "even 1 to 3 stars cannot lose the police"): the dispatch has lost the pursuit, so
+     *  this body walks to {@link #pursuitPoint} -- a spot in the area round where they were last seen -- and stands
+     *  there looking, instead of closing on a position nobody knows. It neither aims at nor steers by the pursuit. */
+    public boolean pursuitSearch;
+    public godot.core.Vector3 pursuitPoint;
     /** The approach SLOT (PLAN.md 1i): a world offset from the pursuit that this body closes on instead of the
      *  pursuit itself, so a squad comes from several sides instead of single file. Zero = straight at the pursuit. */
     public godot.core.Vector3 pursuitOffset = new godot.core.Vector3();

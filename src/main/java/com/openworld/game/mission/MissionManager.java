@@ -92,7 +92,7 @@ public class MissionManager extends Node {
         if (busNode instanceof EventBus bus) {
             bus.characterEliminated.connectUnsafe(
                     MethodCallable.createUnsafe(this, "onCharacterEliminated"),
-                    Object.ConnectFlags.DEFAULT);
+                    godot.core.ConnectFlags.DEFAULT);
         }
     }
 

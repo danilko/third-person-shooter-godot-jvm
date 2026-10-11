@@ -82,16 +82,16 @@ public class CharacterHUD extends Control {
     if (busNode instanceof EventBus bus) {
       bus.playerHealthChanged.connectUnsafe(
           MethodCallable.createUnsafe(this, "onHealthChanged"),
-          godot.api.Object.ConnectFlags.DEFAULT);
+          godot.core.ConnectFlags.DEFAULT);
       bus.pickupInteractChanged.connectUnsafe(
           MethodCallable.createUnsafe(this, "onPickupInteractChanged"),
-          godot.api.Object.ConnectFlags.DEFAULT);
+          godot.core.ConnectFlags.DEFAULT);
       bus.interactPromptChanged.connectUnsafe(
           MethodCallable.createUnsafe(this, "onInteractPromptChanged"),
-          godot.api.Object.ConnectFlags.DEFAULT);
+          godot.core.ConnectFlags.DEFAULT);
       bus.playerOxygenChanged.connectUnsafe(
           MethodCallable.createUnsafe(this, "onOxygenChanged"),
-          godot.api.Object.ConnectFlags.DEFAULT);
+          godot.core.ConnectFlags.DEFAULT);
     }
   }
 

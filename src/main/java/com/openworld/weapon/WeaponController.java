@@ -583,14 +583,14 @@ public class WeaponController extends Node {
     // just the local player's. Avoids touching every existing ammoChanged.emit() call site.
     ammoChanged.connectUnsafe(
         MethodCallable.createUnsafe(this, "relayAmmoToEventBus"),
-        godot.api.Object.ConnectFlags.DEFAULT);
+        godot.core.ConnectFlags.DEFAULT);
 
     // Have WeaponAudio stop ITSELF the instant it leaves the tree. _exitTree here is too late when a
     // whole body subtree is freed at once (incl. app exit): the sibling WeaponAudio can exit first,
     // orphaning its in-flight AudioStreamPlaybackWAV before our stop() runs (CLAUDE.md audio-leak
     // quirk). tree_exiting fires while the node is still valid, so a self-stop reliably releases it.
     if (weaponAudio != null && GD.isInstanceValid(weaponAudio)) {
-      weaponAudio.connect(new StringName("tree_exiting"),
+      weaponAudio.connect("tree_exiting",
           MethodCallable.createUnsafe(weaponAudio, "stop"));
     }
   }

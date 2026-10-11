@@ -126,9 +126,9 @@ public class MissionDirector extends Node {
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) {
             bus.missionCompleted.connectUnsafe(
-                    MethodCallable.createUnsafe(this, "onMissionCompleted"), Object.ConnectFlags.DEFAULT);
+                    MethodCallable.createUnsafe(this, "onMissionCompleted"), godot.core.ConnectFlags.DEFAULT);
             bus.missionFailed.connectUnsafe(
-                    MethodCallable.createUnsafe(this, "onMissionFailed"), Object.ConnectFlags.DEFAULT);
+                    MethodCallable.createUnsafe(this, "onMissionFailed"), godot.core.ConnectFlags.DEFAULT);
         }
     }
 

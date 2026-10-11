@@ -15,12 +15,15 @@ import java.util.Map;
  * one place and a performance run can be made at any of them ({@code OW_WORLD_DENSITY=HIGH}). The values below are
  * only what a missing table gives. Measured on the development PC (probe_walk_perf, 2026-10-10, walk_downtown
  * physics ms p50 / frame p95): 10 cars 6.2 / 18.1, 16 cars 9.3 / 18.1, 22 cars 13.9 / 19.6 -- a car is a physics body
- * AND a seated driver, so ULTRA wants a desktop CPU.
+ * AND a seated driver, so ULTRA wants a desktop CPU. Since 2026-10-10 late a car on rails carries NO driver
+ * (ZoneManager.trafficLazyDrivers) and the levels are 20 / 26 / 32: measured the same way (physics ms a frame, p95,
+ * walk / drive downtown) 12 cars with a driver each 18.8 / 19.8, and without far drivers 12 cars 13.7 / 14.9,
+ * 20 cars 13.6 / 16.5, 28 cars 14.7 / 19.0.
  */
 public enum WorldDensity {
-    NORMAL("Normal", new Row(12, 8, 6, 0)),
-    HIGH("High", new Row(16, 12, 8, 1)),
-    ULTRA("Ultra", new Row(22, 16, 10, 2));
+    NORMAL("Normal", new Row(20, 8, 6, 0)),
+    HIGH("High", new Row(26, 12, 8, 1)),
+    ULTRA("Ultra", new Row(32, 16, 10, 2));
 
     /**
      * One level's numbers: simulated ambient cars (ZoneManager.trafficBudget), crowd peds promoted to full bodies and

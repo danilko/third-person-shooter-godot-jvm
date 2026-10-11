@@ -59,8 +59,8 @@ public class IntersectionZone extends Area3D {
     public void _ready() {
         addToGroup(new StringName(GROUP));
         // godot-jvm registers @Register methods under their snake_case names.
-        connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_body_entered"));
-        connect(new StringName("body_exited"), MethodCallable.createUnsafe(this, "on_body_exited"));
+        connect("body_entered", MethodCallable.createUnsafe(this, "on_body_entered"));
+        connect("body_exited", MethodCallable.createUnsafe(this, "on_body_exited"));
     }
 
     @Register

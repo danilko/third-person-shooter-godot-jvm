@@ -24,6 +24,7 @@ to hand work: level designers and artists edit it in place, and the generators s
 | DebugWorld roads | `DebugRoads.roads.json` via `DebugWorld.tscn` → `DebugRoads` | Godot, Road Kit dock | Build Piece, Stamp Terrain (already hand-owned) |
 | where each town building stands | `assets/world_source/buildings/IslandBuildings.json` | text editor (today) | `python3 tools/island_buildings.py write` |
 | unique sites (landmarks, stations, container terminal, air base, …) | `IslandSites.json` (frozen x, y, yaw) | text editor | `python3 tools/island_sites.py` |
+| 横断歩道橋 (pedestrian footbridges over the wide junction arms) | `IslandFootbridges.json` (frozen x, z, yaw; one row a bridge -- move it, delete it, or add one) | text editor, or `island_footbridges.py --resite` (searches every arm again and OVERWRITES the file) | `python3 tools/island_footbridges.py`, then `--check` (it names a bridge whose stair now meets a lamp, a tree or a moved road) |
 | civic / mission plots (police, bank, hospital, safe houses, …) | `IslandCivicSites.json` (frozen) | text editor, or `island_civic_sites.py --resite=<id>` | `island_buildings.py write` |
 | ground a generator must leave empty | `tools/island_plan.py` `RESERVES` (Godot boxes) | text editor | re-derive (until the handover) |
 | a building TYPE (shape, doors, interior) | `kits/<kit>/<kit>.blend` + `buildings/building_types.json` | Blender + text | `tools/building_kit/build_buildings.sh` |

@@ -89,7 +89,7 @@ public class RaceCheckpoint extends Area3D {
         addToGroup(new StringName(GROUP));
         setCollisionMask(CollisionLayers.CHARACTER | CollisionLayers.VEHICLE);
         // godot-jvm registers @Register methods under their snake_case names.
-        connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_body_entered"));
+        connect("body_entered", MethodCallable.createUnsafe(this, "on_body_entered"));
         if (raceId.isEmpty()) {
             GD.printErr("[RaceCheckpoint] '" + getName() + "' has no race_id — it belongs to no route");
         }

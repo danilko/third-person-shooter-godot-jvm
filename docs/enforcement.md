@@ -12,6 +12,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - Attack tokens, spare ammo in police vehicles, the regroup lull (PLAN.md 1g b2/b3, 2026-10-07)
 - Uniforms per force, a think budget for AI, and dummy traffic cars (PLAN.md 1g c/d/e, 2026-10-07)
 - Breaching units walk round the BLOCK, on a baked walk grid (PLAN.md 1g f, 2026-10-07)
+- Losing the police (and a gang's hunters): sight is a line, and the lost are SEARCHED for (2026-10-10, user-reported)
 
 ---
 
@@ -367,3 +368,48 @@ in `GangSystem`, all in which gangs are hostile to players (`applyFlips`, one ow
 So: held and standing there = nothing happens, for as long as it lasts; leave the spot or attack = they act.
 `probe_recovery.gd` case 5 (a low standing: 4 s standing still changes nothing; one shot makes the gang hostile in the
 same frame).
+
+## Losing the police (and a gang's hunters): sight is a line, and the lost are SEARCHED for (2026-10-10, user-reported)
+
+User: "even 1 to 3 stars cannot lose the police engagement", and "after first reaching the player, switch to an
+Area3D search rather than asking navigation every time -- will it save resources?", then "do the same for gang /
+other engagement members".
+
+**Why it was impossible** (read from the code, then reproduced by the control below): (1) "seen" was any police body
+within `seen_reach` 60 m, THROUGH walls; (2) every unit, car and fresh spawn steered by the player's TRUE position, so
+one was always within 60 m; the calm clock (`calm_seconds` 12 + 6 a star) therefore never ran.
+
+**Now** (`game.EnforcementDispatch`, "LOSING THE POLICE"; one `Sight` per player AND side -- the police, each gang):
+* **SEEN** = a unit of that side within `seen_reach` with a clear world line to the player (`clearLine`, knee and
+  chest), or within `HEAR_REACH` 9 m; a patrol car likewise; a helicopter within 140 m with a clear ray from the air.
+  Only police sight feeds `WantedSystem.seen` (a gang's standing does not drain by being unseen: it is paid off).
+* Not seen for `LOST_GRACE` 2.5 s = **LOST**: the side's units stop steering by the player and SEARCH
+  (`AIController.pursuitSearch` / `pursuitPoint`, walked by `ArrestState`): each to its own point in a disc round the
+  LAST KNOWN position that grows 8 m + 1 m/s up to 45 m, a new point every 5-9 s. A sniper holds with nothing on the
+  radio; armour's main gun, the helicopter's gunner and the ram stop; a car en route drives to the last known place
+  and unloads there. Nothing fights what it cannot see.
+* **New units are sent to the last known position from the FIRST unseen tick** (`sendTo`), not after the grace:
+  measured, with the grace there a player who had just got away was handed a fresh unit 45-75 m off within 1.5 s,
+  which saw them -- never lost. And when that place is past `despawn_far` of the player nobody is sent at all (a
+  unit set down there would be freed on the next tick: a spawn / free churn).
+* Any unit getting a line again ends it: the chase is back on, the calm clock restarts. The status feed says
+  "Police radio: lost them -- search the area" / "there they are!" (`EventBus.radioChatter`; the minimal-HUD rule:
+  the player learns it from the radio, not from a new widget).
+* `searchPhase` off = the old all-knowing dispatch (the control).
+
+**On the Area3D idea:** the detection was never the cost -- it is a distance test and two rays a unit, 4 times a
+second on the dispatch's own tick; an Area3D per unit would add a physics object each and still need the ray (an
+overlap is not a line of sight). What the search phase saves is the PATH: a searching unit's goal is a fixed point
+for 5-9 s, so `shouldUpdateNav` asks the navigation server once a point instead of re-planning at a moving player,
+and units far from a lost player are simply not sent.
+
+**Gate** `tools/godot/probe_lose_police.gd` (island, headless `--fixed-fps 60`): police arrive and SEE the player
+(3 s); the player is gone 230 m -> LOST after 2.5 s, no police body within 60 m of them afterwards, 2 stars gone
+after 30 s. `--control` (no search phase): units turn up 22 m from the player and the stars are still there at 75 s
+-- the reported bug. `--hide` ducks behind a building 50 m off instead: lost, 3 units searching within 9 m of the
+last known place, found again 3 times in 70 s (hide-and-seek, which is the feature).
+
+**Not done / to judge in play:** the stars do not blink while searching (GTA's cue; the HUD shows the SHOWN
+standing only); a lost player INSIDE a building is not breached (units search outside until one sees in); there is
+no vision cone (a unit "sees" all round within reach); the helicopter still orbits the player's true position while
+lost (it does not fire); gang hunters were not probed separately (same code path, `sight_of_now(player, gang)`).

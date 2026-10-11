@@ -64,8 +64,8 @@ public class ShopCounter extends Area3D implements com.openworld.control.Interac
         cs.setShape(box);
         cs.setPosition(new Vector3(0, size.getY() * 0.5, 0));
         addChild(cs);
-        connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_body_entered"));
-        connect(new StringName("body_exited"), MethodCallable.createUnsafe(this, "on_body_exited"));
+        connect("body_entered", MethodCallable.createUnsafe(this, "on_body_entered"));
+        connect("body_exited", MethodCallable.createUnsafe(this, "on_body_exited"));
         setProcess(false);
     }
 

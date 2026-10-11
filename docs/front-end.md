@@ -204,6 +204,10 @@ only NORMAL is safe there. Only the CAR column was measured; the ped and token c
 (unreviewed). Graphics (render scale, shadows, view distance) stay per machine and never change what is simulated.
 Not applied under a probe (`--script`): probes set their own budgets; `set_world_density_now` is their door.
 
+**Later the same day the levels became 20 / 26 / 32 cars** (user: "stable around 12 cars most of the time, even if it
+means fewer peds"), paid for by near-only drivers, not by pedestrians: docs/open-world-simulation.md "The cars
+stand was an instrument error ...". The paragraph below is the morning's.
+
 **User decisions, 2026-10-10 (same day):** NORMAL is 12 cars, not 10 ("at least 12 -- maybe 8 cars for racing, and
 a few crowd cars appearing on the road like an arcade racing game"); the HIGH / ULTRA numbers are accepted. The
 levels are DATA: `game/density.json` (`Tables.DENSITY`, one row per level: traffic / walkers / fighters /
@@ -238,3 +242,9 @@ after 60 s; (3) clears the focus, hands the view back and waits for the streamer
 Gate: `probe_world_warmup.gd` 11/11 (cover up from the first frame to the end; the player moved 0.00 m; loaded zones
 110 -> peak 169 during the tour; held + invulnerable meanwhile; focus, hold and invulnerability gone at the end; the
 streamer quiet again) and `-- --control` (no sites: nothing beyond the player's own zones loads, 110 -> 110).
+
+**Skipping the tour (user, 2026-10-10: "so I do not wait for the tour every time when testing").** GAME tab,
+"Loading tour" (`QualitySettings.loadingTour`, `settings.cfg` `[world] loading_tour`, default on, client-local): off
+= `FrontEnd.startWarmup` adds no `WorldWarmup` and the world is playable at once (the streaming and shader
+compilation the tour hides then happen in the first minutes of play). The other ways stay: `-- --no-warmup` on the
+command line, `OW_NO_WARMUP=1`, and it never runs headless or under `--script`.

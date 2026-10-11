@@ -124,6 +124,94 @@ public class EnforcementDispatch extends Node {
         double breachStill;
         /** Its approach slot: a bearing round the player (radians, NaN = not chosen yet), PLAN.md 1i. */
         double slot = Double.NaN;
+        /** SEARCHING: the point it is walking to round the last known position, and how long it keeps it. */
+        Vector3 searchPoint;
+        double searchFor;
+    }
+
+    // ── LOSING THE POLICE -- and a gang's hunters (user, 2026-10-10: "even 1 to 3 stars cannot lose the police
+    //    engagement"; then "do the same for gang / other engagement members to save overall resources") ──────
+    //
+    // Two things made it impossible: "seen" was any police body within seen_reach, THROUGH walls, and every unit
+    // steered by the player's true position, so one was always within reach and the calm clock never ran. Now:
+    //  * SEEN is a police body within seen_reach WITH a clear world line to the player (or within HEAR_REACH: round a
+    //    corner at arm's length is not hidden), a patrol car likewise, a helicopter with a clear line from the air;
+    //  * a player not seen for LOST_GRACE is LOST: police units stop steering by them and SEARCH -- each walks to its
+    //    own point in a disc round the LAST KNOWN position that grows with the time lost, stands, picks another;
+    //    new units and cars are sent to that position, not to the player; nothing rams or fights what it cannot see;
+    //  * any of them getting a line again ends it at once: the chase is back on and the calm clock restarts.
+    // The heat itself is WantedRules' (calm period, then the drain). `searchPhase` off = the old all-knowing dispatch.
+
+    /** Off is the control: units always know where the player is, and reach alone keeps the heat up. */
+    @godot.annotation.Visible public boolean searchPhase = true;
+    static final double LOST_GRACE = 2.5, HEAR_REACH = 9.0, HELI_SEEN_REACH = 140.0;
+    static final double SEARCH_START = 8.0, SEARCH_GROW = 1.0, SEARCH_MAX = 45.0;
+
+    private static final class Sight {
+        Vector3 lastKnown;
+        double lostFor;
+        boolean lostSaid;
+    }
+    private final Map<String, Sight> sightOf = new HashMap<>();
+    /** Its own stream: drawing from `rng` would move every later spawn spot (the probes' units start elsewhere). */
+    private final java.util.Random searchRng = new java.util.Random(77);
+    private int lostCount, foundCount;
+
+    /** `side` (the police, a gang's hunters) has lost this player (see above). */
+    private boolean lost(String playerId, String side) {
+        Sight s = sightOf.get(playerId + "|" + side);
+        return searchPhase && s != null && s.lastKnown != null && s.lostFor >= LOST_GRACE;
+    }
+
+    /** Where `side` believes the player is: the last known position while it has lost them, else the player. */
+    private Vector3 believed(Player p, String side) {
+        String id = p.getCharacterInfo().characterId;
+        return lost(id, side) ? sightOf.get(id + "|" + side).lastKnown : p.getGlobalPosition();
+    }
+
+    /** Where NEW units of `side` are sent: the last known position from the first tick nobody has the player in
+     *  sight -- not after the grace. (Measured with probe_lose_police: with the grace here too, a player who had just
+     *  got away was given a fresh unit 45-75 m off within 1.5 s, which saw them, and they were never lost.) */
+    private Vector3 sendTo(Player p, String side) {
+        Sight s = sightOf.get(p.getCharacterInfo().characterId + "|" + side);
+        return searchPhase && s != null && s.lastKnown != null && s.lostFor > 0 ? s.lastKnown : p.getGlobalPosition();
+    }
+
+    /** Probe readout for the POLICE: "lost=<bool> lost_for=<s> lost_n=<times lost> found_n=<times found again> known=(x, z)". */
+    @godot.annotation.Register
+    public String sightNow(String playerId) { return sightOfNow(playerId, POLICE); }
+
+    /** {@link #sightNow} for any side (a gang id). */
+    @godot.annotation.Register
+    public String sightOfNow(String playerId, String side) {
+        Sight s = sightOf.get(playerId + "|" + side);
+        if (s == null || s.lastKnown == null) return "lost=false lost_for=0.0 lost_n=" + lostCount + " found_n=" + foundCount;
+        return String.format("lost=%s lost_for=%.1f lost_n=%d found_n=%d known=(%.1f, %.1f)", lost(playerId, side), s.lostFor,
+                lostCount, foundCount, s.lastKnown.getX(), s.lastKnown.getZ());
+    }
+
+    /** One searching unit: to its own point round the last known position; a new point when it gets there or tires. */
+    private void searchTick(Unit u, Player p, AIController brain) {
+        Sight s = sightOf.get(u.playerId + "|" + u.side);
+        Vector3 b = u.body.getGlobalPosition();
+        u.searchFor -= TICK;
+        if (u.searchPoint == null || u.searchFor <= 0) {
+            double radius = Math.min(SEARCH_MAX, SEARCH_START + SEARCH_GROW * s.lostFor);
+            double a = searchRng.nextDouble() * Math.PI * 2, r = radius * (0.35 + 0.65 * searchRng.nextDouble());
+            u.searchPoint = new Vector3(s.lastKnown.getX() + Math.sin(a) * r, s.lastKnown.getY(), s.lastKnown.getZ() + Math.cos(a) * r);
+            u.searchFor = 5.0 + searchRng.nextDouble() * 4.0;
+        }
+        brain.setPursuit(p);
+        brain.pursuitAway = false;
+        brain.pursuitVia.clear();
+        brain.pursuitSearch = true;
+        brain.pursuitPoint = u.searchPoint;
+        brain.pursuitDirect = clearLine(b, u.searchPoint);
+        if (brain.getCurrentState() != ArrestState.INSTANCE) brain.forceState(ArrestState.INSTANCE);
+        u.breachOf = null;
+        u.breachDoor = null;
+        u.sinceCloser = 0;                 // not stuck: it is not trying to close in
+        u.closest = Double.MAX_VALUE;
     }
 
     /** Approach slots (PLAN.md 1i, user 2026-10-08: "all police line up and get stuck"): every unit closes on its own
@@ -272,11 +360,11 @@ public class EnforcementDispatch extends Node {
 
         measurePlayerSpeeds(players);
         clock += TICK;
+        arrestsAndSight(players, demand, ws, police, hunters);   // first: the units below act on what was SEEN this tick
         tickUnits(players, demand, ws, police);
         assignTokens(players, demand, police);
         tickCars(players, demand, police, hunters);
         tickHelis(players, demand);
-        arrestsAndSight(players, ws, police);
 
         spawnIn -= TICK;
         if (spawnIn <= 0) {
@@ -341,6 +429,14 @@ public class EnforcementDispatch extends Node {
                 continue;
             }
             brain.pursuitStand = false;
+            brain.pursuitSearch = false;
+            if (lost(u.playerId, u.side)) {
+                // the player is LOST: a sniper holds with nothing on the radio, everybody else searches the area
+                if (u.sniper) brain.setPursuit(null);
+                else searchTick(u, p, brain);
+                continue;
+            }
+            u.searchPoint = null;
             if (dryRetreat && handleDry(u, p, brain, stars, r)) continue;
             // BREACH (PLAN.md W6): the player is inside a building -- follow them in, at ANY star level (user: always
             // get in, so the behaviour is consistent): through the building's door nearest this unit, straight (no
@@ -685,7 +781,7 @@ public class EnforcementDispatch extends Node {
             boolean seenNow = inView(at);
             double far = nearestPlayer(at);
             int starsNow = p != null ? demand.getOrDefault(c.playerId, Map.of()).getOrDefault(c.side, 0) : 0;
-            if (c.gun && wanted && r != null && p != null && p.isAlive()) fireMainGun(c, p, r);
+            if (c.gun && wanted && r != null && p != null && p.isAlive() && !lost(c.playerId, c.side)) fireMainGun(c, p, r);
             if (!c.arrived) {
                 VehicleAIController ctrl = c.car.getController() instanceof VehicleAIController v ? v : null;
                 // the regroup lull (1g b3): a car sent before it started stops where it is and waits it out, or its
@@ -707,7 +803,9 @@ public class EnforcementDispatch extends Node {
                 // RAM (PLAN.md W6): from ram_at stars the car drives AT the player within its ram range instead of
                 // stopping 35 m out to unload. Its crew gets out only once the player is on foot and close for a
                 // while (a gun vehicle never unloads: it keeps ramming and firing).
-                boolean ram = wanted && r != null && r.rams(starsNow) && ctrl != null && c.car.getHealthNow() > 0;
+                // (a LOST player is not rammed: the car drives to where they were last seen and unloads there)
+                boolean ram = wanted && r != null && r.rams(starsNow) && ctrl != null && c.car.getHealthNow() > 0
+                        && !lost(c.playerId, c.side);
                 if (ctrl != null) ctrl.ramTarget = ram ? p : null;
                 if (ram) {
                     double dd = flat(p.getGlobalPosition(), at);
@@ -726,7 +824,7 @@ public class EnforcementDispatch extends Node {
                     if (!seenNow || !wanted) { zm().freeServiceCar(c.car); it.remove(); }
                     continue;
                 }
-                double d = p.getGlobalPosition().distanceTo(at);
+                double d = believed(p, c.side).distanceTo(at);
                 boolean stuck = ctrl != null && ctrl.stalledFor() > 4.0 && d < 150.0;
                 if (r != null && !c.gun && !ram && (d <= r.arriveDist || stuck || lost)) {
                     if (ctrl != null) ctrl.holdStop = true;
@@ -738,7 +836,7 @@ public class EnforcementDispatch extends Node {
                     c.replanIn = REPLAN;
                     RoadGraph g = RoadMap.graph();
                     if (g != null) {
-                        Vector3 pp = p.getGlobalPosition();
+                        Vector3 pp = believed(p, c.side);
                         // from the lane the car is ON (a position snap may pick the other carriageway, and a car
                         // cannot turn round where it stands: measured, both cars drove away from the player)
                         RoadGraph.Route route = ctrl.getRoute() instanceof Node rn
@@ -781,27 +879,80 @@ public class EnforcementDispatch extends Node {
 
     // ── being seen ───────────────────────────────────────────────────────────
 
-    /** Police in sight of a wanted player stop the heat draining. There is no arrest by proximity any more (user
-     *  2026-10-07: police hunt the player down); a wanted player who goes DOWN is arrested by RecoveryRules. */
-    private void arrestsAndSight(Map<String, Player> players, WantedSystem ws, DispatchRules police) {
-        if (ws == null || police == null) return;
+    /** Who has each hunted player in SIGHT (see "LOSING THE POLICE"), per side: the police and every gang hunting
+     *  them. Police in sight also stop the heat draining. There is no arrest by proximity any more (user 2026-10-07:
+     *  police hunt the player down); a wanted player who goes DOWN is arrested by RecoveryRules. */
+    private void arrestsAndSight(Map<String, Player> players, Map<String, Map<String, Integer>> demand, WantedSystem ws,
+                                 DispatchRules police, DispatchRules hunters) {
+        java.util.Set<String> live = new java.util.HashSet<>();
         for (Player p : players.values()) {
             String id = p.getCharacterInfo().characterId;
-            if (ws.starsOf(id) <= 0) continue;
             Vector3 pp = p.getGlobalPosition();
-            boolean seen = false;
-            for (Unit u : units) {
-                if (!POLICE.equals(u.side) || !GD.isInstanceValid(u.body) || u.body.isDead()) continue;
-                if (u.body.currentVehicleNode != null) continue;
-                if (u.body.getGlobalPosition().distanceTo(pp) <= police.seenReach) { seen = true; break; }
+            for (String side : demand.getOrDefault(id, Map.of()).keySet()) {
+                DispatchRules r = POLICE.equals(side) ? police : hunters;
+                if (r == null) continue;
+                String key = id + "|" + side;
+                live.add(key);
+                boolean seen = false;
+                for (Unit u : units) {
+                    if (seen) break;
+                    if (!side.equals(u.side) || !id.equals(u.playerId) || !GD.isInstanceValid(u.body) || u.body.isDead()) continue;
+                    if (u.body.currentVehicleNode != null) continue;
+                    seen = sees(u.body.getGlobalPosition(), pp, r.seenReach);
+                }
+                for (Car c : cars) {
+                    if (seen) break;
+                    if (side.equals(c.side) && id.equals(c.playerId) && GD.isInstanceValid(c.car))
+                        seen = sees(c.car.getGlobalPosition(), pp, r.seenReach);
+                }
+                for (Heli h : helis) {
+                    if (seen || !searchPhase) break;
+                    if (side.equals(h.side) && id.equals(h.playerId) && GD.isInstanceValid(h.h) && h.retiredFor == 0)
+                        seen = h.h.getGlobalPosition().distanceTo(pp) <= HELI_SEEN_REACH
+                                && clearRay(h.h.getGlobalPosition(), pp.plus(new Vector3(0, 1.4, 0)));
+                }
+                Sight s = sightOf.computeIfAbsent(key, k -> new Sight());
+                if (s.lastKnown == null) s.lastKnown = pp;       // the crime itself was reported from somewhere
+                boolean wasLost = lost(id, side);
+                String who = POLICE.equals(side) ? "Police radio" : "Gang radio";
+                if (seen) {
+                    s.lastKnown = pp;
+                    s.lostFor = 0;
+                    if (POLICE.equals(side) && ws != null) ws.seen(id);
+                    if (wasLost) {
+                        foundCount++;
+                        s.lostSaid = false;
+                        if (getNodeOrNull("/root/EventBus") instanceof EventBus bus) bus.radioChatter.emit(who + ": there they are!");
+                    }
+                } else {
+                    s.lostFor += TICK;
+                    if (lost(id, side) && !s.lostSaid) {
+                        s.lostSaid = true;
+                        lostCount++;
+                        if (getNodeOrNull("/root/EventBus") instanceof EventBus bus)
+                            bus.radioChatter.emit(who + ": lost them -- search the area");
+                    }
+                }
             }
-            for (Car c : cars) {
-                if (seen) break;
-                if (POLICE.equals(c.side) && GD.isInstanceValid(c.car)
-                        && c.car.getGlobalPosition().distanceTo(pp) <= police.seenReach) seen = true;
-            }
-            if (seen) ws.seen(id);
         }
+        sightOf.keySet().retainAll(live);
+    }
+
+    /** A body at `from` has the player at `to` in sight: within reach with a clear world line (or at arm's length,
+     *  where a corner hides nobody). With {@link #searchPhase} off reach alone counts (the control). */
+    private boolean sees(Vector3 from, Vector3 to, double reach) {
+        double d = from.distanceTo(to);
+        if (d > reach) return false;
+        return !searchPhase || d <= HEAR_REACH || clearLine(from, to);
+    }
+
+    /** One world ray between two points (a helicopter's eye to a player's chest). */
+    private boolean clearRay(Vector3 from, Vector3 to) {
+        if (getViewport() == null || getViewport().getWorld3d() == null) return true;
+        var q = godot.api.PhysicsRayQueryParameters3D.create(from, to, CollisionLayers.WORLD,
+                new godot.core.VariantArray<>(godot.core.RID.class));
+        godot.core.Dictionary<Object, Object> hit = getViewport().getWorld3d().getDirectSpaceState().intersectRay(q);
+        return hit == null || hit.isEmpty();
     }
 
     /**
@@ -845,6 +996,9 @@ public class EnforcementDispatch extends Node {
         for (Car c : cars) if (pid.equals(c.playerId) && side.equals(c.side) && !c.arrived) carsEnRoute++;
         // the regroup lull (1g b3): half the units ran dry, the next wave is held back -- the player's escape window
         if (clock < lullUntil.getOrDefault(pid + "|" + side, -1.0)) return;
+        // LOST and far from where they were last seen: nobody is sent. A unit set down at the last known position
+        // would be past despawn_far of every player and freed on the next tick -- a spawn / free churn for nothing
+        if (flat(sendTo(p, side), p.getGlobalPosition()) > r.despawnFar - 20.0) return;
         for (int i = DispatchRules.toSpawn(r.carsFor(stars), carsEnRoute, 1); i > 0; i--) spawnCar(p, side, r, ws, stars);
         int snipers = 0;
         for (Unit u : units) if (u.sniper && pid.equals(u.playerId) && side.equals(u.side) && GD.isInstanceValid(u.body)
@@ -854,7 +1008,7 @@ public class EnforcementDispatch extends Node {
         for (Heli h : helis) if (pid.equals(h.playerId) && side.equals(h.side) && GD.isInstanceValid(h.h) && h.retiredFor == 0) hs++;
         for (int i = DispatchRules.toSpawn(r.helisFor(stars), hs, 1); i > 0; i--) spawnHeli(p, side);
         for (int i = DispatchRules.toSpawn(r.footFor(stars), foot - snipers, spawnPerTick); i > 0; i--) {
-            Vector3 at = footSpot(p.getGlobalPosition(), r.footMin, r.footMax);
+            Vector3 at = footSpot(sendTo(p, side), r.footMin, r.footMax);
             if (at == null) break;
             AICharacter ai = spawnBody(side, at, weaponFor(side, pid, r, ws, stars));
             if (ai == null) break;
@@ -886,14 +1040,14 @@ public class EnforcementDispatch extends Node {
         List<String> models = r.vehiclesFor(stars);
         String model = models.isEmpty() ? "" : models.get(rng.nextInt(models.size()));
         String scene = com.openworld.carrier.vehicle.VehicleModels.sceneOfId(model);
-        Vehicle v = z.spawnServiceCar(side, scene != null ? scene : "", p.getGlobalPosition(), (float) r.carMin, (float) r.carMax);
+        Vehicle v = z.spawnServiceCar(side, scene != null ? scene : "", sendTo(p, side), (float) r.carMin, (float) r.carMax);
         if (v == null) return;
         String pid = p.getCharacterInfo().characterId;
         // a car whose ROAD route is far longer than the straight line (the far side of a river, a one-way loop) is
         // no use: discarded at once, out of view, and the next tick tries another lane
         RoadGraph g = RoadMap.graph();
         if (g != null && v.getController() instanceof VehicleAIController c0 && c0.getRoute() instanceof Node ln) {
-            Vector3 pp = p.getGlobalPosition();
+            Vector3 pp = sendTo(p, side);
             RoadGraph.Route route = g.routeFromLane(ln.getName().toString(), 0.0, pp.getX(), pp.getY(), pp.getZ());
             double straight = flat(v.getGlobalPosition(), pp);
             if (route == null || route.length > Math.max(400.0, ROUTE_DETOUR * straight)) {
@@ -1241,7 +1395,7 @@ public class EnforcementDispatch extends Node {
             e.retiredFor = 0;
             e.h.orbitRadius = 55.0;
             e.h.aiTarget = p;
-            heliFire(e, p);
+            if (!lost(e.playerId, e.side)) heliFire(e, p);     // nobody shoots what nobody sees
         }
     }
 

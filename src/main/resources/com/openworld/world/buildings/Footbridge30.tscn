@@ -1,0 +1,128 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/Footbridge30_mesh.res" id="1_uoj3q"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/Footbridge30_collision.res" id="2_1xxgg"]
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_7ceh0"]
+points = PackedVector3Array(-17.3, 0.15139, -14, -17.3, -0.14861, -14, -17.3, 2.975, -8.3, -17.3, 2.675, -8.3, -15.7, 0.15139, -14, -15.7, -0.14861, -14, -15.7, 2.975, -8.3, -15.7, 2.675, -8.3)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_rgwo7"]
+points = PackedVector3Array(-17.3, 2.975, -6.8, -17.3, 2.675, -6.8, -17.3, 5.65, -1.4, -17.3, 5.35, -1.4, -15.7, 2.975, -6.8, -15.7, 2.675, -6.8, -15.7, 5.65, -1.4, -15.7, 5.35, -1.4)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_rcbqt"]
+points = PackedVector3Array(15.7, 0.15139, -14, 15.7, -0.14861, -14, 15.7, 2.975, -8.3, 15.7, 2.675, -8.3, 17.3, 0.15139, -14, 17.3, -0.14861, -14, 17.3, 2.975, -8.3, 17.3, 2.675, -8.3)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_vlj88"]
+points = PackedVector3Array(15.7, 2.975, -6.8, 15.7, 2.675, -6.8, 15.7, 5.65, -1.4, 15.7, 5.35, -1.4, 17.3, 2.975, -6.8, 17.3, 2.675, -6.8, 17.3, 5.65, -1.4, 17.3, 5.35, -1.4)
+
+[node name="Footbridge30" type="Node3D" unique_id=1513763768]
+metadata/building = {
+"aabb": [Vector3(-17.48, 0, -13.4), Vector3(34.96, 6.75, 14.53)],
+"base_m": 0.0,
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [34.96, 14.53],
+"height_m": 6.75,
+"id": "Footbridge30",
+"kit": "interiors",
+"landmark": false,
+"marks": [{
+"name": "MARK_footbridge_foot_01",
+"pos": [-16.5, 0.3, -14.4],
+"props": {
+"kind": "footbridge_foot",
+"side": -1.0
+},
+"yaw": 0.0
+}, {
+"name": "MARK_footbridge_foot_02",
+"pos": [16.5, 0.3, -14.4],
+"props": {
+"kind": "footbridge_foot",
+"side": 1.0
+},
+"yaw": 0.0
+}, {
+"name": "MARK_name_plate_01",
+"pos": [0.0, 5.25, 1.13],
+"props": {
+"h": 0.46,
+"kind": "name_plate",
+"w": 3.2
+},
+"yaw": 0.0
+}, {
+"name": "MARK_name_plate_02",
+"pos": [0.0, 5.25, -1.13],
+"props": {
+"h": 0.46,
+"kind": "name_plate",
+"w": 3.2
+},
+"yaw": 180.0
+}],
+"piece_count": 1,
+"probe_xz": [0.0, 0.0],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "横断歩道橋, a pedestrian footbridge over a road 30.5 m kerb to kerb (a 3+3 trunk), with a pier in the median: plate girders 4.7 m clear over the road (立体横断施設技術基準), a 2.0 m walkway 5.5 m up, a pier on each footway, a stair at each end coming down along the footway on its kerb half (riser 0.15, tread 0.30, a landing at half height). Origin on the road surface at the centreline, the junction toward +Z, the stairs toward -Z. Placed by tools/island_footbridges.py. kits/interiors/Footbridge30.blend (blender/tools/street_plans.py)",
+"wall_top_m": 6.75
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=351796647]
+visibility_range_end = 381.0
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_uoj3q")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=2122180299]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1615037596]
+shape = ExtResource("2_1xxgg")
+
+[node name="StairRamps" type="StaticBody3D" parent="." unique_id=1333910238]
+collision_layer = 64
+collision_mask = 0
+
+[node name="Ramp0" type="CollisionShape3D" parent="StairRamps" unique_id=263749015]
+shape = SubResource("ConvexPolygonShape3D_7ceh0")
+
+[node name="Ramp1" type="CollisionShape3D" parent="StairRamps" unique_id=859271197]
+shape = SubResource("ConvexPolygonShape3D_rgwo7")
+
+[node name="Ramp2" type="CollisionShape3D" parent="StairRamps" unique_id=842518722]
+shape = SubResource("ConvexPolygonShape3D_rcbqt")
+
+[node name="Ramp3" type="CollisionShape3D" parent="StairRamps" unique_id=12473136]
+shape = SubResource("ConvexPolygonShape3D_vlj88")
+
+[node name="Markers" type="Node3D" parent="." unique_id=1611590841]
+
+[node name="MARK_footbridge_foot_01" type="Marker3D" parent="Markers" unique_id=410598725 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16.5, 0.3, -14.4)
+metadata/side = -1.0
+metadata/kind = "footbridge_foot"
+
+[node name="MARK_footbridge_foot_02" type="Marker3D" parent="Markers" unique_id=1702424308 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.5, 0.3, -14.4)
+metadata/side = 1.0
+metadata/kind = "footbridge_foot"
+
+[node name="MARK_name_plate_01" type="Marker3D" parent="Markers" unique_id=715286969 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.25, 1.13)
+metadata/w = 3.2
+metadata/h = 0.46
+metadata/kind = "name_plate"
+
+[node name="MARK_name_plate_02" type="Marker3D" parent="Markers" unique_id=1930555124 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 5.25, -1.13)
+metadata/w = 3.2
+metadata/h = 0.46
+metadata/kind = "name_plate"

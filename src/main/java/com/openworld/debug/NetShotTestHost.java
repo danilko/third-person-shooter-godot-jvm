@@ -102,7 +102,7 @@ public class NetShotTestHost extends Node3D {
         if (getTree().getFirstNodeInGroup("impact_manager") == null) addChild(new ImpactManager());
         if (getNodeOrNull("/root/EventBus") instanceof com.openworld.game.EventBus bus) {
             bus.damageDealt.connectUnsafe(godot.core.MethodCallable.createUnsafe(this, "onDamageDealt"),
-                    godot.api.Object.ConnectFlags.DEFAULT);
+                    godot.core.ConnectFlags.DEFAULT);
         }
 
         if (host) {

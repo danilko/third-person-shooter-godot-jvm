@@ -46,8 +46,8 @@ public class InteriorVolume extends Area3D {
     @Override
     public void _ready() {
         addToGroup(new StringName(INTERIOR_GROUP));
-        connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_body_entered"));
-        connect(new StringName("body_exited"), MethodCallable.createUnsafe(this, "on_body_exited"));
+        connect("body_entered", MethodCallable.createUnsafe(this, "on_body_entered"));
+        connect("body_exited", MethodCallable.createUnsafe(this, "on_body_exited"));
     }
 
     @Register

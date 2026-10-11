@@ -73,7 +73,7 @@ public class DebugConsole extends CanvasLayer {
         input = new LineEdit();
         input.setPosition(new Vector2(12, 248));
         input.setSize(new Vector2(1128, 26));
-        input.connect(new StringName("text_submitted"), MethodCallable.createUnsafe(this, "on_submit"));
+        input.connect("text_submitted", MethodCallable.createUnsafe(this, "on_submit"));
         addChild(input);
 
         setVisible(false);
@@ -105,14 +105,15 @@ public class DebugConsole extends CanvasLayer {
         Vector3 fwd = cam != null ? cam.getGlobalTransform().getBasis().getColumn(2).times(-1.0) : new Vector3(0, 0, -1);
         double fx = fwd.getX(), fz = fwd.getZ(), fl = Math.max(1e-6, Math.hypot(fx, fz));
         fx /= fl; fz /= fl;
-        int n60 = 0, n100 = 0, n200 = 0, all = 0, moving = 0;
+        int n60 = 0, n100 = 0, n200 = 0, all = 0, parked = 0;
         int[] side = new int[4];   // ahead, right, behind, left -- within 200 m
         for (godot.api.Node n : getTree().getNodesInGroup(new StringName("characters"))) {
             if (!(n instanceof com.openworld.carrier.vehicle.Vehicle v) || !GD.isInstanceValid(v)) continue;
             double dx = v.getGlobalPosition().getX() - at.getX(), dz = v.getGlobalPosition().getZ() - at.getZ();
             double d = Math.hypot(dx, dz);
             all++;
-            if (v.getLinearVelocity().length() > 1.0) moving++;
+            // a body with no traffic brain and nobody driving it is PARKED: it is counted, never as traffic
+            if (!(v.getController() instanceof com.openworld.ai.vehicle.VehicleAIController) && v.getLinearVelocity().length() < 1.0) parked++;
             if (d <= 60) n60++;
             if (d <= 100) n100++;
             if (d > 200) continue;
@@ -120,13 +121,16 @@ public class DebugConsole extends CanvasLayer {
             double ahead = dx * fx + dz * fz, right = dx * -fz + dz * fx;
             side[Math.abs(ahead) >= Math.abs(right) ? (ahead >= 0 ? 0 : 2) : (right >= 0 ? 1 : 3)]++;
         }
-        print("cars (every vehicle body, parked ones too): " + all + " loaded, " + moving + " moving; within 60 m " + n60
+        print("cars (every vehicle body): " + all + " loaded, " + parked + " of them parked; within 60 m " + n60
                 + ", 100 m " + n100 + ", 200 m " + n200);
+        // an on-rails car's body velocity reads zero: what a car is DOING comes from its brain (standingReason)
+        print("ambient traffic within 200 m: " + zm.trafficStateNow(200f));
         print("within 200 m by side of the camera: ahead " + side[0] + ", right " + side[1] + ", behind " + side[2] + ", left " + side[3]);
         print("traffic: " + zm.trafficAliveNow() + " alive of a budget of " + zm.effectiveTrafficBudgetNow() + ", "
                 + zm.trafficSpawnsRefusedNow() + " spawns refused near a player, " + zm.trafficRecycledNow() + " recycled, far tier "
                 + zm.farTrafficCarsNow());
         print("region " + zm.trafficRegionNow() + "; models " + zm.trafficModelsNow());
+        print("drivers in the world: " + zm.trafficDriversNow() + " (a far car on rails carries none)");
     }
 
     private void activity(String[] a) {

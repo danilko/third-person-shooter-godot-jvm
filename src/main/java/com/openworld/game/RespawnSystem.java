@@ -114,7 +114,7 @@ public class RespawnSystem extends Node {
         instance = this;
         if (getNodeOrNull("/root/EventBus") instanceof EventBus bus)
             bus.characterDied.connectUnsafe(godot.core.MethodCallable.createUnsafe(this, "onCharacterDied"),
-                    godot.api.Object.ConnectFlags.DEFAULT);
+                    godot.core.ConnectFlags.DEFAULT);
     }
 
     @Register

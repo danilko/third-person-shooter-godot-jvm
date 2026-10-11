@@ -1010,10 +1010,10 @@ public class AimDebugHost extends Node3D {
 		if (body == null) return;
 		if (body.getNodeOrNull(new NodePath("WeaponController")) instanceof WeaponController wc) {
 			// weaponFired, not ammoChanged: ammoChanged also fires on every equip and ammo refresh.
-			wc.weaponFired.connectUnsafe(MethodCallable.createUnsafe(this, shotMethod), godot.api.Object.ConnectFlags.DEFAULT);
+			wc.weaponFired.connectUnsafe(MethodCallable.createUnsafe(this, shotMethod), godot.core.ConnectFlags.DEFAULT);
 		}
 		if (body.getNodeOrNull(new NodePath("Health")) instanceof Health h) {
-			h.hit.connectUnsafe(MethodCallable.createUnsafe(this, hitMethod), godot.api.Object.ConnectFlags.DEFAULT);
+			h.hit.connectUnsafe(MethodCallable.createUnsafe(this, hitMethod), godot.core.ConnectFlags.DEFAULT);
 		}
 	}
 

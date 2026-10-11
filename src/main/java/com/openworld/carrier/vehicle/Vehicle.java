@@ -200,11 +200,11 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             healthNode = hn;
             healthNode.died.connectUnsafe(
                     MethodCallable.createUnsafe(this, "onVehicleDestruction"),
-                    godot.api.Object.ConnectFlags.DEFAULT);
+                    godot.core.ConnectFlags.DEFAULT);
             // Damage wakes a parked (sleeping) body so it reacts to what follows the hit.
             healthNode.hit.connectUnsafe(
                     MethodCallable.createUnsafe(this, "onVehicleDamaged"),
-                    godot.api.Object.ConnectFlags.DEFAULT);
+                    godot.core.ConnectFlags.DEFAULT);
         }
 
         VehicleConfig cfg = getConfig();
@@ -2467,7 +2467,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             damageModel.dressWreck(wreck);
         }
         SceneTreeTimer t = getTree().createTimer(cfg.wreckDuration, true, false, false);
-        t.connect(new StringName("timeout"),
+        t.connect("timeout",
                 MethodCallable.createUnsafe(wreck, "queue_free"));
     }
 

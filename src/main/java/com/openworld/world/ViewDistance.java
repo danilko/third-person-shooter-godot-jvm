@@ -119,7 +119,7 @@ public class ViewDistance extends Node {
     @Override
     public void _ready() {
         instance = this;
-        getTree().connect(new StringName("node_added"), MethodCallable.createUnsafe(this, "on_node_added"));
+        getTree().connect("node_added", MethodCallable.createUnsafe(this, "on_node_added"));
     }
 
     @Register

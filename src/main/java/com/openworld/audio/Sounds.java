@@ -89,8 +89,8 @@ public final class Sounds {
         if (pitchJitter > 0f) p.setPitchScale((float) GD.randfRange(1f - pitchJitter, 1f + pitchJitter));
         parent.addChild(p);
         p.setGlobalPosition(at);
-        p.connect(new StringName("finished"), MethodCallable.createUnsafe(p, "queue_free"));
-        p.connect(new StringName("tree_exiting"), MethodCallable.createUnsafe(p, "stop"));   // CLAUDE.md audio rule
+        p.connect("finished", MethodCallable.createUnsafe(p, "queue_free"));
+        p.connect("tree_exiting", MethodCallable.createUnsafe(p, "stop"));   // CLAUDE.md audio rule
         p.play();
         PLAYED.merge(s, 1, Integer::sum);
     }
@@ -108,8 +108,8 @@ public final class Sounds {
         p.setVolumeDb(volumeDb);
         p.setProcessMode(Node.ProcessMode.ALWAYS);
         parent.addChild(p);
-        p.connect(new StringName("finished"), MethodCallable.createUnsafe(p, "queue_free"));
-        p.connect(new StringName("tree_exiting"), MethodCallable.createUnsafe(p, "stop"));
+        p.connect("finished", MethodCallable.createUnsafe(p, "queue_free"));
+        p.connect("tree_exiting", MethodCallable.createUnsafe(p, "stop"));
         p.play();
         PLAYED.merge(s, 1, Integer::sum);
     }

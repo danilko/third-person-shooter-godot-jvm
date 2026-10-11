@@ -16,6 +16,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - A vehicle entry is a dropped kerb (切り下げ), authored per station (2026-10-04, user-asked)
 - Asphalt from kerb to door; a paved site's edge slopes (2026-10-05, user-asked)
 - The expressway as of 2026-10-01: a complete Wangan, a lane-split T at the spur, all four movements at both JCTs
+- 横断歩道橋: footbridges over the widest junction arms, measured in Blender, placed from the lane records (2026-10-10, user-asked)
 
 ---
 
@@ -1701,3 +1702,42 @@ gutters stay concrete", and "use --\ slope on the side of parking spaces so ther
     `point_export.write` (20 s) and `island_grades.py ramps`; the generator alone on the base cannot judge the diamonds
     (their junctions are cut and set back later).
 
+## 横断歩道橋: footbridges over the widest junction arms, measured in Blender, placed from the lane records (2026-10-10, user-asked)
+
+User: "Japan seems to also equip air bridges on some intersections ... implement on some of the bigger street
+intersections (ones with more than 2 lanes) as a way for peds to pass / show more tightness."
+
+**The piece** is `kits/interiors/Footbridge30.blend` (a 3+3 trunk, 30.5 m kerb to kerb) and `Footbridge23.blend` (a
+2+2 arterial with a median, 22.5-23 m), laid out by `blender/tools/street_plans.py` from the 立体横断施設技術基準:
+4.7 m clear under the girder (the road's 4.5 m 建築限界 + 0.2), a 2.0 m walkway 5.5 m up between two 0.8 m plate
+girders, stairs at 50 % (riser 0.15, tread 0.30, 1.6 m wide, a 1.5 m landing at half height), a 1.1 m railing with a
+solid lower panel, one pier behind each kerb and one in the median, yellow nosings, one paint (`MI_BridgePaint`).
+Built like every interiors piece (one `.blend`, the artist's after the first build; a `custom` row in
+`building_types.json`; trimesh collision; `HULL_stair_*` ramps on the stair_ramp layer). 5.4-5.6k vertices, 4
+surfaces. **The widths are MEASURED, not the preset table's**: every 3+3 arm is 15.25 m centreline to kerb, but the
+2+2 arms are 9.75 (40 arms, no median), 11.25 (73) or 11.5 (26) -- a first piece drawn for "19.5 m" fitted none of
+the junctions that wanted it, so the second piece is drawn for 11.35 and the generator refuses an arm more than
+0.3 m off its piece.
+
+**The placement** is `tools/island_footbridges.py` -> `assets/world_source/buildings/IslandFootbridges.json` (FROZEN,
+hand-editable) -> a generated `IslandFootbridges` block of zones in `World.tscn` (one streamed zone a bridge, load
+380 m, the site pattern without a reserve, so the building stages ignore it). `--resite` searches: every signalised
+4-arm crossing of two 3+3 roads plus the `EXTRA` ids; on each, the widest arms first, at most `MAX_SPANS` 2, an
+opposite pair when there is one; the deck is set back from the pad edge 1 m at a time until the piers and stairs
+stand clear (0.7 m) of every furniture point the road pieces placed (the `mmesh_*` nodes of the baked glTF; a lamp,
+tree or signal also keeps off the deck's plan), the lanes are straight and level under it, and no other lane passes
+3-9.5 m overhead (a rail viaduct at +6..8 m refuses the arm; the C1 deck at +11 m clears). Today: 19 bridges on 10
+junctions, all at a 9 m setback but two at 18 m; 6 arms refused (4 under the rail, 1 a lamp, 2 arms 10 m long).
+`--list` prints every arm and why; `--check` (in `island_world.sh`'s sites stage) fails on a stale scene block AND on
+a frozen bridge that no longer fits today's records.
+
+**Checked:** `probe_stairs.gd -- --scenes=Footbridge30,Footbridge23` 8/8 flights (the first build failed 4: the lower
+ramp began exactly at the 0.15 m footway height, a 0.15 m wall wherever the paving is lower -- it now starts one
+tread below); pictures from the junction centre, a driver's approach and the stair foot (the crowd passes on the
+building half of the footway).
+
+**Not done:** the crowd does not USE a bridge (pedestrians do not cross streets at all yet: `MARK_footbridge_foot`
+marks where a walker would step on); no name plate text (`MARK_name_plate`); the stairs are not joined round a
+corner into the ring a real big crossing has (each span is its own bridge); no lift / slope; the navmesh under a
+streamed bridge is the road piece's own (an AI on foot does not path over the deck); cost at a junction with two in
+view is 8 draws -- not measured with `perf_gate.sh`.

@@ -189,12 +189,44 @@ public class ZoneManager extends Node {
 		return n;
 	}
 	/**
+	 * Probe readout: what the ambient cars within {@code r} m of the nearest player are DOING -- {@code "n=13 moving=9
+	 * rails=8 signal=3 queue=1"} ({@link VehicleAIController#standingReason}; {@code rails} = how many of the n drive
+	 * on rails). The answer to "the cars are there but they stand" (user, 2026-10-10).
+	 */
+	@Register public String trafficStateNow(float r) {
+		java.util.Map<String, Integer> by = new java.util.TreeMap<>();
+		int n = 0, rails = 0;
+		for (LoadedZone lz : loaded.values())
+			for (Vehicle v : lz.vehicles) {
+				if (!GD.isInstanceValid(v) || nearestPlayerDistXZ(v.getGlobalPosition()) > r) continue;
+				n++;
+				if (v.isDummy()) rails++;
+				String why = v.getController() instanceof VehicleAIController ai ? ai.standingReason() : "no-brain";
+				by.merge(why, 1, Integer::sum);
+			}
+		StringBuilder b = new StringBuilder("n=" + n + " moving=" + by.getOrDefault("moving", 0) + " rails=" + rails);
+		for (java.util.Map.Entry<String, Integer> e : by.entrySet())
+			if (!e.getKey().equals("moving")) b.append(' ').append(e.getKey()).append('=').append(e.getValue());
+		return b.toString();
+	}
+
+	/** Probe readout: ambient cars within {@code r} m of the nearest player travelling faster than 1 m/s. */
+	@Register public int trafficMovingNow(float r) {
+		int n = 0;
+		for (LoadedZone lz : loaded.values())
+			for (Vehicle v : lz.vehicles)
+				if (GD.isInstanceValid(v) && nearestPlayerDistXZ(v.getGlobalPosition()) <= r
+						&& v.getController() instanceof VehicleAIController ai && ai.currentSpeed() > 1.0f) n++;
+		return n;
+	}
+
+	/**
 	 * THE CAR BUDGET: ambient traffic cars alive across EVERY loaded zone. The ring alone concentrated traffic -- each of
 	 * the island's 29 traffic zones covers ~1.5 km of lanes, so all of them filled their cars inside the ring (measured:
 	 * 49 cars + 48 seated drivers within 420 m downtown). A car and its driver cost ~0.16-0.18 ms of physics each per
 	 * tick (3.6), so the budget is what bounds the frame. 0 = unlimited (the control).
 	 */
-	@Export public int trafficBudget = 12;
+	@Export public int trafficBudget = 20;
 	/**
 	 * THE FAR TRAFFIC TIER (PLAN.md R-10): script-free cars on the lanes from the simulation ring out to 700 m
 	 * ({@link FarTraffic}), local to each peer. Off = the old behaviour, an empty street past the ring (the control).
@@ -238,6 +270,9 @@ public class ZoneManager extends Node {
 	 * sites and runs says which is better (PLAN.md, the user's traffic report of 2026-10-10 s5).
 	 */
 	@Export public boolean trafficSpawnAlongLanes = false;
+	/** The share of top-ups placed by the along-lane rule when {@link #trafficSpawnAlongLanes} is off (the rest
+	 *  take the entry queue slots). See the knob's note for the measurement. */
+	@Export public float trafficSpawnAlongShare = 0.5f;
 	@Export public float trafficSpawnMinDist = 80.0f;
 	@Export public float trafficSpawnLeadSeconds = 6.0f;
 	@Export public float trafficSpawnViewDist = 160.0f;
@@ -547,6 +582,11 @@ public class ZoneManager extends Node {
 		final List<AISquad>     squads = new ArrayList<>();   // one per SpawnConfig group (E3) → freed
 		final List<Vehicle>     vehicles = new ArrayList<>(); // VehicleSpawnConfig traffic (I3) → freed
 		final Map<Vehicle, AICharacter> driverOf = new HashMap<>(); // traffic car → its AI driver (I3c)
+		/** Traffic cars whose driver is NOT in the world right now (the car is on rails, {@link #trafficLazyDrivers}),
+		 *  with the config a driver is built from when the car comes near. */
+		final Map<Vehicle, VehicleSpawnConfig> driverOwed = new HashMap<>();
+		/** Every traffic car's spawn config (its driver's faction and behaviour), for a driver seated later. */
+		final Map<Vehicle, VehicleSpawnConfig> driverCfg = new HashMap<>();
 		/** Advances on every ambient-car placement attempt, so successive spawns rotate through the
 		 *  zone's lanes. It used to be {@code vehicles.size()}, which repeats: every top-up after one
 		 *  reclaim asked for the same index, i.e. the same lane and the same point on it. */
@@ -1108,8 +1148,32 @@ public class ZoneManager extends Node {
 	/** Probe readout: how many traffic cars are on rails right now. */
 	@Register public int dummiesNow() { return dummiesNow; }
 
+	/**
+	 * A TRAFFIC CAR'S DRIVER EXISTS ONLY WHILE THE CAR IS REAL (user, 2026-10-10: "is the character inside also
+	 * simplified? the vehicle should not be that heavy compared to a ped"). It was a full AICharacter for every car,
+	 * near or far -- half the bodies of the traffic budget, sitting in cars 100-200 m off where nobody can see into a
+	 * windscreen. Now a car on rails has no driver: one is seated when the car is made real (inside
+	 * {@link #dummyInDist}, or hit, or sent on a call) and freed when it goes back on rails. Everything a driver is
+	 * FOR happens near a player -- the carjack reaction, being shot through the glass, getting out -- so no mechanic
+	 * is lost; what is lost is a head in a car at 150 m. Off = every car has its driver always (the control).
+	 */
+	@Export public boolean trafficLazyDrivers = true;
+	private int driversSeated, driversStowed;
+	/** Cars built twice because rc2 dropped their config at instantiate (see spawnVehicle). */
+	private int jvmResourceMisses;
+	@Register public int jvmResourceMissesNow() { return jvmResourceMisses; }
+
+	/** Probe readout: "<traffic drivers in the world> of <traffic cars>; seated <n>, stowed <n> since start". */
+	@Register public String trafficDriversNow() {
+		int d = 0, c = 0;
+		for (LoadedZone lz : loaded.values()) { d += lz.driverOf.size(); c += lz.vehicles.size(); }
+		return d + " of " + c + "; seated " + driversSeated + ", stowed " + driversStowed;
+	}
+
 	private void updateDummyTier() {
 		int n = 0;
+		Node container = charactersContainer();
+		NetworkManager net = networkManager();
 		for (LoadedZone lz : loaded.values()) {
 			for (Vehicle v : lz.vehicles) {
 				if (!GD.isInstanceValid(v) || !(v.getController() instanceof VehicleAIController ai)) continue;
@@ -1121,10 +1185,37 @@ public class ZoneManager extends Node {
 					v.setDummy(true);
 				}
 				if (v.isDummy()) n++;
+				// the driver follows the tier (a car a bullet made real is seen here too, one tick later)
+				if (!v.isDummy()) {
+					VehicleSpawnConfig owed = lz.driverOwed.get(v);
+					if (owed != null && container != null && v.getOccupant() == null) {
+						lz.driverOwed.remove(v);
+						AICharacter driver = spawnTrafficDriver(owed, v, container);
+						if (driver != null) { lz.driverOf.put(v, driver); driversSeated++; }
+					}
+				} else if (trafficLazyDrivers) {
+					AICharacter driver = lz.driverOf.get(v);
+					// only a driver still at the wheel and unhurt: one who got out, fled or died is the world's
+					if (driver != null && GD.isInstanceValid(driver) && !driver.isDead() && v.getOccupant() == driver) {
+						VehicleSpawnConfig cfg = configOf(lz, v);
+						if (cfg != null) {
+							lz.driverOf.remove(v);
+							v.releaseOccupant(driver);      // quietly: no door, no getting out (Vehicle's seated-death path)
+							if (net != null && driver.characterInfo != null) net.announceDespawn(driver.characterInfo.characterId);
+							silenceWeaponAudio(driver);
+							driver.queueFree();
+							lz.driverOwed.put(v, cfg);
+							driversStowed++;
+						}
+					}
+				}
 			}
 		}
 		dummiesNow = n;
 	}
+
+	/** The spawn config a traffic car's driver is rebuilt from (kept from its spawn). */
+	private static VehicleSpawnConfig configOf(LoadedZone lz, Vehicle v) { return lz.driverCfg.get(v); }
 
 	private void maintainTraffic() {
 		if (loaded.isEmpty()) return;
@@ -2014,6 +2105,8 @@ public class ZoneManager extends Node {
 			for (AISquad squad : lz.squads) if (GD.isInstanceValid(squad)) squad.queueFree();
 			lz.squads.clear();
 			lz.driverOf.clear();
+			lz.driverOwed.clear();
+			lz.driverCfg.clear();
 			t.phase = Phase.FREE_GEO;
 		}
 		return true;
@@ -2145,6 +2238,8 @@ public class ZoneManager extends Node {
 		for (Vehicle v : new ArrayList<>(lz.vehicles)) freeTrafficCar(lz, v, net);
 		lz.vehicles.clear();
 		lz.driverOf.clear();
+		lz.driverOwed.clear();
+		lz.driverCfg.clear();
 		if (lz.geometryInstance != null && GD.isInstanceValid(lz.geometryInstance))
 			lz.geometryInstance.queueFree();
 	}
@@ -2225,6 +2320,15 @@ public class ZoneManager extends Node {
 		Object loaded = GD.load(scenePath);
 		if (!(loaded instanceof PackedScene scene)) return null;
 		Node inst = scene.instantiate();
+		// godot-jvm rc2 (seen 3 times in ~70 probe runs, never on rc1): instantiate hands an embedded JVM resource
+		// to its setter as a plain godot.api.Resource, the registrar throws ClassCastException and the property stays
+		// null -- a car with no VehicleConfig. Built again, once; a second miss spawns nothing this tick.
+		if (inst instanceof Vehicle broken && broken.getConfig() == null) {
+			broken.queueFree();
+			jvmResourceMisses++;
+			inst = scene.instantiate();
+			if (inst instanceof Vehicle again && again.getConfig() == null) { again.queueFree(); return null; }
+		}
 		if (!(inst instanceof Vehicle v)) { if (inst != null) inst.queueFree(); return null; }
 
 		// ALWAYS a fresh per-instance CharacterInfo — NEVER reuse the one the scene supplied. Vehicle.tscn
@@ -2261,8 +2365,15 @@ public class ZoneManager extends Node {
 		NetworkManager net = networkManager();
 		if (net != null) net.announceVehicleSpawn(v);
 
-		AICharacter driver = spawnTrafficDriver(vc, v, container);
-		if (driver != null) lz.driverOf.put(v, driver);
+		// THE DRIVER is a whole character -- a body, a skeleton, a brain. A car is born out of sight, 80 m or more
+		// off, and nearly always goes straight onto rails: its driver is owed, and seated when the car comes near
+		// (updateDummyTier). Off = a driver from the first tick (the control).
+		lz.driverCfg.put(v, vc);
+		if (trafficLazyDrivers && dummyOutDist > 0f) lz.driverOwed.put(v, vc);
+		else {
+			AICharacter driver = spawnTrafficDriver(vc, v, container);
+			if (driver != null) lz.driverOf.put(v, driver);
+		}
 		return v;
 	}
 
@@ -2309,8 +2420,11 @@ public class ZoneManager extends Node {
 		// responsibility for it, and MissionDirector cannot know when a mission's car may be freed.
 		if (GD.isInstanceValid(v) && missionProtected(v)) {
 			lz.driverOf.remove(v);
+			lz.driverOwed.remove(v);
 			return;
 		}
+		lz.driverOwed.remove(v);
+		lz.driverCfg.remove(v);
 		AICharacter driver = lz.driverOf.remove(v);
 		boolean vValid = GD.isInstanceValid(v);
 		// Unseat the driver from its car first, so neither node dangles when freed: a seated occupant
@@ -2399,7 +2513,7 @@ public class ZoneManager extends Node {
 			return null;
 		}
 		lz.laneMissLogged = false;
-		if (gateOnPlayers && trafficSpawnAlongLanes) {
+		if (gateOnPlayers && (trafficSpawnAlongLanes || sidewalkRng.nextFloat() < trafficSpawnAlongShare)) {
 			Placement at = placementInRing(lanes, zone);
 			if (at != null) return spawnVehicle(vc, container, at, lz.trafficCursor++, lz);
 		}
@@ -2439,7 +2553,7 @@ public class ZoneManager extends Node {
 	private Placement placementInRing(List<Lane> lanes, Zone zone) {
 		float gate = trafficSpawnGate(zone);
 		Placement best = null;
-		double bestScore = -2.0;
+		double bestScore = -Double.MAX_VALUE;
 		int found = 0;
 		int start = sidewalkRng.nextInt(lanes.size());
 		for (int i = 0; i < lanes.size() && found < TRAFFIC_RING_CANDIDATES; i++) {
@@ -2457,30 +2571,50 @@ public class ZoneManager extends Node {
 				if (spawnRefusedByPlayers(p)) { spawnsRefusedNearPlayer++; continue; }
 				Vector3 dir = travelDirection(lane, s, total);
 				found++;
-				double score = dir == null ? 0.0 : towardNearestPlayer(p, dir);
+				// the car that will DRIVE PAST a player wins: how near its road ahead comes to one (a car on the
+				// next street over is alive and invisible -- the buildings between are the whole reason the player
+				// "sees 1 or 2" of a dozen)
+				double score = -passDistance(lane, s);
 				if (score > bestScore) { bestScore = score; best = new Placement(lane, p, dir); }
 			}
 		}
 		return best;
 	}
 
-	/** How much {@code dir} at {@code p} points at the nearest player: 1 straight at them, -1 straight away. */
-	private double towardNearestPlayer(Vector3 p, Vector3 dir) {
-		Player near = null;
-		double bestD = Double.MAX_VALUE;
-		for (Player pl : PlayerRegistry.getPlayers()) {
-			if (!GD.isInstanceValid(pl)) continue;
-			double d = Math.hypot(pl.getGlobalPosition().getX() - p.getX(), pl.getGlobalPosition().getZ() - p.getZ());
-			if (d < bestD) { bestD = d; near = pl; }
+	/** How far ahead of a new car its road is followed to see whether it passes a player (m). */
+	private static final double TRAFFIC_PASS_LOOK = 260.0;
+
+	/**
+	 * The nearest (XZ, m) the road ahead of a car set down at {@code s} on {@code lane} comes to any player: the rest
+	 * of the lane, then the straightest successor at each junction, {@link #TRAFFIC_PASS_LOOK} m in all. A car may
+	 * still turn off; most go straight (the turn roll is straightness-biased), so this is where it will usually be.
+	 */
+	private double passDistance(Lane lane, double s) {
+		double best = Double.MAX_VALUE, left = TRAFFIC_PASS_LOOK;
+		Lane at = lane;
+		double from = s;
+		for (int hop = 0; hop < 8 && at != null && left > 0.0; hop++) {
+			double total = at.total();
+			for (double d = from; d <= total && left > 0.0; d += 8.0, left -= 8.0) {
+				Vector3 p = at.pointAtLength(d);
+				if (p != null) best = Math.min(best, nearestPlayerDistXZ(p));
+			}
+			double[] out = at.endTangentXZ();
+			Lane next = null;
+			double bestDot = -2.0;
+			for (Lane n : LaneGraph.successorsOf(at)) {
+				double[] in = n.startTangentXZ();
+				double dot = out != null && in != null ? out[0] * in[0] + out[1] * in[1] : 0.0;
+				if (dot > bestDot) { bestDot = dot; next = n; }
+			}
+			at = next;
+			from = 0.0;
 		}
-		if (near == null || bestD < 1e-3) return 0.0;
-		double tx = (near.getGlobalPosition().getX() - p.getX()) / bestD, tz = (near.getGlobalPosition().getZ() - p.getZ()) / bestD;
-		double dl = Math.max(1e-6, Math.hypot(dir.getX(), dir.getZ()));
-		return (dir.getX() * tx + dir.getZ() * tz) / dl;
+		return best;
 	}
 
 	/** How many legal points {@link #placementInRing} looks at before it takes the one heading most toward a player. */
-	private static final int TRAFFIC_RING_CANDIDATES = 4;
+	private static final int TRAFFIC_RING_CANDIDATES = 6;
 
 	/** The first clear queue slot on {@code lane}, facing its travel direction; null when all are taken.
 	 *  A loop offers slots all the way round the ring; a one-way lane only near its entry, so a

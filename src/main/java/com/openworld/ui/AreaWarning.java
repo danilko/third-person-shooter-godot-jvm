@@ -55,9 +55,9 @@ public class AreaWarning extends Control {
         setVisible(false);
         if (getNodeOrNull("/root/EventBus") instanceof EventBus bus) {
             bus.leavingArea.connectUnsafe(MethodCallable.createUnsafe(this, "onLeavingArea"),
-                    godot.api.Object.ConnectFlags.DEFAULT);
+                    godot.core.ConnectFlags.DEFAULT);
             bus.returnedToArea.connectUnsafe(MethodCallable.createUnsafe(this, "onReturnedToArea"),
-                    godot.api.Object.ConnectFlags.DEFAULT);
+                    godot.core.ConnectFlags.DEFAULT);
         }
     }
 

@@ -79,7 +79,7 @@ public class Nameplate extends Node3D {
             applyColor();
             t.getNameplateChangedSignal().connectUnsafe(
                     MethodCallable.createUnsafe(this, "onTargetChanged"),
-                    godot.api.Object.ConnectFlags.DEFAULT);
+                    godot.core.ConnectFlags.DEFAULT);
         }
 
         // Health via the sibling Health node (healthChanged tracks replicated health on clients too).
@@ -91,10 +91,10 @@ public class Nameplate extends Node3D {
             updateBar(health.getCurrentHealth());
             health.healthChanged.connectUnsafe(
                     MethodCallable.createUnsafe(this, "onHealthChanged"),
-                    godot.api.Object.ConnectFlags.DEFAULT);
+                    godot.core.ConnectFlags.DEFAULT);
             health.died.connectUnsafe(
                     MethodCallable.createUnsafe(this, "onDied"),
-                    godot.api.Object.ConnectFlags.DEFAULT);
+                    godot.core.ConnectFlags.DEFAULT);
         }
 
         // Weapon/ammo via the sibling WeaponController (same node name on Character and Vehicle).
@@ -103,7 +103,7 @@ public class Nameplate extends Node3D {
             weaponController = wc;
             wc.ammoChanged.connectUnsafe(
                     MethodCallable.createUnsafe(this, "onAmmoChanged"),
-                    godot.api.Object.ConnectFlags.DEFAULT);
+                    godot.core.ConnectFlags.DEFAULT);
         }
         // The controller may not have built its slot array yet (its _ready can run after this one);
         // refreshWeapon handles the empty/not-ready case, and the equip's ammoChanged repaints it.

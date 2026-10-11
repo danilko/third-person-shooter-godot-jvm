@@ -22,7 +22,8 @@
 #   roads      island_rebuild.sh --no-layout (ground sidecar, zones, pieces, stamp, traffic zones, road map)
 #   sites      building_kit/build_stations.sh (the station scenes; only the stations whose layout or kit changed
 #              since their last passing build, station_digest.py) ; island_sites.py (the FROZEN sites; re-search by
-#              hand with --resite)
+#              hand with --resite) ; island_footbridges.py (the frozen 横断歩道橋, checked against
+#              the furniture the roads stage placed)
 #   buildings  dump the stamped terrain ; island_buildings.py derive + write ; build_building_hlod.gd
 #   ground     dump ; island_ground.py derive ; apply_height_grid.gd + apply_paint_grid.gd
 #
@@ -115,6 +116,10 @@ if want sites; then
     # the station scenes first (PLAN.md step 3): each open-air station's layout reads the ends the rail reserve chose
     tools/building_kit/build_stations.sh
     python3 tools/island_sites.py | tail -2
+    # the 横断歩道橋 over the widest junction arms: FROZEN like the sites; the check fails when a road rebuild moved a
+    # lamp or a tree into a stair (then: tools/island_footbridges.py --resite)
+    python3 tools/island_footbridges.py | tail -1
+    python3 tools/island_footbridges.py --check | grep STALE && exit 1 || true
 fi
 if want buildings; then
     stage buildings

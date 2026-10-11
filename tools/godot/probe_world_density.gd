@@ -22,9 +22,9 @@ func _initialize() -> void:
 		quit(1)
 		return
 	_check("control: a probe starts on the shipped budgets, whatever settings.cfg says",
-		int(zm.get("traffic_budget")) == 12 and int(zm.get("walker_budget")) == 8 and int(ed.call("attack_token_bonus_now")) == 0,
+		int(zm.get("traffic_budget")) == 20 and int(zm.get("walker_budget")) == 8 and int(ed.call("attack_token_bonus_now")) == 0,
 		"cars %d walkers %d tokens +%d" % [int(zm.get("traffic_budget")), int(zm.get("walker_budget")), int(ed.call("attack_token_bonus_now"))])
-	var want := {"HIGH": [16, 12, 8, 1], "ULTRA": [22, 16, 10, 2], "NORMAL": [12, 8, 6, 0]}
+	var want := {"HIGH": [26, 12, 8, 1], "ULTRA": [32, 16, 10, 2], "NORMAL": [20, 8, 6, 0]}
 	for level in ["HIGH", "ULTRA", "NORMAL"]:
 		q.call("set_world_density_now", level)
 		var got := [int(zm.get("traffic_budget")), int(zm.get("walker_budget")), int(zm.get("fighter_budget")), int(ed.call("attack_token_bonus_now"))]

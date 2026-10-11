@@ -64,8 +64,8 @@ public class WaterVolume extends Area3D {
 	setCollisionMask(getCollisionMask() | com.openworld.util.CollisionLayers.VEHICLE | com.openworld.util.CollisionLayers.PICKUP);
 	setPhysicsProcess(false);
 	// godot-jvm registers @Register methods under their snake_case names.
-	connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_body_entered"));
-	connect(new StringName("body_exited"), MethodCallable.createUnsafe(this, "on_body_exited"));
+	connect("body_entered", MethodCallable.createUnsafe(this, "on_body_entered"));
+	connect("body_exited", MethodCallable.createUnsafe(this, "on_body_exited"));
 	if (farOceanExtent > 0.0) buildFarOcean();
   }
 

@@ -48,7 +48,7 @@ public class PickupBody extends RigidBody3D {
   public void _ready() {
     setCollisionLayer(CollisionLayers.PICKUP);
     setCollisionMask(CollisionLayers.WORLD);
-    connect(new StringName("child_exiting_tree"),
+    connect("child_exiting_tree",
         MethodCallable.createUnsafe(this, "on_child_exiting"));
   }
 

@@ -57,7 +57,7 @@ public class HitMarker extends Control {
         setVisible(false);
         if (getNodeOrNull("/root/EventBus") instanceof EventBus bus) {
             bus.damageDealt.connectUnsafe(MethodCallable.createUnsafe(this, "onDamageDealt"),
-                    godot.api.Object.ConnectFlags.DEFAULT);
+                    godot.core.ConnectFlags.DEFAULT);
         }
         tick = new AudioStreamPlayer();
         tick.setStream(com.openworld.audio.Sounds.stream(com.openworld.audio.Sound.HIT_MARKER));   // null = missing file = silent

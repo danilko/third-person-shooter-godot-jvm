@@ -4,7 +4,7 @@ extends SceneTree
 ## player is stood at each site in turn, the streamer is given time to go quiet, then the ambient cars are counted
 ## every 2 s for --seconds (default 40).
 ##   stdbuf -oL <godot> --headless --fixed-fps 60 --path . --script tools/godot/probe_traffic_census.gd -- \
-##       [--seconds=40] [--sites=downtown_core,farm] [--budget=N] [--near-target=N]
+##       [--seconds=40] [--sites=downtown_core,farm] [--budget=N] [--near-target=N] [--along-lanes | --along-share=0.5] [--on-road]
 ## A MEASUREMENT (it prints a table and exits 0); --min-near=<n> turns it into a gate: every site's mean count of
 ## simulated cars within 200 m must reach n.
 const WORLD := "res://src/main/resources/com/openworld/world/World.tscn"
@@ -33,6 +33,28 @@ func _cars(p: Vector3, r: float) -> Array:
 				out.append(n)
 	return out
 
+## The point of the through lane nearest `p` in plan (a street the player would stand on), or `p` when none
+## within 300 m. --on-road: a box centre is often the inside of a block, where no car can ever be within 60 m.
+func _on_road(p: Vector3) -> Vector3:
+	var best := p
+	var best_d := 300.0
+	for n in root.find_children("*", "Node3D", true, false):
+		var sc: Script = n.get_script()
+		if sc == null or not str(sc.resource_path).ends_with("PathLaneRoute.java") or str(n.name).begins_with("c"):
+			continue
+		var path: Path3D = n.get_node_or_null("Path3D")
+		if path == null or path.curve == null or path.curve.get_baked_length() < 60.0:
+			continue
+		var off := path.curve.get_closest_offset(path.to_local(p))
+		if not is_finite(off):
+			continue
+		var at := path.to_global(path.curve.sample_baked(off))
+		var d := Vector2(at.x - p.x, at.z - p.z).length()
+		if d < best_d:
+			best_d = d
+			best = Vector3(at.x, p.y, at.z)
+	return best
+
 func _run() -> void:
 	var w: Node = (load(WORLD) as PackedScene).instantiate()
 	root.add_child(w)
@@ -52,11 +74,23 @@ func _run() -> void:
 		zm.set("traffic_near_radius", float(args["near-radius"]))
 	if args.has("near-target"):
 		zm.set("traffic_near_target", int(args["near-target"]))
+	# --fixed-fps game time is not wall time: the lights keep game time too (on the wall clock a 40 s sample sees a
+	# few seconds of one phase, and a car at a red reads as standing for ever)
+	var ts := root.find_child("TrafficSignals", true, false)
+	if ts != null:
+		ts.set("game_clock", true)
+	if args.has("no-lazy-drivers"):
+		zm.set("traffic_lazy_drivers", false)
+	if args.has("along-share"):
+		zm.set("traffic_spawn_along_share", float(args["along-share"]))
+	if args.has("along-lanes"):
+		zm.set("traffic_spawn_along_lanes", true)
 	var car := w.get_node_or_null("VehicleRoot")
 	if car != null:
 		car.queue_free()
 	var p := w.get_node("Characters/Player") as CharacterBody3D
 	p.get_node("Health").set("max_health", 1000000.0)
+	p.get_node("Health").set("invulnerable", true)
 	p.set_physics_process(false)
 	var seconds := float(args.get("seconds", "40"))
 	var only: PackedStringArray = str(args.get("sites", "")).split(",", false)
@@ -68,6 +102,12 @@ func _run() -> void:
 	for site in SITES:
 		if not only.is_empty() and not only.has(site[0]):
 			continue
+		if not is_instance_valid(p):
+			# the respawn system replaced the body (something killed it between sites): take the new one
+			p = current_scene.get_node("Characters/Player") as CharacterBody3D
+			p.get_node("Health").set("invulnerable", true)
+			p.set_physics_process(false)
+			print("    (the player body was replaced before %s: taken again)" % site[0])
 		p.global_position = Vector3(site[1], 30.0, site[2])
 		p.velocity = Vector3.ZERO
 		var waited := 0
@@ -76,12 +116,21 @@ func _run() -> void:
 			waited += 1
 			if waited > 240 and int(zm.call("streaming_pending_now")) == 0:
 				break
+		var moved := 0.0
+		if args.has("on-road"):
+			var q := _on_road(p.global_position)
+			moved = (q - p.global_position).length()
+			p.global_position = q
+			for i in 600:
+				await physics_frame
 		var refused0: int = zm.call("traffic_spawns_refused_now")
 		var s60 := 0.0
 		var s100 := 0.0
 		var s200 := 0.0
 		var alive := 0.0
 		var far := 0.0
+		var mov := 0.0
+		var why := {}
 		var n := 0
 		var frames := int(seconds * 60.0)
 		for f in range(frames):
@@ -93,12 +142,33 @@ func _run() -> void:
 				s200 += int(zm.call("traffic_near_now", 200.0))
 				alive += int(zm.call("traffic_alive_now"))
 				far += int(zm.call("far_traffic_cars_now"))
+				# what the cars are DOING (an on-rails body's velocity reads zero: the brain is asked)
+				mov += int(zm.call("traffic_moving_now", 200.0))
+				for kv in str(zm.call("traffic_state_now", 200.0)).split(" "):
+					var e := kv.split("=")
+					if e[0] != "n" and e[0] != "moving":
+						why[e[0]] = int(why.get(e[0], 0)) + int(e[1])
 				n += 1
 		var models: String = str(zm.call("traffic_models_now")) if zm.has_method("traffic_models_now") else "?"
 		var d: int = maxi(n, 1)
 		print("%-18s %6.1f %6.1f %6.1f %6.1f %6.1f %6d  %s  (settled in %.0f s, region '%s')" % [site[0], s60 / d, s100 / d,
 			s200 / d, alive / d, far / d, int(zm.call("traffic_spawns_refused_now")) - refused0, models, waited / 60.0,
 			str(zm.call("traffic_region_now")) if zm.has_method("traffic_region_now") else "?"])
+		print("    drivers: %s" % str(zm.call("traffic_drivers_now")))
+		if args.has("lanes"):
+			# where each ambient car is at the end: its lane, its distance and height against the player
+			for c in _cars(p.global_position, 400.0):
+				for ch in c.get_children():
+					var sc: Script = ch.get_script()
+					if sc != null and str(sc.resource_path).ends_with("VehicleAIController.java"):
+						print("      %-44s %5.0f m  y %6.1f  %s" % [ch.call("lane_now"),
+							Vector2(c.global_position.x - p.global_position.x, c.global_position.z - p.global_position.z).length(),
+							c.global_position.y, "rails" if ch.call("dummy_now") else "real"])
+		var parts := []
+		for k in why:
+			parts.append("%s %.1f" % [k, float(why[k]) / d])
+		print("    of the %.1f within 200 m: moving %.1f; %s%s" % [s200 / d, mov / d, ", ".join(parts),
+			"  (stood on a street %.0f m from the site)" % moved if args.has("on-road") else ""])
 		if min_near >= 0.0 and s200 / d < min_near:
 			fails += 1
 	if min_near >= 0.0:

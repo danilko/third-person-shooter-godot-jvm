@@ -193,8 +193,8 @@ public class Elevator extends Node3D {
         }
         Area3D ride = sensor(car, new Vector3(cw - 0.2, 1.6, cd - 0.2), new Vector3(0, 0.9, 0));
         ride.setName(new StringName("Ride"));
-        ride.connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_ride_entered"));
-        ride.connect(new StringName("body_exited"), MethodCallable.createUnsafe(this, "on_ride_exited"));
+        ride.connect("body_entered", MethodCallable.createUnsafe(this, "on_ride_entered"));
+        ride.connect("body_exited", MethodCallable.createUnsafe(this, "on_ride_exited"));
         addChild(car);
     }
 
@@ -246,11 +246,11 @@ public class Elevator extends Node3D {
             Area3D call = sensor(this, new Vector3(CALL_DEPTH, 1.8, dw + 0.8),
                     new Vector3(sx * (x + 0.1 + CALL_DEPTH / 2), y + 1.0, 0));
             call.setName(new StringName("Call" + s + (f == 0 ? "W" : "E")));
-            call.connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_sensor_entered"));
+            call.connect("body_entered", MethodCallable.createUnsafe(this, "on_sensor_entered"));
             calls.add(call);
             Area3D way = sensor(this, new Vector3(0.7, 1.8, dw), new Vector3(sx * x, y + 1.0, 0));
             way.setName(new StringName("Doorway" + s + (f == 0 ? "W" : "E")));
-            way.connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_sensor_entered"));
+            way.connect("body_entered", MethodCallable.createUnsafe(this, "on_sensor_entered"));
             ways.add(way);
         }
         addChild(body);

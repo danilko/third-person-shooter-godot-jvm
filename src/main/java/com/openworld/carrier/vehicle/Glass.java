@@ -135,7 +135,7 @@ public final class Glass {
         p.setEmitting(true);
 
         SceneTreeTimer t = scene.getTree().createTimer(2.2, false, true, false);
-        t.connect(new StringName("timeout"), MethodCallable.createUnsafe(p, "queue_free"));
+        t.connect("timeout", MethodCallable.createUnsafe(p, "queue_free"));
         BURSTS.addLast(p);
         while (BURSTS.size() > MAX_BURSTS) {
             Node3D old = BURSTS.pollFirst();

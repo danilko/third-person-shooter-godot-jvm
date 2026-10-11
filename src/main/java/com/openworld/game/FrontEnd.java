@@ -76,7 +76,8 @@ public class FrontEnd extends Node {
     private long warmedScene;
 
     /** The island just came up: put the loading screen over it (game.WorldWarmup), once per world load. Not under a
-     *  probe (--script), not headless, not with OW_NO_WARMUP=1; OW_WARMUP=1 forces it (a probe of the screen itself). */
+     *  probe (--script), not headless, not with OW_NO_WARMUP=1 or `-- --no-warmup`, not with the GAME tab's
+     *  "Loading tour" setting off; OW_WARMUP=1 forces it (a probe of the screen itself). */
     private void startWarmup() {
         Node scene = getTree() != null ? getTree().getCurrentScene() : null;
         if (scene == null || scene.getInstanceId() == warmedScene) return;
@@ -88,6 +89,8 @@ public class FrontEnd extends Node {
             if ("headless".equals(godot.api.DisplayServer.getName())) return;
             for (String a : godot.api.OS.getCmdlineArgs()) if ("--script".equals(a) || "-s".equals(a)) return;
             for (String a : godot.api.OS.getCmdlineUserArgs()) if ("--no-warmup".equals(a)) return;
+            // the player's own setting (GAME tab, "Loading tour"): off = straight into the world
+            if (QualitySettings.get() != null && !QualitySettings.get().loadingTour) return;
         }
         WorldWarmup w = new WorldWarmup();
         w.setName(new godot.core.StringName("WorldWarmup"));

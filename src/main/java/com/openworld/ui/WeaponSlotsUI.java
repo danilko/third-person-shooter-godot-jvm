@@ -125,12 +125,12 @@ public class WeaponSlotsUI extends PanelContainer {
         if (weaponController != null) {
             weaponController.ammoChanged.connectUnsafe(
                     MethodCallable.createUnsafe(this, "onAmmoChanged"),
-                    godot.api.Object.ConnectFlags.DEFAULT);
+                    godot.core.ConnectFlags.DEFAULT);
         }
         if (c != null) {
             c.changedWeapon.connectUnsafe(
                     MethodCallable.createUnsafe(this, "onWeaponSwitched"),
-                    godot.api.Object.ConnectFlags.DEFAULT);
+                    godot.core.ConnectFlags.DEFAULT);
         }
 
         activeSlot = (weaponController != null) ? weaponController.getWeapon() : 0;

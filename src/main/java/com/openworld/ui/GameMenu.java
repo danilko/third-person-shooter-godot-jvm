@@ -80,7 +80,7 @@ public class GameMenu extends Control {
     private VBoxContainer statusLeft, statusRight;
     private OptionButton presetBox, windowMode, resolution, worldDensity;
     private HSlider renderScale, shadowDist, viewDist, lookSens, padLook, volume, fov;
-    private CheckButton invertY, aimAssist, hudMinimal, vsync;
+    private CheckButton invertY, aimAssist, hudMinimal, vsync, loadingTour;
     private final Map<HSlider, Label> sliderValues = new LinkedHashMap<>();
     /** "key_<row>" / "pad_<row>" -> its button. */
     private final Map<String, Button> bindButtons = new LinkedHashMap<>();
@@ -151,7 +151,7 @@ public class GameMenu extends Control {
         QualitySettings q = QualitySettings.get();
         if (q != null) sync(q);
         refreshBindings();
-        connect(new StringName("visibility_changed"), callable("on_visibility_changed"));
+        connect("visibility_changed", callable("on_visibility_changed"));
         selectTab(0);
     }
 
@@ -162,7 +162,7 @@ public class GameMenu extends Control {
         b.setToggleMode(true);
         b.setCustomMinimumSize(new Vector2(190f, 52f));
         b.setFocusMode(Control.FocusMode.ALL);
-        b.connect(new StringName("pressed"), callable("on_tab_pressed"));
+        b.connect("pressed", callable("on_tab_pressed"));
         bar.addChild(b);
         page.setName("Page_" + name);
         page.setAnchorsPreset(Control.LayoutPreset.PRESET_FULL_RECT, false);
@@ -204,7 +204,7 @@ public class GameMenu extends Control {
         reset.setText("Reset keyboard and controller to defaults");
         reset.setCustomMinimumSize(new Vector2(0f, ROW_H));
         reset.setHSizeFlags(Control.SizeFlags.SHRINK_CENTER);
-        reset.connect(new StringName("pressed"), callable("reset_bindings"));
+        reset.connect("pressed", callable("reset_bindings"));
         page.addChild(reset);
         return page;
     }
@@ -223,7 +223,7 @@ public class GameMenu extends Control {
             b.setName(prefix + r.id());
             // one handler for every row, reading WHICH from the focus (a bound Callable fails in connect() under
             // godot-jvm rc1): a click or a pad press focuses the button before "pressed" fires
-            b.connect(new StringName("pressed"), callable("on_bind_pressed"));
+            b.connect("pressed", callable("on_bind_pressed"));
             row(v, r.label(), b);
             bindButtons.put(prefix + r.id(), b);
         }
@@ -235,7 +235,7 @@ public class GameMenu extends Control {
         presetBox = new OptionButton();
         for (QualitySettings.Preset p : QualitySettings.Preset.values()) presetBox.addItem(cap(p.name()), p.ordinal());
         row(g, "Preset", presetBox);
-        presetBox.connect(new StringName("item_selected"), callable("on_preset"));
+        presetBox.connect("item_selected", callable("on_preset"));
         renderScale = slider(g, "Render scale", 0.5, 1.0, 0.05, "on_graphics");
         shadowDist = slider(g, "Shadow distance (m)", QualitySettings.MIN_SHADOW_DISTANCE, 600.0, 10.0, "on_graphics");
         viewDist = slider(g, "View distance (m)", QualitySettings.MIN_VIEW_DISTANCE, 500.0, 10.0, "on_graphics");
@@ -247,15 +247,15 @@ public class GameMenu extends Control {
         windowMode.addItem("Fullscreen (borderless)", 1);
         windowMode.addItem("Fullscreen (exclusive)", 2);
         row(w, "Mode", windowMode);
-        windowMode.connect(new StringName("item_selected"), callable("on_display"));
+        windowMode.connect("item_selected", callable("on_display"));
         resolution = new OptionButton();
         resolution.addItem("Keep current", 0);
         for (int i = 0; i < QualitySettings.RESOLUTIONS.length; i++) resolution.addItem(QualitySettings.RESOLUTIONS[i], i + 1);
         row(w, "Resolution", resolution);
-        resolution.connect(new StringName("item_selected"), callable("on_display"));
+        resolution.connect("item_selected", callable("on_display"));
         vsync = new CheckButton();
         row(w, "VSync", vsync);
-        vsync.connect(new StringName("toggled"), callable("on_display_toggled"));
+        vsync.connect("toggled", callable("on_display_toggled"));
         return h;
     }
 
@@ -268,8 +268,10 @@ public class GameMenu extends Control {
         for (com.openworld.game.WorldDensity d : com.openworld.game.WorldDensity.values()) worldDensity.addItem(d.label, d.ordinal());
         worldDensity.setName("WorldDensity");
         row(o, "World density", worldDensity);
-        worldDensity.connect(new StringName("item_selected"), callable("on_display"));
+        worldDensity.connect("item_selected", callable("on_display"));
         note(o, "Cars, pedestrians and attackers at once. The host's choice in co-op, the same for every player. Normal is tuned for the Steam Deck.");
+        loadingTour = check(o, "Loading tour");
+        note(o, "A short tour behind the loading screen that streams the city in before you play. Off starts at once; the first minutes may stutter.");
         VBoxContainer s = column(h, inGame ? "SESSION" : "");
         if (inGame) {
             action(s, "Resume", "Resume", "on_resume_pressed");
@@ -514,6 +516,7 @@ public class GameMenu extends Control {
         aimAssist.setPressed(q.aimAssist);
         volume.setValue(q.masterVolume);
         hudMinimal.setPressed(q.hudMinimal);
+        loadingTour.setPressed(q.loadingTour);
         worldDensity.select(q.worldDensity.ordinal());
         fov.setValue(q.fovOffset);
         windowMode.select(q.windowMode.ordinal());
@@ -526,7 +529,7 @@ public class GameMenu extends Control {
 
     private void showValues() {
         // a switch spells its state: the default theme's "off" is a faint dot at this size
-        for (CheckButton c : new CheckButton[] {invertY, aimAssist, hudMinimal, vsync})
+        for (CheckButton c : new CheckButton[] {invertY, aimAssist, hudMinimal, vsync, loadingTour})
             if (c != null) c.setText(c.isPressed() ? "On" : "Off");
         for (Map.Entry<HSlider, Label> e : sliderValues.entrySet()) {
             double v = e.getKey().getValue(), step = e.getKey().getStep();
@@ -573,6 +576,7 @@ public class GameMenu extends Control {
         q.aimAssist = aimAssist.isPressed();
         q.masterVolume = volume.getValue();
         q.hudMinimal = hudMinimal.isPressed();
+        q.loadingTour = loadingTour.isPressed();
         q.fovOffset = fov.getValue();
         q.apply();
     }
@@ -674,7 +678,7 @@ public class GameMenu extends Control {
         value.setHorizontalAlignment(godot.core.HorizontalAlignment.RIGHT);
         h.addChild(value);
         sliderValues.put(s, value);
-        s.connect(new StringName("value_changed"), callable(handler));
+        s.connect("value_changed", callable(handler));
         return s;
     }
 
@@ -682,7 +686,7 @@ public class GameMenu extends Control {
         CheckButton c = new CheckButton();
         row(v, label, c);
         c.setHSizeFlags(Control.SizeFlags.SHRINK_BEGIN);
-        c.connect(new StringName("toggled"), callable("on_toggled"));
+        c.connect("toggled", callable("on_toggled"));
         return c;
     }
 
@@ -692,7 +696,7 @@ public class GameMenu extends Control {
         b.setText(text);
         b.setCustomMinimumSize(new Vector2(0f, 56f));
         b.setFocusMode(Control.FocusMode.ALL);
-        b.connect(new StringName("pressed"), callable(handler));
+        b.connect("pressed", callable(handler));
         v.addChild(b);
     }
 

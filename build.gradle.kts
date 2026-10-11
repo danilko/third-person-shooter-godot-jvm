@@ -1,5 +1,5 @@
 plugins {
-    id("com.utopia-rise.godot-jvm") version "1.0.0-rc1"
+    id("com.utopia-rise.godot-jvm") version "1.0.0-rc2"
 }
 
 repositories {
@@ -7,7 +7,7 @@ repositories {
 }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(25)
 }
 
 // ── Headless unit tests for the engine-free networking logic (com.openworld.game.net) ──

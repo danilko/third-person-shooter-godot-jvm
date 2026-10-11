@@ -242,7 +242,7 @@ public class AICharacter extends Character {
         if (weaponController != null) {
             weaponController.ammoChanged.connectUnsafe(
                     MethodCallable.createUnsafe(this, "onAmmoChanged"),
-                    godot.api.Object.ConnectFlags.DEFAULT);
+                    godot.core.ConnectFlags.DEFAULT);
         }
 
         // Resolve escort target from NodePath if provided.
@@ -343,7 +343,7 @@ public class AICharacter extends Character {
         if (h instanceof Health health) {
             health.hit.connectUnsafe(
                     MethodCallable.createUnsafe(this, "onEscortTargetDamaged"),
-                    godot.api.Object.ConnectFlags.DEFAULT);
+                    godot.core.ConnectFlags.DEFAULT);
         }
     }
 

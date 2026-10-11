@@ -330,6 +330,8 @@ inherited scenes override.
 
 ### Traffic by region, the idle-car recycle and the 210 m ring (user, 2026-10-10)
 
+(The budgets quoted here are that morning's; see the next section for 20 / 26 / 32 and the near-only drivers.)
+
 **Reported:** "barely more than 3 cars even in the busy city / suburb, residential barely any; the west centre the
 most crowded". **Measured** (`tools/godot/probe_traffic_census.gd`: the player stood at each district, ambient cars
 counted every 2 s for 30-40 s): the budget was always FULL (10 alive) but the cars were not near the player --
@@ -378,6 +380,65 @@ Gates: `probe_traffic_census.gd -- --min-near=4` (every site >= 4 simulated cars
 slow), `probe_traffic_ahead.gd` (no car born ahead of a fast player; its control fails 2 -- it now counts ambient
 traffic only: two PARKED cars in a car park 85 m off the line had failed it), `probe_traffic_spawn`, `probe_far_traffic`,
 `probe_road_zones` PASS on the new ring.
+
+### "The cars stand" was an instrument error; near-only drivers; 20 cars at Normal (user, 2026-10-10 late)
+
+**Reported:** "still not enough vehicles, rarely see 1 or 2, most on one side", then "increase cars even if it means
+fewer peds ... hope to stay around 12 most of the time", then "is the character inside also simplified? the vehicle
+should not be that heavy compared to a ped".
+
+**1. The first reading was wrong.** The console's `traffic` said 3 of 13 cars were moving. It asked each BODY for its
+linear velocity -- and a car on rails (`Vehicle.setDummy`, everything past 90 m) is a frozen kinematic body whose
+velocity reads zero however fast it travels. A car is asked of its BRAIN now:
+`VehicleAIController.standingReason()` (`moving` above 1 m/s by `currentSpeed()`, else `signal` / `queue` / `car` /
+`person` / `obstacle` / `yield` / `end` / `hold` / `slow`), tallied by `ZoneManager.trafficStateNow(r)` and printed
+by the console's `traffic` and as the second line of every `probe_traffic_census` row. And the census ran the lights
+on the WALL clock under `--fixed-fps`, where 40 game-seconds are a few real ones: a car at a red read as standing
+for the whole sample (`game_clock` is set now). With both fixed, 4 districts: **65-97 % of the cars within 200 m
+are moving, 2-4 of ~9 stand at a red, queues and blocked cars are ~0.1.** The cars do not stand. They are FAR.
+
+**2. Why 12 cars look like 1 or 2.** 12 cars over a 210 m ring is ~1 within 60 m and 2-3 within 100 m, and most of
+the rest are on the next street over, behind buildings. Measured with `--on-road` (the player stood on the nearest
+street: a region box's centre is often the inside of a block, where no car can be within 60 m), 90 s a site, 2-3
+runs; means over downtown_core / nightlife / residential_north / suburb, cars within 60 / 100 m:
+
+| spawn rule (12 cars) | within 60 m | within 100 m | note |
+|---|---|---|---|
+| entry queue slots (the shipped rule) | 1.15 | 2.25 | suburb 0.0 / 0.2: its lanes' entries are far from the site |
+| + a turn lean toward the player at junctions | 1.02 | 2.20 | no effect -- DELETED |
+| a random point along any lane, heading at the player | 1.90 | 3.15 | suburb 2.2 / 3.5, but downtown 0.3 / 1.0 |
+| along a lane, the car whose ROAD AHEAD passes nearest a player (`passDistance`) | 1.7 | 3.05 | downtown 0.4-1.1 / 0.9-1.9 |
+| half and half (`trafficSpawnAlongShare` 0.5, the default) | 1.1 | 2.3 | downtown 0.7 / 2.0 |
+
+None is a clear win at 12: on a 60 km/h trunk a car is within 60 m of a standing player for ~7 s, whoever placed
+it. The lever is the BUDGET: at 20 cars (along-lane rule) 2.95 / 5.15 within 60 / 100 m and 14.8 within 200 m.
+
+**3. What a car costs, and the driver.** Every traffic car carried a full `AICharacter` driver, near or far (its
+AnimationTree paused on rails, the body, skeleton and brain still there). `ZoneManager.trafficLazyDrivers` (on): a
+car on rails has NO driver; `updateDummyTier` seats one (`spawnTrafficDriver`, from the config kept at spawn) when
+the car is real -- inside `dummyInDist` 70 m, or hit, or on a call -- and frees it (`Vehicle.releaseOccupant`, no
+door) when the car goes back on rails. Only a driver still at the wheel and alive is stowed: one who got out, fled
+or died is the world's. Everything a driver is for happens near a player (the carjack reaction, a shot through the
+glass), so no mechanic is lost; what is lost is a head in a windscreen at 150 m. Measured: 2-7 drivers in the world
+for 20 cars (`traffic_drivers_now`; the console prints it). Cost, `probe_walk_perf --legs=walk_downtown,
+drive_downtown` under the software renderer (so ~12 fps and ~7 physics ticks a frame: compare the rows, not the
+absolute numbers; frame and draw-call figures are NOT usable from this run), physics ms a frame p50 / p95:
+
+| | walk | drive |
+|---|---|---|
+| 12 cars, a driver each (`--no-lazy-drivers`, the old state) | 5.52 / 18.78 | 8.75 / 19.76 |
+| 12 cars, near-only drivers | 6.00 / 13.67 | 6.55 / 14.87 |
+| 20 cars, near-only drivers | 6.30 / 13.57 | 7.54 / 16.53 |
+| 28 cars, near-only drivers | 7.43 / 14.72 | 8.45 / 18.98 |
+
+So 20 cars now cost no more physics than 12 did, and **`game/density.json` is NORMAL 20 / HIGH 26 / ULTRA 32**
+(walkers and tokens unchanged: the cars are paid for by the drivers, not by pedestrians). The many pedestrians the
+user sees are the VAT crowd tier (`PED_DENSITY`, a MultiMesh): thinning it buys almost nothing and is a taste
+decision, not made here. NOT measured: a Steam Deck; the GPU / draw side of 8 more cars; co-op (each seat / unseat
+is a spawn + occupancy message at the 70 / 90 m hysteresis).
+
+Probe flags added: `probe_traffic_census -- [--on-road] [--lanes] [--along-lanes | --along-share=] [--budget=]
+[--no-lazy-drivers]`; `probe_walk_perf -- [--no-lazy-drivers]`.
 
 ### Terrain & seam alignment (ground is NOT a flat plane)
 

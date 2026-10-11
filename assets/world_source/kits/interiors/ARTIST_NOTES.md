@@ -114,6 +114,17 @@ boat) and `FIB1` (fishing boat) `.blend` / `.glb` / `.craft.json`; `tools/build_
 generator keeps an edited one -- keeping the nose / bow toward Blender +Y, the seats' Empties and the cockpit eye;
 then re-run both tools. `tools/godot/probe_craft.gd` checks the boats float and make way and the aircraft take off.
 
+## 横断歩道橋 (Footbridge30 / Footbridge23) -- street structures, not buildings
+`blender/tools/street_plans.py` lays them out from Japan's footbridge standard (立体横断施設技術基準): 4.7 m clear
+under the girder, a 2.0 m walkway 5.5 m up, stairs of 0.15 m risers on 0.30 m treads with a landing at half height,
+a 1.1 m railing with a solid lower panel. Frame: the origin is on the ROAD SURFACE at the centreline, the road runs
+along Blender Y, the junction is toward -Y and both stairs come down toward +Y on the kerb half of the footway.
+Remodel freely (lattice railings, a roofed deck, a slope beside the stair, signs on the girder) but KEEP: the piers'
+plan positions, the stair foot, the clearance, and the `HULL_stair_*` Empties (the invisible ramps characters walk).
+The `MARK_name_plate_*` Empties are where the crossing's name goes (not drawn yet). After an edit:
+`tools/building_kit/build_interiors_only.sh Footbridge30 Footbridge23`, then
+`godot --headless --fixed-fps 60 --script tools/godot/probe_stairs.gd -- --scenes=Footbridge30,Footbridge23`.
+
 ## After editing
 `tools/building_kit/build_buildings.sh` exports these files with the other kits, rebuilds the scenes and runs
 `probe_buildings.gd`; `tools/godot/probe_building_lift.gd -- --scene=<X_Shop.tscn>` rides a lift floor by floor. A

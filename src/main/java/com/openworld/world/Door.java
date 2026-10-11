@@ -133,7 +133,7 @@ public class Door extends Breakable implements com.openworld.control.Interactabl
         }
         bindSensor();
         EventBus bus = getEventBus();
-        if (bus != null) bus.connect(new StringName("mission_completed"),
+        if (bus != null) bus.connect("mission_completed",
                 MethodCallable.createUnsafe(this, "on_mission_completed"));
         wake();   // one tick to settle; after that a door SLEEPS until something can change it (R14, below)
 
@@ -152,8 +152,8 @@ public class Door extends Breakable implements com.openworld.control.Interactabl
         Node n = getNodeOrNull(sensorPath);
         if (!(n instanceof Area3D a)) return;
         sensor = a;
-        sensor.connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_sensor_body_entered"));
-        sensor.connect(new StringName("body_exited"), MethodCallable.createUnsafe(this, "on_sensor_body_exited"));
+        sensor.connect("body_entered", MethodCallable.createUnsafe(this, "on_sensor_body_entered"));
+        sensor.connect("body_exited", MethodCallable.createUnsafe(this, "on_sensor_body_exited"));
         // Seed counts from anything already overlapping (e.g. a body spawned inside the zone).
         for (Node3D b : sensor.getOverlappingBodies()) {
             if (!isCharacterBody(b) || !admits(b)) continue;

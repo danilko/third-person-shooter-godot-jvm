@@ -21,12 +21,13 @@ sys.path.insert(0, HERE)
 import interior_kit as IK  # noqa: E402
 import interior_plans as IP  # noqa: E402
 import interior_plans_jp as IPJ  # noqa: E402
+import street_plans as SP  # noqa: E402
 from library_palette import material  # noqa: E402
 from library_procedural import Builder  # noqa: E402
 
 ROOT = IK.ROOT
 KIT = os.path.join(ROOT, "assets", "world_source", "kits", "interiors")
-PLANS = {**IP.PLANS, **IPJ.PLANS}
+PLANS = {**IP.PLANS, **IPJ.PLANS, **SP.PLANS}
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ONLY = {n for a in argv if a.startswith("--only=") for n in a[len("--only="):].split(",") if n}
 FORCE = {n for a in argv if a.startswith("--force=") for n in a[len("--force="):].split(",") if n}

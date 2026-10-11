@@ -651,6 +651,8 @@ public class VehicleAIController extends Controller {
     public boolean dummy;
     /** The on-rails speed (m/s), carried across both switches so a promotion keeps its pace. */
     public double dummySpeed;
+    /** The gap rule is what holds this on-rails car still (for {@link #standingReason}). */
+    private boolean dummyGapHeld;
     static final double DUMMY_ACCEL = 2.5, DUMMY_DECEL = 4.0, DUMMY_GAP = 9.0;
     @Register public boolean dummyNow() { return dummy; }
     @Register public double dummySpeedNow() { return dummySpeed; }
@@ -713,9 +715,12 @@ public class VehicleAIController extends Controller {
             double d = o.routeProgress - routeProgress;
             if (d > 0 && d < gap) gap = d;
         }
+        dummyGapHeld = false;
         if (gap < Double.MAX_VALUE) {
             double room = Math.max(0.0, gap - DUMMY_GAP);
-            target = Math.min(target, Math.sqrt(2.0 * DUMMY_DECEL * room));
+            double held = Math.sqrt(2.0 * DUMMY_DECEL * room);
+            dummyGapHeld = held < 1.0;
+            target = Math.min(target, held);
         }
         if (dummySpeed < target) dummySpeed = Math.min(target, dummySpeed + DUMMY_ACCEL * delta);
         else dummySpeed = Math.max(target, dummySpeed - DUMMY_DECEL * delta);
@@ -800,6 +805,33 @@ public class VehicleAIController extends Controller {
                     trains.stopDistance(ln, routeProgress), lxStoppedSinceMs, lxDoneLane, lxDoneS, lxLog));
         }
         return b.toString();
+    }
+
+    /**
+     * WHY this car is not moving, in one word -- or {@code "moving"} (the console's `traffic` and
+     * probe_traffic_census tally it). Speed is {@link #currentSpeed}: an on-rails car is a frozen body whose
+     * linear velocity reads ZERO however fast it travels, which is how a first census counted 10 of 13 cars as
+     * standing. {@code signal} = held at a red / a 踏切 line, {@code queue} = behind another traffic car,
+     * {@code car} = behind a vehicle that is not traffic (parked, a player's), {@code person}, {@code obstacle},
+     * {@code yield} = a junction another car holds, {@code end} = out of lane, {@code hold} = a dispatched car
+     * arrived, {@code slow} = nothing in the way (pulling away, or creeping).
+     */
+    public String standingReason() {
+        if (currentSpeed() > 1.0f) return "moving";
+        if (finished || route == null) return "end";
+        if (holdStop) return "hold";
+        if (dummy) return heldAtSignal ? "signal" : dummyGapHeld ? "queue" : "slow";
+        if (heldAtSignal) return "signal";
+        if (shouldYield()) return "yield";
+        RayCast3D[] all = {obstacleRay, flankRays[0], flankRays[1], flankRays[2], flankRays[3]};
+        for (RayCast3D r : all) {
+            if (r == null || !r.isColliding()) continue;
+            Object o = r.getCollider();
+            if (o instanceof Vehicle v) return v.getController() instanceof VehicleAIController ? "queue" : "car";
+            if (o instanceof com.openworld.character.Character) return "person";
+            return "obstacle";
+        }
+        return "slow";
     }
 
     public boolean isPathBlocked() {

@@ -168,9 +168,9 @@ public class SaveSystem extends Node {
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) {
             bus.missionBeatTriggered.connectUnsafe(
-                    MethodCallable.createUnsafe(this, "onBeatTriggered"), Object.ConnectFlags.DEFAULT);
+                    MethodCallable.createUnsafe(this, "onBeatTriggered"), godot.core.ConnectFlags.DEFAULT);
             bus.missionCompleted.connectUnsafe(
-                    MethodCallable.createUnsafe(this, "onMissionCompleted"), Object.ConnectFlags.DEFAULT);
+                    MethodCallable.createUnsafe(this, "onMissionCompleted"), godot.core.ConnectFlags.DEFAULT);
         }
     }
 

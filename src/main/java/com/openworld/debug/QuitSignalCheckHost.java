@@ -27,7 +27,7 @@ public class QuitSignalCheckHost extends Node3D {
         Window root = getTree().getRoot();
         root.getCloseRequested().connectUnsafe(
                 MethodCallable.createUnsafe(this, "onCloseRequested"),
-                godot.api.Object.ConnectFlags.DEFAULT);
+                godot.core.ConnectFlags.DEFAULT);
         GD.print("QUITCHECK: about to call getTree().quit() directly (the PauseMenu/MenuManager/"
                 + "GameOverMenu path)");
         getTree().quit();

@@ -210,61 +210,61 @@ public class HUDManager extends CanvasLayer {
 	  // is always in place before the signal arrives, regardless of tree order.
 	  bus.playerSpawned.connectUnsafe(
 		  MethodCallable.createUnsafe(this, "onPlayerSpawned"),
-		  Object.ConnectFlags.DEFAULT);
+		  godot.core.ConnectFlags.DEFAULT);
 	  bus.vehicleEntered.connectUnsafe(
 		  MethodCallable.createUnsafe(this, "onVehicleEntered"),
-		  Object.ConnectFlags.DEFAULT);
+		  godot.core.ConnectFlags.DEFAULT);
 	  bus.vehicleExited.connectUnsafe(
 		  MethodCallable.createUnsafe(this, "onVehicleExited"),
-		  Object.ConnectFlags.DEFAULT);
+		  godot.core.ConnectFlags.DEFAULT);
 	  bus.characterEliminated.connectUnsafe(
 		  MethodCallable.createUnsafe(this, "onCharacterEliminated"),
-		  Object.ConnectFlags.DEFAULT);
+		  godot.core.ConnectFlags.DEFAULT);
 	  // mission stingers (every peer: a client's mission events are mirrored by GameManager)
-	  bus.missionStarted.connectUnsafe(MethodCallable.createUnsafe(this, "onMissionStartedSting"), Object.ConnectFlags.DEFAULT);
-	  bus.missionCompleted.connectUnsafe(MethodCallable.createUnsafe(this, "onMissionCompletedSting"), Object.ConnectFlags.DEFAULT);
-	  bus.missionFailed.connectUnsafe(MethodCallable.createUnsafe(this, "onMissionFailedSting"), Object.ConnectFlags.DEFAULT);
+	  bus.missionStarted.connectUnsafe(MethodCallable.createUnsafe(this, "onMissionStartedSting"), godot.core.ConnectFlags.DEFAULT);
+	  bus.missionCompleted.connectUnsafe(MethodCallable.createUnsafe(this, "onMissionCompletedSting"), godot.core.ConnectFlags.DEFAULT);
+	  bus.missionFailed.connectUnsafe(MethodCallable.createUnsafe(this, "onMissionFailedSting"), godot.core.ConnectFlags.DEFAULT);
 
 	  // C2 — multi-character HUD wiring: route per-character events to whichever
 	  // widget (if any) is registered for that characterId via registerCharacterHUD().
 	  bus.characterHealthChanged.connectUnsafe(
 		  MethodCallable.createUnsafe(this, "onCharacterHealthChanged"),
-		  Object.ConnectFlags.DEFAULT);
+		  godot.core.ConnectFlags.DEFAULT);
 	  bus.characterAmmoChanged.connectUnsafe(
 		  MethodCallable.createUnsafe(this, "onCharacterAmmoChanged"),
-		  Object.ConnectFlags.DEFAULT);
+		  godot.core.ConnectFlags.DEFAULT);
 	  bus.characterOxygenChanged.connectUnsafe(
 		  MethodCallable.createUnsafe(this, "onCharacterOxygenChanged"),
-		  Object.ConnectFlags.DEFAULT);
+		  godot.core.ConnectFlags.DEFAULT);
 	  bus.characterDied.connectUnsafe(
 		  MethodCallable.createUnsafe(this, "onCharacterDiedHud"),
-		  Object.ConnectFlags.DEFAULT);
+		  godot.core.ConnectFlags.DEFAULT);
 
 	  // C1 — mission status banner: surfaces start/complete/fail events that were
 	  // previously only visible via GD.print in the console.
 	  bus.radioChatter.connectUnsafe(
 		  MethodCallable.createUnsafe(this, "onRadioChatter"),
-		  Object.ConnectFlags.DEFAULT);
+		  godot.core.ConnectFlags.DEFAULT);
 	  bus.missionStarted.connectUnsafe(
 		  MethodCallable.createUnsafe(this, "onMissionStarted"),
-		  Object.ConnectFlags.DEFAULT);
+		  godot.core.ConnectFlags.DEFAULT);
 	  bus.missionCompleted.connectUnsafe(
 		  MethodCallable.createUnsafe(this, "onMissionCompletedHud"),
-		  Object.ConnectFlags.DEFAULT);
+		  godot.core.ConnectFlags.DEFAULT);
 	  bus.missionFailed.connectUnsafe(
 		  MethodCallable.createUnsafe(this, "onMissionFailedHud"),
-		  Object.ConnectFlags.DEFAULT);
+		  godot.core.ConnectFlags.DEFAULT);
 
 	  // Pickup toasts route through the same status feed as mission events
 	  // (was previously a dead connection — nothing connected weaponPickedUp).
 	  bus.weaponPickedUp.connectUnsafe(
 		  MethodCallable.createUnsafe(this, "onWeaponPickedUp"),
-		  Object.ConnectFlags.DEFAULT);
+		  godot.core.ConnectFlags.DEFAULT);
 
 	  // Damage-direction indicator: routed per-character, filtered to the local player below.
 	  bus.characterDamagedFrom.connectUnsafe(
 		  MethodCallable.createUnsafe(this, "onCharacterDamagedFrom"),
-		  Object.ConnectFlags.DEFAULT);
+		  godot.core.ConnectFlags.DEFAULT);
 	}
 
 	// Cache the crosshair and weapon slot bar — siblings of FootHUD/VehicleHUD,
@@ -608,7 +608,7 @@ public class HUDManager extends CanvasLayer {
 	if (wcNode instanceof WeaponController wc) {
 	  wc.ammoChanged.connectUnsafe(
 		  MethodCallable.createUnsafe(this, "onPlayerAmmoChanged"),
-		  Object.ConnectFlags.DEFAULT);
+		  godot.core.ConnectFlags.DEFAULT);
 	  // Wire crosshair spread source once — self-managed from here on.
 	  if (crosshair != null) crosshair.weaponController = wc;
 	}
@@ -617,7 +617,7 @@ public class HUDManager extends CanvasLayer {
 	if (newPlayer instanceof Character c) {
 	  c.changedCombatState.connectUnsafe(
 		  MethodCallable.createUnsafe(this, "onPlayerCombatStateChanged"),
-		  Object.ConnectFlags.DEFAULT);
+		  godot.core.ConnectFlags.DEFAULT);
 	}
 
 	Node healthNode = player.getNodeOrNull("Health");
@@ -626,7 +626,7 @@ public class HUDManager extends CanvasLayer {
 	  // change — local damage/heal and replicated updates — uniformly.
 	  h.healthChanged.connectUnsafe(
 		  MethodCallable.createUnsafe(this, "onPlayerHealthChanged"),
-		  Object.ConnectFlags.DEFAULT);
+		  godot.core.ConnectFlags.DEFAULT);
 	  emitHealth(h.getCurrentHealth());
 	}
 

@@ -67,7 +67,7 @@ public class TitleScreen extends Control {
         b.setName(text.replace(" ", ""));
         b.setText(text);
         v.addChild(b);
-        b.connect(new StringName("pressed"), MethodCallable.createUnsafe(this, handler));
+        b.connect("pressed", MethodCallable.createUnsafe(this, handler));
         return b;
     }
 

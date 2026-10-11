@@ -53,6 +53,10 @@ public class QualitySettings extends Node {
     public boolean aimAssist = true;
     public double masterVolume = 1.0;        // linear 0..1
     public boolean hudMinimal = false;
+    /** The loading screen's warm-up TOUR when the island comes up (game.WorldWarmup). Off = the world starts at once
+     *  (user, 2026-10-10: "so I do not wait for the tour every time when testing"); the first minutes then stream
+     *  and compile shaders in play, which is what the tour is there to hide. Client-local: it changes nobody's world. */
+    public boolean loadingTour = true;
     /** How much the HOST simulates (cars, promoted peds, attackers at once): {@link WorldDensity}. Host-decided. */
     public WorldDensity worldDensity = WorldDensity.NORMAL;
     /** Added to every on-foot and vehicle camera FOV (deg), never to a scope's declared FOV. -10..+20. */
@@ -281,6 +285,7 @@ public class QualitySettings extends Node {
         invertY = bool(cf, "controls", "invert_y", invertY);
         aimAssist = bool(cf, "controls", "aim_assist", aimAssist);
         masterVolume = num(cf, "audio", "master", masterVolume);
+        loadingTour = bool(cf, "world", "loading_tour", loadingTour);
         hudMinimal = "minimal".equals(String.valueOf(cf.getValue("hud", "mode", hudMinimal ? "minimal" : "full")));
         fovOffset = num(cf, "view", "fov_offset", fovOffset);
         worldDensity = WorldDensity.of(String.valueOf(cf.getValue("world", "density", worldDensity.name())));
@@ -305,6 +310,7 @@ public class QualitySettings extends Node {
         cf.setValue("hud", "mode", hudMinimal ? "minimal" : "full");
         cf.setValue("view", "fov_offset", fovOffset);
         cf.setValue("world", "density", worldDensity.name());
+        cf.setValue("world", "loading_tour", loadingTour);
         cf.setValue("display", "window_mode", windowMode.name());
         cf.setValue("display", "resolution", resolution);
         cf.setValue("display", "vsync", vsync);
@@ -332,6 +338,8 @@ public class QualitySettings extends Node {
     @Register public void setPresetNow(String p) { setPreset(Preset.valueOf(p)); apply(); }
     @Register public void setViewDistanceNow(double m) { viewDistance = m; graphicsChanged(); apply(); }
     @Register public void setShadowDistanceNow(double m) { shadowDistance = m; graphicsChanged(); apply(); }
+    @Register public boolean loadingTourNow() { return loadingTour; }
+    @Register public void setLoadingTourNow(boolean on) { loadingTour = on; }
     @Register public boolean hudMinimalNow() { return hudMinimal; }
     @Register public void setHudMinimalNow(boolean on) { hudMinimal = on; }
     @Register public void setFovOffsetNow(double deg) { fovOffset = clamp(deg, FOV_OFFSET_MIN, FOV_OFFSET_MAX); apply(); }

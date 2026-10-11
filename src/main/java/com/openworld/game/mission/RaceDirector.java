@@ -141,9 +141,9 @@ public class RaceDirector extends Node {
             // The race ends when its mission does, on EVERY peer — a client's mirror of the mission
             // event is what ends its race, so no fourth world-event constant is needed.
             bus.missionCompleted.connectUnsafe(
-                    MethodCallable.createUnsafe(this, "onMissionCompleted"), Object.ConnectFlags.DEFAULT);
+                    MethodCallable.createUnsafe(this, "onMissionCompleted"), godot.core.ConnectFlags.DEFAULT);
             bus.missionFailed.connectUnsafe(
-                    MethodCallable.createUnsafe(this, "onMissionFailed"), Object.ConnectFlags.DEFAULT);
+                    MethodCallable.createUnsafe(this, "onMissionFailed"), godot.core.ConnectFlags.DEFAULT);
         }
     }
 

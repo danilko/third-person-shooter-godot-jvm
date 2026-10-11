@@ -30,8 +30,8 @@ public class Ladder extends Area3D {
         setCollisionLayer(0);
         setCollisionMask(com.openworld.util.CollisionLayers.CHARACTER);
         setMonitoring(true);
-        connect(new StringName("body_entered"), godot.core.MethodCallable.createUnsafe(this, "on_body_entered"));
-        connect(new StringName("body_exited"), godot.core.MethodCallable.createUnsafe(this, "on_body_exited"));
+        connect("body_entered", godot.core.MethodCallable.createUnsafe(this, "on_body_entered"));
+        connect("body_exited", godot.core.MethodCallable.createUnsafe(this, "on_body_exited"));
     }
 
     /** The ladder's outward horizontal normal (away from the face, toward the climber's back), world. */

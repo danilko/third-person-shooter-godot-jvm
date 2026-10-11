@@ -126,7 +126,7 @@ public class ZoneTrigger extends Area3D {
 				? CollisionLayers.CHARACTER | CollisionLayers.VEHICLE
 				: CollisionLayers.CHARACTER);
 		// godot-jvm registers @Register methods under their snake_case names.
-		connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_body_entered"));
+		connect("body_entered", MethodCallable.createUnsafe(this, "on_body_entered"));
 		if (beatId.isEmpty()) {
 			GD.printErr("[ZoneTrigger] '" + getName() + "' has no beat_id — it can never fire");
 		}

@@ -47,10 +47,10 @@ public class MenuManager extends CanvasLayer {
         if (busNode instanceof EventBus bus) {
             bus.allPlayersDied.connectUnsafe(
                     MethodCallable.createUnsafe(this, "onAllPlayersDied"),
-                    godot.api.Object.ConnectFlags.DEFAULT);
+                    godot.core.ConnectFlags.DEFAULT);
             bus.connectionLost.connectUnsafe(
                     MethodCallable.createUnsafe(this, "onConnectionLost"),
-                    godot.api.Object.ConnectFlags.DEFAULT);
+                    godot.core.ConnectFlags.DEFAULT);
         }
     }
 

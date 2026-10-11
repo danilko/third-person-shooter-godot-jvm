@@ -91,8 +91,8 @@ public class AmmoSupply extends Area3D implements com.openworld.control.Interact
         cs.setShape(box);
         cs.setPosition(new Vector3(0, 1.1, 0));
         addChild(cs);
-        connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_body_entered"));
-        connect(new StringName("body_exited"), MethodCallable.createUnsafe(this, "on_body_exited"));
+        connect("body_entered", MethodCallable.createUnsafe(this, "on_body_entered"));
+        connect("body_exited", MethodCallable.createUnsafe(this, "on_body_exited"));
         setProcess(false);
     }
 

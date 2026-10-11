@@ -188,8 +188,8 @@ public class GameManager extends Node {
         Node eventBusNode = getNodeOrNull("/root/EventBus");
         if (eventBusNode instanceof EventBus) {
             EventBus bus = (EventBus) eventBusNode;
-            bus.characterSpawned.connectUnsafe(MethodCallable.createUnsafe(this, "onCharacterSpawned"), godot.api.Object.ConnectFlags.DEFAULT);
-            bus.characterDied.connectUnsafe(MethodCallable.createUnsafe(this, "onCharacterDied"), godot.api.Object.ConnectFlags.DEFAULT);
+            bus.characterSpawned.connectUnsafe(MethodCallable.createUnsafe(this, "onCharacterSpawned"), godot.core.ConnectFlags.DEFAULT);
+            bus.characterDied.connectUnsafe(MethodCallable.createUnsafe(this, "onCharacterDied"), godot.core.ConnectFlags.DEFAULT);
             // Note: playerDied is intentionally NOT connected here — it fires per dead
             // body. GAME_OVER is driven by the characterSpawned/characterDied "all dead"
             // tracking below, which emits EventBus.allPlayersDied for MenuManager's UI.
@@ -245,7 +245,7 @@ public class GameManager extends Node {
         if (root != null) {
             root.getCloseRequested().connectUnsafe(
                 MethodCallable.createUnsafe(this, "onCloseRequested"),
-                godot.api.Object.ConnectFlags.DEFAULT);
+                godot.core.ConnectFlags.DEFAULT);
         }
     }
 
