@@ -347,6 +347,12 @@ PUBLIC_BUILDINGS = (      # (Godot x, z, why, wanted TYPE, "", ROLE): a specific
     # `PlayerSpawn`, the `Player` and the starting car at its front door. A shop-house near that konbini.
     # `None` = "beside the building the named role resolved to".
     (None, "armoury", "the player's safe house", "ShopHouse", "", "safehouse"),
+    # The KONBINI JOB's shop (user, 2026-10-11: "the player cannot enter the store ... should be able to trigger the
+    # mission while inside"): an ordinary OPEN konbini -- clerk, counter, weapons -- with Kaneda's crew on its
+    # pavement. It was a LOCKED `_Open` mission building with the mission node (and so the crew, and the start
+    # zone) at its footprint centre: the crew stood inside a shop nobody could get into. The 5th field moves the
+    # `Missions` child onto the building, TURNED to its yaw (the scene's +Z is the shop's front).
+    (685.0, -336.0, "m01_konbini: the shop the konbini job is played at", "KonbiniS", "M01_Konbini"),
 )
 # every konbini is a weapon shop (user, 2026-09-26: "no need for a different weapon counter"), so the store beside
 # the safe house is on the map as an ordinary Convenience Store; `armoury` is only how the safe house finds its street
@@ -363,9 +369,7 @@ ARMOURY_REACH = 1200.0   # the weapon counter is the nearest large konbini, howe
 # names the TYPE it wants and is matched to the nearest one within `ANCHOR_REACH`, and `write` moves the mission
 # node onto the building it actually chose -- one owner for "where is this mission", instead of a scene
 # transform and a constant here that have to be kept in step by hand.
-OPEN_BUILDINGS = (
-    (685.0, -336.0, "m01_konbini: the shop the konbini job is played at", "KonbiniS", "M01_Konbini"),
-)
+OPEN_BUILDINGS = ()      # none today: the konbini job's shop is an ordinary open one (PUBLIC_BUILDINGS)
 OPEN_MATCH = 12.0      # the placement nearest an anchor with no wanted type, within this
 
 # --- WHAT THE MAP CALLS A PLACE (PLAN.md 3.18n, user 2026-09-21: "the map should say WHERE you are").
@@ -3028,7 +3032,8 @@ def apply_anchors(placed):
                 continue
             near["scene"] = near["type"] + suffix
             if node:
-                anchored[node] = [round(v, 3) for v in near["pos"]]
+                # position + the building's yaw (deg): the mission scene is authored in the building's own frame
+                anchored[node] = [round(v, 3) for v in near["pos"]] + [round(float(near["yaw"]), 4)]
             if role == "safehouse":
                 park = home_park_neighbour(placed, near)
                 if park["type"] == HOME_PARK:
@@ -3103,9 +3108,13 @@ def patch_missions(text, anchored):
             continue
         was = (float(v[9]), float(v[10]), float(v[11]))
         v[9], v[10], v[11] = "%.3f" % pos[0], "%.3f" % pos[1], "%.3f" % pos[2]
+        if len(pos) > 3:                 # turned to its building: the scene's +Z is the building's front (`xf`)
+            a = math.radians(pos[3])
+            c, sn = math.cos(a), math.sin(a)
+            v[0:9] = ["%.6f" % c, "0", "%.6f" % sn, "0", "1", "0", "%.6f" % -sn, "0", "%.6f" % c]
         text = text[:m.start()] + m.group(1) + ", ".join(v) + m.group(3) + text[m.end():]
-        if math.dist(was, tuple(pos)) > 0.01:
-            moved.append("%s %.1f m" % (node, math.dist(was, tuple(pos))))
+        if math.dist(was, tuple(pos[:3])) > 0.01:
+            moved.append("%s %.1f m" % (node, math.dist(was, tuple(pos[:3]))))
     if moved:
         print("island_buildings: mission node(s) moved onto their building: %s" % ", ".join(moved))
     return text

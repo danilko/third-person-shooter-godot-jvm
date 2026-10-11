@@ -16,10 +16,13 @@ import java.util.function.Consumer;
  * is two stages here, and the framework owns the rest.
  *
  * <ul>
- *   <li>A crew of named characters loiters outside a konbini as {@code neutral}. A player walking into the trigger
- *       in front of the shop is offered the job and starts it with the interact key (another player walking into the
- *       running job joins it): the crew turns
- *       {@link #hostileFaction}, which the job's overlay makes hostile to players, and the shop's doors unlock.</li>
+ *   <li>A crew of named characters loiters on the pavement outside a konbini as {@code neutral}. The shop is an
+ *       ordinary open one (redesigned 2026-10-11, user: "the player cannot enter the store ... should be able to
+ *       trigger the mission while inside"): a player anywhere in it or on its pavement is offered the job -- walk in,
+ *       buy a gun at the counter, start it from behind the shelves -- and starts it with the interact key (another
+ *       player walking into the running job joins it): the crew turns {@link #hostileFaction}, which the job's
+ *       overlay makes hostile to players. (A LOCKED door within {@link #doorUnlockRadius} is still unlocked for the
+ *       run: nothing at this shop any more, the rule is there for a mission whose building is shut.)</li>
  *   <li>FIGHT: with the crew down and the boss under {@link #surrenderHealthFraction}, he SURRENDERS -- neutral
  *       again and running. That is the choice.</li>
  *   <li>SURRENDER: shoot him anyway and the job completes {@code BOSS_KILLED}; let him get {@link #spareDistance}
@@ -41,7 +44,7 @@ public final class KonbiniActivity extends Activity {
     public double surrenderHealthFraction = 0.5;
     public double spareDistance = 45;
     public double spareSeconds = 15;
-    /** The shop is placed as its `_Open` variant, whose doors ship locked: open for the job, not for ever. */
+    /** Locked doors this near the job are open for its run (none at the konbini since it is an open shop). */
     public double doorUnlockRadius = 25;
     public String fightObjective = "Take down Kaneda's crew";
     public String surrenderObjective = "Kaneda gives up -- finish him, or let him run";

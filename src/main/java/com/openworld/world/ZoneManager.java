@@ -1778,7 +1778,10 @@ public class ZoneManager extends Node {
 		}
 		for (NamedCharacterConfig nc : zone.namedCharacters) {
 			if (nc == null) continue;
-			t.spawnWork.add(() -> spawnNamed(t.lz, nc, center, container));
+			// the offset is in the MARKER's frame: a mission scene turned to its building keeps its cast where it
+			// was authored (it was a world offset, which only worked while every marker was unrotated)
+			final Vector3 at = t.marker.getGlobalTransform().times(nc.offset);
+			t.spawnWork.add(() -> spawnNamed(t.lz, nc, at, container));
 		}
 		for (VehicleSpawnConfig vc : zone.vehicleSpawnConfigs) {
 			if (vc == null) continue;
@@ -2047,7 +2050,7 @@ public class ZoneManager extends Node {
 	}
 
 	/** One named story AI (extracted from the old synchronous load loop, one work item). */
-	private void spawnNamed(LoadedZone lz, NamedCharacterConfig nc, Vector3 center, Node container) {
+	private void spawnNamed(LoadedZone lz, NamedCharacterConfig nc, Vector3 at, Node container) {
 		if (!GD.isInstanceValid(container)) return;
 		// a story character killed in this world stays dead (PLAN.md 2.0 / CR3, game.WorldLedger)
 		if (!nc.characterId.isEmpty() && com.openworld.game.WorldLedger.get().isDead(nc.characterId)) return;
@@ -2065,7 +2068,7 @@ public class ZoneManager extends Node {
 		ai.storyCharacter = !nc.characterId.isEmpty();
 
 		container.addChild(ai);
-		ai.activateForSpawn(center.plus(nc.offset));
+		ai.activateForSpawn(at);
 		equipWeapon(ai, nc.weaponScenePath, container);
 
 		lz.named.add(ai);

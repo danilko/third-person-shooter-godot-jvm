@@ -709,6 +709,26 @@ watch sees a clean profile, and NEVER in a breached state, so a game over cannot
 a rule yet (the thresholds are a design decision), so nothing fires in play; the card and the safe-house respawn come
 with the first rule.
 
+**The konbini job, redesigned (user, 2026-10-11: "the current setup does not make sense: the player cannot enter the
+store, the AI crew can shoot out ... the player should be able to trigger the mission while inside, or at least force
+entry").** What was wrong was one fact: `island_buildings` puts the mission node on its building's footprint CENTRE,
+and the scene had been authored as if that were the shop's door -- so the crew (offsets of a few metres round the
+node) stood INSIDE a mission building whose doors were locked until the job started, and the start zone (22 x 16 m
+about the node) reached the pavement by about a metre. Now:
+* the shop is an ordinary OPEN konbini (`PUBLIC_BUILDINGS` -> its `_Shop` scene: clerk, counter, weapons), before,
+  during and after the job; `OPEN_BUILDINGS` (locked until a mission) is empty;
+* the mission node is turned to its building's yaw (`anchored_missions` carries it, `patch_missions` writes the
+  basis) and the scene is authored in the BUILDING's frame, +Z = the shop front; a named character's `offset` is
+  applied in its zone marker's frame (`ZoneManager`: it was a world offset);
+* the crew stands on the pavement in front (local z 11-12; the facade is at 9.1), and the start zone is the whole
+  shop plus that pavement (22 x 30 m), so the job is offered inside the store too: walk in, buy a gun, start it
+  from behind the shelves. The fight is on the street, where the crew can path; the glass rule is the same for
+  both sides (a round under 30 damage breaks a pane and stops, a heavier one carries on -- docs/combat.md).
+`probe_konbini_mission` asserts it: the shop's doors unlocked before the job, 3 of 3 crew under open sky, the offer
+taken with a roof over the player, the shop still open afterwards (kill / spare PASS, the control fails 2).
+NOT done: a version with the crew INSIDE (needs AI on the interior navmesh, which only the enforcement dispatch
+uses today); the clerk does not react to the fight.
+
 **The mission test kit** (CR6). TIER 1, JUnit, engine-free: `KonbiniActivityTest` (15: every path of the shipped
 mission against `FakeActivityHost` with scripted events and a clock -- start, surrender only when both conditions
 hold, both spares, both kills, a death with no event, fail + restore, retry, a helper joining and being credited, a

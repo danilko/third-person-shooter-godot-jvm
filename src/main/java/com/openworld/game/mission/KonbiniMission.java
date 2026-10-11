@@ -22,7 +22,13 @@ import java.util.List;
  * {@link KonbiniActivity} and {@code Act1}'s row for it; the framework ({@code ActivityDirector}) owns who may start
  * it, the host check, the door unlocks and the cleanup this node used to hand-roll.
  *
- * <p>The scene ({@code M01_Konbini.tscn}) carries what a level designer places: this node at the shop's door, the
+ * <p><b>The frame (2026-10-11).</b> {@code island_buildings} puts this node on the shop's footprint CENTRE and turns
+ * it to the shop's yaw, so the scene is authored in the BUILDING's frame: +Z is the shop front (a KonbiniS is
+ * 12.7 x 18.2 m, its sliding door at local (3.64, 9.1)). The crew stands on the pavement at z 11-12; the start zone
+ * is the whole shop plus that pavement, so the job is offered inside the store too. The shop is an ordinary OPEN
+ * konbini (`_Shop`: clerk, counter, weapons) -- it was a locked mission building with the crew inside it.
+ *
+ * <p>The scene ({@code M01_Konbini.tscn}) carries what a level designer places: this node, the
  * {@code ZoneTrigger} whose beat id is the activity's start zone, and the {@code Zone} that streams the crew of named
  * story characters. The exports below are the run's tuning, handed to it in {@link #configure}.
  */

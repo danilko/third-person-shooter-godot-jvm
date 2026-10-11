@@ -41,6 +41,23 @@ func _find_ai(n: Node, id: String) -> Node:
 			return r
 	return null
 
+## Unlocked doors of an open shop (`_Shop`) building within 14 m of `at` -- the job's konbini is 12.7 x 18.2 m
+## about it; its front door slides (auto_open), so the lock is what is asked, not how it opens.
+func _open_shop_doors(at: Vector3) -> int:
+	var n_open := 0
+	for n in get_nodes_in_group("breakable"):
+		if n.get_script() == null or not str(n.get_script().resource_path).ends_with("Door.java"):
+			continue
+		if (n as Node3D).global_position.distance_to(at) > 14.0 or bool(n.get("locked")):
+			continue
+		var up: Node = n
+		while up != null:
+			if str(up.name).contains("_Shop"):
+				n_open += 1
+				break
+			up = up.get_parent()
+	return n_open
+
 func _faction(id: String) -> String:
 	var ai := _find_ai(w, id)
 	return "" if ai == null else str(ai.get("character_info").get("faction"))
@@ -102,12 +119,31 @@ func _initialize() -> void:
 	check("the player's story is new: the job may be started", str(rt.call("why_not_now", MISSION, "STORY")) == "",
 			str(rt.call("why_not_now", MISSION, "STORY")))
 	check("player and gang_a are not hostile before the job", not factions.call("hostile_now", "player", "gang_a"))
+	# THE REDESIGN (user, 2026-10-11: "the player cannot enter the store ... should be able to trigger the mission
+	# while inside"): the shop is open BEFORE the job, the crew is on its pavement, not in it
+	var space := root.get_world_3d().direct_space_state
+	var open_doors := _open_shop_doors(at)
+	check("the shop's street doors are unlocked before the job", open_doors >= 1, "%d unlocked outer door(s) within 14 m" % open_doors)
+	var outside := 0
+	var crew_at := []
+	for id in IDS:
+		var body := _find_ai(w, id) as Node3D
+		if body == null:
+			continue
+		crew_at.append("%s %.1f m" % [id, Vector2(body.global_position.x - at.x, body.global_position.z - at.z).length()])
+		var up := PhysicsRayQueryParameters3D.create(body.global_position + Vector3(0, 1.0, 0), body.global_position + Vector3(0, 9.0, 0), 1)
+		if space.intersect_ray(up).is_empty():
+			outside += 1
+	check("the crew stands OUTSIDE, on the pavement in front of the shop", outside == IDS.size(), "%d of %d under open sky; %s" % [outside, IDS.size(), crew_at])
 	var balance_before := int(saves.call("profile_balance_now"))
 
 	# 2. walking into the trigger starts the job and turns the crew
 	player.global_position = at + Vector3(0, 1.2, -3)
 	var offered := await _wait(func(): return str(rt.call("offered_now")) == MISSION, 3.0)
 	await _wait(func(): return false, 1.0)
+	var roof := PhysicsRayQueryParameters3D.create(player.global_position + Vector3(0, 0.5, 0), player.global_position + Vector3(0, 9.0, 0), 1)
+	check("the job is offered to a player standing INSIDE the shop", offered and not space.intersect_ray(roof).is_empty(),
+			"a roof over the player: %s" % (not space.intersect_ray(roof).is_empty()))
 	check("walking into the trigger only OFFERS the job", offered and not rt.call("running_now", MISSION)
 			and IDS.all(func(id): return _faction(id) == "neutral"), "offered '%s'" % rt.call("offered_now"))
 	check("the offer is an interact prompt (E), and taking it starts the job", int(root.get_node("GameManager").call("interact_offers_now")) >= 1
@@ -162,9 +198,9 @@ func _initialize() -> void:
 	for d in doors:
 		print("    mission door %s at %s, %.1f m from the job, locked=%s" % [d.name, (d as Node3D).global_position,
 				(d as Node3D).global_position.distance_to(at), d.get("locked")])
-	check("the job unlocked the mission shop's doors", doors.size() > 0
-			and doors.all(func(d): return not bool(d.get("locked"))) and int(job.call("unlocked_doors_now")) == doors.size(),
-			"%d door(s), unlocked %s" % [doors.size(), job.call("unlocked_doors_now")])
+	# since 2026-10-11 the job's shop is an ordinary open konbini (`_Shop`): the job holds no door of its own
+	check("the job holds no door: its shop is an open one", doors.size() == 0 and int(job.call("unlocked_doors_now")) == 0,
+			"%d locked-building door(s) in reach, unlocked %s" % [doors.size(), job.call("unlocked_doors_now")])
 	check("an always-open shop door nearby was left alone", shop_doors.size() > 0
 			and shop_doors.all(func(d): return not bool(d.get("locked"))), "%d shop door(s)" % shop_doors.size())
 
@@ -206,8 +242,7 @@ func _initialize() -> void:
 			str(rt.call("why_not_now", MISSION, "STORY")))
 	var unlocked: bool = dir.call("is_mission_unlocked", "m02_informant")
 	check("m02_informant is %s" % ("open" if case == "spare" else "still locked"), unlocked == (case == "spare"), str(unlocked))
-	check("the mission shop is locked again once the job is over", doors.size() > 0
-			and doors.all(func(d): return bool(d.get("locked"))), str(doors.map(func(d): return d.get("locked"))))
+	check("the job's shop is still open once the job is over", _open_shop_doors(at) >= 1, "%d unlocked outer door(s)" % _open_shop_doors(at))
 	check("the always-open shop door is still open after the job", shop_doors.size() > 0
 			and shop_doors.all(func(d): return not bool(d.get("locked"))),
 			str(shop_doors.map(func(d): return d.get("locked"))))
