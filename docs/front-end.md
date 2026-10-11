@@ -250,3 +250,11 @@ client-local): off
 = `FrontEnd.startWarmup` adds no `WorldWarmup` and the world is playable at once (the streaming and shader
 compilation the tour hides then happen in the first minutes of play). The other ways stay: `-- --no-warmup` on the
 command line, `OW_NO_WARMUP=1`, and it never runs headless or under `--script`.
+
+**New game is NEW (user, 2026-10-11: "New game seems not to start a new game, but rather continues"; "wipe everything
+except settings and key bindings").** `FrontEnd.start` with no action: a fresh profile (`Profiles.resetLocal` -- the
+starting cash, no debts, cars, story, career or checkpoints; the install's id stays), `WantedSystem.clearAll` and
+`GangSystem.clearAll` (both live under the GameManager AutoLoad, so their states outlived the world they were earned
+in), the world ledger and MissionDirector's campaign as before, and the autosave slot DELETED, so Continue is
+disabled until the new game saves. It used to reset only the story. Host co-op resets none of it. Settings and key
+bindings are `settings.cfg`, untouched. Gate: `probe_title_actions.gd -- --role=new`.

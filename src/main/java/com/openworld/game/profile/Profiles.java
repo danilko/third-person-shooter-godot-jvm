@@ -77,6 +77,21 @@ public final class Profiles {
         return fresh;
     }
 
+    /**
+     * NEW GAME (user, 2026-10-11: "wipe everything except settings and key bindings"): this install's profile is
+     * thrown away and a new one made -- the starting stake, no debts, no cars, no story, no career, no checkpoints.
+     * The id stays (it is the install's, not the save's). Written at the next save window.
+     */
+    public static PlayerProfile resetLocal() {
+        PlayerProfile fresh = new PlayerProfile(com.openworld.net.session.PersistentPlayerId.getOrCreate());
+        fresh.balance = stake;
+        fresh.touch();
+        local = fresh;
+        loadedFrom = "new";
+        savedRevision = -1;
+        return fresh;
+    }
+
     /** Write the local profile now if it changed since the last write. */
     public static boolean saveIfDirty() {
         if (local == null || file == null || local.revision() == savedRevision) return false;

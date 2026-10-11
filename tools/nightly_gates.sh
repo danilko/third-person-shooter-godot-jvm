@@ -66,6 +66,7 @@ GATES=(
   "weapon_counter|400|0|0|$H --script $P/probe_weapon_counter.gd"
   "front_end|600|0|0|$HF --script $P/probe_front_end.gd"
   "title_continue|600|0|0|$HF --script $P/probe_title_actions.gd -- --role=continue"
+  "title_new_game|600|0|0|$HF --script $P/probe_title_actions.gd -- --role=new"
   "profile|300|0|0|$HF --script $P/probe_profile.gd"
   "garage|450|0|0|$HF --script $P/probe_garage.gd"
   "race|300|0|0|$HF --script $P/probe_race.gd"

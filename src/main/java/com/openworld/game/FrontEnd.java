@@ -37,14 +37,19 @@ public class FrontEnd extends Node {
             var director = com.openworld.game.mission.MissionDirector.get();
             if (director != null) director.resetCampaign();
         }
-        // NEW GAME is a new story too (PLAN.md 2.1): the campaign lives in the player's profile now, and a new world
-        // with every mission already done would have nothing to start. Money, cars and career records are the
-        // player's and stay. Hosting does not reset it: a player brings their story into the world they host.
+        // NEW GAME WIPES EVERYTHING but the settings and the key bindings (user, 2026-10-11: "New game seems not to
+        // start a new game, but rather continues" -- it reset the story and kept the money, the cars, the wanted
+        // level and the old autosave, by a pick of mine the user never asked for): a new PROFILE (the starting cash,
+        // no debts, cars, story, career or checkpoints), nobody wanted by the police or a gang, and the autosave of
+        // the game before it gone, so Continue cannot bring that world back under the new profile. Hosting resets
+        // none of it: a player brings their profile into the world they host.
         if (pending == Action.NONE) {
-            var profile = com.openworld.game.profile.Profiles.local();
-            profile.campaign.reset();
-            profile.activityCheckpoint = null;
-            profile.touch();
+            com.openworld.game.profile.Profiles.resetLocal();
+            if (WantedSystem.get() != null) WantedSystem.get().clearAll();
+            if (GangSystem.get() != null) GangSystem.get().clearAll();
+            SaveSystem save = SaveSystem.get();
+            if (save != null && save.hasSlot(save.autosaveSlot)) save.deleteSlot(save.autosaveSlot);
+            newGames++;
         }
         from.getTree().changeSceneToFile(WORLD);
     }
@@ -72,6 +77,10 @@ public class FrontEnd extends Node {
         }
         GD.print("FrontEnd: " + lastRun);
     }
+
+    private static int newGames;
+    /** Probe readout: New games started in this process. */
+    @Register public int newGamesNow() { return newGames; }
 
     private long warmedScene;
 

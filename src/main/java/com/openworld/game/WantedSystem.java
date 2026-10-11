@@ -277,6 +277,13 @@ public class WantedSystem extends Node {
     }
 
     /** Clear a player's wanted level (a jail respawn, a mission script). */
+    /** A NEW GAME: nobody is wanted (game.FrontEnd). This node lives under the GameManager AutoLoad, so its states
+     *  outlive the world scene they were earned in. */
+    public void clearAll() {
+        states.clear();
+        shown.clear();
+    }
+
     public void clear(String playerId) {
         WantedRules.State s = states.get(playerId);
         if (s != null) s.clear();

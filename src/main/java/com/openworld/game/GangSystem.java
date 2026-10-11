@@ -250,6 +250,12 @@ public class GangSystem extends Node {
     /** The gang hunters' rules (gangs.json `hunters`), or null. */
     public DispatchRules hunterRules() { return hunters; }
 
+    /** A NEW GAME: no gang is after anybody and nobody is held (game.FrontEnd; this node outlives the world scene). */
+    public void clearAll() {
+        states.clear();
+        captive.clear();
+    }
+
     /** Every gang this player stands at chase_at or more with, and the stars (the dispatch's hunters). */
     public Map<String, Integer> huntedBy(String playerId) {
         Map<String, Integer> out = new HashMap<>();
