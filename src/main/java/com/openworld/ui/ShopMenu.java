@@ -76,22 +76,25 @@ public class ShopMenu extends Control {
         openedFrame = godot.api.Engine.INSTANCE.getProcessFrames();
     }
 
-    /** The menu was closed by E and E has not been let go since. */
-    private static boolean closedByInteract;
+    /** The physics frame in which E last closed the menu; -1 = never. */
+    private static long closedByInteractFrame = -1;
+    /** A press that closed the menu cannot reopen it for this many physics steps (0.1 s): the same key-down reaches
+     *  the physics step one or two steps later. Steps, not milliseconds: a headless probe runs faster than a clock. */
+    static final long REOPEN_GUARD_STEPS = 6;
 
     /**
      * The key that just closed the menu must not reopen it. E opens the counter from the PHYSICS step
-     * (control.Interactions) and closes it from this _process, so one press is "just pressed" in both. This used to be
-     * one PROCESS frame of slack, which only covers a press when there is one process frame per physics step: above
-     * 60 fps (a 144 Hz display, or an uncapped headless run) the next physics step came 2+ frames later and the same
-     * press reopened the store -- E could not close it (probe_weapon_counter, found 2026-10-10). Now: refused for a
-     * frame after any close, and after an E close until E is RELEASED, whatever the frame rate.
+     * (control.Interactions) and closes it from this _process, so one press is "just pressed" in both; above 60 fps
+     * the physics step that sees it comes 2+ process frames after the close (probe_weapon_counter, 2026-10-10).
+     *
+     * <p>That was first guarded with "refused until E is RELEASED" -- and the release was only ever looked for inside
+     * this method, which is only called WHILE E is pressed. So after the first E-close the store never opened again
+     * (user, 2026-10-11: "after the first purchase E cannot open again"; the probe closed with E only as its last
+     * step). It is a span of PHYSICS STEPS now: the same press arrives within a couple of them, a person's next press does not.
      */
     public static boolean closedThisFrame() {
         if (godot.api.Engine.INSTANCE.getProcessFrames() - closedFrame <= 1) return true;
-        if (closedByInteract && Input.INSTANCE.isActionPressed("interact", false)) return true;
-        closedByInteract = false;
-        return false;
+        return closedByInteractFrame >= 0 && godot.api.Engine.INSTANCE.getPhysicsFrames() - closedByInteractFrame < REOPEN_GUARD_STEPS;
     }
 
     public static void closeFor(ShopCounter counter) {
@@ -165,7 +168,7 @@ public class ShopMenu extends Control {
         Input in = Input.INSTANCE;
         if (in.isActionJustPressed("ui_cancel", false)) { close(); return; }
         if (in.isActionJustPressed("interact", false)
-                && godot.api.Engine.INSTANCE.getProcessFrames() != openedFrame) { closedByInteract = true; close(); return; }
+                && godot.api.Engine.INSTANCE.getProcessFrames() != openedFrame) { closedByInteractFrame = godot.api.Engine.INSTANCE.getPhysicsFrames(); close(); return; }
         if (in.isActionJustPressed("ui_down", false) || in.isActionJustPressed("back", false)) move(1);
         if (in.isActionJustPressed("ui_up", false) || in.isActionJustPressed("forward", false)) move(-1);
         if (in.isActionJustPressed("ui_accept", false)) buySelected();

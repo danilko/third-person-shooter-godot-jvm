@@ -127,6 +127,7 @@ public class ActivityRuntime extends Node implements ActivityHost, ActivityDirec
         if (director == null) return;
         tickOffer();
         tickObjective(delta);
+        tickResult(delta);
         if (!authority()) {
             // this machine joined someone else's world: nothing of its own goes on running
             if (!director.running().isEmpty()) director.abortAll("joined a session");
@@ -364,6 +365,7 @@ public class ActivityRuntime extends Node implements ActivityHost, ActivityDirec
         ActivityPlacement p = placement(a.activityId());
         if (p != null) p.ended(a.outcome(), a.variant(), a.reason());
         EventBus bus = getNodeOrNull("/root/EventBus") instanceof EventBus b ? b : null;
+        announceResult(a, results, bus);
         if (a.outcome() == ActivityInstance.Outcome.COMPLETED) {
             if (bus != null) bus.missionCompleted.emit(a.activityId(), "player", a.variant());
             broadcast(GameManager.WORLD_EVENT_MISSION_COMPLETED, a.activityId(), List.of("player", a.variant()));
@@ -371,6 +373,96 @@ public class ActivityRuntime extends Node implements ActivityHost, ActivityDirec
             if (bus != null) bus.missionFailed.emit(a.activityId(), a.reason());
             broadcast(GameManager.WORLD_EVENT_MISSION_FAILED, a.activityId(), List.of(a.reason()));
         }
+    }
+
+    // ── "is it over?" (user, 2026-10-11: "hard to know if the mission is complete or not") ──
+
+    private godot.api.Label resultLabel;
+    private double resultLeft;
+    private String resultText = "";
+    static final double RESULT_SECONDS = 7.0;
+
+    /** A banner where the objective was, and a line in the status feed: COMPLETE with what was paid, or FAILED with
+     *  why. Shown to this machine's player when they took part; the pause menu's MISSIONS tab keeps the record. */
+    private void announceResult(ActivityInstance a, List<ActivityResult> results, EventBus bus) {
+        ActivityResult mine = null;
+        for (ActivityResult r : results) if (r.playerId().equals(localId())) mine = r;
+        if (mine == null) return;
+        ActivityDef d = director.graph().activity(a.activityId());
+        String title = d == null || d.title().isEmpty() ? a.activityId() : d.title();
+        boolean won = a.outcome() == ActivityInstance.Outcome.COMPLETED;
+        String text = won ? "MISSION COMPLETE -- " + title + (mine.pay() > 0 ? String.format("   +¥%,d", mine.pay()) : "")
+                : "MISSION FAILED -- " + title + (a.reason() == null || a.reason().isEmpty() ? "" : " (" + a.reason() + ")");
+        resultText = text;
+        if (resultLabel == null) {
+            godot.api.CanvasLayer layer = new godot.api.CanvasLayer();
+            layer.setLayer(41);
+            resultLabel = new godot.api.Label();
+            resultLabel.setAnchorsPreset(godot.api.Control.LayoutPreset.PRESET_CENTER_TOP, false);
+            resultLabel.setOffset(godot.core.Side.LEFT, -700f);
+            resultLabel.setOffset(godot.core.Side.RIGHT, 700f);
+            resultLabel.setOffset(godot.core.Side.TOP, 130f);
+            resultLabel.setHorizontalAlignment(godot.core.HorizontalAlignment.CENTER);
+            resultLabel.setMouseFilter(godot.api.Control.MouseFilter.IGNORE);
+            resultLabel.addThemeFontSizeOverride(new StringName("font_size"), 40);
+            resultLabel.addThemeColorOverride(new StringName("font_outline_color"), new godot.core.Color(0, 0, 0, 1));
+            resultLabel.addThemeConstantOverride(new StringName("outline_size"), 10);
+            layer.addChild(resultLabel);
+            addChild(layer);
+        }
+        resultLabel.setText(text);
+        resultLabel.addThemeColorOverride(new StringName("font_color"),
+                won ? new godot.core.Color(0.45, 1.0, 0.55, 1.0) : new godot.core.Color(1.0, 0.4, 0.35, 1.0));
+        resultLabel.setModulate(new godot.core.Color(1, 1, 1, 1));
+        resultLabel.setVisible(true);
+        resultLeft = RESULT_SECONDS;
+        if (bus != null) bus.radioChatter.emit(text);
+    }
+
+    private void tickResult(double delta) {
+        if (resultLabel == null || resultLeft <= 0) return;
+        resultLeft -= delta;
+        if (resultLeft <= 0) resultLabel.setVisible(false);
+        else if (resultLeft < 1.0) resultLabel.setModulate(new godot.core.Color(1, 1, 1, resultLeft));
+    }
+
+    /** Probe readout: the banner's text while it is up, else "". */
+    @Register public String resultBannerNow() { return resultLabel != null && resultLabel.isVisible() ? resultText : ""; }
+
+    /**
+     * THE MISSION LOG for the pause menu's MISSIONS tab: one row {title, status, detail} per mission of the campaign
+     * graph, for this machine's player -- IN PROGRESS (its objective), COMPLETED (how it ended), AVAILABLE (where),
+     * LOCKED (why not).
+     */
+    public List<String[]> missionLog() {
+        List<String[]> out = new ArrayList<>();
+        if (director == null) return out;
+        CampaignWrite story = localStory();
+        for (ActivityDef d : director.graph().activities()) {
+            String id = d.id;
+            String title = d.title().isEmpty() ? id : d.title();
+            ActivityInstance run = director.runningOf(id);
+            if (run != null) {
+                out.add(new String[]{title, "IN PROGRESS", objectiveText.isEmpty() ? run.stageId() : objectiveText});
+            } else if (story.achieved(id, "")) {
+                String how = "";
+                for (String v : d.variants()) if (story.achieved(id, v)) how = v;
+                out.add(new String[]{title, "COMPLETED", how.replace('_', ' ').toLowerCase(java.util.Locale.ROOT)});
+            } else {
+                String why = director.whyNot(id, localId(), Activity.Mode.STORY);
+                boolean placed = placement(id) != null;
+                if (why.isEmpty()) out.add(new String[]{title, "AVAILABLE", placed ? "marked M on the map" : "not placed in this world yet"});
+                else out.add(new String[]{title, "LOCKED", why});
+            }
+        }
+        return out;
+    }
+
+    /** {@link #missionLog} for a probe: "title|status|detail;...". */
+    @Register public String missionLogNow() {
+        List<String> rows = new ArrayList<>();
+        for (String[] r : missionLog()) rows.add(String.join("|", r));
+        return String.join(";", rows);
     }
 
     private void broadcast(int event, String activityId, List<String> args) {

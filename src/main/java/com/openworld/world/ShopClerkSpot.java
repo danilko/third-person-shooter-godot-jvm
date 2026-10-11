@@ -29,7 +29,8 @@ import java.util.UUID;
  *
  * <p>On the authoritative peer, when the building streams in, a clerk (an ordinary AICharacter) is spawned here with a
  * {@link ClerkController}: still, hands empty, facing the counter. A THREAT -- a player in combat aiming within
- * {@link #AIM_RADIUS} of the clerk from within {@link #THREAT_RANGE}, or the clerk getting hurt -- is rolled ONCE
+ * {@link #AIM_RADIUS} of the clerk from within {@link #THREAT_RANGE} (fists or a melee weapon: raised, from within
+ * {@link #MELEE_THREAT_RANGE}), or the clerk getting hurt -- is rolled ONCE
  * (by the clerk's id, so a peer and a replay agree): SURRENDER (crouches behind the counter and stays) or FIGHT
  * (draws a weapon from {@link #weapons}, turns to {@link #FIGHT_FACTION} so it is hostile to everyone, and gets the
  * ordinary AI brain back). The clerk is freed with the building.
@@ -156,8 +157,11 @@ public class ShopClerkSpot extends Node3D {
         Player aimer = null;
         for (Player p : PlayerRegistry.getPlayers()) {
             if (!GD.isInstanceValid(p) || !p.isAlive() || !p.isCombat() || p.inputBlocked()) continue;
-            if (!drawsWeapon(p)) continue;
-            if (p.getGlobalPosition().distanceTo(chest) > THREAT_RANGE) continue;
+            // a gun threatens across the shop; fists, a knife or a bat only from where they could land a blow
+            // (user, 2026-10-11: "the robbery does not happen with normal melee" -- a punch cannot reach over the
+            // counter, so being HIT never fired either: squaring up to the clerk is the threat)
+            double reach = threatReach(p);
+            if (reach <= 0 || p.getGlobalPosition().distanceTo(chest) > reach) continue;
             Vector3 aim = p.getAimTargetPosition();
             if (aim == null) continue;
             // the aim LINE passing the clerk, not the aim point (it may land on the wall behind)
@@ -185,12 +189,21 @@ public class ShopClerkSpot extends Node3D {
         return near;
     }
 
-    /** A real weapon in the hands: not fists, not a holster, not a healing supply. */
-    private static boolean drawsWeapon(Player p) {
+    static final double MELEE_THREAT_RANGE = 4.0;
+
+    /** How far what the player holds threatens a clerk: {@link #THREAT_RANGE} for a gun, {@link #MELEE_THREAT_RANGE}
+     *  for fists (empty or holstered hands) or a melee weapon raised (the caller already asks for the combat stance),
+     *  0 for a healing supply. */
+    private static double threatReach(Player p) {
         var wc = p.weaponController;
-        if (wc == null || wc.isHolstered()) return false;
+        if (wc == null) return 0;
+        // empty hands are FISTS: a new player's weapons are holstered, and their raised guard (the combat stance the
+        // caller asks for) is the only threat they can make
+        if (wc.isHolstered()) return MELEE_THREAT_RANGE;
         var w = wc.getCurrentWeaponItem();
-        return w != null && !(w instanceof com.openworld.weapon.FistItem) && !(w instanceof com.openworld.weapon.SupplyItem);
+        if (w == null) return MELEE_THREAT_RANGE;
+        if (w instanceof com.openworld.weapon.SupplyItem) return 0;
+        return w instanceof com.openworld.weapon.MeleeItem ? MELEE_THREAT_RANGE : THREAT_RANGE;
     }
 
     /** The one roll: by the clerk's id, so it is the same answer every time it is asked. */
@@ -328,5 +341,7 @@ public class ShopClerkSpot extends Node3D {
     @Register public Node clerkNow() { return clerk; }
     @Register public int clerkStateNow() { return state; }
     @Register public boolean robbableNow() { return robbable(); }
+    /** Probe readout: how far what this player holds threatens a clerk (0 = it does not). */
+    @Register public double threatReachNow(Node player) { return player instanceof Player p ? threatReach(p) : 0; }
     @Register public void threatenNow(Node player) { if (clerk != null && player instanceof Player p && state == 0) react(p); }
 }

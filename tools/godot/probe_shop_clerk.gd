@@ -69,6 +69,10 @@ func _initialize() -> void:
 	var spot: Node3D = a[0]
 	var counter: Area3D = a[1]
 	_check(spot.call("clerk_now") != null, "the spot spawned a clerk")
+	# fists (what a new player has) threaten from arm's reach: a punch cannot land over the counter, so squaring up
+	# is the threat (user, 2026-10-11: "the robbery does not happen with normal melee")
+	var reach := float(spot.call("threat_reach_now", player))
+	_check(reach > 0.0 and reach <= 5.0, "what the player starts with (fists) threatens a clerk from close (%.1f m)" % reach)
 	spot.call("threaten_now", player)
 	await _tick(10)
 	_check(int(spot.call("clerk_state_now")) == 1, "a surrender-1 clerk surrenders")

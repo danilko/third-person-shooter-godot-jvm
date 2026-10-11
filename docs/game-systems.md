@@ -729,6 +729,24 @@ taken with a roof over the player, the shop still open afterwards (kill / spare 
 NOT done: a version with the crew INSIDE (needs AI on the interior navmesh, which only the enforcement dispatch
 uses today); the clerk does not react to the fight.
 
+**"Is it over?" and three shop defects found playing it (user, 2026-10-11).**
+* **A result banner and a mission log.** A finished run was a sound and nothing else. `ActivityRuntime.announceResult`
+  shows "MISSION COMPLETE -- <title>   +¥<pay>" (green) or "MISSION FAILED -- <title> (<why>)" (red) for 7 s where
+  the objective was, to this machine's player when they took part, and puts the same line in the status feed. The
+  pause menu has a **MISSIONS** tab (`GameMenu.missionsPage`, from `ActivityRuntime.missionLog()`): every mission
+  of the campaign graph as IN PROGRESS (its objective) / COMPLETED (how it ended) / AVAILABLE (marked M on the map)
+  / LOCKED (why). This is the "mission list" of 2.1's leftovers in its read-only form: no start / replay / retry
+  buttons yet.
+* **E never opened a store again after it was closed with E** ("after the first purchase E cannot open again").
+  `ShopMenu.closedThisFrame` refused a reopen "until E is released", and looked for the release only inside that
+  method -- which runs only while E is DOWN. It is a span of 6 physics steps now. `probe_weapon_counter` closed with
+  E only as its last step, and its next "open for the Esc test" was never checked: three checks added.
+* **A clerk could not be held up without a gun** ("the robbery does not happen with normal melee"). A threat was a
+  drawn non-fist weapon aimed, or the clerk being hurt -- and a punch does not reach over a counter. Fists (empty or
+  holstered hands) and melee weapons now threaten in the combat stance from `MELEE_THREAT_RANGE` 4 m
+  (`ShopClerkSpot.threatReach`); a gun still from 25 m. Only the reach is probed (`threat_reach_now`), not a played
+  hold-up with raised fists.
+
 **The mission test kit** (CR6). TIER 1, JUnit, engine-free: `KonbiniActivityTest` (15: every path of the shipped
 mission against `FakeActivityHost` with scripted events and a clock -- start, surrender only when both conditions
 hold, both spares, both kills, a death with no event, fail + restore, retry, a helper joining and being credited, a

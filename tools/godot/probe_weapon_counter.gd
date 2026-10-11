@@ -20,8 +20,8 @@ var fails := 0
 ## every check that must have run: a GDScript error inside an awaited coroutine aborts it and lets the caller print
 ## its RESULT line, so a probe that skipped half its cases would otherwise read PASS
 var checks := 0
-const EXPECT_ISLAND := 13
-const EXPECT_DEBUG := 9
+const EXPECT_ISLAND := 16
+const EXPECT_DEBUG := 12
 
 func _finish() -> void:
 	var want := EXPECT_DEBUG if debug else EXPECT_ISLAND
@@ -241,9 +241,19 @@ func _counter_cycle(counter: Area3D, p: CharacterBody3D, spawn: Node3D, weapon: 
 	_check("interact opens it again and interact closes it", reopened and _menu(root) == null
 			and not bool(p.call("input_blocked_now")), "reopened %s, open after %s, blocked %s" % [reopened,
 			_menu(root) != null, p.call("input_blocked_now")])
+	# ...and E opens it AGAIN after that (user, 2026-10-11: "after the first purchase E cannot open again" -- the
+	# reopen guard was only ever cleared while E was up, and only ever looked at while E was down)
+	await _tick(10)
+	await _press("interact")
+	await _tick(2)
+	_check("after an E close, E opens the store again", _menu(root) != null)
+	await _press("interact")
+	await _tick(10)
+	_check("...and closes it again", _menu(root) == null)
 	# Esc as a real input EVENT (the pause menu listens to events): it closes the store and does NOT pause the game
 	await _press("interact")
 	await _tick(2)
+	_check("the store is open for the Esc test", _menu(root) != null)
 	var ev := InputEventAction.new()
 	ev.action = "ui_cancel"
 	ev.pressed = true

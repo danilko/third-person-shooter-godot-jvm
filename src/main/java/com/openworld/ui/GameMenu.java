@@ -137,6 +137,7 @@ public class GameMenu extends Control {
         root.addChild(hint);
 
         if (inGame) addTab(bar, holder, "STATUS", statusPage());
+        if (inGame) addTab(bar, holder, "MISSIONS", missionsPage());
         addTab(bar, holder, "CONTROLS", controlsPage());
         addTab(bar, holder, "DISPLAY", displayPage());
         addTab(bar, holder, "GAME", gamePage());
@@ -292,6 +293,33 @@ public class GameMenu extends Control {
     @Register public void onQuitPressed() {}
     @Register public void close() { save(); }
 
+    /** MISSIONS (user, 2026-10-11: "hard to know if the mission is complete ... a message log / mission tab"): every
+     *  mission of the campaign with where it stands for this player -- game.activity.ActivityRuntime.missionLog. */
+    private VBoxContainer missionsList;
+
+    private Control missionsPage() {
+        HBoxContainer h = columns();
+        missionsList = column(h, "MISSIONS");
+        return h;
+    }
+
+    private void refreshMissions() {
+        if (missionsList == null) return;
+        clearRows(missionsList);
+        var rt = com.openworld.game.activity.ActivityRuntime.get();
+        java.util.List<String[]> rows = rt == null ? java.util.List.of() : rt.missionLog();
+        if (rows.isEmpty()) { note(missionsList, "No missions in this world yet."); return; }
+        for (String[] r : rows) {
+            Color c = switch (r[1]) {
+                case "COMPLETED" -> new Color(0.45f, 1.0f, 0.55f, 1f);
+                case "IN PROGRESS" -> new Color(1.0f, 0.86f, 0.3f, 1f);
+                case "LOCKED" -> new Color(1f, 1f, 1f, 0.45f);
+                default -> null;
+            };
+            fact(missionsList, r[0], r[1] + (r[2].isEmpty() ? "" : "  --  " + r[2]), c);
+        }
+    }
+
     // ── tabs ──
 
     @Register
@@ -311,6 +339,7 @@ public class GameMenu extends Control {
             tabButtons.get(i).setPressedNoSignal(i == tab);
         }
         if ("STATUS".equals(tabNames.get(tab))) refreshStatus();
+        if ("MISSIONS".equals(tabNames.get(tab))) refreshMissions();
         refreshBindings();
     }
 

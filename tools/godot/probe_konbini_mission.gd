@@ -238,6 +238,11 @@ func _initialize() -> void:
 			and str(rt.call("activity_checkpoint_now")) == "", str(rt.call("activity_checkpoint_now")))
 	check("the overlay is gone with the job", int(factions.call("activity_overlays_now")) == 0
 			and not factions.call("hostile_now", "player", "gang_a"))
+	# "is it over?" (user, 2026-10-11): a banner says so, and the pause menu's MISSIONS tab keeps the record
+	check("a MISSION COMPLETE banner names the job and the pay", str(rt.call("result_banner_now")).begins_with("MISSION COMPLETE -- The konbini job")
+			and str(rt.call("result_banner_now")).contains("¥"), str(rt.call("result_banner_now")))
+	check("the mission log lists it COMPLETED, with how it ended", str(rt.call("mission_log_now")).contains("The konbini job|COMPLETED|boss " + ("spared" if case == "spare" else "killed")),
+			str(rt.call("mission_log_now")))
 	check("it cannot be started again", str(rt.call("why_not_now", MISSION, "STORY")) == "already completed",
 			str(rt.call("why_not_now", MISSION, "STORY")))
 	var unlocked: bool = dir.call("is_mission_unlocked", "m02_informant")

@@ -100,7 +100,7 @@ func _initialize() -> void:
 
 	print("=== 4. the full-screen pause menu ===")
 	var pm := _find(current_scene, "PauseMenu")
-	_check("the pause menu has the four tabs", pm != null and String(pm.call("tabs_now")) == "STATUS,CONTROLS,DISPLAY,GAME",
+	_check("the pause menu has the five tabs (MISSIONS since 2026-10-11)", pm != null and String(pm.call("tabs_now")) == "STATUS,MISSIONS,CONTROLS,DISPLAY,GAME",
 		String(pm.call("tabs_now")) if pm else "-")
 	_check("... and Resume / Quit to title on GAME", _find(pm, "Resume") is Button and _find(pm, "QuitToTitle") is Button)
 	_check("... ONE backdrop, no stacked panels", _find(pm, "Backdrop") is ColorRect and _count(pm, "PanelContainer") == 0,
