@@ -195,7 +195,7 @@ public class MinimapController extends Control {
 
         // Places (3.18n): the shops and landmarks in range, as squares so they never read as a character.
         if (showPlaces) {
-            RoadOverlay.drawPlaces(this, Places.near(origin, rangeMeters * 1.5), origin, center, scale,
+            RoadOverlay.drawPlaces(this, RoadOverlay.withMissions(Places.near(origin, rangeMeters * 1.5)), origin, center, scale,
                     radiusPx, rot, placeSizePx, 0, null, 0, RoadOverlay.mapFont(), false);
         }
         // North on the rim, in north's on-screen direction: on a heading-up radar it travels round as you turn.
@@ -228,6 +228,21 @@ public class MinimapController extends Control {
                 Vector2 c = worldToScreen(m.getGlobalPosition(), origin, center, scale, rot);
                 float rr = m.zone.loadRadius * scale;
                 if (distance(c, center) - rr <= radiusPx) drawCircle(c, rr, regionColor, false, 1f, true);
+            }
+        }
+
+        // WHERE THE POLICE ARE SEARCHING (user, 2026-10-11): while they have lost the player, the disc round the last
+        // known place their units comb -- stay out of it and out of sight and the stars drain. The host's own
+        // knowledge (game.EnforcementDispatch): a co-op guest does not get it yet.
+        if (player instanceof Player sp && sp.characterInfo != null && com.openworld.game.EnforcementDispatch.get() != null) {
+            double[] area = com.openworld.game.EnforcementDispatch.get().searchArea(sp.characterInfo.characterId);
+            if (area != null) {
+                Vector2 c = worldToScreen(new Vector3(area[0], origin.getY(), area[1]), origin, center, scale, rot);
+                float rr = (float) area[2] * scale;
+                if (distance(c, center) - rr <= radiusPx) {
+                    drawCircle(c, rr, searchFillColor, true, -1f, true);
+                    drawCircle(c, rr, searchRingColor, false, 2f, true);
+                }
             }
         }
 
@@ -319,6 +334,10 @@ public class MinimapController extends Control {
      * It delegates to {@link RoadOverlay#project}, so the blips, the route and the baked road picture cannot
      * come to disagree about which way the map is facing.
      */
+    /** The police search disc (see _draw): a faint fill and a ring, in the police blue. */
+    @Export public Color searchFillColor = new Color(0.35f, 0.60f, 1.00f, 0.16f);
+    @Export public Color searchRingColor = new Color(0.35f, 0.60f, 1.00f, 0.85f);
+
     private Vector2 worldToScreen(Vector3 world, Vector3 origin, Vector2 center, float scale, float rot) {
         return RoadOverlay.project(world.getX(), world.getZ(), origin.getX(), origin.getZ(),
                 center.getX(), center.getY(), scale, rot);

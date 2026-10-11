@@ -244,7 +244,9 @@ Gate: `probe_world_warmup.gd` 11/11 (cover up from the first frame to the end; t
 streamer quiet again) and `-- --control` (no sites: nothing beyond the player's own zones loads, 110 -> 110).
 
 **Skipping the tour (user, 2026-10-10: "so I do not wait for the tour every time when testing").** GAME tab,
-"Loading tour" (`QualitySettings.loadingTour`, `settings.cfg` `[world] loading_tour`, default on, client-local): off
+"Loading tour" (`QualitySettings.loadingTour`, `settings.cfg` `[world] loading_tour`, **default OFF since 2026-10-11** -- the
+user tested it and saw no saving, and its hitch benefit was never measured; queued for removal in PLAN.md --
+client-local): off
 = `FrontEnd.startWarmup` adds no `WorldWarmup` and the world is playable at once (the streaming and shader
 compilation the tour hides then happen in the first minutes of play). The other ways stay: `-- --no-warmup` on the
 command line, `OW_NO_WARMUP=1`, and it never runs headless or under `--script`.

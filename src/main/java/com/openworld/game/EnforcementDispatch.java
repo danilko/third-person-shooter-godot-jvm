@@ -177,6 +177,21 @@ public class EnforcementDispatch extends Node {
         return searchPhase && s != null && s.lastKnown != null && s.lostFor > 0 ? s.lastKnown : p.getGlobalPosition();
     }
 
+    /** For the minimap: {x, z, radius m} of the disc the POLICE are searching for this player, or null while they
+     *  have them in sight (or are not after them). The radius is the one {@link #searchTick} draws its points from. */
+    public double[] searchArea(String playerId) {
+        if (!lost(playerId, POLICE)) return null;
+        Sight s = sightOf.get(playerId + "|" + POLICE);
+        return new double[] {s.lastKnown.getX(), s.lastKnown.getZ(), Math.min(SEARCH_MAX, SEARCH_START + SEARCH_GROW * s.lostFor)};
+    }
+
+    /** {@link #searchArea} for a probe: "x,z,r" or "". */
+    @godot.annotation.Register
+    public String searchAreaNow(String playerId) {
+        double[] a = searchArea(playerId);
+        return a == null ? "" : String.format("%.1f,%.1f,%.1f", a[0], a[1], a[2]);
+    }
+
     /** Probe readout for the POLICE: "lost=<bool> lost_for=<s> lost_n=<times lost> found_n=<times found again> known=(x, z)". */
     @godot.annotation.Register
     public String sightNow(String playerId) { return sightOfNow(playerId, POLICE); }

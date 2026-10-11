@@ -21,6 +21,7 @@ import godot.core.Vector3;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Draws the baked road picture and a GPS route onto a north-up map (PLAN.md 4.7, 4.7b) — shared by
@@ -330,7 +331,7 @@ final class RoadOverlay {
                 ci.drawString(numberFont, new Vector2(at.getX() - h, at.getY() + fs * 0.36f), k.code,
                         HorizontalAlignment.CENTER, sizePx, fs, new Color(0f, 0f, 0f, 0.9f));
             }
-            if (font != null && (p.tier() >= Places.LANDMARK_TIER || showAllNames)) {
+            if (font != null && (k.major || showAllNames)) {
                 // two places side by side (the safe house and the weapon counter are 21 m apart) must not print
                 // their names on top of each other: a label that would overlap one already drawn steps down a line
                 float lx = (float) (at.getX() + h + 3f), ly = (float) (at.getY() + fontSize * 0.35f);
@@ -357,37 +358,80 @@ final class RoadOverlay {
      * {@code building_types.json}) and, for the roles the placement names, on the place's own name.
      */
     enum PlaceKind {
-        SAFEHOUSE("H", "Safe house", new Color(1.00f, 1.00f, 1.00f, 1f)),
-        ARMOURY("W", "Weapon counter", new Color(1.00f, 0.35f, 0.30f, 1f)),
-        KONBINI("1", "Convenience store", new Color(0.40f, 0.85f, 0.45f, 1f)),
-        GAS("2", "Gas station", new Color(1.00f, 0.62f, 0.20f, 1f)),
-        FOOD("3", "Restaurant", new Color(1.00f, 0.88f, 0.30f, 1f)),
-        STATION("4", "Station", new Color(0.40f, 0.70f, 1.00f, 1f)),
-        LANDMARK("5", "Landmark", new Color(0.80f, 0.55f, 1.00f, 1f)),
-        OTHER("6", "Other", new Color(0.85f, 0.85f, 0.85f, 1f));
+        // Redone 2026-10-11 (user): no "Weapon counter" (every konbini sells weapons; the stand-alone store is gone)
+        // and no "Landmark" -- the map names what a player DOES something at: where they live, a mission, the police,
+        // a gang's ground, where they are patched up, and every building they can walk into.
+        SAFEHOUSE("H", "Safe house", new Color(1.00f, 1.00f, 1.00f, 1f), true),
+        MISSION("M", "Mission", new Color(1.00f, 0.90f, 0.25f, 1f), true),
+        POLICE("P", "Police (station, koban)", new Color(0.35f, 0.60f, 1.00f, 1f), true),
+        GANG("G", "Gang ground", new Color(0.95f, 0.30f, 0.75f, 1f), true),
+        MEDICAL("+", "Hospital, clinic, fire", new Color(1.00f, 0.45f, 0.40f, 1f), true),
+        STATION("T", "Station", new Color(0.45f, 0.85f, 1.00f, 1f), true),
+        KONBINI_L("K", "Konbini, large (weapons)", new Color(0.25f, 0.80f, 0.40f, 1f), false),
+        KONBINI_S("k", "Konbini, small (weapons)", new Color(0.60f, 0.92f, 0.62f, 1f), false),
+        GARAGE("2", "Gas, repair, car dealer", new Color(1.00f, 0.62f, 0.20f, 1f), false),
+        BANK("3", "Bank", new Color(0.80f, 0.72f, 0.30f, 1f), false),
+        FOOD("4", "Food and nightlife", new Color(1.00f, 0.75f, 0.55f, 1f), false),
+        SHOP("5", "Shops and services", new Color(0.75f, 0.62f, 1.00f, 1f), false),
+        OTHER("6", "Other enterable / site", new Color(0.82f, 0.82f, 0.82f, 1f), false);
 
         final String code;
         final String label;
         final Color color;
+        /** Named at every zoom (the rest only once zoomed in), and the ones a zoomed-out player navigates by. */
+        final boolean major;
 
-        PlaceKind(String code, String label, Color color) {
+        PlaceKind(String code, String label, Color color, boolean major) {
             this.code = code;
             this.label = label;
             this.color = color;
+            this.major = major;
+        }
+
+        private static boolean any(String k, String... starts) {
+            for (String s : starts) if (k.startsWith(s)) return true;
+            return false;
         }
 
         static PlaceKind of(Places.Place p) {
             String k = p.kind() == null ? "" : p.kind();
-            String n = p.name() == null ? "" : p.name().toLowerCase(java.util.Locale.ROOT);
-            if (n.contains("safe")) return SAFEHOUSE;
-            if (n.contains("weapon")) return ARMOURY;
-            if (k.startsWith("Konbini")) return KONBINI;
-            if (k.startsWith("Gas")) return GAS;
-            if (k.startsWith("FamilyRestaurant")) return FOOD;
-            if (k.contains("Station")) return STATION;
-            if (p.tier() >= Places.LANDMARK_TIER) return LANDMARK;
+            if (k.equals(MISSION_KIND)) return MISSION;
+            if (k.startsWith("SafeHouse")) return SAFEHOUSE;
+            // a gang's ground first: an abducted player is held there, whatever the building is
+            if (p.gang() != null && !p.gang().isEmpty()) return GANG;
+            if (k.startsWith("Gang")) return GANG;
+            if (any(k, "Koban", "PoliceStation", "ImpoundLot")) return POLICE;
+            if (any(k, "Hospital", "Clinic", "FireStation", "FireBranch")) return MEDICAL;
+            if (k.startsWith("Station_")) return STATION;
+            if (k.startsWith("KonbiniL")) return KONBINI_L;
+            if (k.startsWith("Konbini")) return KONBINI_S;
+            if (any(k, "GasStation", "RepairShop", "CarDealer")) return GARAGE;
+            if (k.startsWith("Bank")) return BANK;
+            if (any(k, "FamilyRestaurant", "Izakaya", "Karaoke", "MaidCafe", "Pachinko", "GameCentre", "HotelLove",
+                    "AdultServices", "PublicMarket", "Shotengai")) return FOOD;
+            if (any(k, "Supermarket", "DepartmentStore", "ClothingStore", "FashionBuilding", "HomeCentre", "SuburbanMall",
+                    "PostOffice", "WardOffice", "CivicCenter", "PublicLibrary", "SuperSento", "OnsenRyokan", "HotelBusiness",
+                    "ShootingRange", "ShopHouse", "AirportTerminal", "StationMall")) return SHOP;
             return OTHER;
         }
+    }
+
+    /** The kind of a place that is a MISSION's start (game.activity.ActivityRuntime's placements), added to the
+     *  places a map draws by {@link #withMissions}: it is not a building, so it is not in the places record. */
+    static final String MISSION_KIND = "Mission";
+
+    /** {@code places} plus one MISSION place per mission that stands in this world and can be started (or is
+     *  running) now -- where its placement node is. */
+    static List<Places.Place> withMissions(List<Places.Place> places) {
+        com.openworld.game.activity.ActivityRuntime rt = com.openworld.game.activity.ActivityRuntime.get();
+        if (rt == null) return places;
+        Map<String, Vector3> spots = rt.missionSpots();
+        if (spots.isEmpty()) return places;
+        List<Places.Place> out = new ArrayList<>(places);
+        for (Map.Entry<String, Vector3> e : spots.entrySet())
+            out.add(new Places.Place(e.getKey(), MISSION_KIND, Places.LANDMARK_TIER, e.getValue(), e.getValue(), "",
+                    List.of(), null, null));
+        return out;
     }
 
     /** The full map's key to {@link PlaceKind}: one square and one line per kind, bottom-left of the view. */

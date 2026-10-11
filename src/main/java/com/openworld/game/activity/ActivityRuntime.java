@@ -300,6 +300,22 @@ public class ActivityRuntime extends Node implements ActivityHost, ActivityDirec
 
     public void unplace(Node3D node) { placements.values().removeIf(n -> n == node); }
 
+    /** For the MAP (ui.RoadOverlay): mission title -> where its placement stands, for every placed mission the local
+     *  player can start now or that is running. A finished one (not replayable now) is off the map. */
+    public Map<String, godot.core.Vector3> missionSpots() {
+        Map<String, godot.core.Vector3> out = new LinkedHashMap<>();
+        if (director == null) return out;
+        for (Map.Entry<String, Node3D> e : placements.entrySet()) {
+            Node3D n = e.getValue();
+            if (n == null || !GD.isInstanceValid(n) || !n.isInsideTree()) continue;
+            String id = e.getKey();
+            if (!isRunning(id) && whyNotNow(id, "start") != null && !whyNotNow(id, "start").isEmpty()) continue;
+            ActivityDef d = director.graph().activity(id);
+            out.put(d == null || d.title().isEmpty() ? id : d.title(), n.getGlobalPosition());
+        }
+        return out;
+    }
+
     private ActivityPlacement placement(String activityId) {
         Node3D n = placements.get(activityId);
         return n != null && GD.isInstanceValid(n) && n instanceof ActivityPlacement p ? p : null;

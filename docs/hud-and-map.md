@@ -335,3 +335,27 @@ Two asks, one answer each.
   90 deg, and four 90 deg corners are filleted to `CORNER_R` 15 m; `SIDES` 90/110/130 m are searched, smallest
   first. The airport end became 90 x 90 m (was a 43 x 59 m teardrop).
 
+## The map key, redone: what a player DOES something at; the police search disc (user, 2026-10-11)
+
+User: "update the map to include mission areas / all enterable buildings, police stations / gang / mission area
+instead of landmark; there is no longer a weapon store, so re-do the keys; mark konbini small and big", and "add the
+circle area of the police search in the minimap".
+
+`ui.RoadOverlay.PlaceKind` is still the ONE table the blips and the full map's legend read. The kinds, in legend
+order: **H** Safe house, **M** Mission, **P** Police (station, koban, impound), **G** Gang ground (any place the
+record gives a `gang`, and the Gang* kinds), **+** Hospital / clinic / fire, **T** Station -- these six are `major`:
+named at every zoom -- then **K** Konbini large and **k** Konbini small (both sell weapons; `KonbiniL` / `KonbiniS`),
+**2** Gas / repair / car dealer, **3** Bank, **4** Food and nightlife, **5** Shops and services, **6** Other
+enterable / site. "Weapon counter" and "Landmark" are gone (a name used to decide the first, a tier the second);
+the old `k.contains("Station")` also made a police station, a fire station and the station mall a rail station --
+a station is `Station_*` only now. Every place is still drawn at every zoom (all 237 are enterable buildings or
+sites: the record lists nothing else).
+
+**Mission places are not in the places record** (they are not buildings): `RoadOverlay.withMissions` appends one
+`Mission` place per `ActivityRuntime.missionSpots()` -- a placed mission the local player can start now, or one
+that is running -- at its placement node, named by the mission's title. A finished mission leaves the map.
+
+**The search disc** (`MinimapController`): while the police have LOST the local player, a blue ring and faint fill
+at `EnforcementDispatch.searchArea(playerId)` = the last known place and the radius their units are searching (8 m
+growing 1 m/s to 45 m). It is the host's knowledge read directly: a co-op guest does not see it yet (it would ride
+`WORLD_EVENT_WANTED`). `probe_lose_police` checks the readout (`search_area_now`).

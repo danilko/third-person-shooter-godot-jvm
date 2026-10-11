@@ -136,6 +136,7 @@ func _initialize() -> void:
 	if mc != null and mc.has_method("clear_motion"):
 		mc.call("clear_motion")
 	var lost_at := -1
+	var area := ""
 	var nearest := 1e9
 	var cleared_at := -1
 	for i in 60 * 75:
@@ -144,6 +145,7 @@ func _initialize() -> void:
 			continue
 		if lost_at < 0 and str(ed.call("sight_now", pid)).contains("lost=true"):
 			lost_at = i
+			area = str(ed.call("search_area_now", pid))
 		if i > 120:
 			nearest = minf(nearest, _police_near(ed, player.global_position))
 		if cleared_at < 0 and int(ws.call("stars_now", pid)) == 0:
@@ -156,6 +158,7 @@ func _initialize() -> void:
 			"stars %d, nearest police came to %.0f m" % [int(ws.call("stars_now", pid)), nearest])
 	else:
 		check("the police LOSE a player who is gone", lost_at >= 0 and lost_at <= 60 * 6, "after %.1f s" % (lost_at / 60.0))
+		check("the minimap is given the search disc (x, z, radius)", area.split(",").size() == 3, area)
 		check("no unit turns up where the player went (they search the last known place)", nearest > 60.0,
 			"nearest police body came to %.0f m" % nearest)
 		check("the stars drain to nothing after the calm period", cleared_at >= 0, "after %.0f s" % (cleared_at / 60.0))

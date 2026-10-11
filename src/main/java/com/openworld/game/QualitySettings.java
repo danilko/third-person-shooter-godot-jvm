@@ -55,8 +55,10 @@ public class QualitySettings extends Node {
     public boolean hudMinimal = false;
     /** The loading screen's warm-up TOUR when the island comes up (game.WorldWarmup). Off = the world starts at once
      *  (user, 2026-10-10: "so I do not wait for the tour every time when testing"); the first minutes then stream
-     *  and compile shaders in play, which is what the tour is there to hide. Client-local: it changes nobody's world. */
-    public boolean loadingTour = true;
+     *  and compile shaders in play, which is what the tour is there to hide. Client-local: it changes nobody's world.
+     *  OFF BY DEFAULT since 2026-10-11 (user, after testing: "the tour does not seem to save any resources"); its
+     *  hitch benefit was never measured either. Queued for REMOVAL unless a measurement shows one (PLAN.md). */
+    public boolean loadingTour = false;
     /** How much the HOST simulates (cars, promoted peds, attackers at once): {@link WorldDensity}. Host-decided. */
     public WorldDensity worldDensity = WorldDensity.NORMAL;
     /** Added to every on-foot and vehicle camera FOV (deg), never to a scope's declared FOV. -10..+20. */

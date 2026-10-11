@@ -346,7 +346,7 @@ public class WorldMapManager extends Control {
         if (showRail) RoadOverlay.drawRail(this, view, center, scale, 0f, railWidthPx, true, 0f);
         if (showPlaces) {
             // EVERY place at every zoom, as its kind's numbered square; names only once zoomed in
-            RoadOverlay.drawPlaces(this, visiblePlaces(), view, center, scale, 0f, 0f, placeSizePx,
+            RoadOverlay.drawPlaces(this, RoadOverlay.withMissions(visiblePlaces()), view, center, scale, 0f, 0f, placeSizePx,
                     minPlaceTier(), showPlaceNames ? RoadOverlay.mapFont() : null, placeFontSize, RoadOverlay.mapFont(),
                     rangeMeters <= placeDetailRange);
             // clear of the row numbers down the left edge (drawPostalEdgeNumbers puts them at x 4)
