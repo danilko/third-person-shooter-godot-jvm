@@ -118,8 +118,9 @@ func _fail_retry(activity: String, job: Node, control: bool) -> void:
 	var balance := int(saves.call("profile_balance_now"))
 	check("it starts", str(rt.call("start_now", activity, "STORY")) == "" and str(rt.call("stage_now", activity)) == "FIGHT",
 			str(rt.call("stage_now", activity)))
-	check("the crew is hostile, doors are held", CREW.all(func(id): return _faction(id) == "gang_a")
-			and int(rt.call("doors_held_now", activity)) > 0, "%d door(s)" % rt.call("doors_held_now", activity))
+	# the job's shop is an ordinary OPEN konbini since the 2026-10-11 redesign (a0ece725): the run holds no door
+	check("the crew is hostile, the open shop's doors are not held", CREW.all(func(id): return _faction(id) == "gang_a")
+			and int(rt.call("doors_held_now", activity)) == 0, "%d door(s)" % rt.call("doors_held_now", activity))
 	rt.call("fail_now", activity, "player_arrested")
 	await physics_frame
 	check("failing it from outside ends the run", not rt.call("running_now", activity) and failed == [[activity, "player_arrested"]],

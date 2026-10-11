@@ -360,6 +360,18 @@ public class VehicleAIController extends Controller {
 
         if (dummy) return dummyInput(delta);
 
+        // The lane's limit is the CAR's to keep (Vehicle.speedCap, PLAN.md V6). No cap for a car with business of
+        // its own: racing, on a dispatch plan, ramming.
+        float cap = vehicleCapsSpeed && !racing && ramTarget == null && !hasPlan() ? effectiveCruiseSpeed() : 0f;
+        vehicleBody.setSpeedCap(cap);
+        float limit = !racing && ramTarget == null && !hasPlan() ? effectiveCruiseSpeed() : 0f;
+        if (limit > 0f) {
+            float over = currentSpeed() - limit;
+            capSeconds += delta;
+            if (over > 2f) overSeconds += delta;
+            if (over > worstOver) worstOver = over;
+        }
+
         if (rammingNow() && !holdStop) {
             // driving AT the target: not stalled, not waiting -- the dispatch decides when it has given up
             stallSeconds = 0.0;
@@ -431,6 +443,13 @@ public class VehicleAIController extends Controller {
      *
      *  <p>Plain Java, not {@code @Register}: only {@link CruiseState} calls it, and
      *  exposing it to Godot would be one more registered symbol for no caller. */
+    /** Off = the brain's own throttle fade keeps the pace, as before V6 (ZoneManager.trafficSpeedCap; the control). */
+    public static boolean vehicleCapsSpeed = true;
+    /** Since start, over every traffic brain: seconds driven under a limit, seconds more than 2 m/s over it, and the
+     *  worst excess (m/s). Counted with the cap on or off, so the two can be compared (probe_traffic_census). */
+    public static double capSeconds, overSeconds;
+    public static float worstOver;
+
     public float effectiveCruiseSpeed() {
         if (route instanceof PathLaneRoute p && p.speedLimit > 0f) {
             return p.speedLimit / 3.6f;                 // km/h -> m/s
@@ -654,6 +673,10 @@ public class VehicleAIController extends Controller {
     /** The gap rule is what holds this on-rails car still (for {@link #standingReason}). */
     private boolean dummyGapHeld;
     static final double DUMMY_ACCEL = 2.5, DUMMY_DECEL = 4.0, DUMMY_GAP = 9.0;
+    /** How far ahead and how far to each side an on-rails car looks for a car on ANOTHER lane (m). */
+    static final double DUMMY_REACH = 40.0, DUMMY_PATH_HALF = 1.8;
+    /** Off = an on-rails car sees only the cars on its own lane (the control). */
+    public static boolean dummyGapAcrossLanes = true;
     @Register public boolean dummyNow() { return dummy; }
     @Register public double dummySpeedNow() { return dummySpeed; }
     @Register public double progressNow() { return routeProgress; }
@@ -714,6 +737,23 @@ public class VehicleAIController extends Controller {
             if (o == this || o.route != route) continue;
             double d = o.routeProgress - routeProgress;
             if (d > 0 && d < gap) gap = d;
+        }
+        // ... AND THE CAR AHEAD ON THE NEXT LANE. The rule above compares progress on ONE lane, so a car on rails
+        // coming off a connector did not see the queue standing on the lane it was about to join: it drove into the
+        // last car, and both were made real overlapping when a player came near -- thrown, stacked (measured with
+        // the census' new crash count: 209 of 426 traffic crashes were at ONE red light, contact normal straight
+        // down). Whatever traffic car stands in this car's own path within reach, on any lane, is a car ahead.
+        if (dummyGapAcrossLanes && vehicleBody != null) {
+            Vector3 here = vehicleBody.getGlobalPosition();
+            Vector3 fwd = vehicleBody.getGlobalBasis().getColumn(2).times(-1.0);
+            for (VehicleAIController o : LIVE) {
+                if (o == this || o.route == route || o.vehicleBody == null || !GD.isInstanceValid(o.vehicleBody)) continue;
+                Vector3 d = o.vehicleBody.getGlobalPosition().minus(here);
+                double along = d.dot(fwd);
+                if (along <= 0.0 || along >= DUMMY_REACH || along >= gap || Math.abs(d.getY()) > 3.0) continue;
+                double lat = d.minus(fwd.times(along)).length();
+                if (lat < DUMMY_PATH_HALF) gap = along;
+            }
         }
         dummyGapHeld = false;
         if (gap < Double.MAX_VALUE) {
@@ -870,7 +910,11 @@ public class VehicleAIController extends Controller {
 
     private void buildFlankRays() {
         if (vehicleBody == null || obstacleRay == null) return;
-        double half = Math.max(0.6, vehicleBody.getConfig().hullHalfWidth - 0.15);
+        // The outer lines sit just OUTSIDE the hull's edge, not inside it (PLAN.md V3 a). The hull touches a person
+        // whose centre is within hullHalfWidth + their 0.35 m radius; with the outer ray 0.15 m inside the edge a
+        // person 1.0 m off the lane centre was seen only while the car rode within 0.15 m of the centreline --
+        // probe_ai_stops' second case failed 2 runs in 4, the car first slowing 10 m off instead of 37 m.
+        double half = Math.max(0.6, vehicleBody.getConfig().hullHalfWidth + 0.05);
         flankHalf = half;
         // FIVE lines across the car's own width, not three: a person is a 0.35 m capsule, so two rays a metre
         // apart leave a gap wider than they are -- measured, a person standing exactly on the lane centre was

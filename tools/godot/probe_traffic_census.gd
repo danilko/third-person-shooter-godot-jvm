@@ -81,6 +81,10 @@ func _run() -> void:
 		ts.set("game_clock", true)
 	if args.has("no-lazy-drivers"):
 		zm.set("traffic_lazy_drivers", false)
+	if args.has("no-cross-gap"):
+		zm.set("traffic_gap_across_lanes", false)   # the control: an on-rails car joins a queue it cannot see
+	if args.has("no-cap"):
+		zm.set("traffic_speed_cap", false)   # V6's control: the brain fades its own throttle, the car has no limit
 	if args.has("along-share"):
 		zm.set("traffic_spawn_along_share", float(args["along-share"]))
 	if args.has("along-lanes"):
@@ -155,6 +159,7 @@ func _run() -> void:
 			s200 / d, alive / d, far / d, int(zm.call("traffic_spawns_refused_now")) - refused0, models, waited / 60.0,
 			str(zm.call("traffic_region_now")) if zm.has_method("traffic_region_now") else "?"])
 		print("    drivers: %s" % str(zm.call("traffic_drivers_now")))
+		print("    safety: %s" % str(zm.call("traffic_safety_now")))
 		if args.has("lanes"):
 			# where each ambient car is at the end: its lane, its distance and height against the player
 			for c in _cars(p.global_position, 400.0):

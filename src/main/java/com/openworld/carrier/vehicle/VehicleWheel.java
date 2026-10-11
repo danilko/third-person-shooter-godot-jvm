@@ -378,6 +378,8 @@ public class VehicleWheel extends RayCast3D {
                 motorScale *= 1.0 + (cfg.launchBoost - 1.0)
                         * Math.max(0.0, 1.0 - baseRatio / cfg.launchBoostEndRatio);
             }
+            // a capped car (traffic at its lane's limit) gets no forward drive at the cap: Vehicle.capDriveScale
+            if (cmd.motor > 0f) motorScale *= vehicle.capDriveScale(dirSpeed);
             Vector3 accelForce = forwardDir.times(cfg.acceleration * cmd.motor * accelRatio * motorScale);
             vehicle.applyForce(accelForce, forcePos);
         }

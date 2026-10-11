@@ -80,9 +80,13 @@ public class CruiseState implements VehicleAIState {
         // how powerful the vehicle archetype is.
         // Per-lane pace when the sidecar gives one (v2 `speed_limit`), else the controller's own
         // cruiseSpeed — so an expressway lane and a backstreet lane no longer run at one speed.
-        float over = ((float) body.getLinearVelocity().length() - ctrl.effectiveCruiseSpeed())
-                / Math.max(0.1f, ctrl.cruiseSpeedFalloff);
-        if (over > 0f) cmd.motor *= Math.max(0f, 1f - over);
+        // SINCE V6 THE CAR HOLDS THE LIMIT (Vehicle.speedCap, set by the brain from this lane): this throttle fade is
+        // only for a car with no cap -- a racer, a unit on a call -- which still needs a pace of its own.
+        if (body.getSpeedCap() <= 0f) {
+            float over = ((float) body.getLinearVelocity().length() - ctrl.effectiveCruiseSpeed())
+                    / Math.max(0.1f, ctrl.cruiseSpeedFalloff);
+            if (over > 0f) cmd.motor *= Math.max(0f, 1f - over);
+        }
         // Junction discipline: the probe above only sees the CURRENT route, so a hard turn
         // connector right after this lane's end is invisible until adopted — ease off ahead of
         // any chained lane end, and stay slow while the connector actually bends (L/R).

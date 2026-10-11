@@ -12,6 +12,7 @@ import com.openworld.world.PropBreakRules;
 import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
+import godot.annotation.Visible;
 import godot.api.*;
 import godot.core.*;
 import godot.core.MethodCallable;
@@ -500,6 +501,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             } else {
                 boolean supported = applyLocomotion(cfg, delta);
                 lastGrounded = supported;
+                if (supported) applySpeedCap();
 
                 // Park evaluation: idle + supported + slow, held for parkDelaySeconds
                 // (the dwell prevents sleep/wake flap at the threshold). AI traffic never
@@ -660,7 +662,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     // car drives on through where the body was (GTA's run-over) and keeps all but a person's share of its momentum.
     // A living person (a slow nudge) is still met by the physics. Simulating peer only: damage is applied there.
     /** Off = the old behaviour (a person is a wall). */
-    @godot.annotation.Visible public boolean knockPeople = true;
+    @Visible public boolean knockPeople = true;   // (was a fully-qualified annotation: never registered, so the probes' control did nothing)
     private static final double PERSON_MASS = 80.0;
     private static final double PERSON_RADIUS = 0.4;
     private static final double PASS_THROUGH_SECONDS = 1.5;
@@ -687,13 +689,21 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
                 it.remove();
             }
         }
+        expireShoves(delta);
         if (!knockPeople || delta <= 0.0 || !isLocallySimulated() || isFreezeEnabled() || parked) return;
         VehicleConfig cfg = getConfig();
         if (cfg == null || cfg.vehicleCollisionMinSpeed <= 0) return;
         Vector3 vel = getLinearVelocity();
         double speed = Math.hypot(vel.getX(), vel.getZ());
         // NaN < min is false: a car whose velocity went non-finite would deal NaN damage (PLAN.md 1a)
-        if (!Double.isFinite(speed) || speed < cfg.vehicleCollisionMinSpeed) return;
+        if (!Double.isFinite(speed)) return;
+        if (speed < cfg.vehicleCollisionMinSpeed) {
+            if (shovePeople) shoveSweep(vel, speed, delta, false);
+            return;
+        }
+        // someone it met SLOWLY and is still moving out of its way is not run down because it has since picked up
+        // speed (a quick car is past the hit speed 0.3 s after pulling away): they stay shoved until they are clear
+        if (shovePeople && !shoving.isEmpty()) shoveSweep(vel, speed, delta, true);
         if (hullHalfWidth < 0.0) measureHull();
         Vector3 pos = getGlobalPosition();
         Basis basis = getGlobalBasis();
@@ -715,7 +725,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         double keep = 1.0;
         for (Node n : peopleScratch) {
             if (!(n instanceof Character c) || c == occupant || c.currentVehicleNode != null || !c.isAlive()
-                    || passThrough.containsKey(c) || !GD.isInstanceValid(c)) continue;
+                    || passThrough.containsKey(c) || !GD.isInstanceValid(c) || shoving.containsKey(c)) continue;
             Vector3 d = c.getGlobalPosition().minus(pos);
             if (Math.abs(d.getY()) > 2.5) continue;
             if (!PropBreakRules.reachesPole(d.dot(bx), d.dot(bz), hullHalfWidth, hullHalfLength, PERSON_RADIUS,
@@ -729,6 +739,111 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             }
         }
         if (keep < 1.0) setLinearVelocity(vel.times((float) keep));
+    }
+
+    // ── A slow car shoves a person out of its way (PLAN.md V3; user 2026-10-11: "the player's car pushes through a
+    // person most of the time, forward and in reverse (GTA)") ────────────────────────────────────────────────────
+    // Below the hit speed a living character was a WALL: a kinematic capsule, which a rigid car cannot move. Measured
+    // (probe_car_vs_ped --control, SPC1 at full throttle): bumper to a standing person, forward -- the car creeps
+    // 0.3 m in a second, then squeezes round them turned 27 deg and 32 m off its line; in reverse -- it pushes them
+    // along at 1.3 m/s for ever and never gets past. Now a DRIVEN car (someone at the wheel or a brain, and throttle
+    // or motion) moves whoever stands in the hull's path sideways out of it, and does not collide with them while
+    // it does: the car keeps its line and its speed, the person steps aside unhurt. Someone who cannot get out of
+    // the way (a wall beside them) is driven over slowly and hurt for it (CRUSH_*). At the hit speed and above,
+    // the knock-down path above is unchanged.
+    /** Off = a person is a wall to a slow car again (probe control). */
+    @Export public boolean shovePeople = true;
+    public boolean isShovePeople() { return shovePeople; }
+    public void setShovePeople(boolean v) { shovePeople = v; }
+    private static final double SHOVE_SIDE_SPEED = 2.6;       // m/s sideways: clears a 1.9 m car's half width in ~0.5 s
+    private static final double SHOVE_HOLD = 0.2;             // s the body keeps the shove after the last ask
+    private static final double SHOVE_GRACE = 0.5;            // s the car ignores the body after the last ask
+    private static final double CRUSH_AFTER = 0.8;            // s under the hull before it hurts
+    private static final float  CRUSH_DAMAGE = 12f;           // per CRUSH_EVERY
+    private static final double CRUSH_EVERY = 0.5;
+    /** [seconds of grace left, seconds spent under the hull, seconds to the next crush tick] per person in the way. */
+    private final java.util.Map<Character, double[]> shoving = new java.util.HashMap<>();
+    private int peopleShoved;
+    /** Probe readout: people this car has shoved aside (counted once each time they enter its path). */
+    @Register public int peopleShovedNow() { return peopleShoved; }
+
+    private void shoveSweep(Vector3 vel, double speed, double delta, boolean knownOnly) {
+        boolean driven = hasAnyOccupant() || isAiDriven() || controller != null;
+        if (!driven || (Math.abs(cmd.motor) < 0.05f && speed < 0.5)) return;
+        if (hullHalfWidth < 0.0) measureHull();
+        Vector3 pos = getGlobalPosition();
+        Basis basis = getGlobalBasis();
+        Vector3 bx = basis.getColumn(0), bz = basis.getColumn(2);
+        double alongZ = vel.dot(bz);
+        // which way it is going: its motion once it has some, the pedal until then (the nose is -Z)
+        double dir = Math.abs(alongZ) > 0.3 ? Math.signum(alongZ) : (cmd.motor > 0f ? -1.0 : 1.0);
+        double reachAhead = hullHalfLength + PERSON_RADIUS + 0.25 + speed * 0.25;
+        peopleScratch.clear();
+        SpatialEntityGrid grid = SpatialEntityGrid.get();
+        if (grid != null) grid.queryRadius(pos, (float) (reachAhead + 1.0), peopleScratch);
+        else for (Node n : getTree().getNodesInGroup(new StringName("characters"))) peopleScratch.add(n);
+        for (Node n : peopleScratch) {
+            if (!(n instanceof Character c) || !GD.isInstanceValid(c) || c.currentVehicleNode != null || !c.isAlive()
+                    || passThrough.containsKey(c) || isSeated(c)) continue;
+            Vector3 d = c.getGlobalPosition().minus(pos);
+            if (Math.abs(d.getY()) > 2.5) continue;
+            double lx = d.dot(bx), lz = d.dot(bz) * dir;
+            if (Math.abs(lx) > hullHalfWidth + PERSON_RADIUS || lz < -0.3 || lz > reachAhead) continue;
+            double[] st = shoving.get(c);
+            if (st == null && knownOnly) continue;
+            if (st == null) {
+                st = new double[] {0.0, 0.0, 0.0};
+                shoving.put(c, st);
+                addCollisionExceptionWith(c);
+                peopleShoved++;
+            }
+            st[0] = SHOVE_GRACE;
+            // out to the side they are already on (dead centre: one side, the same every tick), and along with the car
+            double side = Math.abs(lx) > 0.05 ? Math.signum(lx) : ((c.getInstanceId() & 1L) == 0L ? 1.0 : -1.0);
+            Vector3 push = bx.times((float) (side * SHOVE_SIDE_SPEED)).plus(bz.times((float) (dir * speed * 0.7)));
+            com.openworld.movement.character.MovementController mc = c.movementControllerNow();
+            if (mc != null) mc.shove(push, SHOVE_HOLD);
+            // under the hull itself and not getting out: it is being driven over
+            if (Math.abs(lx) < hullHalfWidth - 0.1 && lz < hullHalfLength - 0.1) {
+                st[1] += delta;
+                st[2] -= delta;
+                if (st[1] > CRUSH_AFTER && st[2] <= 0.0 && c.getNodeOrNull("Health") instanceof Health h) {
+                    st[2] = CRUSH_EVERY;
+                    h.takeDamage(null, CRUSH_DAMAGE, DAMAGE_SOURCE_COLLISION, getConfig().vehicleIcon,
+                            occupant != null ? occupant.getCharacterInfo().displayName : "",
+                            characterInfo != null ? characterInfo.faction : "");
+                }
+            } else {
+                st[1] = 0.0;
+            }
+        }
+    }
+
+    private boolean isSeated(Character c) {
+        for (Character s : seatOccupants) if (s == c) return true;
+        return false;
+    }
+
+    /** A shoved person is solid to the car again once it has stopped asking AND they are clear of the hull (a body
+     *  made solid inside the hull throws the car). */
+    private void expireShoves(double delta) {
+        if (shoving.isEmpty()) return;
+        Vector3 pos = getGlobalPosition();
+        Basis basis = getGlobalBasis();
+        java.util.Iterator<java.util.Map.Entry<Character, double[]>> it = shoving.entrySet().iterator();
+        while (it.hasNext()) {
+            java.util.Map.Entry<Character, double[]> e = it.next();
+            Character c = e.getKey();
+            if (!GD.isInstanceValid(c)) { it.remove(); continue; }
+            e.getValue()[0] -= delta;
+            if (e.getValue()[0] > 0.0) continue;
+            Vector3 d = c.getGlobalPosition().minus(pos);
+            boolean inside = c.isAlive() && Math.abs(d.dot(basis.getColumn(0))) < hullHalfWidth + PERSON_RADIUS
+                    && Math.abs(d.dot(basis.getColumn(2))) < hullHalfLength + PERSON_RADIUS && Math.abs(d.getY()) < 2.5;
+            if (inside) continue;
+            if (!passThrough.containsKey(c)) removeCollisionExceptionWith(c);
+            it.remove();
+        }
     }
 
     private void measureHull() {
@@ -1413,6 +1528,34 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
 
     /** Motor-force multiplier the wheels apply this tick. */
     public float getBoostAccelScale() { return boostActive ? getConfig().boostAccelMultiplier : 1f; }
+
+    // ── The speed cap (PLAN.md V6; user 2026-10-11: "set AT THE VEHICLE ... so the AI does not have to keep
+    // throttling") ──────────────────────────────────────────────────────────────────────────────────────────────
+    // A traffic brain kept to its lane's speed by easing its own throttle across a band above it, every tick
+    // (CruiseState's governor): a fade, not a limit -- a car ran over it downhill, off a ramp or after a shove. Now
+    // the CAR holds the limit: the brain tells it the lane's speed once a tick (a field write) and keeps its foot
+    // down; the wheels give no drive at the cap (VehicleWheel) and the engine brakes above it. 0 = no cap: a player's
+    // car, a racer, a unit on a call, a ram. It goes with the brain (removeAiDriverBrain) and with any controller
+    // that is not a traffic brain (attachController).
+    private float speedCap = 0f;
+    /** Engine braking above the cap (m/s^2): enough to hold a limit down the island's steepest road, gentle to see. */
+    private static final float CAP_ENGINE_BRAKE = 3.0f;
+    public float getSpeedCap() { return speedCap; }
+    public void setSpeedCap(float metresPerSecond) { speedCap = Math.max(0f, metresPerSecond); }
+    @Register public double speedCapNow() { return speedCap; }
+    /** The share of its drive a capped car still gets at {@code forwardSpeed}: all of it up to 1 m/s under the cap,
+     *  none at it (a ramp, not a switch: the car settles ON the limit instead of hunting round it). */
+    public double capDriveScale(double forwardSpeed) {
+        return speedCap <= 0f ? 1.0 : Math.max(0.0, Math.min(1.0, speedCap - forwardSpeed));
+    }
+
+    private void applySpeedCap() {
+        if (speedCap <= 0f) return;
+        Vector3 v = getLinearVelocity();
+        double speed = Math.hypot(v.getX(), v.getZ());
+        if (speed <= speedCap + 0.5) return;
+        applyCentralForce(new Vector3(v.getX(), 0, v.getZ()).normalized().times((float) (-getMass() * CAP_ENGINE_BRAKE)));
+    }
 
     /** Effective top speed this tick — boost raises the accel-curve ceiling. */
     public float getBoostMaxSpeed() {
@@ -2606,6 +2749,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             old.queueFree();
         }
         controller = ctrl;
+        if (!(ctrl instanceof VehicleAIController)) speedCap = 0f;   // a lane's limit is a traffic brain's (V6)
         addChild(ctrl);
     }
 
@@ -2684,6 +2828,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
      * player's controller in and the player couldn't drive.
      */
     public void removeAiDriverBrain() {
+        speedCap = 0f;   // the limit was the brain's lane's
         if (isAiDriven()) {
             Controller old = detachController();
             if (old != null) old.queueFree();

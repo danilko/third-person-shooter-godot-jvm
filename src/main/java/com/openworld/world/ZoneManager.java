@@ -210,6 +210,23 @@ public class ZoneManager extends Node {
 		return b.toString();
 	}
 
+	/** The car keeps its lane's limit (Vehicle.speedCap, PLAN.md V6). Off = the brain fades its own throttle (control). */
+	@Export public boolean trafficSpeedCap = true;
+	public boolean isTrafficSpeedCap() { return trafficSpeedCap; }
+	public void setTrafficSpeedCap(boolean v) { trafficSpeedCap = v; VehicleAIController.vehicleCapsSpeed = v; }
+
+	/** An on-rails car keeps its gap to a car on the lane it is about to join, not only on its own. Off = the control. */
+	@Export public boolean trafficGapAcrossLanes = true;
+	public boolean isTrafficGapAcrossLanes() { return trafficGapAcrossLanes; }
+	public void setTrafficGapAcrossLanes(boolean v) { trafficGapAcrossLanes = v; VehicleAIController.dummyGapAcrossLanes = v; }
+
+	/** Probe readout since start: "crashes <n> in <car-minutes> car-min; over the limit by 2 m/s <s> s of <s> s; worst +<m/s>". */
+	@Register public String trafficSafetyNow() {
+		return String.format(java.util.Locale.ROOT, "crashes %d in %.1f car-min; over the limit by 2 m/s %.1f s of %.0f s; worst +%.1f m/s",
+				com.openworld.carrier.vehicle.VehicleDamageModel.trafficCrashes, VehicleAIController.capSeconds / 60.0,
+				VehicleAIController.overSeconds, VehicleAIController.capSeconds, VehicleAIController.worstOver);
+	}
+
 	/** Probe readout: ambient cars within {@code r} m of the nearest player travelling faster than 1 m/s. */
 	@Register public int trafficMovingNow(float r) {
 		int n = 0;
@@ -521,7 +538,7 @@ public class ZoneManager extends Node {
 		for (int seat = v.getSeatCount() - 1; seat >= 0; seat--) {
 			Character c = v.getSeatOccupant(seat);
 			if (c == null || c instanceof Player) continue;
-			v.tryExit(seat);
+			v.releaseOccupant(c);   // leaving the world, not the car: no door, never stood beside it
 			if (GD.isInstanceValid(c)) {
 				if (net != null && c.getCharacterInfo() != null) net.announceDespawn(c.getCharacterInfo().characterId);
 				silenceWeaponAudio(c);
@@ -2434,7 +2451,7 @@ public class ZoneManager extends Node {
 		// is dereferenced every frame in Vehicle._physicsProcess, and freeing the car or the driver out
 		// of order leaves a use-after-free. Only when the driver is still the occupant — a carjacked car
 		// holds a Player and must never be auto-unseated.
-		if (vValid && driver != null && v.getOccupant() == driver) v.tryExit();
+		if (vValid && driver != null && v.getOccupant() == driver) v.releaseOccupant(driver);
 		if (driver != null && GD.isInstanceValid(driver)) {
 			if (net != null && driver.characterInfo != null) net.announceDespawn(driver.characterInfo.characterId);
 			silenceWeaponAudio(driver);

@@ -320,3 +320,61 @@ its control before anything was changed.
   Rule, in one place (`Vehicle._integrateForces`, `heldWhenEmpty`): nobody aboard, no brain, no input, touched by a
   character and by NO other rigid body this step, under 3 m/s -> the velocity is taken back. A ram, a blast and a
   car rolling by itself are untouched. `--park-control` reproduces both numbers.
+- **V3, "the player's car pushes through a person most of the time, forward and in reverse (GTA)".** Below the hit
+  speed (`VehicleConfig.vehicleCollisionMinSpeed`, 5 m/s) a living character was a WALL: a kinematic capsule, which a
+  rigid car cannot move. MEASURED (`tools/godot/probe_car_vs_ped.gd -- --control`, a Player at the wheel of SPC1, a
+  scripted pair of hands, full throttle 4 s into a standing AICharacter at the bumper): forward, the car creeps 0.3 m
+  in a second and then squeezes round them **turned 27 deg and 32 m off its line**; in REVERSE it pushes them along at
+  1.3 m/s for ever and **never gets past**; at half throttle in an alley one car wide it stops dead. The rule
+  (`Vehicle.shoveSweep`, called from `sweepPeople` under the hit speed; `shovePeople` off = the control):
+  * a DRIVEN car (someone aboard or a brain, and throttle or motion) looks at its own hull's path in its direction of
+    travel (the pedal decides until it moves: the nose is -Z), `hullHalfWidth + 0.4` wide, to the bumper + 0.65 m +
+    a quarter second of travel;
+  * whoever stands there is moved SIDEWAYS out of it at 2.6 m/s, to the side they are already on, and carried along
+    at 0.7 of the car's speed (`MovementController.shove`: a collided motion of its OWN after the slide -- added to
+    the walk velocity it fed back into itself, 2.6 m/s carried a body 9 m), and the car does not collide with them
+    while it asks and until they are clear of the hull (a body made solid inside the hull throws the car);
+  * someone met slowly is NOT run down because the car has since passed the hit speed (SPC1 is over 5 m/s 0.3 s after
+    pulling away: the person at the bumper died every time): they stay shoved until clear;
+  * no room to step aside (the alley): the car drives over them slowly; under the hull itself for more than 0.8 s
+    costs 12 HP every 0.5 s. At the hit speed and above for anyone NOT being shoved, the knock-down path is unchanged.
+  Result, all five player cases: past in 0.8-1.7 s, drift <= 0.3 m, turned 0 deg, the person 2.0-2.3 m off the car's
+  line with 100 HP. 12 of 12; the control fails 11. NOT done: a stagger animation (the body slides sideways upright);
+  a co-op guest's car (simulated on the guest) passes THROUGH a host-simulated AI instead of moving it -- the
+  exception is local, the shove needs the body's own peer; the reaction (a shoved AI does not turn hostile).
+  Found on the way: `Vehicle.knockPeople` carried a fully-qualified `@godot.annotation.Visible`, so it was never
+  registered and `probe_car_hits_ped --control` / `probe_car_hits_player` had been setting nothing; imported now,
+  and the control really fails 5.
+- **V3 (a), an AI car and a person at the edge of its width.** `probe_ai_stops`' second case (a person 1.0 m off the
+  lane centre) FAILED 2 RUNS IN 4 on the previous commit: the car first slowed 10 m off instead of 37 m. The outer
+  obstacle rays sat 0.15 m INSIDE the hull's edge, so that person was seen only while the car rode within 0.15 m of
+  the centreline. They sit 0.05 m outside it now (`VehicleAIController.buildFlankRays`): 6 of 6, first slowing at
+  32-38 m. And whoever the rays still miss at the corner is shoved aside by the rule above (the "driverless brain's
+  car" case) instead of holding the car against its own throttle.
+- **V5, the car a driver left.** No AI driver gets out by itself: the only exits are a carjack and a dispatch unload
+  (both remove the brain), death in the seat (the car brakes) and the lazy-driver stow (the car is on rails by then).
+  A standing car with no pedal leaves a person at its bumper alone (the probe's last case). `ZoneManager.
+  freeTrafficCar` / `freeServiceCar` release their riders quietly now (they stood them beside the car, doors open,
+  one frame before freeing them).
+- **V6, the CAR keeps the limit** (user: "set AT THE VEHICLE ... so the AI does not have to keep throttling"; the
+  existing limits stay: street 40, arterial 60, expressway 80, ramp 40, turn 20 km/h). `Vehicle.speedCap` (m/s, 0 =
+  none): the wheels give no forward drive at the cap (a ramp over the last 1 m/s, `capDriveScale`) and the engine
+  brakes at 3 m/s^2 above it. The brain writes its lane's limit once a tick and keeps its foot down; no cap while
+  racing, on a dispatch plan or ramming; the cap goes with the brain (`removeAiDriverBrain`) and with any controller
+  that is not a traffic brain (`attachController`), so a player never inherits one. MEASURED (`probe_traffic_census
+  -- --seconds=90`, 11 sites, ~42 car-minutes of real cars; `--no-cap` is the control, the new `safety:` line):
+  **without the cap traffic was more than 2 m/s over its lane's limit 15.4 % of the time (393 s of 2549 s), worst
+  +13.2 m/s; with it 0.2 % (5.7 s), worst +10.6 m/s** (one event, a car made real on a slower lane). What the cap
+  replaced in the brain is ONE fade (`CruiseState`'s `over` block, kept only for uncapped cars); the corner limit,
+  the junction ease, the red light and the obstacle brake all stay -- they are reasons to go SLOWER than the limit,
+  which a cap cannot know. So the brain is not measurably cheaper (the fade was three float operations a tick) and
+  the lower limits the user offered were NOT tried: speed is not what the brain's cost scales with. CRASHES did not
+  move with the cap (76-105 with, 93-95 without, per ~42 car-minutes): they were not a speed defect -- see next.
+- **Found by the crash count: a car on rails drove into the queue on the lane it was joining.** 209 of 426 traffic
+  crashes in one census were at ONE red light (Godot -960, 675), car on car with the contact normal straight DOWN:
+  stacked. The on-rails gap rule compared progress on one lane only, so a car coming off a connector did not see the
+  queue on the next lane, drove into its last car, and both were made real overlapping when a player came within
+  70 m -- very likely the larger half of the user's "the car beside it is thrown aside". An on-rails car now also
+  keeps its gap to any traffic car standing in its own path within 40 m on ANY lane (`VehicleAIController.
+  dummyGapAcrossLanes`; `--no-cross-gap` is the control): **94 -> 52 crashes** per ~40 car-minutes, the counts near
+  the player unchanged. The 52 left are not looked at (`OW_CRASH_TRACE=all` names each one's collider).

@@ -177,6 +177,20 @@ public class MovementController extends Node {
    * the body's velocity still lands it at the old fall speed -- and takes fall damage for it. Call this after
    * moving a body by hand (a rescue, a respawn, a probe's snap).
    */
+  // ── Shoved by a car (PLAN.md V3) ──
+  private Vector3 shove = new Vector3();
+  private double shoveLeft = 0.0;
+
+  /**
+   * A horizontal velocity added to the body's own for {@code seconds}: a slow car bumper moving a person out of its
+   * way (Vehicle.shoveSweep re-asks every tick while they are in its path). It is a
+   * collided motion of its own after the slide, so a wall stops it.
+   */
+  public void shove(Vector3 horizontal, double seconds) {
+    shove = new Vector3(horizontal.getX(), 0.0, horizontal.getZ());
+    shoveLeft = seconds;
+  }
+
   @Register
   public void clearMotion() {
     velocity = new Vector3();
@@ -483,6 +497,12 @@ public class MovementController extends Node {
     Vector3 before = player.getGlobalPosition();
     Vector3 floorN = wasOnFloor ? player.getFloorNormal() : null;
     player.moveAndSlide();
+    if (shoveLeft > 0.0) {
+      // its own motion, NOT part of the velocity: the walk model eases from last tick's velocity, so a shove added
+      // there fed back into itself (measured: a 2.6 m/s shove carried a body 9 m)
+      shoveLeft -= delta;
+      player.moveAndCollide(shove.times((float) delta));
+    }
     Vector3 slid = player.getGlobalPosition();
     double ySlid = slid.getY();
     // A LIP the slide itself rode over, up or down (a 6 cm plate edge, a kerb stepped DOWN by the floor snap): on

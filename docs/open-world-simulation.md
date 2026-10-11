@@ -1277,3 +1277,11 @@ sooner by `getSharedTarget`'s self-clear).
 
 ---
 
+
+## Traffic: the car keeps its lane's limit, and an on-rails car sees the queue on the next lane (2026-10-11)
+
+Written up with the other traffic car bugs in `docs/vehicles.md` "Traffic car bugs V1-V6": `Vehicle.speedCap` (the
+brain writes the lane's limit, the car holds it: over the limit by 2 m/s 15.4 % -> 0.2 % of the time),
+`VehicleAIController.dummyGapAcrossLanes` (traffic crashes 94 -> 52 per ~40 car-minutes), and the census' `safety:`
+line (`ZoneManager.trafficSafetyNow`: scored crashes of brain-driven cars, car-minutes, seconds over the limit).
+`probe_traffic_census -- --no-cap` / `--no-cross-gap` are the controls.

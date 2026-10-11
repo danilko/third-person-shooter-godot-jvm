@@ -340,6 +340,9 @@ public class VehicleDamageModel extends Node {
         }
     }
 
+    /** Crashes hard enough to score, of cars a traffic brain was driving, since start (probe_traffic_census). */
+    public static int trafficCrashes;
+
     private void flushCrash() {
         if (crashDv <= 0.0) return;
         // the crash is still going on: score it once it goes quiet, or after MAX_CRASH_STEPS of unbroken contact
@@ -354,6 +357,7 @@ public class VehicleDamageModel extends Node {
                     vehicle.getName(), vehicle.crashCollider, crashDv, crashStartVel, v, impactPoints(crashDv)));
         }
         double points = impactPoints(crashDv);
+        if (points > 0.0 && vehicle.isAiDriven()) trafficCrashes++;
         if (points > 0.0) {
             for (Part p : parts) {
                 double s = share(p.min, p.max, crashPoint);

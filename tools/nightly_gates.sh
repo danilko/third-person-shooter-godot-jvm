@@ -99,6 +99,7 @@ GATES=(
   "car_push_jump|600|0|0|$HF --script $P/probe_car_push.gd -- --move=jump --state=vacated"
   "car_push_jump_taxi|600|0|0|$HF --script $P/probe_car_push.gd -- --car=TAX1 --move=jump"
   "ai_stops|600|0|0|$HF --script $P/probe_ai_stops.gd"
+  "car_vs_ped|600|0|0|$HF --script $P/probe_car_vs_ped.gd"
   "world_warmup|900|1|0|$HF --script $P/probe_world_warmup.gd"
   "road_clear|3600|1|0|$H --script $P/probe_road_clear.gd"
   "world_boot|300|0|0|$H --quit-after 600 res://src/main/resources/com/openworld/world/World.tscn"
