@@ -331,6 +331,66 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         }
     }
 
+    // ── A hit on a car ANOTHER PEER simulates (user 2026-10-11: "co-op vehicle the guest / host should be able to
+    // interact with each other") ───────────────────────────────────────────────────────────────────────────────
+    // A puppet is a frozen body placed from snapshots: a wall to this peer's car, and nothing at all to its owner
+    // (measured, run_net_car_test.sh --control: a guest's police car into the host's truck stopped dead at the
+    // bumper on both peers and the truck moved 0.00 m). So what the solver gave THIS car against the puppet is
+    // handed to the puppet's owner, reversed: the same impulse, at the same point, on the real body. One small
+    // reliable message per car pair at most every PUSH_SEND_EVERY; momentum is conserved across the two peers.
+    /** Off = a remote car is a wall and is never moved (the control). */
+    public static boolean pushRemoteCars = true;
+    private static final double PUSH_SEND_EVERY = 0.05;
+    private static final float PUSH_MIN_IMPULSE = 40f;        // N s: a resting touch is not a hit
+    /** Per remote car touched since the last send: the impulse summed [0..2], the contact points weighted by their
+     *  impulse [3..5], and that weight [6]. */
+    private final java.util.Map<Vehicle, float[]> remotePushes = new java.util.HashMap<>();
+    private double remotePushTimer = 0.0;
+    private int remotePushesReceived;
+    /** Probe readout: pushes this car has taken from another peer. */
+    @Register public int remotePushesNow() { return remotePushesReceived; }
+
+    private void collectRemotePushes(PhysicsDirectBodyState3D state, int count) {
+        for (int i = 0; i < count; i++) {
+            if (!(state.getContactColliderObject(i) instanceof Vehicle other) || other == this
+                    || !other.isFreezeEnabled() || other.isLocallySimulated()) continue;
+            Vector3 j = state.getContactImpulse(i);
+            Vector3 at = state.getContactColliderPosition(i);
+            float w = (float) j.length();
+            float[] acc = remotePushes.computeIfAbsent(other, k -> new float[7]);
+            acc[0] += (float) j.getX(); acc[1] += (float) j.getY(); acc[2] += (float) j.getZ();
+            acc[3] += (float) at.getX() * w; acc[4] += (float) at.getY() * w; acc[5] += (float) at.getZ() * w;
+            acc[6] += w;
+        }
+        remotePushTimer -= state.getStep();
+        if (remotePushes.isEmpty() || remotePushTimer > 0.0) return;
+        remotePushTimer = PUSH_SEND_EVERY;
+        NetworkManager net = getNodeOrNull("/root/NetworkManager") instanceof NetworkManager n ? n : null;
+        for (java.util.Map.Entry<Vehicle, float[]> e : remotePushes.entrySet()) {
+            float[] a = e.getValue();
+            Vehicle other = e.getKey();
+            Vector3 mine = new Vector3(a[0], a[1], a[2]);
+            if (net == null || !GD.isInstanceValid(other) || mine.length() < PUSH_MIN_IMPULSE || a[6] <= 0f) continue;
+            // The contact's impulse is what THIS body took against a WALL (the puppet cannot give): m v, where two
+            // free bodies exchange only the reduced mass' share, m M / (m + M) v. Handing over the whole of it sent
+            // a 700 kg truck off at ~28 m/s, spinning, from a police car's 8 m/s. The other body takes the opposite.
+            double share = other.getMass() / Math.max(1.0, getMass() + other.getMass());
+            net.sendVehiclePush(other, mine.times(-share), new Vector3(a[3] / a[6], a[4] / a[6], a[5] / a[6]));
+        }
+        remotePushes.clear();
+    }
+
+    /** The owner's side of {@link #collectRemotePushes}: another peer's car hit this one. */
+    public void applyRemotePush(Vector3 impulse, Vector3 worldPoint) {
+        if (!isLocallySimulated() || isFreezeEnabled()) return;
+        float max = (float) (getMass() * 40.0);               // nothing a car does gives another more than this
+        if (impulse.length() > max) impulse = impulse.normalized().times(max);
+        if (parked) unpark();
+        setSleeping(false);
+        applyImpulse(impulse, worldPoint.minus(getGlobalPosition()));
+        remotePushesReceived++;
+    }
+
     // ── THE DUMMY TIER (PLAN.md 1g e / 2d) ────────────────────────────────────
     //
     // A traffic car far from every player drives on rails: frozen KINEMATIC, its pose written from the lane by its
@@ -1664,6 +1724,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         }
 
         int count = state.getContactCount();
+        if (pushRemoteCars && (count > 0 || !remotePushes.isEmpty())) collectRemotePushes(state, count);
         if (damageModel != null) feedCrash(state, count);
 
         if (cfg.vehicleCollisionMinSpeed <= 0) return;

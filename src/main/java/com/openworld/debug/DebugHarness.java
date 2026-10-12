@@ -638,11 +638,13 @@ public class DebugHarness extends Node {
             else if ("--net-diag".equals(arg)) { NetworkManager.NET_DEBUG_VEHICLES = true; }
             else if (arg.startsWith("--hold-action=")) { holdAction = arg.substring("--hold-action=".length()); }
             else if ("--coop-test".equals(arg)) { coopTest = true; }
+            else if (arg.startsWith("--car-test=")) { carTest = arg.substring("--car-test=".length()); }
+            else if ("--car-test-control".equals(arg)) { com.openworld.carrier.vehicle.Vehicle.pushRemoteCars = false; }
             else if ("--crowd-dump".equals(arg)) { crowdDump = true; }
             else if ("--car-trace".equals(arg)) { com.openworld.net.VehicleNetworkController.TRACE = true; }
         }
         setPhysicsProcess(autoWalk || dumpCollisionDelay > 0.0 || spawnRoutesDelay > 0.0 || netDelay > 0.0 || holdAction != null
-                || coopTest);
+                || coopTest || carTest != null);
         if (autoWalk) GD.print("DebugHarness: auto-walk enabled — touring every zone marker in zoneId order"
                 + (autoWalkStartFilter != null ? ", starting at first match of '" + autoWalkStartFilter + "'" : ""));
     }
@@ -949,6 +951,138 @@ public class DebugHarness extends Node {
         }
     }
 
+
+    /**
+     * {@code -- --car-test=<driver>:<obstacle>} (tools/net/run_net_car_test.sh, user 2026-10-11: "co-op vehicle the
+     * guest / host should be able to interact with each other"): {@code driver} = guest | host takes a wheel through
+     * the seat request and holds the throttle; the OTHER peer's player is the obstacle -- {@code ped} stands 1.8 m
+     * ahead of the sports car's nose (the car driven, 4 s); {@code seated} sits in the kei truck 10 m ahead of the
+     * police car (the car driven, 2.5 s); {@code parked} leaves that truck empty (the host simulates it). Both peers print a "[cartest]" line every 0.25 s the script compares.
+     */
+    private String carTest = null;
+    private double carT = 0.0, carReadyAt = -1, carSeatedAt = -1, carDriveAt = -1, carNextAsk = 0, carNextPrint = 0;
+    private Vector3 carGlideTo;
+    private double carGlideSince = -1;
+    private boolean carGlided, carDone, carNeutral;
+
+    private com.openworld.carrier.vehicle.Vehicle carKet, carSpc, carPoc;
+
+    /** The scene-placed car parked at {@code (-395, z)}: by PLACE, since a client's copy is re-supplied under another name. */
+    private com.openworld.carrier.vehicle.Vehicle carParkedAt(double z) {
+        for (Node n : getTree().getNodesInGroup(new StringName("characters"))) {
+            if (!(n instanceof com.openworld.carrier.vehicle.Vehicle v) || v.isQueuedForDeletion()
+                    || v.isInGroup(new StringName(com.openworld.carrier.vehicle.Vehicle.STREAMED_GROUP))) continue;
+            Vector3 p = v.getGlobalPosition();
+            if (Math.abs(p.getX() + 395.0) < 1.5 && Math.abs(p.getZ() - z) < 1.5) return v;
+        }
+        return null;
+    }
+
+    private void carTestTick(double delta) {
+        carT += delta;
+        NetworkManager net = getNodeOrNull("/root/NetworkManager") instanceof NetworkManager n ? n : null;
+        if (net == null || !net.isNetworked()) return;
+        boolean client = !net.isServer();
+        // DebugWorld's "enemy" patrol must not shoot the stand (the same reason as the coop phase), from before the join
+        if (!client && !carNeutral && getNodeOrNull("/root/FactionManager") instanceof com.openworld.character.FactionManager fm) {
+            carNeutral = true;
+            fm.setCampaignRelationship(com.openworld.character.Faction.PLAYER, com.openworld.character.Faction.ENEMY,
+                    com.openworld.character.FactionRules.NEUTRAL);
+        }
+        Player me = localPlayer();
+        if (carKet == null || !GD.isInstanceValid(carKet)) carKet = carParkedAt(50.0);
+        if (carSpc == null || !GD.isInstanceValid(carSpc)) carSpc = carParkedAt(40.0);
+        if (carPoc == null || !GD.isInstanceValid(carPoc)) carPoc = carParkedAt(60.0);
+        com.openworld.carrier.vehicle.Vehicle ket = carKet, spc = carSpc, poc = carPoc;
+        if (me == null || ket == null || spc == null || poc == null || PlayerRegistry.getPlayers().size() < 2) {
+            if (carT >= carNextPrint) {
+                carNextPrint = carT + 5.0;
+                GD.print("[cartest] waiting me=" + (me != null) + " truck=" + (ket != null) + " sports=" + (spc != null)
+                        + " police=" + (poc != null) + " players=" + PlayerRegistry.getPlayers().size());
+            }
+            return;
+        }
+        String[] parts = carTest.split(":");
+        boolean driver = "guest".equals(parts[0]) == client;
+        String obstacle = parts.length > 1 ? parts[1] : "ped";
+        if (carReadyAt < 0) {
+            carReadyAt = carT + 3.0;
+        }
+        if (carT < carReadyAt) return;
+        // the ped case drives the sports car (nothing ahead of it); the car cases drive the police car INTO the truck
+        com.openworld.carrier.vehicle.Vehicle drive = "ped".equals(obstacle) ? spc : poc;
+        com.openworld.carrier.vehicle.Vehicle mine = driver ? drive : "seated".equals(obstacle) ? ket : null;
+        if (!carGlided) {
+            carGlided = true;
+            if (mine != null) {
+                carGlideTo = mine.getGlobalPosition().plus(new Vector3(2.6, 0.3, 0));
+            } else if ("ped".equals(obstacle)) {
+                carGlideTo = spc.getGlobalPosition().plus(new Vector3(0, 0.3, -4.0));
+            }
+        }
+        if (carGlideTo != null) {
+            // OVER whatever stands on the way (a passer-by or a car on the line pushed the body back out every step:
+            // it hung there for the whole run, 1 join in 3), 4 m above its mark, then down onto it
+            Vector3 at = me.getGlobalPosition();
+            Vector3 to = new Vector3(carGlideTo.getX() - at.getX(), 0, carGlideTo.getZ() - at.getZ());
+            double step = 0.3;
+            me.setGlobalPosition(to.length() <= step ? carGlideTo
+                    : new Vector3(at.getX(), carGlideTo.getY() + 4.0, at.getZ()).plus(to.normalized().times(step)));
+            me.setVelocity(new Vector3());
+            if (me.movementControllerNow() != null) me.movementControllerNow().clearMotion();
+            if (to.length() <= step) { carGlideTo = null; carNextAsk = carT + 0.5; }
+            // a body that will not be moved to its mark: say what it is, the script retries the case once
+            if (carGlideSince < 0) carGlideSince = carT;
+            if (carT >= carGlideSince + 8.0 && carT >= carNextPrint) {
+                carNextPrint = carT + 4.0;
+                int locals = 0;
+                for (Player q : PlayerRegistry.getPlayers()) if (GD.isInstanceValid(q) && q.isLocalOwnedPlayer()) locals++;
+                GD.print("[cartest] STUCK at " + at + " to " + carGlideTo + " alive=" + me.isAlive() + " locals=" + locals
+                        + " physics=" + me.isPhysicsProcessing() + " ctrl=" + (me.getController() == null ? "none" : me.getController().getClass().getSimpleName())
+                        + " queued=" + me.isQueuedForDeletion() + " id=" + me.getCharacterInfo().characterId
+                        + " owner=" + me.getCharacterInfo().ownerPeerId + " floor=" + me.isOnFloor() + " paused=" + getTree().isPaused());
+            }
+            return;
+        }
+        if (mine != null && me.currentVehicleNode == null && carSeatedAt < 0 && carT >= carNextAsk) {
+            mine.requestEnter(me);
+            carNextAsk = carT + 1.0;
+        }
+        if (mine != null && me.currentVehicleNode != null && carSeatedAt < 0) {
+            carSeatedAt = carT;
+            GD.print("[cartest] seated in " + mine.getName() + " sim=" + mine.isLocallySimulated());
+        }
+        long ms = (long) (godot.api.Time.INSTANCE.getUnixTimeFromSystem() * 1000.0);
+        if (driver && carSeatedAt >= 0 && carDriveAt < 0 && carT >= carSeatedAt + 8.0) {
+            carDriveAt = carT;
+            godot.api.Input.actionPress(new StringName("throttle"));
+            GD.print("[cartest] drive start unix_ms=" + ms);
+        }
+        if (driver && carDriveAt >= 0 && !carDone && carT >= carDriveAt + ("ped".equals(obstacle) ? 4.0 : 2.5)) {
+            carDone = true;
+            godot.api.Input.actionRelease(new StringName("throttle"));
+            GD.print("[cartest] drive end unix_ms=" + ms);
+        }
+        if (carT >= carNextPrint) {
+            carNextPrint = carT + 0.25;
+            StringBuilder sb = new StringBuilder("[cartest] unix_ms=" + ms);
+            for (com.openworld.carrier.vehicle.Vehicle v : new com.openworld.carrier.vehicle.Vehicle[] {ket, spc, poc}) {
+                Vector3 p = v.getGlobalPosition();
+                sb.append(String.format(java.util.Locale.ROOT, " %s=(%.2f,%.2f,%.2f) yaw=%.1f", v == ket ? "ket" : v == spc ? "spc" : "poc",
+                        p.getX(), p.getY(), p.getZ(), Math.toDegrees(v.getGlobalRotation().getY())));
+            }
+            for (Player p : PlayerRegistry.getPlayers()) {
+                if (!GD.isInstanceValid(p)) continue;
+                Vector3 q = p.getGlobalPosition();
+                float hp = p.getNodeOrNull("Health") instanceof com.openworld.character.Health h ? h.getCurrentHealth() : -1f;
+                sb.append(String.format(java.util.Locale.ROOT, " %s=(%.2f,%.2f,%.2f) hp=%.0f car=%s",
+                        p.getCharacterInfo().ownerPeerId == 1 ? "hostp" : "guestp", q.getX(), q.getY(), q.getZ(), hp,
+                        p.currentVehicleNode != null));
+            }
+            GD.print(sb.toString());
+        }
+    }
+
     private Vector3 coopGlideTo;
     private double coopArrivedAt = -1, coopNextAsk, coopSeatedAt = 1e9;
     private int coopAsks;
@@ -979,6 +1113,7 @@ public class DebugHarness extends Node {
     @Override
     public void _physicsProcess(double delta) {
         if (coopTest) coopTick(delta);
+        if (carTest != null) carTestTick(delta);
         if (crowdDump) crowdDumpTick(delta);
         if (holdAction != null) {
             holdDelay -= delta;

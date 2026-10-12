@@ -121,6 +121,7 @@ public class NetworkManager extends Node {
     private static final int MSG_BEAT_REQUEST           = 34; // F3  — client→host: the owner's body tripped a ZoneTrigger here; the host fires its beat
     private static final int MSG_SHOP_GRANT             = 33; // W3  — host→owner: a shop sale the host accepted; the owner grants it to its own body
     private static final int MSG_PROFILE                = 35; // 1.4 AR2 — client→host at join: my PlayerProfile; host→owner: it as the host now holds it
+    private static final int MSG_VEHICLE_PUSH           = 36; // any→the car's owner (a client's goes through the host): my car hit yours, take the impulse
 
     /** WeaponController's slotTypes table has 7 entries (FIST/PRIMARY×2/SECONDARY/MELEE/THROWABLE/CONSUMABLE) — bounds isValidSnapshot's activeSlotIndex check. */
     private static final int WEAPON_SLOT_COUNT = 7;
@@ -181,7 +182,7 @@ public class NetworkManager extends Node {
             // pickups and spawns on channel 0, and vice versa. Ordered within the channel, which is
             // what lets the host treat a non-advancing shotSeq as a replay.
             // Swings share the shots' lane (N2): the same reliable, ordered stream of attack inputs.
-            case MSG_SHOT, MSG_MELEE, MSG_LAUNCH, MSG_DETONATE_REQUEST, MSG_SHOP_REQUEST, MSG_SUPPLY_USE -> new ChannelSpec(1, ENetPacketPeer.FLAG_RELIABLE);
+            case MSG_SHOT, MSG_MELEE, MSG_LAUNCH, MSG_DETONATE_REQUEST, MSG_SHOP_REQUEST, MSG_SUPPLY_USE, MSG_VEHICLE_PUSH -> new ChannelSpec(1, ENetPacketPeer.FLAG_RELIABLE);
             // Shot results are cosmetic and superseded by the next pull: unreliable, own lane (N1b).
             case MSG_SHOT_RESULT_BATCH -> new ChannelSpec(3, 0L);
             default -> throw new IllegalArgumentException("No channel mapping for MSG_* tag " + msgType);
@@ -920,6 +921,7 @@ public class NetworkManager extends Node {
                     }
                 }
                 case MSG_VEHICLE_SEAT_REQUEST -> handleVehicleSeatRequestMessage(senderPeerId, buf);
+                case MSG_VEHICLE_PUSH -> handleVehiclePushMessage(senderPeerId, buf);
                 case MSG_VEHICLE_OCCUPANCY -> handleVehicleOccupancyMessage(senderPeerId, buf);
                 case MSG_VEHICLE_SPAWN -> handleVehicleSpawnMessage(senderPeerId, buf);
                 case MSG_WEAPON_SWITCH -> handleWeaponSwitchMessage(senderPeerId, buf);
@@ -1244,6 +1246,43 @@ public class NetworkManager extends Node {
                         vehicle.getCurrentSteerAngle(), vehicle.getCurrentThrottle(),
                         vehicle.isHandbraking(), vehicle.isBraking(), vehicle.isSlipping(),
                         vehicle.getFlatMask(), healthValue, fireSeq, vehicle.getPartMask())));
+    }
+
+    /**
+     * My car hit {@code target}, which another peer simulates: hand that peer the impulse its real body takes
+     * (Vehicle.collectRemotePushes). A client's goes to the host, which applies it or passes it on to the owner.
+     */
+    public void sendVehiclePush(com.openworld.carrier.vehicle.Vehicle target, Vector3 impulse, Vector3 point) {
+        if (!isNetworked() || target.getCharacterInfo() == null) return;
+        int owner = target.getCharacterInfo().ownerPeerId;
+        if (isServer() && owner == SERVER_PEER_ID) return;
+        com.openworld.net.NetStats.increment("vehicle_push_sent");
+        sendMessage(isServer() ? owner : SERVER_PEER_ID, NetMessageCodec.encodeVehiclePush(MSG_VEHICLE_PUSH,
+                target.getCharacterInfo().characterId, impulse, point));
+    }
+
+    private void handleVehiclePushMessage(int senderPeerId, StreamPeerBuffer buf) {
+        NetMessageCodec.DecodedVehiclePush push = NetMessageCodec.decodeVehiclePush(buf);
+        if (!isValidIdentifier(push.vehicleId()) || !isFiniteVector3(push.impulse()) || !isFiniteVector3(push.point())) {
+            dropInvalid("vehicle_push", "MSG_VEHICLE_PUSH", senderPeerId);
+            return;
+        }
+        if (!isServer() && senderPeerId != SERVER_PEER_ID) return;
+        if (!(findControllableById(push.vehicleId()) instanceof com.openworld.carrier.vehicle.Vehicle vehicle)
+                || vehicle.isQueuedForDeletion() || vehicle.getCharacterInfo() == null) return;
+        // a hit lands on the car: a point far from it is not one
+        if (vehicle.getGlobalPosition().distanceTo(push.point()) > 8.0) {
+            com.openworld.net.NetStats.increment("vehicle_push_rejected_far");
+            return;
+        }
+        if (isAuthorityFor(vehicle.getCharacterInfo())) {
+            com.openworld.net.NetStats.increment("vehicle_push_applied");
+            vehicle.applyRemotePush(push.impulse(), push.point());
+        } else if (isServer()) {
+            int owner = vehicle.getCharacterInfo().ownerPeerId;
+            if (owner != senderPeerId && owner != SERVER_PEER_ID)
+                sendMessage(owner, NetMessageCodec.encodeVehiclePush(MSG_VEHICLE_PUSH, push.vehicleId(), push.impulse(), push.point()));
+        }
     }
 
     /** Client → host: ask the host to (un)seat a character (host-arbitrated enter/exit). No-op on host/single-player — they arbitrate directly. */

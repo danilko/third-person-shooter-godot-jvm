@@ -1155,6 +1155,26 @@ public final class NetMessageCodec {
     public record DecodedVehicleSeatRequest(String vehicleId, String characterId, boolean entering,
             int seatIndex) { }
 
+    /** A hit on a car another peer simulates: the impulse its real body takes, and where (world). */
+    public static PackedByteArray encodeVehiclePush(int msgType, String vehicleId, Vector3 impulse, Vector3 point) {
+        StreamPeerBuffer buf = new StreamPeerBuffer();
+        buf.put8(msgType);
+        buf.putUtf8String(vehicleId);
+        putVector3(buf, impulse);
+        putVector3(buf, point);
+        return buf.getDataArray();
+    }
+
+    /** Decodes the body following the tag byte. Caller must have already consumed it. */
+    public static DecodedVehiclePush decodeVehiclePush(StreamPeerBuffer buf) {
+        String vehicleId = buf.getUtf8String();
+        Vector3 impulse = getVector3(buf);
+        Vector3 point = getVector3(buf);
+        return new DecodedVehiclePush(vehicleId, impulse, point);
+    }
+
+    public record DecodedVehiclePush(String vehicleId, Vector3 impulse, Vector3 point) { }
+
     /** Bit 1 of the occupancy message's `entering` byte: the seat change is QUIET (no door: a body born in its
      *  seat, a self-heal re-send). An older reader takes the byte as "non-zero = entering", so bit 0 keeps that. */
     public static final int OCCUPANCY_QUIET = 2;

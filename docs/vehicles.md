@@ -7,6 +7,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - Sliding shop doors, and the cars' top speed (user, 2026-09-20)
 - Armour, a helicopter that can be shot down, rotors on their hubs (2026-10-07, user-reported)
 - Traffic car bugs V1-V6: a driver born in its seat, the door that threw the next car, a person never moves an empty car (2026-10-11, user-reported)
+- Co-op: a car hits a car ANOTHER PEER simulates (2026-10-11, user)
 
 ---
 
@@ -342,6 +343,9 @@ its control before anything was changed.
   line with 100 HP. 12 of 12; the control fails 11. NOT done: a stagger animation (the body slides sideways upright);
   a co-op guest's car (simulated on the guest) passes THROUGH a host-simulated AI instead of moving it -- the
   exception is local, the shove needs the body's own peer; the reaction (a shoved AI does not turn hostile).
+  **CORRECTED the same day** by `tools/net/run_net_car_test.sh guest:ped / host:ped`: across peers the person DOES end
+  out of the path, on both peers, unhurt, and the car keeps its line (drift 0.02 m, 0.1 deg) -- the driver's peer
+  stops colliding with the body, and the body's own peer sees the car's puppet walk into it and steps it out.
   Found on the way: `Vehicle.knockPeople` carried a fully-qualified `@godot.annotation.Visible`, so it was never
   registered and `probe_car_hits_ped --control` / `probe_car_hits_player` had been setting nothing; imported now,
   and the control really fails 5.
@@ -378,3 +382,44 @@ its control before anything was changed.
   keeps its gap to any traffic car standing in its own path within 40 m on ANY lane (`VehicleAIController.
   dummyGapAcrossLanes`; `--no-cross-gap` is the control): **94 -> 52 crashes** per ~40 car-minutes, the counts near
   the player unchanged. The 52 left are not looked at (`OW_CRASH_TRACE=all` names each one's collider).
+
+## Co-op: a car hits a car ANOTHER PEER simulates (2026-10-11, user)
+
+User: "co-op vehicle the guest / host should be able to interact with each other". A car is simulated by ONE peer
+(its driver's; the host's for everything parked or AI-driven) and is a frozen body placed from snapshots everywhere
+else. So to the peer whose car hits it, it is a WALL, and to its owner the hit never happened.
+
+- **Measured** (`tools/net/run_net_car_test.sh --control`, DebugWorld, two headless processes; one player takes the
+  police car and holds the throttle 2.5 s into the kei truck 10 m ahead): guest into the host's parked truck, guest
+  into the truck with the host at its wheel, host into the truck with the guest at its wheel -- every time the police
+  car stopped dead at the bumper on both peers (ran 5.9 m, centres 4.15 m apart) and the truck moved **0.00 m**. The
+  one-machine reference (`host:parked`, the host simulates both): the truck goes 38.7 m.
+- **Tried and dropped: a KINEMATIC puppet** (frozen in `FreezeMode.KINEMATIC`, so the solver moves it to each pose
+  with the speed that takes and it pushes what it meets). It works only when the puppet happens to overshoot into the
+  other car before the hitter's own wall stops it: the same case moved the truck 9.84 m in one run and 0.09 m in the
+  next, and a held throttle carried a parked car 60 m in front of an infinite-mass copy. A snapshot jump would also
+  become a 3000 m/s move.
+- **Built: the hit is handed to the car's owner** (`Vehicle.collectRemotePushes` -> `NetworkManager.sendVehiclePush`
+  -> `MSG_VEHICLE_PUSH` = 36 -> `Vehicle.applyRemotePush`). In `_integrateForces` the hitting car sums the contact
+  impulses it took from each frozen car it does not simulate, and at most every 0.05 s sends that car's owner the
+  OPPOSITE impulse at the impulse-weighted contact point. Reliable, on the shots lane (channel 1): a crash is one or
+  two steps long, a lost one is a hit that never happened. A client's goes to the host, which applies it or passes it
+  on to the owning client. The owner wakes / unparks the car and applies it; more than `mass x 40` is clamped, a point
+  over 8 m from the car is refused.
+  * **The share.** Against a wall a body gives up `m v`; two free bodies exchange only `m M / (m + M) v`. The whole
+    wall impulse sent a 700 kg truck off at ~28 m/s, turned 144 deg, from a police car doing 8. It is scaled by
+    `M / (m + M)` (the struck car's share of the two masses). The hitter still loses what a wall takes, so momentum is
+    LOST across the pair, never made -- do not hand the difference back to the hitter: the puppet is still in front
+    of it, so it is re-spent on the wall and the series sums to the full wall impulse again.
+- **Result** (6 of 6, then 3 more car cases): guest into the host's parked truck -- truck 22 m, police car on for
+  18 m, both peers agree to 0.00 m; guest into the host-driven truck 22 m; host into the guest-driven truck 16.6 m;
+  nothing thrown (<= 0.16 m off the ground). The control fails the three cross-peer cases. The two `ped` cases pass
+  with and without it (see the correction under V3).
+- NOT done: the struck car takes no CRASH DAMAGE from a remote hit (its damage model reads its own contacts, and it
+  has none: the hitter's car takes its own); a sideswipe at speed hands over less than a local one would (the wall
+  stops the hitter in a step, so later steps have little left to give); client-into-client is relayed by the host and
+  not tested (two peers only); an on-rails traffic car (frozen on its OWNER) ignores a push until it is made real,
+  which being near any player already does.
+- The stand's own trap: its players are slid to their marks, and a passer-by or a car on that line pushed the body
+  back out every step (it hung there for the run, 1 join in 3). They are carried 4 m over the ground now; the
+  script says STUCK and retries once if a body still does not arrive.
