@@ -107,6 +107,7 @@ GATES=(
   "title_coop|400|0|1|tools/net/run_title_coop.sh"
   "net_debugworld|1200|1|1|tools/net/run_net_debugworld.sh"
   "net_car|900|1|1|tools/net/run_net_car_test.sh"
+  "net_car3|900|1|1|tools/net/run_net_car_test.sh --three"
 )
 
 run_gate() {   # name timeout command

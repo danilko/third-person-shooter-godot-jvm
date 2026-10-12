@@ -102,17 +102,11 @@ public class VehicleDamageModel extends Node {
      * separate KINEMATIC body, never a shape on the car's RigidBody: a character stepping out stands where the door
      * opens, and a shape of the car overlapping them was resolved by throwing the CAR (measured: 100 m/s in one
      * frame). A kinematic door stops a character walking into it and is hit by bullets, and pushes the car nowhere.
+     * It is on the VEHICLE layer, so it also hits the car in the next bay: 11 m at a 0.5 m gap, 3.9 m at 1.0 m
+     * (probe_lazy_driver_seat --real-door). Kept on purpose (user 2026-10-11: a door is a way to hit the car beside
+     * you); only a REAL enter / exit swings one, a traffic driver is born in its seat (Vehicle.seatQuietly).
      */
     private static final double COLLIDER_MIN_ANGLE = Math.toRadians(2.0);
-    /**
-     * What sees an open door: bullets (HITBOX is in every aim ray's mask) and character bodies (STAIR_RAMP is in
-     * theirs and in nothing else's) -- NOT other vehicles. It was the VEHICLE layer, and a kinematic box swung 65
-     * degrees into the car in the next lane threw that car 11 m at a 0.5 m gap and 3.9 m at 1.0 m (PLAN.md V1,
-     * probe_lazy_driver_seat --control); a rigid body cannot push a kinematic one back, so it takes the whole
-     * penetration as velocity. A door meeting another car now passes through it for the second it stands open.
-     */
-    private static final int DOOR_LAYER = CollisionLayers.HITBOX | CollisionLayers.STAIR_RAMP;
-
     private Vehicle vehicle;
     private Node3D model;
     private final List<Part> parts = new ArrayList<>();
@@ -497,7 +491,7 @@ public class VehicleDamageModel extends Node {
         for (Part p : parts) {
             if (p.collider == null || !p.collider.isInsideTree()) continue;
             boolean solid = p.state < OFF && p.angle > COLLIDER_MIN_ANGLE;
-            int layer = solid ? DOOR_LAYER : 0;
+            int layer = solid ? CollisionLayers.VEHICLE : 0;
             if (p.collider.getCollisionLayer() != layer) p.collider.setCollisionLayer(layer);
             if (!solid) continue;
             // fresh products only: godot-jvm's Transform3D.times(Transform3D) mutates its receiver

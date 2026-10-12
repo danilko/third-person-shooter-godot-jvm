@@ -303,11 +303,14 @@ its control before anything was changed.
     occupancy message's `entering` byte carries the flag in bit 1 (`NetMessageCodec.OCCUPANCY_QUIET`; bit 0 is still
     "entering", so the layout did not change), and the 1 Hz occupancy sweep and the late-join baseline are always
     quiet: a self-heal or a joiner never sees a door swing for someone who sat down long ago.
-  * **An open door does not touch another car** (`VehicleDamageModel.DOOR_LAYER` = HITBOX | STAIR_RAMP: bullets see
-    HITBOX, character bodies see STAIR_RAMP, a vehicle's mask 51 sees neither). This is the real enter / exit beside
-    another car -- the same defect, which a player getting out in traffic hit too. `--real-door`: the door swings
-    65 deg, the neighbour moves 0.003 m at every gap. `probe_component_car` section 7 (the open door is solid to a
-    person, takes a bullet) unchanged.
+  * **An open door DOES hit the car beside it** (reversed the same day, user: "side by side hit works ... early
+    GTA also works this way", and one less special case). The door's box is back on the VEHICLE layer; the
+    HITBOX | STAIR_RAMP `DOOR_LAYER` that let it pass through another car is deleted. Only a REAL enter / exit swings
+    a door, so the reported defect (a driver APPEARING throws the next car) stays fixed by the quiet seat alone:
+    default probe 19/19, no door and no car moves at any gap. `--real-door` now states the kept behaviour: the
+    neighbour is shoved 11.1 m at a 0.5 m gap and 3.9 m at 1.0 m (a kinematic box cannot be pushed back, so the car
+    takes the whole overlap as speed), 0.003 m at 1.5 m and beyond. That is a hard shove for a door; softening it
+    would need the door to yield when blocked, which is not built.
   NOT measured: two peers (the flag is exercised by `run_net_debugworld.sh` only as far as "the coop gate passes").
 - **V2, the driver sits with empty hands.** `CharacterDriveState.enter` puts every seated body in the combat state
   ("still holds their weapon visually while riding"); `seatQuietly(…, unarmed = true)` takes a non-player back out of
@@ -415,10 +418,23 @@ else. So to the peer whose car hits it, it is a WALL, and to its owner the hit n
   18 m, both peers agree to 0.00 m; guest into the host-driven truck 22 m; host into the guest-driven truck 16.6 m;
   nothing thrown (<= 0.16 m off the ground). The control fails the three cross-peer cases. The two `ped` cases pass
   with and without it (see the correction under V3).
-- NOT done: the struck car takes no CRASH DAMAGE from a remote hit (its damage model reads its own contacts, and it
-  has none: the hitter's car takes its own); a sideswipe at speed hands over less than a local one would (the wall
-  stops the hitter in a step, so later steps have little left to give); client-into-client is relayed by the host and
-  not tested (two peers only); an on-rails traffic car (frozen on its OWNER) ignores a push until it is made real,
+- **Both cars are damaged, and three players relay** (user, the same day: "both should damage"; "test if all
+  three relay to each other"). The stand prints both cars' part masks and takes a second joiner
+  (`--car-role=guest2 --car-peers=3`, case `driver:seated:sitter`; `run_net_car_test.sh --three`, gate `net_car3`).
+  * The "no crash damage on the struck car" note written here was WRONG, and was never measured. The struck car's
+    owner has the hitter's frozen copy driven into its live car, so its damage model reads those contacts itself: in
+    all eight cross-peer cases the truck's mask is non-zero (0x40100520 host-simulated, 0xc1700530 on a client) and
+    so is the police car's (0xc0000033), identical on every peer through the snapshot's MAX-merge. No code changed.
+    The report now fails a case where either car is undamaged or the peers disagree.
+  * One-machine reference (`host:parked`): the truck is dented, the police car is NOT (0x0) -- a heavy car into a
+    0.7 t truck loses too little speed to dent under the single-player rule. Across peers the hitter meets a wall,
+    so it dents: a cross-peer hit is harder on the hitter than a local one. Not changed.
+  * Three players, five cases, all pass: guest into guest2's truck 16.7 m, guest2 into guest's 15.6 m (client to
+    client, carried only by the host's relay), host into guest2's 16.3 m, guest2 into the host's 21.9 m, guest2 into
+    the host's parked truck 21.1 m; all THREE peers agree to 0.00 m, the bystander included. A second instance of
+    one install is told apart by the host already (`GameManager.onPeerIdentified`).
+- NOT done: a sideswipe at speed hands over less than a local one would (the wall
+  stops the hitter in a step, so later steps have little left to give); an on-rails traffic car (frozen on its OWNER) ignores a push until it is made real,
   which being near any player already does.
 - The stand's own trap: its players are slid to their marks, and a passer-by or a car on that line pushed the body
   back out every step (it hung there for the run, 1 join in 3). They are carried 4 m over the ground now; the

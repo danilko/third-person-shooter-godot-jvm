@@ -639,6 +639,8 @@ public class DebugHarness extends Node {
             else if (arg.startsWith("--hold-action=")) { holdAction = arg.substring("--hold-action=".length()); }
             else if ("--coop-test".equals(arg)) { coopTest = true; }
             else if (arg.startsWith("--car-test=")) { carTest = arg.substring("--car-test=".length()); }
+            else if (arg.startsWith("--car-role=")) { carRole = arg.substring("--car-role=".length()); }
+            else if (arg.startsWith("--car-peers=")) { carPeers = Integer.parseInt(arg.substring("--car-peers=".length())); }
             else if ("--car-test-control".equals(arg)) { com.openworld.carrier.vehicle.Vehicle.pushRemoteCars = false; }
             else if ("--crowd-dump".equals(arg)) { crowdDump = true; }
             else if ("--car-trace".equals(arg)) { com.openworld.net.VehicleNetworkController.TRACE = true; }
@@ -958,8 +960,13 @@ public class DebugHarness extends Node {
      * the seat request and holds the throttle; the OTHER peer's player is the obstacle -- {@code ped} stands 1.8 m
      * ahead of the sports car's nose (the car driven, 4 s); {@code seated} sits in the kei truck 10 m ahead of the
      * police car (the car driven, 2.5 s); {@code parked} leaves that truck empty (the host simulates it). Both peers print a "[cartest]" line every 0.25 s the script compares.
+     * Three players: a second joiner runs with {@code --car-role=guest2}, every peer with {@code --car-peers=3}, and
+     * the case names who sits in the truck -- {@code guest:seated:guest2} is a client into a client, which only the
+     * host's relay carries. The peer that is neither is a bystander: it only prints what it sees.
      */
     private String carTest = null;
+    private String carRole = "guest";
+    private int carPeers = 2;
     private double carT = 0.0, carReadyAt = -1, carSeatedAt = -1, carDriveAt = -1, carNextAsk = 0, carNextPrint = 0;
     private Vector3 carGlideTo;
     private double carGlideSince = -1;
@@ -994,7 +1001,7 @@ public class DebugHarness extends Node {
         if (carSpc == null || !GD.isInstanceValid(carSpc)) carSpc = carParkedAt(40.0);
         if (carPoc == null || !GD.isInstanceValid(carPoc)) carPoc = carParkedAt(60.0);
         com.openworld.carrier.vehicle.Vehicle ket = carKet, spc = carSpc, poc = carPoc;
-        if (me == null || ket == null || spc == null || poc == null || PlayerRegistry.getPlayers().size() < 2) {
+        if (me == null || ket == null || spc == null || poc == null || PlayerRegistry.getPlayers().size() < carPeers) {
             if (carT >= carNextPrint) {
                 carNextPrint = carT + 5.0;
                 GD.print("[cartest] waiting me=" + (me != null) + " truck=" + (ket != null) + " sports=" + (spc != null)
@@ -1003,20 +1010,23 @@ public class DebugHarness extends Node {
             return;
         }
         String[] parts = carTest.split(":");
-        boolean driver = "guest".equals(parts[0]) == client;
+        String role = client ? carRole : "host";
+        boolean driver = role.equals(parts[0]);
         String obstacle = parts.length > 1 ? parts[1] : "ped";
+        // who stands in the way / sits in the truck: named, or the other one of host and guest
+        boolean sitter = role.equals(parts.length > 2 ? parts[2] : "guest".equals(parts[0]) ? "host" : "guest");
         if (carReadyAt < 0) {
             carReadyAt = carT + 3.0;
         }
         if (carT < carReadyAt) return;
         // the ped case drives the sports car (nothing ahead of it); the car cases drive the police car INTO the truck
         com.openworld.carrier.vehicle.Vehicle drive = "ped".equals(obstacle) ? spc : poc;
-        com.openworld.carrier.vehicle.Vehicle mine = driver ? drive : "seated".equals(obstacle) ? ket : null;
+        com.openworld.carrier.vehicle.Vehicle mine = driver ? drive : sitter && "seated".equals(obstacle) ? ket : null;
         if (!carGlided) {
             carGlided = true;
             if (mine != null) {
                 carGlideTo = mine.getGlobalPosition().plus(new Vector3(2.6, 0.3, 0));
-            } else if ("ped".equals(obstacle)) {
+            } else if (sitter && "ped".equals(obstacle)) {
                 carGlideTo = spc.getGlobalPosition().plus(new Vector3(0, 0.3, -4.0));
             }
         }
@@ -1079,6 +1089,7 @@ public class DebugHarness extends Node {
                         p.getCharacterInfo().ownerPeerId == 1 ? "hostp" : "guestp", q.getX(), q.getY(), q.getZ(), hp,
                         p.currentVehicleNode != null));
             }
+            sb.append(" kmask=" + ket.getPartMask() + " pmask=" + poc.getPartMask());
             GD.print(sb.toString());
         }
     }

@@ -6,7 +6,7 @@ extends SceneTree
 ## one gets a driver the way ZoneManager seats one, then loses it the way ZoneManager stows one.
 ##   godot --headless --path . --script tools/godot/probe_lazy_driver_seat.gd [-- --car=SPC1] [--control]
 ## --control: Vehicle.quietSeats off = the real enter / exit path that shipped (door swings, body stood beside the car).
-## --real-door: a REAL enter and exit (the door must swing) beside another car: the door throws nothing.
+## --real-door: a REAL enter and exit (the door must swing) beside another car: the door hits a car within its reach.
 const AI := "res://src/main/resources/com/openworld/character/AICharacter.tscn"
 const HELPER := "res://src/main/java/com/openworld/debug/VehicleProbeHelper.java"
 const MAX_MOVE := 0.05
@@ -41,6 +41,15 @@ func _door_deg(car: Node) -> float:
 	for d in ["door_lf", "door_rf", "door_lr", "door_rr"]:
 		a = maxf(a, float(dm.call("part_angle_now", d)))   # -1 = this car has no such door
 	return a
+
+## A quiet seat moves no car at any gap. A REAL door is solid to the car beside it (user, 2026-10-11, reversing the
+## same day's pass-through: "side by side hit works", as in the early GTAs): within the door's reach it shoves that
+## car, out of reach it touches nothing, and it never throws it across the street.
+func _door_or_none(tag: String, real_door: bool, gap: float, moved: float) -> void:
+	if not real_door or gap > 1.2:
+		_check("%s: ... and no car" % tag, moved < MAX_MOVE, "%.3f m" % moved)
+	else:
+		_check("%s: ... and the door shoves the car beside it" % tag, moved > MAX_MOVE and moved < 15.0, "%.3f m" % moved)
 
 func _initialize() -> void:
 	_run.call_deferred()
@@ -102,7 +111,7 @@ func _run() -> void:
 			_check("%s: a real enter swings the door" % tag, door > 30.0, "%.1f deg" % door)
 		else:
 			_check("%s: seating a driver moves no door" % tag, door < 1.0, "%.1f deg" % door)
-		_check("%s: ... and no car" % tag, moved < MAX_MOVE, "%.3f m" % moved)
+		_door_or_none(tag, real_door, gap, moved)
 		if row == 1 and not real_door:
 			var wc := d.get_node("WeaponController")
 			_check("the driver sits holstered, not in the combat state",
@@ -125,7 +134,7 @@ func _run() -> void:
 				moved = maxf(moved, (cars[k].global_position as Vector3).distance_to(p0[k]))
 		if not real_door:
 			_check("%s: stowing the driver moves no door" % tag, door < 1.0, "%.1f deg" % door)
-		_check("%s: ... and no car" % tag, moved < MAX_MOVE, "%.3f m" % moved)
+		_door_or_none(tag, real_door, gap, moved)
 		if row == 1 and not real_door:
 			_check("a stowed driver is never stood beside the car, solid", layer == 0 and absf(stood.x) < 1.0,
 					"layer %d, %.2f m to the side" % [layer, stood.x])
