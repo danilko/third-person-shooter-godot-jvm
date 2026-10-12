@@ -16,6 +16,14 @@ public enum Sound {
      *  ウーウー; an ambulance's ピーポー can be a second file later). 3D, on the car. */
     SIREN("siren"),
 
+    // a running car's engine (carrier.vehicle.EngineAudio): the starter, then LOOPING takes at idle and three engine
+    // speeds, cross-faded and pitched. 3D, on the car, only for cars near the camera.
+    ENGINE_START("engine/start"),
+    ENGINE_IDLE("engine/idle"),
+    ENGINE_LOW("engine/low"),
+    ENGINE_MID("engine/mid"),
+    ENGINE_HIGH("engine/high"),
+
     // a bullet meeting a surface (ImpactManager, by SurfaceType)
     IMPACT_FLESH("sfx/impact_flesh", 5),
     IMPACT_METAL("sfx/impact_metal", 5),

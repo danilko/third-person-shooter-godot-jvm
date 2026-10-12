@@ -460,6 +460,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     @Register
     @Override
     public void _exitTree() {
+        engineAudio.release();
         SpatialEntityGrid grid = SpatialEntityGrid.get();
         if (grid != null) grid.unregister(this);
     }
@@ -1157,11 +1158,40 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     public void _process(double delta) {
         refreshLights(delta);
         refreshEmergency(delta);
+        refreshEngineAudio(delta);
         refreshBumperView();
         damageVfxTimer -= delta;
         if (damageVfxTimer > 0.0) return;
         damageVfxTimer = DAMAGE_VFX_INTERVAL;
         refreshDamageTier();
+    }
+
+    // ── Engine sound (EngineAudio: which cars get a voice, and what it plays) ──────────────────────────────────
+
+    private final EngineAudio engineAudio = new EngineAudio(this);
+
+    private void refreshEngineAudio(double delta) {
+        boolean local = false;
+        for (Character c : seatOccupants) if (c instanceof Player p && p.isLocallyOwnedPlayer()) local = true;
+        engineAudio.update(delta, engineRunningNow(), occupant instanceof Player, local, cmd.motor, getConfig().maxSpeed);
+    }
+
+    /** Is the engine running: a wheeled vehicle, not a wreck, with someone in it or a brain driving it. */
+    @Register public boolean engineRunningNow() {
+        return wheels.size() >= 2 && isAlive() && !hasDefeatedDriver() && (hasAnyOccupant() || isAiDriven());
+    }
+
+    /** Engine players of THIS car sounding now (0 = no voice), for probes. */
+    @Register public int engineVoicesNow() { return engineAudio.playingNow(); }
+    /** Engine speed 0 (idle) .. 1 (red line) of a voiced car, for probes. */
+    @Register public double engineRpmNow() { return engineAudio.rpmNow(); }
+    /** Cars with an engine voice in the whole game, for probes and the console's {@code engine}. */
+    @Register public int engineVoicedCarsNow() { return EngineAudio.voicedCarsNow(); }
+    /** The console's {@code engine 0|1}: the whole engine sound on or off. */
+    public static void setEngineAudio(boolean on) { EngineAudio.enabled = on; }
+    public static String engineAudioReport() {
+        return "engine audio " + (EngineAudio.enabled ? "on" : "off") + ", " + EngineAudio.voicedCarsNow() + " of at most "
+                + EngineAudio.MAX_VOICED + " cars voiced (within " + (int) EngineAudio.HEAR_DISTANCE + " m)";
     }
 
     // ── Lights ────────────────────────────────────────────────────────────────

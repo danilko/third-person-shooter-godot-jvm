@@ -252,6 +252,7 @@ public class DebugConsole extends CanvasLayer {
                 print("load [slot]                            restore it (default 1)");
                 print("hud [0-3]                              debug HUD: off / FPS / perf + graph / + game state");
                 print("traffic                                cars round you now: by distance, by side, budget, region mix");
+                print("engine [0|1]                           engine sound on / off, and how many cars have a voice");
                 print("activity [start|replay|retry|abort|why <id>]   the running activities; start / replay / retry one");
                 print("where                                  the bug-report line (postal code, position, zone, road)");
                 print("postal <x-y[-s]> [tp]                  waypoint (or teleport) to a postal code, e.g. postal 12-7-5");
@@ -353,6 +354,11 @@ public class DebugConsole extends CanvasLayer {
                 print("hud level " + hud.levelNow());
             }
             case "traffic" -> traffic();
+            case "engine" -> {
+                // engine sound on / off (carrier.vehicle.EngineAudio): `engine`, `engine 0`, `engine 1`
+                if (a.length >= 2) com.openworld.carrier.vehicle.Vehicle.setEngineAudio(!a[1].equals("0"));
+                print(com.openworld.carrier.vehicle.Vehicle.engineAudioReport());
+            }
             case "autodrive" -> autodrive(a);
             case "signs" -> {
                 if (a.length >= 2) {

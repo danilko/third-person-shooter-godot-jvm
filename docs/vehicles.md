@@ -9,6 +9,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - Traffic car bugs V1-V6: a driver born in its seat, the door that threw the next car, a person never moves an empty car (2026-10-11, user-reported)
 - Co-op: a car hits a car ANOTHER PEER simulates (2026-10-11, user)
 - Auto-drive to the GPS waypoint, a testing aid (2026-10-11, user)
+- Engine sound: three re-timed loops and an idle, and which cars get a voice (2026-10-12)
 
 ---
 
@@ -469,3 +470,40 @@ debugging / testing setup; the player may exit any time to take over control."
   `--control` = never started). Signals and 踏切 run on the WALL CLOCK, so the probe waits in real time too: a limit
   in ticks measured the machine, not the drive (a headless run that steps 10x real time sits ~270 simulated seconds
   at one red light).
+
+## Engine sound: three re-timed loops and an idle, and which cars get a voice (2026-10-12)
+
+PLAN.md P2b "PENDING THE BUILD" 6 / S9 Q0 b. **Nobody has heard it yet**: everything below was built and gated by
+spectrum and by counting players. `carrier.vehicle.EngineAudio` (a plain class each `Vehicle` owns; `Vehicle._process`
+calls it, `_exitTree` releases it), `tools/audio/build_engine.py`, `assets/audio/engine/`, gate
+`tools/godot/probe_engine_audio.gd`.
+
+- **The files.** `start` (one shot, 2.4 s) and `idle` (loop) are a parked Camry (Freesound vacuumfan7072 322552);
+  `low` / `mid` / `high` are cut from ONE dyno pull of a Scion FR-S (dezoris 183654). A pull is never steady -- the
+  firing frequency climbs 87.6 -> 236.3 Hz between 6.5 s and 21.5 s -- so a slice of it looped has a pitch step at
+  the seam. `build_engine.py` tracks the firing frequency (a comb over its half, whole, 1.5x, double and triple: the
+  loudest partial moves between them; quadratic fit, worst tracked point 1.7 Hz off), resamples 1.6 s round each
+  band so the pitch STANDS STILL at 95 / 150 / 220 Hz (measured afterwards 95.0 / 148.9 / 220.4), divides the pull's
+  rising level out, and closes the loop on whole engine cycles with a 20 ms cross-fade; loop points in the `smpl`
+  chunk, as the siren. The start-to-end match of each loop reads only 0.26-0.40 under the dyno room's roar: whether a
+  seam is audible is for the ear. `FIRING` in the script and `EngineAudio.BAND_HZ` are one table in two places;
+  `build_engine.py --check` (nightly gate `engine_loops`) compares them.
+- **What plays.** Engine speed 0..1 -> a firing frequency 31.3 .. 230 Hz; the two loops either side of it are
+  cross-faded (equal power) and each is pitched to it, clamped 0.65-1.6. Idle hands over by 62 Hz and the low loop
+  plays alone from there to its own 95 Hz (slowed to an idle's pitch it is not an engine). A band at no weight is
+  STOPPED, so a car plays one loop, two between bands. `Vehicle` has no gearbox: the engine speed is read off the
+  road speed through five made-up gears (tops at 0.20 / 0.38 / 0.58 / 0.80 of top speed; it climbs to 0.95 in each
+  and drops to 0.42 at the change), held up to 0.3 by the throttle when standing. Louder on the throttle (7 dB), the
+  load taken from the acceleration where this peer does not know the throttle (a puppet, another peer's car). A
+  player getting into a standing car hears the starter, the loops fading in under it; traffic is born running.
+- **The cost rule** (the one that removed footsteps). A voice only for a RUNNING car (someone in it or a brain
+  driving it, not a wreck, >= 2 wheels) within 45 m of the camera, kept out to 55 m, at most 6 cars at once; the
+  local player's own car is never refused. A car without a voice has no player node and asks 5 times a second.
+  Measured downtown on the island (40 s, 80 samples, 34 vehicles in the world): at most 6 cars / 12 players in one
+  run and 2 / 4 in another, furthest voiced car 54-57 m. CONTROL `OW_ENGINE_AUDIO=all` (no distance, no count): 20
+  cars / 38 players, the furthest 261.6 m -- fails the three rule checks. `OW_ENGINE_AUDIO=0` (or the console's
+  `engine 0`): nothing plays; `-- --expect=off` checks that.
+- **Not done:** one engine for every wheeled vehicle (kei, truck, bus and motorcycle sound like the FR-S); no gear
+  change, tyre, crash or horn sounds; the starter is not gated by a probe; levels (`LEVEL_DB` -9, unit size 5) are
+  unheard picks.
+

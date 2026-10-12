@@ -37,7 +37,7 @@ missing: `SHORTLIST.md`.
 ## Wired in code (`SoundTest` checks this table lists every `Sound`)
 
 A `Sound` with N takes is `<file>_1` .. `<file>_N` (one picked per play). Everything except `hit_marker` and
-`siren` (`python3 tools/audio/build_siren.py`) is BUILT by `python3 tools/audio/build_sfx.py` (its `SPECS` table: source takes, layers, loudness), then
+`siren` (`python3 tools/audio/build_siren.py`) and `engine/*` (`python3 tools/audio/build_engine.py`; `--check` compares it with `EngineAudio.BAND_HZ`) is BUILT by `python3 tools/audio/build_sfx.py` (its `SPECS` table: source takes, layers, loudness), then
 `godot --headless --path . --import`. **None of it was auditioned by ear** (2026-10-08): the picks are by name and
 waveform; listen in game and change the row. Gate: `tools/godot/probe_sfx.gd`.
 
@@ -45,6 +45,11 @@ waveform; listen in game and change the row. Gate: `tools/godot/probe_sfx.gd`.
 |---|---|---|---|
 | `hit_marker` | `HIT_MARKER` | the local player's hit confirmed (HitMarker), 2D, short tick | shipped |
 | `siren` | `SIREN` | an emergency vehicle on a call (Vehicle.refreshEmergency), 3D, LOOPING (the loop is in the WAV's `smpl` chunk). ONE siren for police, fire and ambulance alike (user 2026-10-12): the ambulance's two-tone ピーポー | Freesound thabigm 758375 (CC0; HQ preview, 2 cycles looped by `tools/audio/build_siren.py`) |
+| `engine/start` | `ENGINE_START` | a player getting into a standing car (carrier.vehicle.EngineAudio), 3D, one shot: the starter and the catch | Freesound vacuumfan7072 322552 (CC0; HQ preview, cut by `tools/audio/build_engine.py`) |
+| `engine/idle` | `ENGINE_IDLE` | a running car standing or pulling away, 3D, LOOPING (`smpl` chunk). Engine sounds play only for running cars within 45 m of the camera, at most 6 at once | same take, its idle |
+| `engine/low` | `ENGINE_LOW` | the engine at ~2 850 rpm (firing 95 Hz), LOOPING, pitched 0.65-1.6 by engine speed and cross-faded with its neighbours | Freesound dezoris 183654 (CC0; HQ preview): one dyno pull, re-timed to a steady pitch by `tools/audio/build_engine.py` |
+| `engine/mid` | `ENGINE_MID` | ~4 500 rpm (150 Hz), as above | same pull |
+| `engine/high` | `ENGINE_HIGH` | ~6 600 rpm (220 Hz), as above | same pull |
 | `sfx/impact_flesh` | `IMPACT_FLESH` | a bullet into a body (ImpactManager, by SurfaceType) | Kenney `impactPunch_medium` |
 | `sfx/impact_metal` | `IMPACT_METAL` | a bullet into metal (vehicles, machinery) | Kenney `impactMetal_light` |
 | `sfx/impact_stone` | `IMPACT_STONE` | a bullet into stone / concrete / anything untagged | Kenney `impactPlate_light` |
@@ -82,7 +87,7 @@ Weapons
 - Glass shatter (car crash, shop / train window): the layered Kenney placeholder was REMOVED (user, 2026-10-08: awkward); a real CC0 shatter is on SHORTLIST
 
 Vehicles
-- Engine loop (idle/rev, pitched by rpm) per class: car, kei, truck, motorcycle, boat, plane
+- Engine loops PER CLASS (kei, truck, motorcycle, boat, plane): today every wheeled vehicle has the one car engine (`engine/*`); gear change, turbo, exhaust pops
 - Crash impact (thud / crunch, by impact strength), scrape along a wall, tyre skid, tyre burst
 - Horn, door open / close, boost (NOS), gear change, siren (POC1, MPC1, AMB1, FIE1, LAT1)
 - Wreck burning loop and vehicle explosion; street pole / bollard knocked down
