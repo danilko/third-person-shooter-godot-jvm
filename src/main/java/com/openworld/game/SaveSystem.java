@@ -568,18 +568,18 @@ public class SaveSystem extends Node {
     @Register public int profileWritesNow() { return profileWrites; }
     /** This install's balance / a grant to it (probes; the title runs before any body exists). */
     @Register public long profileBalanceNow() { return com.openworld.game.profile.Profiles.local().balance; }
-    @Register public boolean grantProfileNow(long yen) {
-        return com.openworld.game.profile.Economy.transfer(null, com.openworld.game.profile.Profiles.local(), yen,
+    @Register public boolean grantProfileNow(long dollars) {
+        return com.openworld.game.profile.Economy.transfer(null, com.openworld.game.profile.Profiles.local(), dollars,
                 com.openworld.game.profile.Economy.Reason.GRANT);
     }
     /** A bill to this install's profile (may run into debt -- CR4). */
-    @Register public long billProfileNow(long yen) {
-        return com.openworld.game.profile.Economy.bill(com.openworld.game.profile.Profiles.local(), yen,
+    @Register public long billProfileNow(long dollars) {
+        return com.openworld.game.profile.Economy.bill(com.openworld.game.profile.Profiles.local(), dollars,
                 com.openworld.game.profile.Economy.Reason.BILL_HOSPITAL);
     }
     /** A purchase from this install's profile (refused when short). */
-    @Register public boolean spendProfileNow(long yen) {
-        return com.openworld.game.profile.Economy.transfer(com.openworld.game.profile.Profiles.local(), null, yen,
+    @Register public boolean spendProfileNow(long dollars) {
+        return com.openworld.game.profile.Economy.transfer(com.openworld.game.profile.Profiles.local(), null, dollars,
                 com.openworld.game.profile.Economy.Reason.PURCHASE);
     }
     /** Forget the in-memory profile and read the file again; returns where it came from ("file", "bak1", ...). */

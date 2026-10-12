@@ -391,7 +391,7 @@ public class ActivityRuntime extends Node implements ActivityHost, ActivityDirec
         ActivityDef d = director.graph().activity(a.activityId());
         String title = d == null || d.title().isEmpty() ? a.activityId() : d.title();
         boolean won = a.outcome() == ActivityInstance.Outcome.COMPLETED;
-        String text = won ? "MISSION COMPLETE -- " + title + (mine.pay() > 0 ? String.format("   +¥%,d", mine.pay()) : "")
+        String text = won ? "MISSION COMPLETE -- " + title + (mine.pay() > 0 ? String.format("   +$%,d", mine.pay()) : "")
                 : "MISSION FAILED -- " + title + (a.reason() == null || a.reason().isEmpty() ? "" : " (" + a.reason() + ")");
         resultText = text;
         if (resultLabel == null) {
@@ -654,9 +654,9 @@ public class ActivityRuntime extends Node implements ActivityHost, ActivityDirec
 
     @Override public long reward(String activityId) { return EconomyTable.get().missionReward(activityId); }
 
-    @Override public void pay(String id, long yen) {
+    @Override public void pay(String id, long dollars) {
         PlayerProfile p = profile(id);
-        if (p != null) Economy.transfer(null, p, yen, Economy.Reason.REWARD);
+        if (p != null) Economy.transfer(null, p, dollars, Economy.Reason.REWARD);
     }
 
     @Override public void log(String line) { GD.print("[Activity] " + line); }

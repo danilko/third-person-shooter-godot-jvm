@@ -202,7 +202,7 @@ func _counter_cycle(counter: Area3D, p: CharacterBody3D, spawn: Node3D, weapon: 
 	var none: Array = []
 	_weapons_under(p, weapon, none)
 	var price := int(counter.call("price_for_now", p, weapon))
-	_check("with no money the sale is refused (%s costs ¥%d)" % [weapon, price], none.size() == 0 and price > 0,
+	_check("with no money the sale is refused (%s costs $%d)" % [weapon, price], none.size() == 0 and price > 0,
 		"%d on the body" % none.size())
 	p.call("give_cash_now", 200000)
 	menu.call("buy_now")
@@ -210,7 +210,7 @@ func _counter_cycle(counter: Area3D, p: CharacterBody3D, spawn: Node3D, weapon: 
 	var got: Array = []
 	_weapons_under(p, weapon, got)
 	_check("buying %s puts one in the inventory" % weapon, got.size() == 1, "%d on the body" % got.size())
-	_check("... and takes its price", int(p.call("cash_now")) == 200000 - price, "¥%d left" % int(p.call("cash_now")))
+	_check("... and takes its price", int(p.call("cash_now")) == 200000 - price, "$%d left" % int(p.call("cash_now")))
 	if got.size() == 1:
 		got[0].set("magazine", 0)
 		got[0].set("reserve", 0)
@@ -223,7 +223,7 @@ func _counter_cycle(counter: Area3D, p: CharacterBody3D, spawn: Node3D, weapon: 
 	var full: bool = got.size() == 1 and int(got[0].get("magazine")) == int(got[0].get("magazine_size"))
 	_check("buying it again refills it, no second copy", full and again.size() == 1, "%d on the body" % again.size())
 	_check("... at the REFILL price", refill > 0 and refill < price and int(p.call("cash_now")) == before_refill - refill,
-		"refill ¥%d of ¥%d" % [refill, price])
+		"refill $%d of $%d" % [refill, price])
 	menu.call("select_now", stock.find(food))
 	menu.call("buy_now")
 	await _tick(2)

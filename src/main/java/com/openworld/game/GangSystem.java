@@ -178,7 +178,7 @@ public class GangSystem extends Node {
         states.remove(pid + "|" + gang);
         Captivity held = captive.get(pid);
         if (held != null && held.gang.equals(gang)) captive.remove(pid);
-        GD.print("GangSystem: " + pid + " paid " + fee + " yen to " + gang);
+        GD.print("GangSystem: " + pid + " paid " + fee + " dollars to " + gang);
         return true;
     }
 
@@ -205,7 +205,7 @@ public class GangSystem extends Node {
         // and guards born hostile opened fire in the up-to-half-second before the next pass ("sometimes they attack
         // at the spawn point whatever I do", user 2026-10-10)
         applyFlips();
-        GD.print("GangSystem: " + playerId + " held by " + gang + ", ransom " + ransom + " yen");
+        GD.print("GangSystem: " + playerId + " held by " + gang + ", ransom " + ransom + " dollars");
     }
 
     public Captivity captivityOf(String playerId) { return playerId == null ? null : captive.get(playerId); }
@@ -218,7 +218,7 @@ public class GangSystem extends Node {
         if (c == null || !com.openworld.game.profile.Economy.transfer(com.openworld.game.profile.Profiles.of(who), null, c.ransom, com.openworld.game.profile.Economy.Reason.RANSOM)) return false;
         captive.remove(pid);
         states.remove(pid + "|" + c.gang);
-        GD.print("GangSystem: " + pid + " paid a ransom of " + c.ransom + " yen to " + c.gang);
+        GD.print("GangSystem: " + pid + " paid a ransom of " + c.ransom + " dollars to " + c.gang);
         return true;
     }
 

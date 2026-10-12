@@ -119,13 +119,13 @@ Built first so peak performance can be measured with enforcement in the ring (us
   HUD its vehicle situation. Gate `tools/godot/probe_die_seated.gd [-- --seat=passenger] [--control]`.
 - **Where a downed player wakes** (`game.RecoveryRules`, user 2026-10-06): any gang standing -> **拉致 ABDUCTED**;
   else police stars -> **逮捕 ARRESTED** (jail, a death included); else **入院 HOSPITALIZED**. Bills from cash, never
-  below 0, carried to the new body: hospital `fees.hospital` (¥5,000); arrested (hospital + `police_per_star`) x
-  stars (¥15,000/star); abduction: a ransom `ransom_per_star` x that gang's stars (¥100,000/star, the highest).
+  below 0, carried to the new body: hospital `fees.hospital` ($5,000); arrested (hospital + `police_per_star`) x
+  stars ($15,000/star); abduction: a ransom `ransom_per_star` x that gang's stars ($100,000/star, the highest).
   Abducted: woken at the nearest place of that gang (the places record's new `gang` field, from the civic plots),
   `gangs.json` `abduction.guards` guards cover them (ArrestState `pursuitStand`; the gang is held NON-hostile while
   the captive stays), prompt "拉致 ... [E] pay or run". Pay (`GangSystem.payRansom`, or a donation at that gang's
   counter) clears the standing and the guards stand down; past `escape_start` (15 m) they are escaping (gang hostile,
-  + the `escape` heat), past `escape_free` (90 m) free. The card shows the bill. `make_jp_font.py` adds 拉致身代金¥ and
+  + the `escape` heat), past `escape_free` (90 m) free. The card shows the bill. `make_jp_font.py` adds 拉致身代金$ and
   the gang names. Not done: a client paying a ransom (the key is read on the authority only); no interior "captive"
   marker yet (they wake at the place's door, guards round them).
 - Peak load for perf: `probe_walk_perf.gd --wanted=N --gang=N [--no-balance]`.

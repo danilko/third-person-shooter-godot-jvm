@@ -113,7 +113,7 @@ public interface ActivityHost {
     /** The economy table's reward for completing it (0 = none). */
     long reward(String activityId);
 
-    void pay(String playerId, long yen);
+    void pay(String playerId, long dollars);
 
     void log(String line);
 }

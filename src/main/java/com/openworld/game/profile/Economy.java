@@ -43,7 +43,7 @@ public final class Economy {
     }
 
     /**
-     * Move {@code amount} (> 0) yen. False -- and nothing changes -- when the amount is not positive, both sides are
+     * Move {@code amount} (> 0) dollars. False -- and nothing changes -- when the amount is not positive, both sides are
      * the world, or {@code from} cannot cover it and the reason does not allow debt.
      */
     public static boolean transfer(PlayerProfile from, PlayerProfile to, long amount, Reason reason) {

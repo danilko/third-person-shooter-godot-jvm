@@ -21,11 +21,11 @@ public interface GameOverRule {
     /** What the WORLD tells the player when the grace period starts (a caller's line; the minimal HUD). */
     String warning();
 
-    /** The player owes more than {@code yen} (loans and a negative balance together). */
-    static GameOverRule debtOver(String id, long yen, double graceSeconds, String warning) {
+    /** The player owes more than {@code dollars} (loans and a negative balance together). */
+    static GameOverRule debtOver(String id, long dollars, double graceSeconds, String warning) {
         return new GameOverRule() {
             @Override public String id() { return id; }
-            @Override public boolean breached(PlayerProfile p, CampaignView story) { return p.totalDebt() > yen; }
+            @Override public boolean breached(PlayerProfile p, CampaignView story) { return p.totalDebt() > dollars; }
             @Override public double graceSeconds() { return graceSeconds; }
             @Override public String warning() { return warning; }
         };

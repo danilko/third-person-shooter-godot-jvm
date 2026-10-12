@@ -81,7 +81,7 @@ public final class GangRules {
         s.heat = Math.max(0.0, s.heat - decayPerSecond * dt);
     }
 
-    /** The donation that clears a gang's heat (yen; 0 when there is nothing to pay). */
+    /** The donation that clears a gang's heat (dollars; 0 when there is nothing to pay). */
     public int fee(String gang, State s) {
         Gang g = gangs.get(gang);
         int stars = starsFor(s.heat);

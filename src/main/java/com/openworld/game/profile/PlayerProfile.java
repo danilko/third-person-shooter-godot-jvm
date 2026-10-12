@@ -56,7 +56,7 @@ public final class PlayerProfile {
     public long revision() { return revision; }
     public void touch() { revision++; }
 
-    /** A loan: owed to {@code lender}, {@code principal} yen, due at {@code dueAtUnix} (0 = no due date). */
+    /** A loan: owed to {@code lender}, {@code principal} dollars, due at {@code dueAtUnix} (0 = no due date). */
     public record Debt(String lender, long principal, long dueAtUnix) {}
 
     public long totalDebt() {

@@ -42,8 +42,8 @@ public sealed interface Requirement {
         @Override public boolean test(CampaignView v) { return v.hasCareer(career); }
     }
 
-    record CashAtLeast(long yen) implements Requirement {
-        @Override public boolean test(CampaignView v) { return v.balance() >= yen; }
+    record CashAtLeast(long dollars) implements Requirement {
+        @Override public boolean test(CampaignView v) { return v.balance() >= dollars; }
     }
 
     /** A WORLD requirement: this story character is alive in the world the activity would run in. */
@@ -91,7 +91,7 @@ public sealed interface Requirement {
     static Requirement achieved(String activity) { return new Achieved(activity, ""); }
     static Requirement achieved(String activity, String variant) { return new Achieved(activity, variant); }
     static Requirement career(String career) { return new Career(career); }
-    static Requirement cashAtLeast(long yen) { return new CashAtLeast(yen); }
+    static Requirement cashAtLeast(long dollars) { return new CashAtLeast(dollars); }
     static Requirement storyAlive(String storyId) { return new StoryAlive(storyId); }
     static Requirement beforeEnding() { return new PostEnding(false); }
     static Requirement afterEnding() { return new PostEnding(true); }

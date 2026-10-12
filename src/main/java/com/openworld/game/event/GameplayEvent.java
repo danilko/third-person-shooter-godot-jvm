@@ -37,7 +37,7 @@ public sealed interface GameplayEvent permits GameplayEvent.Damaged, GameplayEve
      *  whose protection the place is under, "" none. */
     record Threatened(Actor actor, Actor target, Spot at, String gang) implements GameplayEvent {}
 
-    /** {@code actor} took {@code amount} yen that was not theirs ({@code what}: "till"). {@code gang}: the gang whose
+    /** {@code actor} took {@code amount} dollars that was not theirs ({@code what}: "till"). {@code gang}: the gang whose
      *  place it was, "" none. */
     record Theft(Actor actor, Spot at, String what, long amount, String gang) implements GameplayEvent {}
 

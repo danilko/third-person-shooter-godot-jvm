@@ -174,6 +174,6 @@ public final class FakeActivityHost implements ActivityHost {
     }
 
     @Override public long reward(String activityId) { return rewards.getOrDefault(activityId, 0L); }
-    @Override public void pay(String id, long yen) { if (p(id) != null) p(id).paid += yen; }
+    @Override public void pay(String id, long dollars) { if (p(id) != null) p(id).paid += dollars; }
     @Override public void log(String line) { log.add(line); }
 }

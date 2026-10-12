@@ -1718,14 +1718,14 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     @Register
     public int cashNow() { return (int) Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, com.openworld.game.profile.Profiles.balanceOf(this))); }
 
-    /** Hand yen to (or, negative, take it from) this player's profile -- probes and the debug console. A take never
+    /** Hand dollars to (or, negative, take it from) this player's profile -- probes and the debug console. A take never
      *  runs into debt: it takes what is there. */
     @Register
-    public void giveCashNow(int yen) {
+    public void giveCashNow(int dollars) {
         com.openworld.game.profile.PlayerProfile p = com.openworld.game.profile.Profiles.of(this);
-        if (p == null || yen == 0) return;
-        if (yen > 0) com.openworld.game.profile.Economy.transfer(null, p, yen, com.openworld.game.profile.Economy.Reason.GRANT);
-        else com.openworld.game.profile.Economy.transfer(p, null, Math.min(-(long) yen, Math.max(0, p.balance)),
+        if (p == null || dollars == 0) return;
+        if (dollars > 0) com.openworld.game.profile.Economy.transfer(null, p, dollars, com.openworld.game.profile.Economy.Reason.GRANT);
+        else com.openworld.game.profile.Economy.transfer(p, null, Math.min(-(long) dollars, Math.max(0, p.balance)),
                 com.openworld.game.profile.Economy.Reason.GRANT);
     }
 

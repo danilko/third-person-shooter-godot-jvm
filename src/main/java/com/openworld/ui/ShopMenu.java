@@ -213,7 +213,7 @@ public class ShopMenu extends Control {
         boolean robbing = clerk != null && (clerk.robbable() || ids.contains(ShopCounter.TILL));
         drawString(font, new Vector2(20f, 38f), robbing ? counter.title + "  (ROBBERY)" : counter.title,
                 HorizontalAlignment.LEFT, -1f, 26, robbing ? new Color(1f, 0.45f, 0.35f, 1f) : new Color(1f, 1f, 1f, 1f));
-        if (buyer != null) drawString(font, new Vector2(W - 140f, 38f), "¥" + com.openworld.game.profile.Profiles.balanceOf(buyer), HorizontalAlignment.RIGHT, 120f,
+        if (buyer != null) drawString(font, new Vector2(W - 140f, 38f), "$" + com.openworld.game.profile.Profiles.balanceOf(buyer), HorizontalAlignment.RIGHT, 120f,
                 18, new Color(1f, 0.9f, 0.5f, 1f));
         for (int i = 0; i < ids.size(); i++) {
             float y = HEAD + ROW * i;
@@ -228,7 +228,7 @@ public class ShopMenu extends Control {
             if (ShopCounter.TILL.equals(ids.get(i))) {
                 var c = counter.clerk();
                 has = c == null || !c.robbable();
-                tag = has ? "EMPTY" : "¥" + (c != null ? c.till : 0);
+                tag = has ? "EMPTY" : "$" + (c != null ? c.till : 0);
             } else if (ShopCounter.DONATION.equals(ids.get(i))) {
                 var gs = com.openworld.game.GangSystem.get();
                 var c = counter.clerk();
@@ -236,7 +236,7 @@ public class ShopMenu extends Control {
                         ? gs.feeOf(buyer.getCharacterInfo().characterId, c.gang()) : 0;
                 boolean shortOf = com.openworld.game.profile.Profiles.balanceOf(buyer) < fee;
                 has = fee == 0 || shortOf;
-                tag = fee == 0 ? "NOTHING OWED" : (shortOf ? "SHORT " : "") + "¥" + fee;
+                tag = fee == 0 ? "NOTHING OWED" : (shortOf ? "SHORT " : "") + "$" + fee;
             } else if (ShopCounter.isSupply(ids.get(i))) {
                 int n = buyer.supplyCountNow(ids.get(i));
                 int max = com.openworld.item.SupplyCatalog.find(ids.get(i)).max();
@@ -252,11 +252,11 @@ public class ShopMenu extends Control {
         footer(h);
     }
 
-    /** "¥25,000", "SHORT ¥25,000" when the buyer's balance does not cover it, "FREE" for an unpriced row. */
+    /** "$25,000", "SHORT $25,000" when the buyer's balance does not cover it, "FREE" for an unpriced row. */
     private String priceTag(long price) {
         if (price <= 0) return "FREE";
         boolean shortOf = com.openworld.game.profile.Profiles.balanceOf(buyer) < price;
-        return (shortOf ? "SHORT " : "") + "¥" + String.format("%,d", price);
+        return (shortOf ? "SHORT " : "") + "$" + String.format("%,d", price);
     }
 
     private void footer(float h) {

@@ -10,7 +10,7 @@ import java.util.Set;
 
 /**
  * The economy's SOURCES that play pays out (PLAN.md 1.4 / F3), run where the result is decided -- the host. Amounts
- * are {@link EconomyTable}'s; every yen goes through {@link Economy#transfer} (REWARD), so a co-op player's session
+ * are {@link EconomyTable}'s; every dollar goes through {@link Economy#transfer} (REWARD), so a co-op player's session
  * copy changes on the host and travels back to them (MSG_PROFILE).
  */
 public final class Payouts {
@@ -26,7 +26,7 @@ public final class Payouts {
             PlayerProfile prof = Profiles.of(p);
             if (prof != null && paid.add(prof)) Economy.transfer(null, prof, amount, Economy.Reason.REWARD);
         }
-        if (!paid.isEmpty()) GD.print("Payouts: '" + missionId + "' paid ¥" + amount + " to " + paid.size() + " player(s)");
+        if (!paid.isEmpty()) GD.print("Payouts: '" + missionId + "' paid $" + amount + " to " + paid.size() + " player(s)");
         return paid.size();
     }
 
@@ -39,7 +39,7 @@ public final class Payouts {
                     || !characterId.equals(p.getCharacterInfo().characterId)) continue;
             PlayerProfile prof = Profiles.of(p);
             if (prof != null && Economy.transfer(null, prof, prize, Economy.Reason.REWARD)) {
-                GD.print("Payouts: " + characterId + " finished #" + place + ", prize ¥" + prize);
+                GD.print("Payouts: " + characterId + " finished #" + place + ", prize $" + prize);
                 return prize;
             }
         }

@@ -477,10 +477,10 @@ public class GameMenu extends Control {
             fact(statusLeft, "Health", Math.round(h.getCurrentHealth()) + " / " + Math.round(h.maxHealth),
                     f < 0.35 ? HudPalette.CRITICAL : null);
         }
-        fact(statusLeft, "Money", CashReadout.yen(prof.balance), prof.balance < 0 ? HudPalette.CRITICAL : null);
+        fact(statusLeft, "Money", CashReadout.dollars(prof.balance), prof.balance < 0 ? HudPalette.CRITICAL : null);
         long loans = 0;
         for (PlayerProfile.Debt d : prof.debts) loans += d.principal();
-        if (loans > 0) fact(statusLeft, "Loans", CashReadout.yen(loans), HudPalette.WARN);
+        if (loans > 0) fact(statusLeft, "Loans", CashReadout.dollars(loans), HudPalette.WARN);
         var ws = com.openworld.game.WantedSystem.get();
         if (ws != null && me != null && me.getCharacterInfo() != null) {
             var shown = ws.hudOf(me.getCharacterInfo().characterId);

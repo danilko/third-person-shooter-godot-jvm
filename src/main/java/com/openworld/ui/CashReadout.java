@@ -64,10 +64,10 @@ public class CashReadout extends Control {
         queueRedraw();
     }
 
-    public static String yen(long v) { return (v < 0 ? "-¥" : "¥") + String.format("%,d", Math.abs(v)); }
+    public static String dollars(long v) { return (v < 0 ? "-$" : "$") + String.format("%,d", Math.abs(v)); }
 
-    /** "¥5,000", or "-¥15,000  ¥5,000" while a change is being told (probe readout). */
-    @Register public String cashTextNow() { return (delta != 0 ? (delta > 0 ? "+" : "") + yen(delta) + "  " : "") + yen(shown); }
+    /** "$5,000", or "-$15,000  $5,000" while a change is being told (probe readout). */
+    @Register public String cashTextNow() { return (delta != 0 ? (delta > 0 ? "+" : "") + dollars(delta) + "  " : "") + dollars(shown); }
     public long balanceShown() { return shown; }
     public boolean inDebt() { return seeded && shown < 0; }
 
@@ -76,11 +76,11 @@ public class CashReadout extends Control {
     public void _draw() {
         if (font == null || !seeded) return;
         float base = H * 0.5f + FONT_SIZE * 0.36f;
-        String bal = yen(shown);
+        String bal = dollars(shown);
         float bw = (float) font.getStringSize(bal, HorizontalAlignment.LEFT, -1f, FONT_SIZE).getX();
         text(new Vector2(W - bw, base), bal, shown < 0 ? HudPalette.CRITICAL : HudPalette.TEXT);
         if (delta == 0) return;
-        String d = (delta > 0 ? "+" : "") + yen(delta);
+        String d = (delta > 0 ? "+" : "") + dollars(delta);
         float dw = (float) font.getStringSize(d, HorizontalAlignment.LEFT, -1f, FONT_SIZE).getX();
         text(new Vector2(W - bw - 14f - dw, base), d, delta > 0 ? GAIN : HudPalette.CRITICAL);
     }

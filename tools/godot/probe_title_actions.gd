@@ -12,7 +12,7 @@ extends SceneTree
 ##     never touched; the backup below is belt and braces.)
 ##   --role=host / --role=join (two processes, tools/net/run_title_coop.sh): Host on one title, Join 127.0.0.1 on the
 ##     other; each side must see the session (NetworkManager.session_now) and BOTH players in its PlayerRegistry.
-##     Then the PROFILE HANDSHAKE (PLAN.md 1.4, AR2): the joiner grants its own profile 4321 yen on the title; the
+##     Then the PROFILE HANDSHAKE (PLAN.md 1.4, AR2): the joiner grants its own profile 4321 dollars on the title; the
 ##     host must hold that as the joiner's session copy, then pays the joiner's body 1000 (money moves on the host);
 ##     the joiner must receive its profile back at 5321 and save it (reloaded from its file).
 
@@ -225,7 +225,7 @@ func _coop() -> void:
 	print("[title] SUMMARY role=%s session=%s players=%d" % [role, String(net.call("session_now")).replace(" ", "_"), _players()])
 	if role == "host":
 		var held := await _wait(func(): return String(saves.call("remote_balances_now")).ends_with("=4321"), 1200)
-		_check("the host holds the joiner's profile (4321 yen)", held, String(saves.call("remote_balances_now")))
+		_check("the host holds the joiner's profile (4321 dollars)", held, String(saves.call("remote_balances_now")))
 		var other: Node = root.get_node("PlayerRegistry").call("remote_player_now")
 		_check("the joiner's body is here", other != null)
 		if other != null:

@@ -57,6 +57,18 @@ func _initialize() -> void:
 	_check("the title is up", current_scene != null and current_scene.name == "TitleScreen",
 		str(current_scene.name) if current_scene else "-")
 	var focus := root.gui_get_focus_owner()
+	var notice := _find(current_scene, "Notice") as Control
+	_check("the first title of a run is under the fiction notice, its button focused", notice != null
+		and notice.visible and focus is Button and focus.name == "Understood", str(focus.name) if focus else "none")
+	_check("  ... the notice covers the screen and stops the mouse", notice != null
+		and notice.size.is_equal_approx(root.get_visible_rect().size) and notice.mouse_filter == Control.MOUSE_FILTER_STOP,
+		"%s of %s" % [notice.size if notice else "-", root.get_visible_rect().size])
+	if focus is Button:
+		(focus as Button).pressed.emit()
+	await _frames(3)
+	focus = root.gui_get_focus_owner()
+	_check("  ... pressed, it is gone and a menu button has the focus", _find(current_scene, "Notice") == null
+		and focus is Button and focus.name != "Understood", str(focus.name) if focus else "none")
 	_check("a button has focus (pad-ready)", focus is Button, str(focus.name) if focus else "none")
 	var cont := _find(current_scene, "Continue") as Button
 	var save: Node = root.get_node("SaveSystem")
@@ -108,7 +120,7 @@ func _initialize() -> void:
 	pm.show()
 	await _frames(3)
 	_check("it opens on STATUS, which names the player's money", String(pm.call("tab_now")) == "STATUS"
-		and String(pm.call("status_text_now")).contains("Money=¥"), String(pm.call("status_text_now")))
+		and String(pm.call("status_text_now")).contains("Money=$"), String(pm.call("status_text_now")))
 	_check("only the selected page is shown", (_find(pm, "Page_STATUS") as Control).visible and not (_find(pm, "Page_DISPLAY") as Control).visible)
 	pm.call("select_tab_now", "DISPLAY")
 	await _frames(2)
@@ -133,6 +145,8 @@ func _initialize() -> void:
 	await _frames(20)
 	_check("back on the title, unpaused", current_scene != null and current_scene.name == "TitleScreen" and not paused,
 		"%s paused %s" % [str(current_scene.name) if current_scene else "-", paused])
+	_check("the notice is once per launch: not shown again", _find(current_scene, "Notice") == null
+		and root.gui_get_focus_owner() is Button)
 
 	if backup != "":
 		var f := FileAccess.open(CFG, FileAccess.WRITE)

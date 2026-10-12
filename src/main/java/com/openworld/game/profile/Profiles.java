@@ -28,7 +28,7 @@ public final class Profiles {
     private static long savedRevision = -1;
 
     /** Where this install's profile is kept. A run under {@code --script} (a probe, never the shipped game) gets its
-     *  own file, so a probe granting itself 100 000 yen never lands in the player's real profile. */
+     *  own file, so a probe granting itself 100 000 dollars never lands in the player's real profile. */
     public static void configure(Path profileFile, long startingStake) {
         file = profileFile;
         stake = Math.max(0, startingStake);

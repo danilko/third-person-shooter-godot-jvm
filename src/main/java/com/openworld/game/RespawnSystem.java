@@ -401,8 +401,8 @@ public class RespawnSystem extends Node {
         var g = gs.gang(c.gang);
         captivePrompt.setText(com.openworld.world.SignText.local("word.abducted") + " "
                 + (g != null ? com.openworld.world.SignText.local("gang." + c.gang) + " " + g.name() : c.gang) + "\n"
-                + com.openworld.world.SignText.local("word.ransom") + " ransom ¥"
-                + String.format("%,d", c.ransom) + "  [E] pay   (cash ¥" + String.format("%,d", com.openworld.game.profile.Profiles.balanceOf(me))
+                + com.openworld.world.SignText.local("word.ransom") + " ransom $"
+                + String.format("%,d", c.ransom) + "  [E] pay   (cash $" + String.format("%,d", com.openworld.game.profile.Profiles.balanceOf(me))
                 + ")   or run for it");
         if (authority() && godot.api.Input.INSTANCE.isActionJustPressed("interact") && gs.payRansom(me))
             GD.print("RespawnSystem: ransom paid");
