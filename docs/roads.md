@@ -1881,3 +1881,36 @@ were rebuilt (their entries cleared from `IslandRoads.build.json`, `DIRTY_ONLY=1
 near-side unit stands on the right kerb. Not checked by a picture yet: the expressway cantilever at an EXIT on the
 rebuilt pieces (unchanged code).
 
+## 17 street corners rounded (2026-10-12, s9; user: "if kerbs under building means squash/reduce building, it is possible")
+
+A generated block street turned a right angle through ONE record point with ~15 m legs: the solved centreline bent at
+~5 m of radius, its inside lane at 2.9 m. A car cannot follow that; it swung into the oncoming lane (census trace:
+opposing cars touching at `koba_waku_w__x2`, one into the building on the corner, a queue standing behind it).
+
+- **`tools/island_fillet_corners.py [--write]`** reads the record through the kit's own curve
+  (`point_profile.centreline_runs`), finds each place a street's centreline bends under 9 m, and REMOVES the corner
+  point, joining its neighbours (then slides the neighbours back along their legs if that is not enough), measuring
+  after each try. Ramps (`shuto*`), the mountain road and roundabouts (`*rotary*`) are skipped. 17 fixed, to
+  11-29 m of centreline radius: c1_ura_higashi, c1_ura_nishi, eki_ginza_res_north (only to 5.9 m), ekimae_industry,
+  ekimae_suburb, kanransha_michi, kichi_dori__2__x1__x1, kitahama_michi, koba_waku_w__x2, koba_waku_w__x2__x1,
+  kogaihama_michi, nishi_ura__x1__x1, nishihama_michi, nodo_waku__x2__x2__x2 (+ neighbours slid x1.5),
+  nodo_waku__x2__x2__x2__x2, yamasoi (two). **5 LEFT** -- the bend is at a road's end, beside a junction, where
+  there is no plain interior point to remove: eki_ginza_res_north (961, 834), ichiba_michi (561, -702),
+  kichi_dori__2__x1 (-499, -1231), nishi_dori__5__x1 (-87, 679), nishi_ura__x1 (-1059, -209) (record x, y).
+- **Rebuilt:** `tools/island_roads_stage.sh` (35 min: 27 road + 15 rail pieces, gate 0 errors, lanes 2 624 as before,
+  stamp, traffic zones, road map PASS, footbridges unchanged, sidewalks), then the buildings.
+- **Buildings** (`tools/island_corner_buildings.py`): four stood inside the new road + footway. Three were slid back
+  (a Mansion on yamasoi 5.5 m, an ApartRC3F and a DetachedHouseB 0.5 m), one had no clear place within 8 m and was
+  REMOVED (the Apartment_W6 on the inside of the koba_waku_w__x2 corner). `island_buildings.py lots` + `write`
+  (2 031 buildings), HLOD rebuilt. `island_downstream.sh --check` PASS; check_roads 44 PASS + the old sample FAIL;
+  probe_gps_route --world=island PASS.
+- **Measured at the old hot cell** (census, `residential`, 300 s, two runs each): cars standing within 60 m of the
+  player 15.8 and 10.8 -> 3.4 and 3.7 (the queue at the corner is gone), contact lines 2 210 and 97 -> 59 and 73,
+  scored crashes 6 and 11 -> 5 and 3. What still scores is at the T junction `cj1fe6ac18` 60 m on (connector
+  against connector), not the bend.
+- **LEFT, known:** (1) the block ground is baked into the terrain by the `ground` stage, which was NOT re-run: on
+  the outside of each rounded corner the sliver the road left is at road level, 15 cm under the block beside it,
+  until the next `island_world.sh --from terrain`; (2) two civic plots at the koba corners, `danchi` and
+  `hospital_west`, now report "lost their frontage": their front stands ~2 m further from the road than the check
+  allows (the road pulled in from the corner). Not re-sited; (3) `probe_road_clear` was not re-run (1 h).
+
