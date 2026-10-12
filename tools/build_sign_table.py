@@ -2,7 +2,7 @@
 """build_sign_table.py -- THE STRING TABLE of everything the world writes in a native script
 (`src/main/resources/com/openworld/i18n/signs.csv`), keyed by id, one column per language.
 
-    python3 tools/build_sign_table.py [--check]
+    python3 tools/build_sign_table.py [--check] [--english]
 
 User, 2026-10-12: "keep these names with id, and names can be more easily translated, without need to recompile";
 "for now keep Japanese, but also able to go Chinese Traditional (English subtitle on both)".
@@ -22,6 +22,8 @@ User, 2026-10-12: "keep these names with id, and names can be more easily transl
     - an empty cell of a language column this script knows how to derive: `zh_TW` from `ja` by tools/sign_lang.py.
   Any other column (a language somebody added) is carried through untouched; its empty cells stay empty and the game
   falls back to `ja`.
+* A street's `en` is its romaji name with the generic word in English (`english()`: 'Nishi-dori' -> 'Nishi St').
+  `--english` converts the cells that still hold the plain romaji default, once; an edited cell is left alone.
 * `--check` exits 1 when the file would change (a road was added or removed and this was not re-run).
 Then `python3 tools/make_jp_font.py`: the sign fonts are subsets of exactly the characters in this table.
 """
@@ -57,6 +59,25 @@ ZH_FIX = {"station.Light Industry": "工業團地", "word.train_departs": "{1} �
           "word.train_bound": "往 {0}", "word.train_none": "停駛", "word.train_local": "區間車"}
 
 
+#: the generic word a romaji street name ends in -> English (S9 Q6: the `en` column was plain Hepburn). The NAME stays
+#: romaji, as on a real sign ("Aoba St", not "Green Leaf St"); 大通り is a name in itself.
+EN_SUFFIX = (("-hondori", " Main St"), ("-dori", " St"), ("-oji", " Ave"), ("-nodo", " Farm Rd"),
+             ("-sokudo", " Frontage Rd"), ("-toge", " Pass"), ("-sando", " Approach"))
+
+
+def english(romaji):
+    """'Nishi-dori' -> 'Nishi St', 'Aoba-dori 2' -> 'Aoba St 2'; anything else (the expressway's names) unchanged."""
+    stem, _, num = romaji.partition(" ") if romaji.rsplit(" ", 1)[-1].isdigit() else (romaji, "", "")
+    if stem == "O-dori":
+        stem = "Odori Ave"
+    else:
+        for suffix, word in EN_SUFFIX:
+            if stem.endswith(suffix):
+                stem = stem[:-len(suffix)] + word
+                break
+    return stem + (" " + num if num else "")
+
+
 def load():
     if not os.path.exists(OUT):
         return list(BASE), {}
@@ -72,8 +93,10 @@ def main(argv):
         if c not in cols:
             cols.append(c)
     want = {}
+    romaji = {}
     for b, v in json.load(open(STREETS))["roads"].items():
-        want["street." + b] = (v["ja"], v["en"])
+        want["street." + b] = (v["ja"], english(v["en"]))
+        romaji["street." + b] = v["en"]
     if os.path.exists(STATIONS):
         for k, v in json.load(open(STATIONS))["stations"].items():
             want["station." + k] = (v["ja"], v["en"])
@@ -93,6 +116,9 @@ def main(argv):
             added += 1
         for c in cols:
             row.setdefault(c, "")
+        if "--english" in argv and row["en"] == romaji.get(key):
+            row["en"] = en                 # the one-time conversion: only a cell nobody has edited
+            filled += 1
         if not row["zh_TW"] and row["ja"]:
             row["zh_TW"] = ZH_FIX.get(key) or sign_lang.to_zh(row["ja"])
             filled += 1

@@ -44,7 +44,7 @@ func _initialize() -> void:
 		return
 	var key := "street.nishi_dori"
 	print("  %s: ja %s | zh_TW %s | en %s" % [key, ja.get_message(key), zh.get_message(key), en.get_message(key)])
-	_check(str(ja.get_message(key)) == "西通り" and str(zh.get_message(key)) == "西通" and str(en.get_message(key)) == "Nishi-dori",
+	_check(str(ja.get_message(key)) == "西通り" and str(zh.get_message(key)) == "西通" and str(en.get_message(key)) == "Nishi St",
 			"one id, three languages")
 	# every street of the built lanekits has a row
 	var bases := {}
