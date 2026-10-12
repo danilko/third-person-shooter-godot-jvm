@@ -78,7 +78,7 @@ public class GameMenu extends Control {
     private boolean dirty;
 
     private VBoxContainer statusLeft, statusRight;
-    private OptionButton presetBox, windowMode, resolution, worldDensity;
+    private OptionButton presetBox, windowMode, resolution, worldDensity, signLanguage;
     private HSlider renderScale, shadowDist, viewDist, lookSens, padLook, volume, fov;
     private CheckButton invertY, aimAssist, hudMinimal, vsync, loadingTour;
     private final Map<HSlider, Label> sliderValues = new LinkedHashMap<>();
@@ -271,6 +271,11 @@ public class GameMenu extends Control {
         row(o, "World density", worldDensity);
         worldDensity.connect("item_selected", callable("on_display"));
         note(o, "Cars, pedestrians and attackers at once. The host's choice in co-op, the same for every player. Normal is tuned for the Steam Deck.");
+        signLanguage = new OptionButton();
+        for (String lang : com.openworld.world.SignText.languages()) signLanguage.addItem(signLanguageLabel(lang));
+        signLanguage.setName("SignLanguage");
+        row(o, "Sign language", signLanguage);
+        note(o, "What street plates, guide signs and station boards are written in (English stays underneath). Signs already built change when their area loads again.");
         loadingTour = check(o, "Loading tour");
         note(o, "A short tour behind the loading screen that streams the city in before you play. Off starts at once; the first minutes may stutter.");
         VBoxContainer s = column(h, inGame ? "SESSION" : "");
@@ -546,6 +551,7 @@ public class GameMenu extends Control {
         volume.setValue(q.masterVolume);
         hudMinimal.setPressed(q.hudMinimal);
         loadingTour.setPressed(q.loadingTour);
+        signLanguage.select(Math.max(0, com.openworld.world.SignText.languages().indexOf(q.signLanguage)));
         worldDensity.select(q.worldDensity.ordinal());
         fov.setValue(q.fovOffset);
         windowMode.select(q.windowMode.ordinal());
@@ -606,6 +612,9 @@ public class GameMenu extends Control {
         q.masterVolume = volume.getValue();
         q.hudMinimal = hudMinimal.isPressed();
         q.loadingTour = loadingTour.isPressed();
+        java.util.List<String> langs = com.openworld.world.SignText.languages();
+        if (signLanguage.getSelected() >= 0 && signLanguage.getSelected() < langs.size())
+            q.signLanguage = langs.get(signLanguage.getSelected());
         q.fovOffset = fov.getValue();
         q.apply();
     }
@@ -709,6 +718,17 @@ public class GameMenu extends Control {
         sliderValues.put(s, value);
         s.connect("value_changed", callable(handler));
         return s;
+    }
+
+    /** A string-table column's name for the menu (Latin: the menu font draws no CJK). */
+    private static String signLanguageLabel(String lang) {
+        return switch (lang) {
+            case "ja" -> "Japanese";
+            case "zh_TW" -> "Traditional Chinese";
+            case "zh_CN" -> "Simplified Chinese";
+            case "ko" -> "Korean";
+            default -> lang;
+        };
     }
 
     private CheckButton check(VBoxContainer v, String label) {

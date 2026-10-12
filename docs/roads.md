@@ -17,6 +17,8 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - Asphalt from kerb to door; a paved site's edge slopes (2026-10-05, user-asked)
 - The expressway as of 2026-10-01: a complete Wangan, a lane-split T at the spur, all four movements at both JCTs
 - 横断歩道橋: footbridges over the widest junction arms, measured in Blender, placed from the lane records (2026-10-10, user-asked)
+- 電柱 + wires, lamps up the mountain road, white ガードレール (PLAN.md T1 + part of T3, 2026-10-11, user-asked)
+- Right-hand traffic is the keep-left lane graph run backwards (2026-10-12, user: "drive on the right")
 
 ---
 
@@ -1741,3 +1743,133 @@ marks where a walker would step on); no name plate text (`MARK_name_plate`); the
 corner into the ring a real big crossing has (each span is its own bridge); no lift / slope; the navmesh under a
 streamed bridge is the road piece's own (an AI on foot does not path over the deck); cost at a junction with two in
 view is 8 draws -- not measured with `perf_gate.sh`.
+
+## 電柱 + wires, lamps up the mountain road, white ガードレール (PLAN.md T1 + part of T3, 2026-10-11, user-asked)
+
+User: "for the wire and pole asset, use japanese measure, more pole / electric pole placed in blender and exported";
+then "for the streets on mountains add gutter and kerb + street lights all the way + destructible ガードレール, white
+guardrails along some mountain roads ... also on larger city roads + coastline roads (exclude the intersection where
+folks need to walk) (instead of wall when not in tunnel)".
+
+**The pieces are modelled in Blender, in `kits/library/library.blend`** (`blender/tools/library_civic.py`, category
+`street`; `build_library.py -- --procedural --only=<names>` then `export_building_kit.py -- --accept-bounds`):
+
+- `Pole_Denchu`, `Pole_DenchuTr` (+ 柱上変圧器), `Pole_DenchuLamp` (+ 防犯灯 at 5 m), `Pole_DenchuTrLamp`: the
+  Japanese distribution pole to its real numbers -- a 14 m concrete pole, 根入れ 1/6 (2.33 m, modelled BELOW z 0 so a
+  pole on a falling verge still reaches the ground; `lift` -2.33 in the table cancels `put`'s stand-on-lowest-point),
+  11.67 m standing, 末口 19 cm, taper 1/75; a one-sided 腕金 for the 6.6 kV lines reaching toward the ROAD (the
+  piece's +X), an 架空地線 on a cap bracket, the low-voltage rack ~2 m down, the communication cable at 6.1 m with a
+  splice closure, 足場ボルト from 2.7 m, three yellow 反射 bands. Three materials (four with the lamp): a MultiMesh
+  draws once per surface. `library_procedural.Builder.cyl` (a tapered, smooth-sided round bar) is new for them.
+- `Guardrail_JP`: one 4 m module of the standard W-beam guardrail (beam centre 0.6 m, 350 mm deep, a φ114 post in
+  the middle, 0.5 m of post in the ground), white, one material.
+
+**`furniture.json` owns where a wire meets a pole** (`rules.denchu_wires`: kind, x toward the road, z, sag at a 30 m
+span, drawn thickness). The pole model reads the table to put its insulators there and `point_furniture.wire_span`
+strings the wires from it, so the two cannot disagree; moving a wire is one edit and a library rebuild.
+
+**Placement** (`point_furniture`, the notes in `furniture.json` are the rule text):
+
+- `denchu_kind(road)`: by LANE COUNT, never class -- at most `denchu_max_lanes` (2) each way; not an expressway, a
+  ramp or a no-pedestrian road. "lamp" (at most 1 lane each way AND a footway: a block street) = `_Lamp` poles every
+  30 m CENTRED in each kerb run, and NO separate `lamp` on that street; "plain" (wider, or no footway: a 2+2 arterial,
+  the mountain road) keeps its lamps and trees, and its poles stand on the lamp pitch a quarter of it off, which is
+  midway between a lamp and a tree on either kerb (self-tested against both lattices). BOTH kerbs in town
+  (`denchu_both_sides`, the user's call the same day: "thought it should be both sides"; the second line is staggered
+  half a pitch), ONE kerb -- a hash of the road's name -- on `denchu_one_side_roads` (the mountain road). The coast
+  road (`barrier_style` RAIL, no kerb) carries them too, 1 m out behind its guardrail, and is lit like a kerbed road
+  (`_lamps` no longer asks for a kerb there). A blocked spot (vehicle entry, lane, car-park keep-out, another solid) slides +-3 / +-6 m first.
+  Runs after the lamps and before the trees. Every third pole carries the transformer.
+- **Wires** are swept INTO the road piece (`FURN__wires`, material `M_Wire` in `road_kit/materials`, no collision):
+  seven three-sided tubes per span (1 ground wire, 3 high voltage, 2 low voltage, 1 communication), a parabola whose
+  sag grows with the square of the span, between consecutive poles of one road up to `denchu_max_span` (62 m), over
+  a junction or a vehicle entry included. A span to a pole in ANOTHER piece is not strung (each piece builds from
+  what it owns), so a zone boundary that falls between two poles leaves one gap.
+- `guardrail_kind(road)`: "kerb" -- both kerbs of a road with >= 2 lanes each way and a footway, 0.25 m behind the
+  kerb line, never within `guardrail_end_clear` (9 m) of a run's end (the crossing), a vehicle entry, a keep-out, a
+  level crossing; "edge" -- a road whose new field **`barrier_style` = RAIL** (the `coast` preset, `kaigan_dori`):
+  `point_solve` no longer stands the no-pedestrian wall where the road is on the ground and outside a rock shed
+  (a deck, a pier, a shed keep wall AND car wall), and the rail goes wherever no wall is; "drop" -- the roads
+  `guardrail_drop_roads` names (`shrine_touge*`): EVERY edge except where the hill stands beside it (the ground 4 m
+  outboard is >= 1 m ABOVE the road -- the inner side; first built as "valley side only", widened the same day on the
+  user's "all the way, at least the non-inner side"). A module is turned to its edge and PITCHED to its grade (`placement["pitch"]` ->
+  `point_gltf.marker_node`), because a level 4 m module on a 10 % grade steps 0.4 m at every joint.
+- **A rail is not a "solid" to the spacing rules** (asset key `rail` [half thickness, height, half length]): a tree,
+  a lamp and a pole stand behind it. It is breakable like a pole: `BreakableProps.poleHalfLength` + `pitches` (the
+  baker reads `break_pole_len` and the marker's pitch), a long box per module, and the car's sweep asks five discs
+  along the beam. mass 60 kg, break speed 6 m/s; 電柱 700 kg, 6 m/s.
+- **Lamps up the mountain road**: `shrine_touge*` left `lamp`'s `exclude_roads` (and the poles'), so the pass is lit
+  kerb to kerb at the ordinary 36 m pitch. Its kerb and L-gutter were already there (the road inherits a 0.15 m
+  kerb both sides; 912 gutter drains above 40 m) -- nothing was changed for them.
+- **The 防犯灯 is a real lamp to the game**: `world.StreetLights` `LAMP_ASSETS` / `HEAD_OFFSETS` gained the two `_Lamp`
+  pieces (bulb (0.91, 4.95, 0)), so they get pools and the nearest get lights, and a knocked-down pole is dark.
+
+**Measured on the island (the mesh build, 41 pieces), first rule set (one kerb, valley-side rails):** 1 124 poles
+(478 lit) + 952 wire spans, 8 461 rail modules (33.8 km; 532 more refused for standing in a lane), lamps
+1 144 -> 1 587, trees unchanged (889), triangles 2.07 M -> 2.11 M. The numbers after the same-day widening (both
+kerbs, the coast road, every non-hill mountain edge) are in PLAN.md's s8 note.
+
+**横断歩道橋 yield nothing; the rail yields to them.** A kerb-long rail stood in a pier or a stair of 18 of the 19
+frozen bridges. `island_footbridges.py` now writes `IslandFootbridges.keepout.json` (each pier / stair rectangle
+grown by its furniture clearance and half a rail module) and `roadkit_cli --keep-out` takes a comma list, so
+nothing that stands up is placed there and only the pieces with a bridge rebuild.
+
+**No zebra on a link shorter than `crosswalk_min_lane` (20 m).** User, with a map picture of wangan_dori at
+(15, 420): "duplicate ... two traffic lights". Measured: a T (machi_sw_15) 72 m from the off-ramp's terminal on a
+six-lane road left a 10 m link between the two pads carrying TWO zebras back to back and four pedestrian heads
+within 4 m. Such a pair is one junction to a walker: the facing arms get no zebra and no pedestrian signal.
+The two vehicle heads there are one per direction (each junction's far-side head) and stay.
+
+**The stub `cho_sw_345__2` is gone, by hand, in the record** (user, same picture: "not necessary and breaks the
+expressway"): a 34 m block street T-ed into the off-ramp `shuto_c_sb_off` where the ramp is still 1.1-3.4 m up, so
+its pad sloped and put a junction on a ramp 70 m before its terminal. The road and its two points are deleted, the
+T at (15, -345) keeps three arms, and the ramp's two halves (`__x1`) are one road again. **The generator still makes
+it** (`island_streets`: the stub comes from the site-cut path, not `_raised_ramp`; a rule there was tried and did
+not remove it) **and a fresh `island_layout.py` no longer reproduces the committed record anyway** (measured the same
+day: it also drops `koba_cho_719` and merges three koba roads) -- so the next layout run must be diffed road by
+road before its record is accepted, and this stub removed again or the generator fixed first.
+
+**Not done / to judge in play:** a knocked-down pole leaves its wires hanging (cosmetic, 60 s); no service drops to
+buildings and no wires ACROSS a street; the rail's collider is built at run time, so the baked navmesh does not
+know it -- an AI on foot pathing across a kerb between two crossings will rub against it (people cross at the
+ends, which are open); the median hedge and the 横断防止柵 of T3 are not built (the guardrail took the kerb).
+
+## Right-hand traffic is the keep-left lane graph run backwards (2026-10-12, user: "drive on the right")
+
+The setting changed the same day (an island with Japanese influence, Traditional Chinese its language, US influence
+on its roads), and the user chose "Drive on the right" when asked what "rightway as the lane" meant.
+
+- **Nothing is redrawn.** Every cross-section, ramp, taper and interchange template of the kit is authored keep-left
+  (`point_profile` lays forward lanes on +s). A lane graph run BACKWARDS is a legal lane graph of the same roads for
+  traffic on the other side, so `point_export.reverse_traffic` (the last step of `export_network`) keeps each lane's
+  geometry and id and reverses it: points and curve (in / out handles swapped), grade and banking negated, `next`
+  rebuilt from the predecessors, a connector's turn L <-> R (the tight turn of a keep-left junction is a left turn;
+  reversed it is a right turn and still the tight one), a junction arm's `in_lanes` / `out_lanes` swapped, edge kinds
+  ramp <-> merge. Every off-ramp becomes an on-ramp and every on-ramp an exit, on the right. `inner_lane` /
+  `outer_lane` are about the median and the kerb and stay.
+- **The side is a fact about the NETWORK, in a sidecar**: `<stem>.network.json` `{"traffic_side": "right"}`, read by
+  `point_model.load_network` into `NetworkData.traffic_side`. Not in `.roads.json`: the Godot dock and every
+  round-trip tool rewrite the record from the fields they know and would drop it. `IslandRoads` is right; `DebugRoads`,
+  the templates and the rail stay left, so the ~30 DebugWorld probes that name lanes keep their meaning. The piece
+  digest is salted with the side only when it is not "left" (a keep-left digest is unchanged).
+- **Measured on the island** (same record, both sides): 2 624 lanes, 3 201 edges, the same 5 discontinuities; turns
+  L 392 / R 375 become L 375 / R 392; dead ends 15 <-> orphans 53 swap. Those 53 are lanes that only BEGIN at a
+  junction mouth (a second lane opening after the pad, reached by a lane change): reversed they END there with no
+  connector, a trap. Each gets what a lane drop gets (`_merge_into`): the lane beside it as its successor, kind
+  `merge` (38 edges added; dead ends back to 15, the real dead-end streets).
+- **Furniture follows the lanes by itself** -- arrows, stop lines, zebras, pedestrian heads, guide-sign SITES are all
+  derived from arriving lanes. What was modelled for a left kerb is mirrored: `tools/mirror_piece.py` reflects
+  `TrafficLight_JP` (+ its `lamps.json`: lenses and name plates) and `Sign_ExpwyCantilever` in X into `*_R` twins
+  (assets `signal_r`, `expwy_sign_r`); `_signals` stands the pole on the kerb the arriving traffic keeps to (the old
+  `signal_skipped_right_hand` refusal is now only for a table without the twin); guide signs and lane gantries stand
+  `_kerbward`; a rail built `--avoid` a right-hand road network puts its 踏切 units at the road's right kerbs
+  (`crossing_signals(..., road_right)`). A mirrored signal reads red-on-the-left, which is the US horizontal order.
+- **Game code:** none assumed a side (grep: only comments) -- the traffic brain, RoadGraph, the GPS, dispatch and
+  the signal plan all follow `next`.
+- **Known consequences, not fixed:** lane and ramp IDS keep their keep-left spelling (`shuto_c_sb_off` is now an
+  ENTRANCE; `<road>_F0` runs against the road's point order) -- names only, every consumer follows `next`;
+  exit-then-entrance order on a carriageway is reversed (reversal turns each interchange's pair into entrance then
+  exit: a weave, where keep-left had none); guide-sign destinations are re-derived but their wording was not
+  re-read; the cars are right-hand drive; `RaceDirector` routes and any authored lane names in missions were not
+  checked on the island.
+

@@ -81,8 +81,11 @@ final class TrainDisplays {
     }
 
     /** {Japanese, English} for a station id ({id, id} when it has no entry). */
+    /** {sign language, English} of a station: the string table's `station.<id>` row (world.SignText). */
     String[] name(String id) {
         if (id == null) return new String[]{"", ""};
+        String key = "station." + id;
+        if (SignText.has(key)) return new String[]{SignText.local(key), SignText.en(key)};
         String[] n = names.get(id);
         return n != null ? n : new String[]{id, id};
     }
@@ -137,19 +140,24 @@ final class TrainDisplays {
     /** Two lines for the board at a track's stop: 先発 / 次発 with time and destination, from every set on it. */
     String boardText(TrainSystem.Track track, int stop, double now) {
         StringBuilder sb = new StringBuilder();
-        String[] label = {"先発", "次発"};
+        String[] label = {SignText.local("word.train_first"), SignText.local("word.train_second")};
         int k = 0;
         for (double[] row : callsAt(track, stop, now, 2)) {
             double arrive = row[0];
             String[] dest = name(destinationOf(row));
-            String when = arrive - now <= SOON && arrive >= now ? "まもなく" : clock(arrive, now);
-            if (arrive < now) when = clock(row[1], now) + " 発";
+            String when = arrive - now <= SOON && arrive >= now ? SignText.local("word.train_soon") : clock(arrive, now);
+            if (arrive < now) when = SignText.local("word.train_departs", "", clock(row[1], now)).trim();
             if (k > 0) sb.append('\n');
-            sb.append(label[k]).append("  ").append(when).append("  普通  ").append(dest[0]).append(" 行  ")
-                    .append(dest[1]);
+            sb.append(label[k]).append("  ").append(when).append("  ").append(SignText.local("word.train_local"))
+                    .append("  ").append(SignText.local("word.train_bound", dest[0])).append("  ").append(dest[1]);
             k++;
         }
-        return sb.length() == 0 ? "運休  Not in service" : sb.toString();
+        return sb.length() == 0 ? SignText.local("word.train_none") + "  " + SignText.en("word.train_none") : sb.toString();
+    }
+
+    /** "中央 行  For Central": a destination in the sign language and in English. */
+    private static String bound(String[] dest) {
+        return SignText.local("word.train_bound", dest[0]) + "  " + SignText.en("word.train_bound", dest[1]);
     }
 
     /** The screen over a door inside a car. */
@@ -161,9 +169,10 @@ final class TrainDisplays {
         double arrive = c.arrive() - set.phase;
         if (arrive <= now) {
             // standing at a stop
-            return at[0] + "  " + at[1] + "\n" + dest[0] + " 行  For " + dest[1];
+            return at[0] + "  " + at[1] + "\n" + bound(dest);
         }
-        return "次は  " + at[0] + "\nNext  " + at[1] + "  " + clock(arrive, now) + " 着";
+        return SignText.local("word.train_next_stop") + "  " + at[0] + "\n" + SignText.en("word.train_next_stop") + "  "
+                + at[1] + "  " + SignText.local("word.train_arrives", "", clock(arrive, now)).trim();
     }
 
     /** The map's panel for the station nearest (x, z) within {@code reach} m: its name, then each way's next two
@@ -191,7 +200,7 @@ final class TrainDisplays {
                         String destId = destinationOf(set, c);
                         if (destId.equals(id)) continue;                  // terminates here
                         String[] dest = name(destId);
-                        byDest.computeIfAbsent(dest[0] + " 行  For " + dest[1], q -> new ArrayList<>())
+                        byDest.computeIfAbsent(bound(dest), q -> new ArrayList<>())
                                 .add(c.depart() - set.phase);
                     }
                 }

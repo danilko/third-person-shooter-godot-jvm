@@ -22,10 +22,12 @@ public final class StreetNames {
 
     public static final String PATH = "res://src/main/resources/com/openworld/world/IslandStreetNames.json";
     public static final String FONT = "res://src/main/resources/com/openworld/ui/fonts/NotoSansJP-Signs.otf";
+    /** The Traditional Chinese face: the JP one lacks 驛 區 灣 ... and draws shared code points in Japanese shapes. */
+    public static final String FONT_TC = "res://src/main/resources/com/openworld/ui/fonts/NotoSansTC-Signs.otf";
 
     /** {ja, en} */
     private static Map<String, String[]> names;
-    private static FontFile font;
+    private static FontFile font, fontTc;
 
     private StreetNames() {}
 
@@ -54,20 +56,31 @@ public final class StreetNames {
         return names;
     }
 
-    /** The kanji name of `road` (any piece of it), or null when it has none. */
+    /**
+     * The name of `road` (any piece of it) in the SIGN LANGUAGE, or null when it has none. Since 2026-10-12 the
+     * owner is the string table ({@link SignText}, key {@code street.<base name>}): Japanese by default,
+     * Traditional Chinese or any other column by the GAME tab's choice. (The method keeps its name: it is "the
+     * native-script line", as against {@link #en}.)
+     */
     public static String ja(String road) {
-        String[] n = table().get(base(road));
-        return n == null ? null : n[0];
+        String key = "street." + base(road);
+        return SignText.has(key) ? SignText.local(key) : null;
     }
 
-    /** The romaji name of `road`, or null. */
+    /** The English line of `road` (the same under every sign language), or null. */
     public static String en(String road) {
-        String[] n = table().get(base(road));
-        return n == null ? null : n[1];
+        String key = "street." + base(road);
+        return SignText.has(key) ? SignText.en(key) : null;
     }
 
-    /** The Japanese sign font, or null when the subset is not built. */
+    /** The sign font of the current sign language, or null when the subset is not built. */
     public static FontFile font() {
+        boolean tc = SignText.language().startsWith("zh");
+        if (tc) {
+            if (fontTc == null && ResourceLoader.INSTANCE.exists(FONT_TC))
+                fontTc = (FontFile) ResourceLoader.INSTANCE.load(FONT_TC);
+            if (fontTc != null) return fontTc;
+        }
         if (font == null && ResourceLoader.INSTANCE.exists(FONT))
             font = (FontFile) ResourceLoader.INSTANCE.load(FONT);
         return font;

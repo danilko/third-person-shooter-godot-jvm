@@ -620,8 +620,11 @@ def solve_road(net, road, uids=None, ground_fn=None):
 
         # ---- the barrier. One rule, both cases: a road nobody may walk on is fenced along its
         # whole length, and a road they may walk on is fenced only where it is off the ground.
+        # `barrier_style` RAIL: the fence of a no-pedestrian road ON THE GROUND and outside a rock shed is a
+        # guardrail `point_furniture` stands, not this wall (so no car wall either: a rail breaks).
+        fenced = not road.ped_access and not (getattr(road, "barrier_style", "") == "RAIL" and v["rka_shed"] == 0.0)
         v["rka_wall_h"] = (float(getattr(road, "barrier_height", 0.0))
-                           if (not road.ped_access or sp["kind"] == rs.SUPPORT_PIER
+                           if (fenced or sp["kind"] == rs.SUPPORT_PIER
                                or sp["delta"] >= BARRIER_MIN_DELTA)
                            else 0.0)
         # The foot is derived from the same two numbers and never authored separately, so the two
@@ -1463,8 +1466,9 @@ def build_mouth(net, uid, ground_fn=None):
     # no raycast of its own: a mouth of a road nobody may walk on, or one well off the ground,
     # carries the wall around its corners too.
     elevated = (float(pt.pos[2]) - float(pt.ground_z)) >= BARRIER_MIN_DELTA
+    fenced = road is not None and not road.ped_access and getattr(road, "barrier_style", "") != "RAIL"
     wall_h = (float(getattr(road, "barrier_height", 0.0))
-              if road is not None and (not road.ped_access or elevated) else 0.0)
+              if road is not None and (fenced or elevated) else 0.0)
     m = Mouth(uid, pt, road, tuple(float(c) for c in pt.pos), out_dir,
               lanes_in, lanes_out, float(pt.lane_width), half_in, half_out, prof,
               fwd_leaves, normal, walk_in, walk_out, kerb_in, kerb_out, wall_h)

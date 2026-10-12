@@ -86,7 +86,7 @@ PRESETS = {
     },
     "coast": {
         "road": {"road_class": "arterial", "ped_access": False, "barrier_height": 1.0, "median_style": pm.MED_PAINT,
-                 "cut_batter": 10.0},
+                 "cut_batter": 10.0, "barrier_style": "RAIL"},
         "base": {"lanes_fwd": 2, "lanes_bwd": 2, "lane_width": 4.5, "median_width": 0.5,
                  "shoulder_left_width": 0.75, "shoulder_right_width": 0.75,
                  "left_walk_width": 0.0, "right_walk_width": 0.0, "left_kerb_height": 0.0,

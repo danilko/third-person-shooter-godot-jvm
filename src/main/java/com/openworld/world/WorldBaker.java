@@ -376,20 +376,28 @@ public class WorldBaker extends Node {
         bp.assetName = asset;
         bp.poleHalfWidth = metaFloat(first, "break_pole_half", bp.poleHalfWidth);
         bp.poleHeight = metaFloat(first, "break_pole_height", bp.poleHeight);
+        bp.poleHalfLength = metaFloat(first, "break_pole_len", 0.0f);
         bp.mass = metaFloat(first, "break_mass", bp.mass);
         bp.breakSpeed = metaFloat(first, "break_break_speed", bp.breakSpeed);
         bp.respawnSeconds = metaFloat(first, "break_respawn", bp.respawnSeconds);
         bp.instanceScale = first.getScale();
         PackedVector3Array pos = new PackedVector3Array();
         PackedFloat32Array yaw = new PackedFloat32Array();
+        PackedFloat32Array pitch = new PackedFloat32Array();
+        boolean pitched = false;
         for (Node3D m : ms) {
             Transform3D t = m.getGlobalTransform();
             pos.append(t.getOrigin());
-            Vector3 f = t.getBasis().getZ();
+            Vector3 f = t.getBasis().getZ().normalized();
             yaw.append((float) Math.atan2(f.getX(), f.getZ()));
+            // a rail follows its road's grade (point_gltf.marker_node `pitch`): its Z dips by the pitch
+            float pt = (float) Math.asin(Math.max(-1.0, Math.min(1.0, -f.getY())));
+            pitch.append(Math.abs(pt) < 1e-4f ? 0.0f : pt);
+            pitched |= Math.abs(pt) >= 1e-4f;
         }
         bp.positions = pos;
         bp.yaws = yaw;
+        if (pitched) bp.pitches = pitch;
         return bp;
     }
 

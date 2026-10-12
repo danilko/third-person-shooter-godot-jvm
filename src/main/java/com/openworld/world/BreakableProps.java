@@ -81,6 +81,12 @@ public class BreakableProps extends MultiMeshInstance3D {
     /** Half width of the shaft's collider (m) and its height (m). */
     @Export public float poleHalfWidth = 0.2f;
     @Export public float poleHeight = 6.0f;
+    /** Half LENGTH of the collider along the piece's own Z (m), for a prop that is a RAIL, not a post (a 4 m
+     *  ガードレール module): 0 = a square post. The break test then asks along the whole length. */
+    @Export public float poleHalfLength = 0.0f;
+    /** Each prop's pitch (radians about its own X, nose up positive), index-parallel to {@link #positions}; empty =
+     *  all upright. A rail follows its road's grade; a post never leans. */
+    @Export public PackedFloat32Array pitches = new PackedFloat32Array();
     /** Effective mass of the pole (kg): what it costs a car to knock it down, and the falling body's mass. */
     @Export public float mass = 250.0f;
     /** A vehicle at or above this speed (m/s) knocks the pole down; below it the pole is a solid post. */
@@ -115,6 +121,8 @@ public class BreakableProps extends MultiMeshInstance3D {
     private double[] brokenAt = new double[0];
     private final Map<Integer, RigidBody3D> debris = new HashMap<>();
     private Vector3[] worldPos = new Vector3[0];
+    /** A rail's direction in the world, per instance; null for a batch of posts. */
+    private Vector3[] worldDir;
     private float minX, maxX, minZ, maxZ;
     private boolean built;
     private double tickTimer;
@@ -155,16 +163,18 @@ public class BreakableProps extends MultiMeshInstance3D {
         // physics server rebuild the body's compound shape per shape -- quadratic in the pole count, and a piece's
         // bollard batch has hundreds: measured 3.27 s in ONE frame entering island_3_3 (probe_start_hitch.gd).
         BoxShape3D box = new BoxShape3D();
-        box.setSize(new Vector3(2 * poleHalfWidth, poleHeight, 2 * poleHalfWidth));
+        box.setSize(new Vector3(2 * poleHalfWidth, poleHeight, 2 * halfLength()));
         Transform3D frame = getGlobalTransform();
+        worldDir = poleHalfLength > poleHalfWidth ? new Vector3[n] : null;
         minX = minZ = Float.MAX_VALUE;
         maxX = maxZ = -Float.MAX_VALUE;
         for (int i = 0; i < n; i++) {
             CollisionShape3D cs = new CollisionShape3D();
             cs.setShape(box);
             Vector3 p = positions.get(i);
-            cs.setTransform(new Transform3D(new Basis(Vector3.Companion.getUP(), yaws.get(i)),
-                    p.plus(new Vector3(0, poleHeight * 0.5, 0))));
+            Basis b = poleBasis(i);
+            cs.setTransform(new Transform3D(b, p.plus(new Vector3(0, poleHeight * 0.5, 0))));
+            if (worldDir != null) worldDir[i] = frame.getBasis().times(b.getZ());
             body.addChild(cs);
             shapes.add(cs);
             Vector3 w = frame.times(p);
@@ -186,6 +196,17 @@ public class BreakableProps extends MultiMeshInstance3D {
         shapes.clear();
         cells.clear();
         built = false;
+    }
+
+    private float halfLength() {
+        return poleHalfLength > 0.0f ? poleHalfLength : poleHalfWidth;
+    }
+
+    /** Yaw about +Y, then the pitch about the prop's own X. */
+    private Basis poleBasis(int i) {
+        Basis yaw = new Basis(Vector3.Companion.getUP(), yaws.get(i));
+        if (i >= pitches.getSize() || pitches.get(i) == 0.0f) return yaw;
+        return yaw.times(new Basis(Vector3.Companion.getRIGHT(), pitches.get(i)));
     }
 
     private int count() {
@@ -240,8 +261,19 @@ public class BreakableProps extends MultiMeshInstance3D {
                         if (p.broken[i]) continue;
                         Vector3 d = p.worldPos[i].minus(pos);
                         if (d.getY() > 2.5 || d.getY() + p.poleHeight < -1.0) continue;   // not at the car's height
-                        if (!PropBreakRules.reachesPole(d.dot(ax), d.dot(az), halfWidth, halfLength,
-                                p.poleHalfWidth, vx, vz, dt)) continue;
+                        if (p.worldDir == null) {
+                            if (!PropBreakRules.reachesPole(d.dot(ax), d.dot(az), halfWidth, halfLength,
+                                    p.poleHalfWidth, vx, vz, dt)) continue;
+                        } else {
+                            // a RAIL: five discs along it, each a fifth of its length across, cover the whole beam
+                            boolean hit = false;
+                            for (int k = -2; k <= 2 && !hit; k++) {
+                                Vector3 q = d.plus(p.worldDir[i].times(k * 0.4 * p.poleHalfLength));
+                                hit = PropBreakRules.reachesPole(q.dot(ax), q.dot(az), halfWidth, halfLength,
+                                        p.poleHalfWidth + 0.2 * p.poleHalfLength, vx, vz, dt);
+                            }
+                            if (!hit) continue;
+                        }
                         if (!PropBreakRules.breaks(speed, p.breakSpeed)) continue;
                         p.knockDown(i, velocity, carMass);
                         keep *= PropBreakRules.keepFraction(carMass, p.mass);
@@ -285,7 +317,7 @@ public class BreakableProps extends MultiMeshInstance3D {
     private Transform3D instanceTransform(int i) {
         // rotation then the piece's own-axis scale (R * S), as the marker's basis was
         Basis scale = new Basis(instanceScale.getX(), 0, 0, 0, instanceScale.getY(), 0, 0, 0, instanceScale.getZ());
-        return new Transform3D(new Basis(Vector3.Companion.getUP(), yaws.get(i)).times(scale), positions.get(i));
+        return new Transform3D(poleBasis(i).times(scale), positions.get(i));
     }
 
     private void spawnDebris(int i, Vector3 impulse) {
@@ -304,13 +336,13 @@ public class BreakableProps extends MultiMeshInstance3D {
         }
         CollisionShape3D cs = new CollisionShape3D();
         BoxShape3D box = new BoxShape3D();
-        box.setSize(new Vector3(2 * poleHalfWidth, poleHeight, 2 * poleHalfWidth));
+        box.setSize(new Vector3(2 * poleHalfWidth, poleHeight, 2 * halfLength()));
         cs.setShape(box);
         cs.setPosition(new Vector3(0, poleHeight * 0.5, 0));
         body.addChild(cs);
         addChild(body);
         body.setGlobalTransform(getGlobalTransform().times(
-                new Transform3D(new Basis(Vector3.Companion.getUP(), yaws.get(i)), positions.get(i))));
+                new Transform3D(poleBasis(i), positions.get(i))));
         // the bumper hits low on the shaft; a little lift so the base does not dig into the ground as it kicks out
         Vector3 up = new Vector3(0, impulse.length() * 0.15, 0);
         body.applyImpulse(impulse.plus(up), new Vector3(0, CONTACT_HEIGHT, 0));

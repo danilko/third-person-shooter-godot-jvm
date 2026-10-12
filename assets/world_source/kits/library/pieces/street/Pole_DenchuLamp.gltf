@@ -1,0 +1,331 @@
+{
+ "asset": {
+  "generator": "Khronos glTF Blender I/O v5.2.40",
+  "version": "2.0",
+  "extras": {
+   "exported_by": "blender/tools/export_building_kit.py",
+   "module_scale": 1.0
+  }
+ },
+ "extensionsUsed": [
+  "KHR_materials_emissive_strength"
+ ],
+ "scene": 0,
+ "scenes": [
+  {
+   "name": "library",
+   "nodes": [
+    0
+   ]
+  }
+ ],
+ "nodes": [
+  {
+   "extras": {
+    "edit_note": "\u96fb\u67f1 (PLAN.md T1): a 14 m concrete distribution pole, 11.67 m above the ground (the rest is its \u6839\u5165\u308c, modelled below z 0 so a pole on a falling verge still reaches the ground). Origin = the axis at the ground, +X = the ROAD side, +Y along the road. Where the wires arrive is furniture.json `denchu_wires`: move an insulator and that table together. The lamp's bulb place is world.StreetLights HEAD_OFFSETS. Keep to MI_ConcreteSmooth / MI_Steel / MI_PaintYellow (+ MI_Light): one draw per material per chunk."
+   },
+   "mesh": 0,
+   "name": "Pole_DenchuLamp"
+  }
+ ],
+ "materials": [
+  {
+   "doubleSided": true,
+   "name": "MI_ConcreteSmooth",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.44070473313331604,
+     0.43014833331108093,
+     0.40880659222602844,
+     1
+    ],
+    "metallicFactor": 0,
+    "roughnessFactor": 0.699999988079071
+   }
+  },
+  {
+   "doubleSided": true,
+   "name": "MI_PaintYellow",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.949999988079071,
+     0.75,
+     0.10000000149011612,
+     1
+    ],
+    "metallicFactor": 0.20000000298023224,
+    "roughnessFactor": 0.699999988079071
+   }
+  },
+  {
+   "doubleSided": true,
+   "name": "MI_Steel",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.5726980566978455,
+     0.5820889472961426,
+     0.5955169796943665,
+     1
+    ],
+    "roughnessFactor": 0.699999988079071
+   }
+  },
+  {
+   "doubleSided": true,
+   "emissiveFactor": [
+    1,
+    0.9800000190734863,
+    0.9399999976158142
+   ],
+   "extensions": {
+    "KHR_materials_emissive_strength": {
+     "emissiveStrength": 2
+    }
+   },
+   "name": "MI_Light",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     1,
+     1,
+     0.9700000286102295,
+     1
+    ],
+    "metallicFactor": 0,
+    "roughnessFactor": 0.699999988079071
+   }
+  }
+ ],
+ "meshes": [
+  {
+   "name": "Pole_DenchuLamp",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 0,
+      "NORMAL": 1
+     },
+     "indices": 2,
+     "material": 0
+    },
+    {
+     "attributes": {
+      "POSITION": 3,
+      "NORMAL": 4
+     },
+     "indices": 5,
+     "material": 1
+    },
+    {
+     "attributes": {
+      "POSITION": 6,
+      "NORMAL": 7
+     },
+     "indices": 8,
+     "material": 2
+    },
+    {
+     "attributes": {
+      "POSITION": 9,
+      "NORMAL": 10
+     },
+     "indices": 11,
+     "material": 3
+    }
+   ]
+  }
+ ],
+ "accessors": [
+  {
+   "bufferView": 0,
+   "componentType": 5126,
+   "count": 48,
+   "max": [
+    0.18833333253860474,
+    11.666666984558105,
+    0.18833333253860474
+   ],
+   "min": [
+    -0.18833333253860474,
+    -2.3333332538604736,
+    -0.18833333253860474
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 1,
+   "componentType": 5126,
+   "count": 48,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 2,
+   "componentType": 5123,
+   "count": 132,
+   "type": "SCALAR"
+  },
+  {
+   "bufferView": 3,
+   "componentType": 5126,
+   "count": 144,
+   "max": [
+    0.17977777123451233,
+    1.75,
+    0.17977777123451233
+   ],
+   "min": [
+    -0.17977777123451233,
+    0.75,
+    -0.17977777123451233
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 4,
+   "componentType": 5126,
+   "count": 144,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 5,
+   "componentType": 5123,
+   "count": 396,
+   "type": "SCALAR"
+  },
+  {
+   "bufferView": 6,
+   "componentType": 5126,
+   "count": 928,
+   "max": [
+    1.5,
+    12.199999809265137,
+    0.2817777693271637
+   ],
+   "min": [
+    -0.4000000059604645,
+    2.700000047683716,
+    -1.0499999523162842
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 7,
+   "componentType": 5126,
+   "count": 928,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 8,
+   "componentType": 5123,
+   "count": 1644,
+   "type": "SCALAR"
+  },
+  {
+   "bufferView": 9,
+   "componentType": 5126,
+   "count": 24,
+   "max": [
+    1.159999966621399,
+    4.96999979019165,
+    0.07999999821186066
+   ],
+   "min": [
+    0.6600000262260437,
+    4.954999923706055,
+    -0.07999999821186066
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 10,
+   "componentType": 5126,
+   "count": 24,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 11,
+   "componentType": 5123,
+   "count": 36,
+   "type": "SCALAR"
+  }
+ ],
+ "bufferViews": [
+  {
+   "buffer": 0,
+   "byteLength": 576,
+   "byteOffset": 0,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 576,
+   "byteOffset": 576,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 264,
+   "byteOffset": 1152,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteLength": 1728,
+   "byteOffset": 1416,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 1728,
+   "byteOffset": 3144,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 792,
+   "byteOffset": 4872,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteLength": 11136,
+   "byteOffset": 5664,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 11136,
+   "byteOffset": 16800,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 3288,
+   "byteOffset": 27936,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteLength": 288,
+   "byteOffset": 31224,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 288,
+   "byteOffset": 31512,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 72,
+   "byteOffset": 31800,
+   "target": 34963
+  }
+ ],
+ "buffers": [
+  {
+   "byteLength": 31872,
+   "uri": "Pole_DenchuLamp.bin"
+  }
+ ]
+}

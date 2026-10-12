@@ -116,9 +116,144 @@ public class PlayerController extends Controller {
         if (c instanceof Player p && p != cachedPlayer) resolveBody();
         else if (c instanceof Vehicle v && v != cachedVehicle) resolveBody();
 
-        if (cachedVehicle != null) return gatherVehicleInput();
+        if (cachedVehicle != null) return autoDrive(gatherVehicleInput(), delta);
+        stopAutoDrive("left the car");
+        autoStopping = false;
         if (cachedPlayer  != null) return gatherCharacterInput();
         return new UserCommand();
+    }
+
+    // ── Auto-drive to the GPS waypoint (user, 2026-10-11: a testing aid; "player may exit any time") ──────────
+
+    /** Seconds between re-plans from the lane the car is on (it may have taken another turn than the plan's). */
+    private static final double AUTO_REPLAN = 3.0;
+    /** The car has arrived this near the waypoint (m, plan). */
+    private static final double AUTO_ARRIVE = 18.0;
+    /** A stick / pedal pushed past this takes the car back. */
+    private static final float AUTO_OVERRIDE = 0.25f;
+
+    private com.openworld.ai.vehicle.VehicleAIController autoBrain;
+    private Vehicle autoCar;
+    private double autoReplanIn;
+    private String autoWhy = "";
+    private boolean autoStopping;
+
+    /**
+     * Start driving the car this controller is seated in to its player's GPS waypoint, along the road lanes: the
+     * traffic brain ({@code VehicleAIController}: lanes, signals, junction yield, obstacle rays) is added to the car
+     * as a plain child -- NOT as its controller, so the car is still the player's (exit, ownership, the wanted
+     * system all see a player-driven car) -- given the GPS route as its plan, and asked for a command each tick in
+     * {@link #autoDrive}. Any steering, pedal or handbrake input, leaving the car, or arriving ends it.
+     * Returns "" when it started, else why not.
+     */
+    public String startAutoDrive() {
+        stopAutoDrive("restarted");
+        autoStopping = false;
+        if (cachedVehicle == null) return "not driving a car";
+        if (!(cachedVehicle.getOccupant() instanceof Player pl)) return "no player in the driver's seat";
+        Vector3 wp = pl.getWaypoint();
+        if (wp == null) return "no GPS waypoint (pick one on the map)";
+        com.openworld.world.RoadGraph g = com.openworld.world.RoadMap.graph();
+        com.openworld.world.ZoneManager z = com.openworld.world.ZoneManager.get();
+        if (g == null || z == null) return "no road graph";
+        Vector3 at = cachedVehicle.getGlobalPosition();
+        com.openworld.world.RoadGraph.Route route = g.route(at.getX(), at.getY(), at.getZ(), wp.getX(), wp.getY(), wp.getZ());
+        if (route == null || route.legs.isEmpty()) return "no road route to the waypoint";
+        java.util.List<String> ids = route.laneIds();
+        com.openworld.world.Lane first = ids.isEmpty() ? null : z.routeByName(ids.get(0));
+        if (first == null) return "the route's first lane is not streamed in";
+        autoBrain = new com.openworld.ai.vehicle.VehicleAIController();
+        autoBrain.setName(new godot.core.StringName("AutoDrive"));
+        cachedVehicle.addChild(autoBrain);
+        autoBrain.setRoute(first);
+        autoBrain.setPlan(ids);
+        autoCar = cachedVehicle;
+        autoReplanIn = AUTO_REPLAN;
+        autoWhy = "";
+        return "";
+    }
+
+    /** End auto-drive (a no-op when it is off); the next tick is the player's own input. */
+    public void stopAutoDrive(String why) {
+        if (autoBrain == null) return;
+        if (godot.global.GD.isInstanceValid(autoBrain)) {
+            if (autoBrain.getParent() != null) autoBrain.getParent().removeChild(autoBrain);
+            autoBrain.queueFree();
+        }
+        if (autoCar != null && godot.global.GD.isInstanceValid(autoCar)) autoCar.setSpeedCap(0f);
+        autoBrain = null;
+        autoCar = null;
+        autoWhy = why;
+    }
+
+    public boolean isAutoDriving() { return autoBrain != null; }
+    @Register public boolean autoDrivingNow() { return autoBrain != null; }
+    /** Why auto-drive last ended ("" while it runs or before it ever did). */
+    @Register public String autoDriveEndedNow() { return autoWhy; }
+    @Register public String startAutoDriveNow() { return startAutoDrive(); }
+    /** Diagnostics: the lane it is on, its place in the plan, the last command. */
+    @Register public String autoDriveDebugNow() {
+        if (autoBrain == null) return "off";
+        return (autoBrain.getRoute() instanceof Node rn ? rn.getName().toString() : "no lane") + " @"
+                + Math.round(autoBrain.routeProgressNow()) + " plan " + autoBrain.planDebug()
+                + " finished=" + autoBrain.isFinished() + " stalled=" + Math.round(autoBrain.stalledFor())
+                + " motor=" + autoLast[0] + " brake=" + (autoLast[1] > 0) + " why=" + autoBrain.standingReason()
+                + " | " + autoBrain.describeBlock();
+    }
+    private final float[] autoLast = new float[2];
+
+    /** The tick's command: the player's own, or -- while auto-drive runs and the player touches nothing -- the brain's. */
+    private UserCommand autoDrive(UserCommand mine, double delta) {
+        if (autoBrain == null) {
+            // arrived: hold the brake until the car stands (or the player touches anything), then it is theirs
+            if (!autoStopping) return mine;
+            boolean touched = Math.abs(mine.motor) > AUTO_OVERRIDE || Math.abs(mine.steering) > AUTO_OVERRIDE
+                    || mine.handbrake || mine.brake || mine.enterExit;
+            if (touched || cachedVehicle.getLinearVelocity().length() < 0.5) autoStopping = false;
+            else { mine.motor = 0f; mine.brake = true; }
+            return mine;
+        }
+        if (autoCar != cachedVehicle || !godot.global.GD.isInstanceValid(autoBrain)) {
+            stopAutoDrive("changed cars");
+            return mine;
+        }
+        if (Math.abs(mine.motor) > AUTO_OVERRIDE || Math.abs(mine.steering) > AUTO_OVERRIDE || mine.handbrake
+                || mine.brake || mine.enterExit) {
+            stopAutoDrive("the player took over");
+            return mine;
+        }
+        Vector3 wp = cachedVehicle.getOccupant() instanceof Player pl ? pl.getWaypoint() : null;
+        if (wp == null) {
+            stopAutoDrive("the waypoint was cleared");
+            return mine;
+        }
+        Vector3 at = cachedVehicle.getGlobalPosition();
+        if (Math.hypot(at.getX() - wp.getX(), at.getZ() - wp.getZ()) <= AUTO_ARRIVE || autoBrain.isFinished()) {
+            stopAutoDrive(autoBrain.isFinished() ? "the road ended" : "arrived");
+            autoStopping = true;
+            mine.brake = true;
+            return mine;
+        }
+        autoReplanIn -= delta;
+        if (autoReplanIn <= 0.0) {
+            autoReplanIn = AUTO_REPLAN;
+            com.openworld.world.RoadGraph g = com.openworld.world.RoadMap.graph();
+            // from the lane the car is ON (a position snap may pick the other carriageway: EnforcementDispatch's rule)
+            if (g != null && autoBrain.getRoute() instanceof Node rn) {
+                com.openworld.world.RoadGraph.Route r = g.routeFromLane(rn.getName().toString(),
+                        autoBrain.routeProgressNow(), wp.getX(), wp.getY(), wp.getZ());
+                if (r != null) autoBrain.setPlan(r.laneIds());
+            }
+        }
+        UserCommand ai = autoBrain.gatherInput(delta);
+        autoLast[0] = ai.motor;
+        autoLast[1] = ai.brake || ai.handbrake ? 1f : 0f;
+        mine.motor = ai.motor;
+        mine.steering = ai.steering;
+        mine.steerToTarget = ai.steerToTarget;
+        mine.brake = ai.brake;
+        mine.handbrake = ai.handbrake;
+        return mine;
     }
 
     // ── Character (on-foot) input ─────────────────────────────────────────────

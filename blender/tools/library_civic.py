@@ -890,6 +890,132 @@ def expwy_entrance_sign(material, Builder):
     return "Sign_ExpwyEntrance", "street", b.mesh()
 
 
+# ── 電柱 (PLAN.md T1, user 2026-10-11: "use japanese measure ... pole / electric pole placed in blender") ─────────────
+# The Japanese distribution pole, to its real numbers:
+#   * a 14 m prestressed-concrete pole (コンクリート柱), 根入れ 1/6 of its length = 2.33 m in the ground, so 11.67 m
+#     stands; 末口 (top) 19 cm, taper 1/75, so ~34.6 cm at the ground and 37.7 cm at the butt;
+#   * 高圧 (6.6 kV, three wires) on pin insulators on a 75 mm 腕金 (1.8 m) near the top -- 片出し, reaching toward the
+#     ROAD so the conductors keep off the buildings; an 架空地線 on a cap bracket above it;
+#   * 低圧 (100 / 200 V) on a vertical rack ~2 m below; the 柱上変圧器 (a grey can, ~0.55 m across) between them;
+#   * 通信線 lowest, over 5 m (the clearance a cable keeps over a road), with a splice closure hung on it;
+#   * 足場ボルト up the shaft from 2.7 m, yellow 反射 bands at bumper height, and (the _Lamp pieces) a 防犯灯 at 5 m.
+# WHERE each wire meets the pole is `furniture.json` rules `denchu_wires` (the one owner: `point_furniture` strings
+# the wires from it), so the insulators are built from that table. Frame: origin = the pole's axis AT THE GROUND,
+# +X = the road side, +Y = along the road. Three materials (four with the lamp), because a MultiMesh draws once per
+# surface.
+DENCHU_LENGTH = 14.0
+DENCHU_BURIED = DENCHU_LENGTH / 6.0
+DENCHU_UP = DENCHU_LENGTH - DENCHU_BURIED          # 11.67 m above the ground
+DENCHU_TOP_R = 0.095
+DENCHU_TAPER = 1.0 / 75.0                          # on the diameter
+DENCHU_LAMP_Z = 5.0                                # a 防犯灯's mounting height
+DENCHU_PIECES = (("Pole_Denchu", False, False), ("Pole_DenchuTr", True, False),
+                 ("Pole_DenchuLamp", False, True), ("Pole_DenchuTrLamp", True, True))
+
+
+def denchu_radius(z):
+    """The shaft's radius `z` m above the ground."""
+    return DENCHU_TOP_R + 0.5 * DENCHU_TAPER * (DENCHU_UP - z)
+
+
+def denchu_wires():
+    import json
+    import os
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    with open(os.path.join(root, "assets", "world_source", "kits", "road_kit", "furniture.json")) as fh:
+        return json.load(fh)["rules"]["denchu_wires"]
+
+
+def _denchu(material, Builder, name, transformer, lamp):
+    b = Builder(name, material)
+    conc, steel = "MI_ConcreteSmooth", "MI_Steel"
+    b.cyl(0.0, 0.0, -DENCHU_BURIED, DENCHU_UP, denchu_radius(-DENCHU_BURIED), DENCHU_TOP_R, conc, segs=12)
+    for k in range(3):                                           # 反射 bands, bumper to chest height
+        z = 0.75 + 0.4 * k
+        b.cyl(0.0, 0.0, z, z + 0.2, denchu_radius(z) + 0.012, denchu_radius(z + 0.2) + 0.012, "MI_PaintYellow", segs=12)
+    z, side = 2.7, 1.0
+    while z < DENCHU_UP - 1.2:                                   # 足場ボルト, alternating sides, 45 cm apart
+        r = denchu_radius(z)
+        b.box((-0.012, side * r - (0.0 if side > 0 else 0.13), z), (0.012, side * r + (0.13 if side > 0 else 0.0), z + 0.024),
+              steel)
+        z, side = z + 0.45, -side
+    wires = denchu_wires()
+    hv = [w for w in wires if w["kind"] == "hv"]
+    if hv:                                                       # the 腕金, bolted to the shaft's +Y face
+        az = min(w["z"] for w in hv) - 0.22
+        ay = denchu_radius(az) + 0.04
+        b.box((min(w["x"] for w in hv) - 0.2, ay - 0.0375, az - 0.075), (max(w["x"] for w in hv) + 0.2, ay + 0.0375, az),
+              steel)
+        b.box((-0.05, -ay, az - 0.06), (0.05, ay, az - 0.02), steel)                     # the band round the shaft
+        x1 = max(w["x"] for w in hv)
+        b.beam((0.0, ay, az - 0.75), (0.75 * x1, ay, az - 0.04), 0.04, steel)             # the arm's brace
+        for w in hv:                                             # pin insulators, the wire on top
+            b.cyl(w["x"], ay, az, w["z"] - 0.1, 0.022, 0.022, steel, segs=6)
+            b.cyl(w["x"], ay, w["z"] - 0.13, w["z"], 0.065, 0.04, steel, segs=8)
+    for w in (w for w in wires if w["kind"] == "gw"):            # 架空地線 on its cap bracket
+        b.box((w["x"] - 0.025, -0.025, DENCHU_UP - 0.3), (w["x"] + 0.025, 0.025, w["z"]), steel)
+    lv = [w for w in wires if w["kind"] == "lv"]
+    if lv:                                                       # the low-voltage rack: a strip with spool insulators
+        z0, z1 = min(w["z"] for w in lv) - 0.15, max(w["z"] for w in lv) + 0.15
+        x = lv[0]["x"]
+        b.box((x - 0.06, -0.02, z0), (x - 0.03, 0.02, z1), steel)
+        for zz in (z0 + 0.03, z1 - 0.07):
+            b.box((0.0, -0.02, zz), (x - 0.03, 0.02, zz + 0.04), steel)
+        for w in lv:
+            b.cyl(w["x"], 0.0, w["z"] - 0.05, w["z"] + 0.05, 0.045, 0.045, steel, segs=8)
+    for w in (w for w in wires if w["kind"] == "comm"):          # the cable's clamp and a splice closure on the span
+        r = denchu_radius(w["z"])
+        sx = -1.0 if w["x"] < 0 else 1.0
+        b.box((min(sx * r, w["x"]) - 0.02, -0.03, w["z"] - 0.05), (max(sx * r, w["x"]) + 0.02, 0.03, w["z"] + 0.03), steel)
+        b.box((w["x"] - 0.07, 0.5, w["z"] - 0.19), (w["x"] + 0.07, 1.05, w["z"] - 0.04), steel)
+    if transformer:                                              # 柱上変圧器, hung in line with the wires
+        ty, tz0, tz1 = -(denchu_radius(8.2) + 0.34), 7.75, 8.65
+        b.cyl(0.0, ty, tz0, tz1, 0.27, 0.27, steel, segs=12)
+        b.cyl(0.0, ty, tz1, tz1 + 0.05, 0.29, 0.29, steel, segs=12)                       # the lid
+        for x in (-0.11, 0.11):                                  # the high-voltage bushings
+            b.cyl(x, ty, tz1 + 0.05, tz1 + 0.3, 0.035, 0.02, steel, segs=6)
+        for zz in (tz0 + 0.15, tz1 - 0.2):                       # the hanger bands
+            b.box((-0.05, ty, zz), (0.05, 0.0, zz + 0.06), steel)
+        b.box((-0.3, ty - 0.3, tz0 - 0.07), (0.3, 0.0, tz0), steel)                       # the platform arm under it
+    if lamp:                                                     # 防犯灯: a short arm toward the road, an LED head
+        r = denchu_radius(DENCHU_LAMP_Z)
+        b.beam((r - 0.02, 0.0, DENCHU_LAMP_Z - 0.35), (0.75, 0.0, DENCHU_LAMP_Z + 0.02), 0.045, steel)
+        b.box((0.6, -0.11, DENCHU_LAMP_Z - 0.03), (1.2, 0.11, DENCHU_LAMP_Z + 0.06), steel)
+        b.box((0.66, -0.08, DENCHU_LAMP_Z - 0.045), (1.16, 0.08, DENCHU_LAMP_Z - 0.03), "MI_Light")
+    return name, "street", b.mesh()
+
+
+def denchu_poles(material, Builder):
+    return [_denchu(material, Builder, n, tr, lamp) for n, tr, lamp in DENCHU_PIECES]
+
+
+# ── ガードレール (user 2026-10-11: "white guardrails along some mountain roads ... larger city roads + coastline roads") ──
+# The Japanese standard guardrail (防護柵 Gr, 土中建込 type): a white W-section beam 350 mm deep whose CENTRE is 0.6 m
+# above the road, on φ114 mm posts every 4 m, the post's top just over the beam. ONE 4 m module with its post in the
+# middle, so modules laid end to end put a post every 4 m; the post runs 0.5 m into the ground so a rail on a falling
+# verge still stands in it. Frame: origin = the post's axis at the ground, +X = the ROAD side (the beam is bolted to
+# the traffic face), +Y along the road. One material (white), so a chunk of rail is one draw.
+GUARDRAIL_MODULE = 4.0
+GUARDRAIL_BEAM = (0.425, 0.775)      # the beam's lower and upper edge above the road (centre 0.6, 350 mm deep)
+
+
+def guardrail(material, Builder):
+    b = Builder("Guardrail_JP", material)
+    white = "MI_PaintWhite"
+    h = GUARDRAIL_MODULE / 2.0
+    b.cyl(0.0, 0.0, -0.5, 0.8, 0.057, 0.057, white, segs=8)
+    x0 = 0.057 + 0.012                                           # the block-out bracket between post and beam
+    b.box((0.0, -0.05, 0.5), (x0, 0.05, 0.7), white)
+    z0, z1 = GUARDRAIL_BEAM
+    half = 0.5 * (z1 - z0)
+    b.box((x0, -h, z0), (x0 + 0.012, h, z1), white)              # the web
+    for zc in (z0 + 0.5 * half, z0 + 1.5 * half):                # the two corrugations of the W
+        lo, hi = zc - 0.5 * half + 0.012, zc + 0.5 * half - 0.012
+        sec = ((x0 + 0.012, lo), (x0 + 0.075, lo + 0.04), (x0 + 0.075, hi - 0.04), (x0 + 0.012, hi))
+        b.convex([(x, y, z) for y in (-h, h) for x, z in sec], white)
+    return "Guardrail_JP", "street", b.mesh()
+
+
 CIVIC_NOTES = {
     "Civic_PoliceStation": "Placeholder 警察署, origin = its PLOT centre (40 x 45 m plot, tools/island_civic_sites.py), "
                            "the street at -Y. Keep the building inside the plot and the street face at -Y.",
@@ -935,6 +1061,16 @@ CIVIC_NOTES = {
                             "EXPWY_SIGN_PANELS in library_civic.py (the runtime draws the text there): move the panel "
                             "and that table together.",
     "Sign_ExpwyEntrance": "Placeholder expressway ENTRANCE sign (two posts); panel in EXPWY_SIGN_PANELS.",
+    **{n: "電柱 (PLAN.md T1): a 14 m concrete distribution pole, 11.67 m above the ground (the rest is its 根入れ, "
+          "modelled below z 0 so a pole on a falling verge still reaches the ground). Origin = the axis at the ground, "
+          "+X = the ROAD side, +Y along the road. Where the wires arrive is furniture.json `denchu_wires`: move an "
+          "insulator and that table together. The lamp's bulb place is world.StreetLights HEAD_OFFSETS. Keep to "
+          "MI_ConcreteSmooth / MI_Steel / MI_PaintYellow (+ MI_Light): one draw per material per chunk."
+       for n in ("Pole_Denchu", "Pole_DenchuTr", "Pole_DenchuLamp", "Pole_DenchuTrLamp")},
+    "Guardrail_JP": "ガードレール: one 4 m module of the Japanese W-beam guardrail (beam centre 0.6 m, 350 mm deep, a "
+                    "φ114 post in the MIDDLE), white. Origin = the post's axis at the ground, +X = the road side, +Y "
+                    "along the road; point_furniture tiles it by its own length (keep it exactly as long as the post "
+                    "pitch) and BreakableProps knocks a module down under a car. One material.",
     "Mil_Hangar": "Placeholder fighter hangar, 48 x 40 m, open front -Y; two jets stand inside as props (MilitaryBase).",
 }
 
@@ -949,7 +1085,8 @@ def build_all(material, Builder):
            detached_house, detached_house_b, sode_kanban, mil_pier_terminal,
            mil_armoury, mil_motor_pool, mil_truck, mil_parade_ground, mil_helipad, mil_fuel_depot, mil_patrol_ship,
            expwy_cantilever_sign, expwy_entrance_sign)
-    return [f(material, Builder) for f in fns] + roof_billboards(material, Builder)
+    return [f(material, Builder) for f in fns] + roof_billboards(material, Builder) + denchu_poles(material, Builder) + [
+        guardrail(material, Builder)]
 
 
 # ── the Japanese house and the 雑居ビル's sign (JAPAN_ART_REVIEW.md §3: "the whole residential texture of Japan is

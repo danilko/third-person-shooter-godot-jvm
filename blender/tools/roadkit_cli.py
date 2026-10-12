@@ -161,23 +161,26 @@ def _context(a):
 def _keep_out(a):
     """`--keep-out <json>`: the boxes road furniture leaves empty (car-park entrances, `island_buildings.py write`), as
     the kit frame's (cx, cy, ux, uy, half_across, half_deep). The file is in the GODOT frame; record (x, y) = (x, -z)."""
-    path = getattr(a, "keep_out", "") or ""
-    if not path or not os.path.exists(path):
-        return []
-    with open(path) as fh:
-        doc = json.load(fh)
-    return [(b[0], -b[1], b[2], -b[3], b[4], b[5]) for b in doc.get("boxes", ())]
+    out = []
+    # a comma list: the car parks' (island_buildings) and the footbridges' piers and stairs (island_footbridges)
+    for path in (getattr(a, "keep_out", "") or "").split(","):
+        if not path or not os.path.exists(path):
+            continue
+        with open(path) as fh:
+            doc = json.load(fh)
+        out += [(b[0], -b[1], b[2], -b[3], b[4], b[5]) for b in doc.get("boxes", ())]
+    return out
 
 
 def _with_entries(net, a):
     """`--keep-out <json>`'s `entries` (car-park driveways, `island_buildings.py write`, Godot frame `[x, z, width]`)
     applied to the network IN MEMORY as dropped-kerb vehicle entries (`point_record_ops.apply_entries`): the record
     stays the layout's output, and every command that builds pieces (`pieces`, `gltf`) sees the same kerb cuts."""
-    path = getattr(a, "keep_out", "") or ""
-    if not path or not os.path.exists(path):
-        return net
-    with open(path) as fh:
-        ents = json.load(fh).get("entries", ())
+    ents = []
+    for path in (getattr(a, "keep_out", "") or "").split(","):
+        if path and os.path.exists(path):
+            with open(path) as fh:
+                ents += json.load(fh).get("entries", ())
     if ents:
         import point_record_ops as pro
         pro.apply_entries(net, [(e[0], -e[1], e[2]) for e in ents])
@@ -466,9 +469,13 @@ def cmd_gltf(a):
     # Its bands keep this network's piers off its carriageways, and a rail road crosses one at its own height as a
     # level crossing (`point_mesh` "RAIL").
     foreign = []
+    other_right = False
     if getattr(a, "avoid", ""):
         fground = pg.load_ground(a.avoid_ground) if getattr(a, "avoid_ground", "") else None
-        foreign = ped.solve_all(pm.load_network(a.avoid), fground)[3]
+        fnet = pm.load_network(a.avoid)
+        foreign = ped.solve_all(fnet, fground)[3]
+        # the 踏切 units of a rail built against a right-hand road network stand at the road's RIGHT kerbs
+        other_right = getattr(fnet, "traffic_side", "left") == "right"
     only = {n for n in a.only.split(",") if n}
     report, pieces = {}, []
     # PLAN.md 3.6c: decals and street furniture. The lane-based marks read the lanekits `pieces` wrote (step 1 of
@@ -486,6 +493,8 @@ def cmd_gltf(a):
                 d = json.load(fh)
             lanes_doc["lanes"] += d.get("lanes", [])
             lanes_doc["junctions"] += d.get("junctions", [])
+    # which kerb this network's traffic keeps to (`<stem>.network.json`): the signals' and guide signs' side
+    lanes_doc["traffic_side"] = getattr(net, "traffic_side", "left")
     styles = {n: pk.resolve(r, kit) for n, r in net.roads.items()}
     default_mark = pk.resolve(object(), kit).material("mark_w")
 
@@ -519,7 +528,7 @@ def cmd_gltf(a):
         if table is not None:
             # this piece's own level crossings (the rows its build just reported) get their signals (R4)
             n_units = len(fur.placements)
-            pfu.crossing_signals(fur, table, report.get("crossings", [])[n_cross:])
+            pfu.crossing_signals(fur, table, report.get("crossings", [])[n_cross:], other_right)
             # ...and both go into the CROSSING PLAN the train runtime reads (world.TrainSystem): where each 踏切 is,
             # and where its signal units stand, in the lanekit's frame (Godot axes), per piece
             crossing_plan[piece] = {
@@ -531,6 +540,8 @@ def cmd_gltf(a):
                           for u in fur.placements[n_units:] if u["asset"] == "crossing_signal"]}
         for mat, tris in fur.paint.items():
             objs.setdefault(pfu.PAINT_OBJECT, {}).setdefault(mat, []).extend(tris)
+        for mat, tris in fur.wires.items():
+            objs.setdefault(pfu.WIRE_OBJECT, {}).setdefault(mat, []).extend(tris)
         if fur.collision:
             objs.setdefault(pfu.COLLISION_OBJECT, {}).setdefault(pfu.NO_MATERIAL, []).extend(fur.collision)
         path = os.path.join(a.out_dir, piece + ".gltf")

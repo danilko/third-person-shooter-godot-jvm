@@ -2656,6 +2656,10 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
      */
     @Register
     public void onVehicleDestruction() {
+        // one line per wreck, like Health's own "killed by": a car that vanishes under a probe (or a player) is
+        // otherwise indistinguishable from one a zone reclaimed
+        GD.print("Vehicle: destroyed " + getName() + " at " + getGlobalPosition()
+                + (getOccupant() != null ? " driver=" + getOccupant().getName() : " (empty)"));
         if (!isEmptyOfRiders()) {
             // FORCED unseat, never requestExit: the seat policy denies a host-initiated exit
             // for a client driver (NOT_OWNER), which would skip the occupancy broadcast and

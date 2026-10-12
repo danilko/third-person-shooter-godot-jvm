@@ -74,6 +74,7 @@ const ROAD_FIELDS := [
 	["ped_access", "b", true, []],
 	["barrier_height", "f", 1.0, []],
 	["taper_factor", "f", 1.0, []],
+	["barrier_style", "s", "", []],
 	["median_style", "e", "RAISED", ["NONE", "PAINT_DOUBLE_Y", "RAISED", "WALL"]],
 	["surface_mat", "s", "", []],
 	["median_mat", "s", "", []],

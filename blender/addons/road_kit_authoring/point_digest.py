@@ -143,6 +143,8 @@ def piece_digests(net, zones, ground=None, foreign=(), keep_clear=(), keep_out=(
         pz.stamp_lanes(doc, part, net)
     roads = {r["name"]: r for r in pm.network_to_dict(net)["roads"]}
     salt = builder_salt()
+    if getattr(net, "traffic_side", "left") != "left":
+        salt = hashlib.sha1((salt + ":" + net.traffic_side).encode()).hexdigest()   # a keep-left digest is unchanged
     per = {z: {"runs": [], "pads": [], "gores": [], "roads": set(), "box": None} for z in part.pieces()}
 
     def reach(z, pts):

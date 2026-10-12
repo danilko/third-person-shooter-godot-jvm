@@ -59,6 +59,9 @@ public class QualitySettings extends Node {
      *  OFF BY DEFAULT since 2026-10-11 (user, after testing: "the tour does not seem to save any resources"); its
      *  hitch benefit was never measured either. Queued for REMOVAL unless a measurement shows one (PLAN.md). */
     public boolean loadingTour = false;
+    /** The language street plates, guide signs and station boards are written in: a column of the string table
+     *  (world.SignText; "ja", "zh_TW", ...). English is the second line under every one. */
+    public String signLanguage = com.openworld.world.SignText.SOURCE;
     /** How much the HOST simulates (cars, promoted peds, attackers at once): {@link WorldDensity}. Host-decided. */
     public WorldDensity worldDensity = WorldDensity.NORMAL;
     /** Added to every on-foot and vehicle camera FOV (deg), never to a scope's declared FOV. -10..+20. */
@@ -138,6 +141,7 @@ public class QualitySettings extends Node {
 
     /** Push every value to what it drives. Safe to call any time; the floors are enforced here. */
     public void apply() {
+        com.openworld.world.SignText.setLanguage(signLanguage);   // engine-free: before the tree check
         if (getTree() == null) return;
         applies++;
         renderScale = clamp(renderScale, 0.5, 1.0);
@@ -288,6 +292,7 @@ public class QualitySettings extends Node {
         aimAssist = bool(cf, "controls", "aim_assist", aimAssist);
         masterVolume = num(cf, "audio", "master", masterVolume);
         loadingTour = bool(cf, "world", "loading_tour", loadingTour);
+        signLanguage = String.valueOf(cf.getValue("game", "sign_language", signLanguage));
         hudMinimal = "minimal".equals(String.valueOf(cf.getValue("hud", "mode", hudMinimal ? "minimal" : "full")));
         fovOffset = num(cf, "view", "fov_offset", fovOffset);
         worldDensity = WorldDensity.of(String.valueOf(cf.getValue("world", "density", worldDensity.name())));
@@ -313,6 +318,7 @@ public class QualitySettings extends Node {
         cf.setValue("view", "fov_offset", fovOffset);
         cf.setValue("world", "density", worldDensity.name());
         cf.setValue("world", "loading_tour", loadingTour);
+        cf.setValue("game", "sign_language", signLanguage);
         cf.setValue("display", "window_mode", windowMode.name());
         cf.setValue("display", "resolution", resolution);
         cf.setValue("display", "vsync", vsync);
@@ -342,6 +348,8 @@ public class QualitySettings extends Node {
     @Register public void setShadowDistanceNow(double m) { shadowDistance = m; graphicsChanged(); apply(); }
     @Register public boolean loadingTourNow() { return loadingTour; }
     @Register public void setLoadingTourNow(boolean on) { loadingTour = on; }
+    @Register public String signLanguageNow() { return com.openworld.world.SignText.language(); }
+    @Register public void setSignLanguageNow(String lang) { signLanguage = lang; com.openworld.world.SignText.setLanguage(lang); }
     @Register public boolean hudMinimalNow() { return hudMinimal; }
     @Register public void setHudMinimalNow(boolean on) { hudMinimal = on; }
     @Register public void setFovOffsetNow(double deg) { fovOffset = clamp(deg, FOV_OFFSET_MIN, FOV_OFFSET_MAX); apply(); }

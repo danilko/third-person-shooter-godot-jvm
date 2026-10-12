@@ -212,6 +212,11 @@ ROAD_FIELDS = (
     #: district. Dialling it down is a legitimate, and now VISIBLE, authoring decision; the
     #: default is 1.0 so the real standard is what you get unless you say otherwise.
     ("taper_factor", 'f', 1.0),
+    #: What stands along an edge that is fenced ONLY because nobody may walk the road (`ped_access` off) and that
+    #: is ON THE GROUND: "" = the barrier wall, "RAIL" = no wall, and `point_furniture` stands a white ガードレール
+    #: there instead (user, 2026-10-11: the coast road). A deck, a pier, a rock shed keep their wall either way --
+    #: a breakable rail is no parapet.
+    ("barrier_style", 's', ""),
 
     # ---- STYLE: what the road is MADE OF ---------------------------------------------------------
     #
@@ -597,6 +602,13 @@ class NetworkData(object):
         self.points = {}        # uid -> PointData
         self.roads = {}         # name -> RoadData
         self.schema_ver = SCHEMA_VER
+        #: Which side of the road traffic keeps to: "left" (the kit's own convention -- every cross-section, ramp and
+        #: template is authored keep-left) or "right". NOT in `.roads.json`: it is a fact about the whole network,
+        #: the Godot dock and every round-trip tool rewrite the record from the fields they know, and a key they do
+        #: not know would be dropped silently. It lives in the sidecar `<stem>.network.json` beside the record
+        #: (`network_sidecar`), which `load_network` reads. `point_export.export_network` is the one reader: a
+        #: right-hand network is the keep-left lane graph with every lane REVERSED.
+        self.traffic_side = "left"
         #: `{uid: "<road>/<object>"}` for the read this network came from, so a finding can name
         #: an object (8i.10). Filled by `read_network`; empty for a network built in plain Python.
         self.labels = {}
@@ -774,9 +786,20 @@ def save_network(net, path):
     return path
 
 
+def network_sidecar(path):
+    """`<stem>.network.json` beside `<stem>.roads.json`: the facts about a network as a whole (`traffic_side`)."""
+    stem = path[:-len(".roads.json")] if path.endswith(".roads.json") else os.path.splitext(path)[0]
+    return stem + ".network.json"
+
+
 def load_network(path):
     with open(path) as fh:
-        return network_from_dict(json.load(fh))
+        net = network_from_dict(json.load(fh))
+    side = network_sidecar(path)
+    if os.path.exists(side):
+        with open(side) as fh:
+            net.traffic_side = str(json.load(fh).get("traffic_side", "left"))
+    return net
 
 
 # =========================================================================== the Blender projection

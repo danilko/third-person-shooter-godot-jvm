@@ -228,6 +228,8 @@ public class DebugConsole extends CanvasLayer {
         MissionDirector director = MissionDirector.get();
         switch (a[0]) {
             case "help" -> {
+                print("signs [ja|zh_TW|...]                   the language of street plates, guide signs and station boards");
+                print("autodrive [off]                        the car drives itself to the GPS waypoint; any driving input takes over");
                 print("named                                  list registered story characters");
                 print("move <id> <x> <y> <z>                  walk a story character there");
                 print("state <id> [NAME]                      read, or force, its FSM state");
@@ -351,6 +353,16 @@ public class DebugConsole extends CanvasLayer {
                 print("hud level " + hud.levelNow());
             }
             case "traffic" -> traffic();
+            case "autodrive" -> autodrive(a);
+            case "signs" -> {
+                if (a.length >= 2) {
+                    com.openworld.world.SignText.setLanguage(a[1]);
+                    if (com.openworld.game.QualitySettings.get() != null)
+                        com.openworld.game.QualitySettings.get().signLanguage = com.openworld.world.SignText.language();
+                }
+                print("sign language " + com.openworld.world.SignText.language() + " of "
+                        + com.openworld.world.SignText.languages() + " (signs already built change when their area reloads)");
+            }
             case "activity" -> activity(a);
             case "unlock" -> {
                 need(a, 2);
@@ -421,6 +433,22 @@ public class DebugConsole extends CanvasLayer {
     }
 
     // ── Postal codes and the bug-report line (PLAN.md 3.26) ─────────────────────────────────────
+
+    /** `autodrive` / `autodrive off`: the player's car drives itself to the GPS waypoint (PlayerController.startAutoDrive). */
+    private void autodrive(String[] a) {
+        Player p = localPlayer();
+        if (p == null) return;
+        com.openworld.control.PlayerController pc = null;
+        for (godot.api.Node n : getTree().getNodesInGroup(new StringName("characters"))) {
+            if (n instanceof com.openworld.carrier.vehicle.Vehicle v && GD.isInstanceValid(v) && v.getOccupant() == p
+                    && v.getController() instanceof com.openworld.control.PlayerController c) pc = c;
+        }
+        if (pc == null) { print("autodrive: get into a driver's seat first"); return; }
+        if (a.length >= 2 && a[1].equals("off")) { pc.stopAutoDrive("console"); print("autodrive off"); return; }
+        String why = pc.startAutoDrive();
+        print(why.isEmpty() ? "autodrive on: driving to the GPS waypoint (steer, brake or accelerate to take over)"
+                : "autodrive: " + why);
+    }
 
     private Player localPlayer() {
         for (Player p : PlayerRegistry.getPlayers()) {

@@ -78,10 +78,14 @@ public class StreetLights extends Node3D {
     public static StreetLights get() { return instance; }
 
     /** Bulb positions in each lamp piece's own frame, measured off the piece's luminaire mesh. */
-    private static final String[] LAMP_ASSETS = {"StreetLight_JP", "StreetLight_JP_Twin"};
+    private static final String[] LAMP_ASSETS = {"StreetLight_JP", "StreetLight_JP_Twin",
+            "Pole_DenchuLamp", "Pole_DenchuTrLamp"};
     private static final Vector3[][] HEAD_OFFSETS = {
             {new Vector3(0.0, 10.07, -2.39)},
             {new Vector3(-2.39, 10.07, 0.0), new Vector3(2.39, 10.07, 0.0)},
+            // the 防犯灯 on a 電柱 (library_civic._denchu: the lens spans x 0.66-1.16 at y 4.955-4.97, toward the road)
+            {new Vector3(0.91, 4.95, 0.0)},
+            {new Vector3(0.91, 4.95, 0.0)},
     };
 
     /** Real lights in the pool (the nearest heads); the fake pools light the rest. Measured 2026-10-02 on the island

@@ -138,6 +138,9 @@ public class Player extends Character {
      * {@link com.openworld.game.WaypointStore} and, when networked, broadcast it so teammates see the
      * marker in this player's faction colour. The minimap / full map / world-space arrow read the store.
      */
+    /** {@link #setWaypoint} for a probe (tools/godot/probe_autodrive.gd). */
+    @Register public void setWaypointNow(godot.core.Vector3 worldPos) { setWaypoint(worldPos); }
+
     public void setWaypoint(godot.core.Vector3 worldPos) {
         String id = waypointKey();
         if (id.isEmpty() || worldPos == null) return;

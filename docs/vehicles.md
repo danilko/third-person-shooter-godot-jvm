@@ -8,6 +8,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - Armour, a helicopter that can be shot down, rotors on their hubs (2026-10-07, user-reported)
 - Traffic car bugs V1-V6: a driver born in its seat, the door that threw the next car, a person never moves an empty car (2026-10-11, user-reported)
 - Co-op: a car hits a car ANOTHER PEER simulates (2026-10-11, user)
+- Auto-drive to the GPS waypoint, a testing aid (2026-10-11, user)
 
 ---
 
@@ -439,3 +440,32 @@ else. So to the peer whose car hits it, it is a WALL, and to its owner the hit n
 - The stand's own trap: its players are slid to their marks, and a passer-by or a car on that line pushed the body
   back out every step (it hung there for the run, 1 join in 3). They are carried 4 m over the ground now; the
   script says STUCK and retries once if a body still does not arrive.
+
+## Auto-drive to the GPS waypoint, a testing aid (2026-10-11, user)
+
+User: "add a feature to allow auto car drive for the player to the destination once GPS is selected, as part of the
+debugging / testing setup; the player may exit any time to take over control."
+
+- **How to use it:** sit in a driver's seat, pick a waypoint on the map, open the console (backtick) and type
+  `autodrive`. `autodrive off`, or ANY steering / throttle / brake / handbrake input, or leaving the car, hands it
+  back at once. It ends by itself within 18 m of the waypoint (the car brakes) or when the waypoint is cleared.
+- **How it is built** (`control.PlayerController.startAutoDrive` / `autoDrive` / `stopAutoDrive`): the traffic brain
+  (`ai.vehicle.VehicleAIController`: lanes, signals, 踏切, obstacle rays, corner speeds) is added to the car as a plain
+  CHILD named `AutoDrive` -- NOT as its controller. The PlayerController stays the car's controller and asks the
+  brain for a command each tick, copying only motor / steering / brake / handbrake. So the car is still a
+  player-driven car to everything else: `Vehicle.isAiDriven()` is false, exit hands the PlayerController back, the
+  wanted system and co-op ownership see a player. (Swapping the brain in AS the controller was the obvious way and
+  is wrong: `isAiDriven` turns true and the exit path then refuses to return the player's controller.)
+- **The route** is the GPS's own (`RoadMap.graph().route(car, waypoint)` -> `setPlan(route.laneIds())`), re-planned
+  every 3 s from the lane the car is ON (`routeFromLane`, EnforcementDispatch's rule: a position snap may pick the
+  other carriageway). A car with a plan is not held to the lane's speed limit (the dispatch rule) but it is not
+  `racing`: it stops at red lights and for people.
+- **Known limits:** it does not take its turn in a junction's queue (`IntersectionZone` only queues cars whose
+  controller is the AI brain: "the player isn't auto-yielded"), so it relies on signals and its obstacle rays there;
+  it needs the route's first lane streamed in (it is, where the car stands); no key binding and no HUD line -- the
+  console is the switch, as befits a testing aid; a co-op guest's car is driven on the guest's own peer like any
+  input.
+- **Gate:** `tools/godot/probe_autodrive.gd` (DebugWorld, the west E-W street to the east ring over the bridge;
+  `--control` = never started). Signals and 踏切 run on the WALL CLOCK, so the probe waits in real time too: a limit
+  in ticks measured the machine, not the drive (a headless run that steps 10x real time sits ~270 simulated seconds
+  at one red light).

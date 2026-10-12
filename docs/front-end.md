@@ -14,6 +14,7 @@ The title screen, the settings and what they may touch (PLAN.md 1.3: F2 + H3, st
 - The loading screen and its warm-up tour (2026-10-10)
 - Gate
 - What is not done yet
+- The sign string table: names by id, one column per language, no recompile (2026-10-12, user)
 
 ---
 
@@ -258,3 +259,45 @@ starting cash, no debts, cars, story, career or checkpoints; the install's id st
 in), the world ledger and MissionDirector's campaign as before, and the autosave slot DELETED, so Continue is
 disabled until the new game saves. It used to reset only the story. Host co-op resets none of it. Settings and key
 bindings are `settings.cfg`, untouched. Gate: `probe_title_actions.gd -- --role=new`.
+
+## The sign string table: names by id, one column per language, no recompile (2026-10-12, user)
+
+User: "keep the Japanese style name, and do a language conversion as needed; for now keep Japanese, but also able to
+go Chinese Traditional (English subtitle on both)"; then "use Godot's default language table or another way, so
+these keep these names with id, and names can be more easily translated, without need to recompile". The setting
+this serves (same day): an island with strong Japanese influence whose own language is Traditional Chinese, with
+US influence on its roads.
+
+- **One owner: `src/main/resources/com/openworld/i18n/signs.csv`** -- `key,ja,zh_TW,en`, one row per thing the world
+  writes in a native script: `street.<road base name>`, `station.<id>`, `gang.<id>`, `word.<name>` (the guide signs'
+  出口 / 入口, the train boards' 先発 / まもなく / `{0} 行`, the respawn cards). Edit it in any spreadsheet. A new
+  language is a new column; an empty cell falls back to `ja`.
+- **No compile, no import.** `world.SignText` reads the CSV at first use and `user://signs.csv` on top of it (a row
+  there replaces the shipped one, so a packaged build can be re-translated). The CSV's `.import` says `keep`:
+  Godot's own CSV importer would turn it into `.translation` resources and the raw file would not ship. Every
+  column is ALSO registered with Godot's `TranslationServer` (locale = the column name), so `tr("street.nishi_dori")`
+  works anywhere.
+- **Why not `tr()` alone:** a sign shows two lines at once -- the sign language and English -- and `tr()` answers
+  for one current locale. `SignText.local(key)` / `SignText.en(key)` read two columns of one row. The sign language
+  is NOT the UI locale (the menus are English and stay so).
+- **The setting:** GAME tab "Sign language" (`settings.cfg [game] sign_language`, `QualitySettings.signLanguage`),
+  console `signs <column>`. Plates, guide signs and boards are built when their area streams in, so ones already
+  standing change at the next load -- they are not rebuilt in place.
+- **`tools/build_sign_table.py` only ADDS:** a `street.*` row for a road id it has not seen (default `ja` / `en`
+  from `tools/island_street_names.py`, which is now only that default), the seed rows for stations / gangs / words,
+  and an empty `zh_TW` cell derived from `ja` by `tools/sign_lang.py` (kana dropped: 通り -> 通, 日の出 -> 日之出;
+  shinjitai to traditional forms: 駅 -> 驛, 桜 -> 櫻, 環状 -> 環狀; 峠 -> 嶺; it REFUSES a name with kana left
+  over). It never rewrites a filled cell and drops the street rows of roads that are gone. `--check` for a gate.
+- **Fonts:** one subset per face, built from the table's columns by `tools/make_jp_font.py`:
+  `NotoSansJP-Signs.otf` (the `ja` column + kana) and `NotoSansTC-Signs.otf` (`zh_TW`; the JP face lacks 驛 區 灣 狀
+  鐵 會 and draws shared code points in Japanese shapes). `StreetNames.font()` picks by sign language. A translation
+  that uses a NEW character needs the script re-run (a tool run, not a compile); a third script (Korean, ...)
+  needs its face added to `FACES`.
+- **Readers moved onto it:** `StreetNames.ja()/en()` (signal plates, guide signs, the minimap street line),
+  `TrainDisplays` (station names and every board word), `RespawnSystem` (cards, the abduction prompt, its font),
+  `TrafficSignals`' sign tags. `IslandStreetNames.json` is no longer read by the game; `StationNames.json` is only
+  the seed and `TrainDisplays`' fallback.
+- **Not done:** the English column is still Hepburn romaji ("Nishi-dori", "Kaito Expwy") under both languages (the
+  user's "English subtitle on both"); the currency sign is still ¥; map place labels and the menus are English and
+  not in the table; shop fronts carry no text at all (new work, not a conversion); no system-font fallback yet for a
+  glyph outside the subsets; `build_sign_table.py --check` is not in `island_world.sh` or the nightly gates yet.

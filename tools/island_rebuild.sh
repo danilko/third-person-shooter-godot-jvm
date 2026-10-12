@@ -65,6 +65,9 @@ step "4/7 build"
 # a C1 column stood on the Main line where it passes under the ring, probe_rail_track's gauge 2026-09-26)
 # ...and out of every car park's entrance (`island_buildings.py write` records them: a tree stood in an exit)
 KEEP_OUT=""; [ -f "$P/IslandRoads.keepout.json" ] && KEEP_OUT="--keep-out $P/IslandRoads.keepout.json"
+# ...and out of every frozen footbridge's piers and stairs (`island_footbridges.py` writes them: a kerb-long guardrail
+# must yield to the bridge)
+[ -n "$KEEP_OUT" ] && [ -f "$P/IslandFootbridges.keepout.json" ] && KEEP_OUT="$KEEP_OUT,$P/IslandFootbridges.keepout.json"
 RAIL_AVOID=""; [ -f "$P/IslandRail.roads.json" ] && RAIL_AVOID="--avoid $P/IslandRail.roads.json"
 [ -f "$P/IslandRail.ground.json" ] && RAIL_AVOID="$RAIL_AVOID --avoid-ground $P/IslandRail.ground.json"
 # SKIP_PIECES=1 (2026-10-04): the ground and stamps only -- for a change that moves no road (the block ground, a

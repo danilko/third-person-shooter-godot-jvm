@@ -119,8 +119,11 @@ def marker_node(m):
     fx, fy = m["fwd"]
     # Godot's direction is (fx, 0, -fy); a yaw theta sends -Z to (-sin theta, 0, -cos theta)
     theta = math.atan2(-fx, fy)
+    sy, cy = math.sin(theta / 2.0), math.cos(theta / 2.0)
+    # `pitch` (radians, nose up): a rail follows its road's grade. Yaw, then the pitch about the piece's own +X
+    sp, cp = math.sin(m.get("pitch", 0.0) / 2.0), math.cos(m.get("pitch", 0.0) / 2.0)
     node = {"name": "mmesh_" + m["asset"], "translation": godot(m["pos"]),
-            "rotation": [0.0, round(math.sin(theta / 2.0), 6), 0.0, round(math.cos(theta / 2.0), 6)],
+            "rotation": [round(cy * sp, 6) + 0.0, round(sy * cp, 6), round(-sy * sp, 6) + 0.0, round(cy * cp, 6)],
             "extras": {"asset_path": m["path"]}}
     if BATCH_CHUNK > 0:
         # PLAN.md 2f: WorldBaker makes one MultiMesh per asset per CHUNK, so a far batch is culled on its own

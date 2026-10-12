@@ -88,6 +88,25 @@ class Builder:
             f = self.bm.faces.new((lo[i], lo[j], hi[j], hi[i]))
             f.material_index = mi
 
+    def cyl(self, cx, cy, z0, z1, r0, r1, mat, segs=12):
+        """A vertical round bar or TAPERED pole: radius `r0` at z0 to `r1` at z1, centred on (cx, cy). The side is
+        smooth-shaded and the two rims are sharp, so a 12-sided pole reads round (a 電柱, an insulator, a can)."""
+        mi = self._mi(mat)
+        lo = [self.bm.verts.new((cx + r0 * math.cos(2 * math.pi * k / segs), cy + r0 * math.sin(2 * math.pi * k / segs), z0))
+              for k in range(segs)]
+        hi = [self.bm.verts.new((cx + r1 * math.cos(2 * math.pi * k / segs), cy + r1 * math.sin(2 * math.pi * k / segs), z1))
+              for k in range(segs)]
+        caps = [self.bm.faces.new(lo[::-1]), self.bm.faces.new(hi)]
+        for f in caps:
+            f.material_index = mi
+            for e in f.edges:
+                e.smooth = False
+        for i in range(segs):
+            j = (i + 1) % segs
+            f = self.bm.faces.new((lo[i], lo[j], hi[j], hi[i]))
+            f.material_index = mi
+            f.smooth = True
+
     def beam(self, p0, p1, w, mat):
         """A square beam `w` wide from point p0 to point p1 (cables, legs, hangers)."""
         import mathutils

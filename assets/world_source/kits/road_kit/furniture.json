@@ -14,6 +14,11 @@
   "`breakable` {mass kg, break_speed m/s, respawn s} makes a collide_pole piece a knock-down pole (PLAN.md 3.11): it leaves the static collision proxy, and WorldBaker gives its batch a BreakableProps node that builds one collider per pole, knocks a pole down under a car at or above break_speed (the car keeps m_car / (m_car + mass) of its speed) and brings it back after respawn seconds where nobody sees it.",
   "tree_a/b/c are street trees (街路樹) from the Stylized Nature kit, placed like planters but ONE SPECIES PER STREET (chosen by a hash of the road's name, the Japanese convention), only on a footway at least tree_min_footway wide -- which on this island is the trunk/arterial network, block streets having 2 m. It stands AT THE KERB (tree_kerb_gap), the Japanese 植樹帯 position, which is also what keeps the trunk off the footway's own walk line that the ambient crowd walks. Their collider is the TRUNK (collide_pole), never the canopy.",
   "A per-asset visibility range was tried for the trees and REMOVED: a MultiMesh is ONE instance to the renderer, so the range is whole-batch, and a range shorter than the batch's own extent culls every instance at any camera distance (measured: a batch 803.7 m across, green pixels 20285 / 0 / 20285 / 20285 at range 0 / 350 / 700 / 1200). Cutting a piece's trees into several smaller batches is what would make one work.",
+  "denchu / denchu_tr / denchu_lamp / denchu_tr_lamp are the 電柱 (PLAN.md T1, 2026-10-11), modelled in kits/library/library.blend (blender/tools/library_civic.py `denchu_*`, category street) to the Japanese distribution pole: a 14 m concrete pole, 1/6 of it (2.33 m) in the ground so 11.67 m stands, 19 cm at the top with a 1/75 taper, a one-sided 腕金 for the 6.6 kV lines reaching toward the ROAD, the low-voltage rack below, the communication cable lowest (over 5 m), an overhead ground wire on top; _tr adds the 柱上変圧器, _lamp the 防犯灯 at 5 m (StreetLights lights it). The piece's +X is the ROAD side. They stand on BOTH kerbs (denchu_both_sides; the second line staggered half a pitch) of every road with at most denchu_max_lanes lanes each way -- ONE kerb, picked by a hash of the road's name, on the roads denchu_one_side_roads names; on a RAIL-style road with no kerb (the coast road) they stand denchu_inset_open out, behind the guardrail, and that road is lit like a kerbed one, denchu_inset behind the kerb line; a road with at most denchu_lamp_max_lanes lanes each way AND a footway (a block street) gets the _lamp poles every denchu_spacing and NO separate `lamp`; a wider one keeps its lamps and trees, and its poles stand on the lamp pitch a quarter of it off, so a pole is never at a lamp or a tree. Every denchu_tr_every-th pole carries a transformer. A pole that would stand in a vehicle entry, a lane, a car-park keep-out or on another pole is slid along the kerb by denchu_shift before it is dropped.",
+  "denchu_wires is THE table of what is strung between two poles and where it meets one: kind (gw overhead ground wire, hv high voltage, lv low voltage, comm), x (m toward the road from the pole's axis), z (m above the pole's foot), sag (m at a denchu_sag_span span; it grows with the square of the span), t (the drawn thickness, m -- thicker than a real conductor so it survives a 1080p pixel). The pole MODEL reads the same table to put its insulators where the wires arrive, so moving a wire is one edit here and `build_library.py --only=Pole_Denchu,...`. The wires are swept by point_furniture into the road piece itself (FURN__wires, material M_Wire, no collision), between consecutive poles of one road no farther apart than denchu_max_span, across a junction included.",
+  "guardrail is the white ガードレール (user, 2026-10-11), kits/library Guardrail_JP: one 4 m module, a post in its middle, tiled end to end by its own length along an edge, guardrail_inset behind the edge line, the beam toward the road. `rail` [half thickness, height, half length] is its collider and what makes it a RAIL to the placer: it keeps nothing else away (a tree, a lamp and a pole stand behind it) and it is breakable like a pole (BreakableProps builds a long box per module). WHERE (point_furniture.guardrail_kind): (1) `kerb` -- both kerbs of a road with at least guardrail_min_lanes lanes each way and a footway, between carriageway and footway, never within guardrail_end_clear of the run's ends (the crossings, where people walk into the road), a vehicle entry or a car-park keep-out; (2) `edge` -- a road whose barrier_style is RAIL (the coast road), wherever the solver stood no wall: on the ground and outside a rock shed; (3) `drop` -- the roads guardrail_drop_roads names (the mountain road): EVERY edge except where the hill stands beside it (the ground guardrail_hill_reach outboard is guardrail_hill_rise or more ABOVE the road: the inner side).",
+  "crosswalk_min_lane: an arm whose lanes are shorter than this gets no zebra and no pedestrian signal -- a link that short joins two junctions that are really one, and two zebras back to back with four pedestrian heads stood in it.",
+  "signal_r / expwy_sign_r are the RIGHT-HAND twins of signal / expwy_sign (tools/mirror_piece.py reflects the piece and its lamps.json in X): on a network whose traffic keeps right (`<stem>.network.json` traffic_side, read by point_model.load_network) the pole stands on the RIGHT kerb and the arm reaches left over the lanes. Everything else follows the lane graph by itself.",
   "Edit and rebuild: the Road Kit digest salts this file and every piece it names, so a change here rebuilds every road piece."
  ],
  "kit": "res://assets/world_source/kits/quaternius_downtown_city/",
@@ -123,9 +128,7 @@
     "break_speed": 5.0,
     "respawn": 60
    },
-   "exclude_roads": [
-    "shrine_touge*"
-   ]
+   "exclude_roads": []
   },
   "median_wall": {
    "kit": "res://assets/world_source/kits/quaternius_zombie_apocalypse/",
@@ -232,6 +235,121 @@
     4.3
    ],
    "sign_panel": true
+  },
+  "denchu": {
+   "kit": "res://assets/world_source/kits/library/",
+   "lift": -2.33,
+   "collide_pole": [
+    0.18,
+    11.67
+   ],
+   "breakable": {
+    "mass": 700,
+    "break_speed": 6.0,
+    "respawn": 60
+   },
+   "exclude_roads": [
+    "shuto_*",
+    "airport_*"
+   ],
+   "piece": "pieces/street/Pole_Denchu.gltf"
+  },
+  "denchu_tr": {
+   "kit": "res://assets/world_source/kits/library/",
+   "lift": -2.33,
+   "collide_pole": [
+    0.18,
+    11.67
+   ],
+   "breakable": {
+    "mass": 700,
+    "break_speed": 6.0,
+    "respawn": 60
+   },
+   "exclude_roads": [
+    "shuto_*",
+    "airport_*"
+   ],
+   "piece": "pieces/street/Pole_DenchuTr.gltf"
+  },
+  "denchu_lamp": {
+   "kit": "res://assets/world_source/kits/library/",
+   "lift": -2.33,
+   "collide_pole": [
+    0.18,
+    11.67
+   ],
+   "breakable": {
+    "mass": 700,
+    "break_speed": 6.0,
+    "respawn": 60
+   },
+   "exclude_roads": [
+    "shuto_*",
+    "airport_*"
+   ],
+   "piece": "pieces/street/Pole_DenchuLamp.gltf"
+  },
+  "denchu_tr_lamp": {
+   "kit": "res://assets/world_source/kits/library/",
+   "lift": -2.33,
+   "collide_pole": [
+    0.18,
+    11.67
+   ],
+   "breakable": {
+    "mass": 700,
+    "break_speed": 6.0,
+    "respawn": 60
+   },
+   "exclude_roads": [
+    "shuto_*",
+    "airport_*"
+   ],
+   "piece": "pieces/street/Pole_DenchuTrLamp.gltf"
+  },
+  "guardrail": {
+   "kit": "res://assets/world_source/kits/library/",
+   "piece": "pieces/street/Guardrail_JP.gltf",
+   "lift": -0.5,
+   "rail": [
+    0.1,
+    0.8,
+    2.0
+   ],
+   "breakable": {
+    "mass": 60,
+    "break_speed": 6.0,
+    "respawn": 60
+   }
+  },
+  "signal_r": {
+   "kit": "res://assets/world_source/kits/quaternius_zombie_apocalypse/",
+   "piece": "pieces/props/TrafficLight_JP_R.gltf",
+   "lift": 0.0,
+   "collide_pole": [
+    0.2,
+    5.8
+   ],
+   "breakable": {
+    "mass": 450,
+    "break_speed": 5.0,
+    "respawn": 60
+   },
+   "exclude_roads": [
+    "shrine_touge*"
+   ],
+   "lamps_file": "TrafficLight_JP_R.lamps.json"
+  },
+  "expwy_sign_r": {
+   "kit": "res://assets/world_source/kits/library/",
+   "piece": "pieces/street/Sign_ExpwyCantilever_R.gltf",
+   "lift": 0.0,
+   "collide_pole": [
+    0.25,
+    7.6
+   ],
+   "sign_panel": true
   }
  },
  "rules": {
@@ -297,9 +415,93 @@
   "signal_all_red": 2.0,
   "ped_signal_pole_clear": 1.2,
   "expwy_sign_before": 120.0,
-  "expwy_lane_gantries": [300.0, 600.0],
+  "expwy_lane_gantries": [
+   300.0,
+   600.0
+  ],
   "expwy_sign_edge": 1.2,
   "expwy_entrance_in": 12.0,
-  "expwy_entrance_edge": 2.9
+  "expwy_entrance_edge": 2.9,
+  "denchu_spacing": 30.0,
+  "denchu_end_clear": 10.0,
+  "denchu_inset": 0.5,
+  "denchu_max_lanes": 2,
+  "denchu_lamp_max_lanes": 1,
+  "denchu_tr_every": 3,
+  "denchu_shift": [
+   0.0,
+   3.0,
+   -3.0,
+   6.0,
+   -6.0
+  ],
+  "denchu_max_span": 62.0,
+  "denchu_sag_span": 30.0,
+  "denchu_wire_material": "M_Wire",
+  "denchu_wires": [
+   {
+    "kind": "gw",
+    "x": 0.0,
+    "z": 12.2,
+    "sag": 0.3,
+    "t": 0.025
+   },
+   {
+    "kind": "hv",
+    "x": -0.2,
+    "z": 11.55,
+    "sag": 0.45,
+    "t": 0.035
+   },
+   {
+    "kind": "hv",
+    "x": 0.55,
+    "z": 11.55,
+    "sag": 0.45,
+    "t": 0.035
+   },
+   {
+    "kind": "hv",
+    "x": 1.3,
+    "z": 11.55,
+    "sag": 0.45,
+    "t": 0.035
+   },
+   {
+    "kind": "lv",
+    "x": 0.3,
+    "z": 9.6,
+    "sag": 0.5,
+    "t": 0.035
+   },
+   {
+    "kind": "lv",
+    "x": 0.3,
+    "z": 9.25,
+    "sag": 0.5,
+    "t": 0.035
+   },
+   {
+    "kind": "comm",
+    "x": -0.26,
+    "z": 6.1,
+    "sag": 0.4,
+    "t": 0.06
+   }
+  ],
+  "guardrail_inset": 0.25,
+  "guardrail_end_clear": 9.0,
+  "guardrail_min_lanes": 2,
+  "guardrail_drop_roads": [
+   "shrine_touge*"
+  ],
+  "guardrail_hill_rise": 1.0,
+  "guardrail_hill_reach": 4.0,
+  "crosswalk_min_lane": 20.0,
+  "denchu_both_sides": true,
+  "denchu_one_side_roads": [
+   "shrine_touge*"
+  ],
+  "denchu_inset_open": 1.0
  }
 }

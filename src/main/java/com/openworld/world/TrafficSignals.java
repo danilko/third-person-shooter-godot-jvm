@@ -591,7 +591,9 @@ public class TrafficSignals extends Node3D {
             }
             return;
         }
-        String tag = "exit".equals(g.kind) ? "出口 EXIT" : "jct".equals(g.kind) ? "JCT" : "入口 ENTRANCE";
+        String tagKey = "exit".equals(g.kind) ? "word.exit" : "jct".equals(g.kind) ? "word.junction" : "word.entrance";
+        String tag = SignText.local(tagKey).equals(SignText.en(tagKey)) ? SignText.en(tagKey)
+                : SignText.local(tagKey) + " " + SignText.en(tagKey);
         double tagH = 0.16 * g.h;
         Label3D t = label(tag, font, 48, tagH / 48.0, base, 0.34 * g.h);
         t.setHorizontalAlignment(godot.core.HorizontalAlignment.LEFT);

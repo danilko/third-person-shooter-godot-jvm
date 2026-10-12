@@ -399,7 +399,9 @@ public class RespawnSystem extends Node {
         captivePrompt.setVisible(show);
         if (!show) return;
         var g = gs.gang(c.gang);
-        captivePrompt.setText("拉致 " + (g != null ? g.nameJa() + " " + g.name() : c.gang) + "\n身代金 ransom ¥"
+        captivePrompt.setText(com.openworld.world.SignText.local("word.abducted") + " "
+                + (g != null ? com.openworld.world.SignText.local("gang." + c.gang) + " " + g.name() : c.gang) + "\n"
+                + com.openworld.world.SignText.local("word.ransom") + " ransom ¥"
                 + String.format("%,d", c.ransom) + "  [E] pay   (cash ¥" + String.format("%,d", com.openworld.game.profile.Profiles.balanceOf(me))
                 + ")   or run for it");
         if (authority() && godot.api.Input.INSTANCE.isActionJustPressed("interact") && gs.payRansom(me))
@@ -426,7 +428,7 @@ public class RespawnSystem extends Node {
             black.setAnchorsPreset(Control.LayoutPreset.PRESET_FULL_RECT, false);
             black.setColor(new Color(0f, 0f, 0f, 0f));
             black.setMouseFilter(Control.MouseFilter.IGNORE);
-            if (GD.load(JP_FONT) instanceof godot.api.Font f) jpFont = f;
+            jpFont = com.openworld.world.StreetNames.font();      // the sign language's face (world.SignText)
             card = label(96);
             cardEn = label(34);
             card.setOffset(godot.core.Side.TOP, -70f);
@@ -442,7 +444,8 @@ public class RespawnSystem extends Node {
                 case ABDUCTED -> new Color(1f, 0.38f, 0.42f, 1f);
                 default -> new Color(0.62f, 0.86f, 1f, 1f);
             };
-            card.setText(switch (reason) { case ARRESTED -> "逮捕"; case ABDUCTED -> "拉致"; default -> "入院"; });
+            card.setText(com.openworld.world.SignText.local(switch (reason) {
+                case ARRESTED -> "word.arrested"; case ABDUCTED -> "word.abducted"; default -> "word.hospitalized"; }));
             // the card never carries money (user, 2026-10-10: a bill line pushed the English up into the kanji);
             // the bill is told by ui.CashReadout's change line
             cardEn.setText(reason.name());

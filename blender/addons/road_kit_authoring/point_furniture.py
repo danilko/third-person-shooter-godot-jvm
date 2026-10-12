@@ -53,6 +53,7 @@ except ImportError:
 #: Object names this module adds to a piece.
 PAINT_OBJECT = "FURN__marks_w"
 COLLISION_OBJECT = "FURN_props-prop-colonly"
+WIRE_OBJECT = "FURN__wires"
 #: `point_mesh.NO_MATERIAL` (restated: importing point_mesh here would be a cycle).
 NO_MATERIAL = ""
 #: How far a cleared zone reaches past the lines it clears, sideways (a centre line sits ON the arriving lanes'
@@ -222,6 +223,8 @@ class Furniture(object):
 
     def __init__(self, keep_out=()):
         self.paint = {}
+        #: `{material: [tri]}` of the overhead wires strung between the 電柱 (`_utility_poles`): the piece's own mesh
+        self.wires = {}
         self.collision = []
         self.placements = []
         self.counts = {}
@@ -250,6 +253,20 @@ class Furniture(object):
         lift = float(a.get("lift", 0.0)) - a["lo"][1] * a["scale"][1]
         self.placements.append({"asset": asset, "path": a["res"], "pos": (pos[0], pos[1], pos[2] + lift),
                                 "fwd": fwd, "scale": list(a["scale"]), "road": road or ""})
+        if a.get("rail"):
+            # a RAIL (ガードレール): a long thin collider, breakable like a pole, and NOT "solid" to the spacing rules --
+            # it runs the kerb's whole length, and a lamp, a pole and a tree stand behind it
+            half, height, half_len = [float(x) for x in a["rail"]]
+            self.counts[asset] = self.counts.get(asset, 0) + 1
+            b = a.get("breakable")
+            if b:
+                self.placements[-1]["breakable"] = {"pole_half": half, "pole_height": height, "pole_len": half_len,
+                                                    "mass": float(b.get("mass", 60.0)),
+                                                    "break_speed": float(b.get("break_speed", 5.0)),
+                                                    "respawn": float(b.get("respawn", 60.0))}
+            else:
+                self.collision += _box((pos[0], pos[1], pos[2]), fwd, half_len, half, height)
+            return True
         if a.get("collide") or a.get("collide_pole"):
             self.placements[-1]["solid"] = True
         if a.get("collide_pole"):
@@ -354,7 +371,12 @@ def _arms(lanes, junctions):
 
 
 def _has_zebra(table, arm):
-    return all(row["length"] >= table.rules["crosswalk_back"][1] for row in arm["rows"])
+    """A zebra needs room for itself -- and `crosswalk_min_lane` of lane behind it: a link that short joins two
+    junctions that are really one (user, 2026-10-11, with a picture: a T 72 m from a ramp terminal on a six-lane
+    road left a 10 m link carrying TWO zebras back to back and four pedestrian heads within 4 m). People cross at
+    the outer arms of the pair."""
+    need = max(table.rules["crosswalk_back"][1], float(table.rules.get("crosswalk_min_lane", 0.0)))
+    return all(row["length"] >= need for row in arm["rows"])
 
 
 def _has_stop(table, row):
@@ -706,11 +728,15 @@ def _signals(fur, table, lanes, junctions, mine, ground, index=None):
         ksign = 1.0
         if outs and sum(w["lat"] for w in ins) / len(ins) < sum(w["lat"] for w in outs) / len(outs):
             ksign = -1.0
+        asset = "signal"
         if ksign < 0.0:
-            # right-hand traffic: the piece's arm reaches right of forward, so it would stand over the verge
-            fur.counts["signal_skipped_right_hand"] = fur.counts.get("signal_skipped_right_hand", 0) + 1
-            continue
-        kerb = max(ins, key=lambda w: w["lat"])
+            # right-hand traffic: the pole stands on the RIGHT kerb and the mirrored piece's arm reaches left over
+            # the lanes (`signal_r`, tools/mirror_piece.py). Without the twin the arm would hang over the verge.
+            asset = "signal_r"
+            if asset not in table.assets:
+                fur.counts["signal_skipped_right_hand"] = fur.counts.get("signal_skipped_right_hand", 0) + 1
+                continue
+        kerb = (max if ksign > 0.0 else min)(ins, key=lambda w: w["lat"])
         lane = kerb["lane"]
         if not mine(lane):
             continue
@@ -725,6 +751,7 @@ def _signals(fur, table, lanes, junctions, mine, ground, index=None):
             tgt = [lanes[n] for n in straight[0].get("next", ()) if n in lanes]
             half = 0.5 * float(tgt[0].get("lane_width", 2.0 * kerb["half"])) if tgt else kerb["half"]
             side = _left(d)
+            side = (ksign * side[0], ksign * side[1])            # the kerb this traffic keeps to
             pos = (end[0] + d[0] * r["signal_past_mouth"] + side[0] * (half + off),
                    end[1] + d[1] * r["signal_past_mouth"] + side[1] * (half + off), end[2])
             fwd = d
@@ -735,11 +762,11 @@ def _signals(fur, table, lanes, junctions, mine, ground, index=None):
             # side is not visible or not there
             fwd, left, anchor = arm["fwd"], arm["left"], arm["anchor"]
             back = r["crosswalk_back"][0] - r["signal_near_inside"]
-            lat = kerb["lat"] + kerb["half"] + off
+            lat = kerb["lat"] + ksign * (kerb["half"] + off)
             z = kerb["sample"](max(0.0, back))[2]
             pos = (anchor[0] + left[0] * lat - fwd[0] * back, anchor[1] + left[1] * lat - fwd[1] * back, z)
-            out = left
-        moved = _out_of_lane(index, table, r, "signal", pos, out)
+            out = (ksign * left[0], ksign * left[1])
+        moved = _out_of_lane(index, table, r, asset, pos, out)
         if moved is None:
             fur.counts["signal_in_lane"] = fur.counts.get("signal_in_lane", 0) + 1
             continue
@@ -748,7 +775,7 @@ def _signals(fur, table, lanes, junctions, mine, ground, index=None):
         pos = moved
         if not _grounded(ground, pos, r["max_above_ground"]):
             continue
-        if fur.put(table, "signal", pos, fwd, lane.get("road_name", "")):
+        if fur.put(table, asset, pos, fwd, lane.get("road_name", "")):
             fur.placements[-1].update({"junction": arm["junction"]["id"], "arm": _arm_index(arm)})
 
 
@@ -759,7 +786,7 @@ def _arm_index(arm):
 
 #: The vehicle signal pieces. ONE since 2026-09-27: the vehicle pole carries no pedestrian head (see
 #: `_ped_signals`), so there are no corner-pole variants.
-SIGNAL_ASSETS = ("signal",)
+SIGNAL_ASSETS = ("signal", "signal_r")
 
 
 def _clear_of_signal(fur, table, pos, back):
@@ -852,11 +879,15 @@ def _lamps(fur, table, solves, bands, mine_run, ground, index=None):
                     on_median += 1
         if (on_median and not r.get("lamp_kerb_with_median")) or "lamp" not in table.assets:
             continue
+        # a street lit from its 電柱 (a 防犯灯 on every pole, `denchu_kind`) stands no separate lamp on its kerbs
+        on_poles = denchu_kind(table, s.road) == "lamp"
+        open_edge = getattr(s.road, "barrier_style", "") == "RAIL"
         for _sfx, pts, walk, kerb, wall, sgn in ped.road_edge_runs(s, bands):
             spacing = r["lamp_spacing"]
-            for p, d, w, k in _edge_samples(pts, walk, kerb, wall, spacing, r["lamp_end_clear"],
-                                            0.5 * spacing if sgn > 0 else 0.0):
-                if k <= 0.0 or not _grounded(ground, p, r["max_above_ground"]):
+            for p, d, w, k in (() if on_poles else _edge_samples(pts, walk, kerb, wall, spacing, r["lamp_end_clear"],
+                                                                 0.5 * spacing if sgn > 0 else 0.0)):
+                # an open-edged RAIL road (the coast road: no kerb, a guardrail) is lit like a kerbed one
+                if (k <= 0.0 and not open_edge) or not _grounded(ground, p, r["max_above_ground"]):
                     continue
                 lat = _left(d)
                 o = sgn * r["lamp_inset"]
@@ -892,6 +923,291 @@ def _lamps(fur, table, solves, bands, mine_run, ground, index=None):
                     continue
                 if fur.clear_of(pos, r["pole_clearance"]):
                     fur.put(table, "lamp", pos, (-sgn * lat[0], -sgn * lat[1]), road)
+
+
+# ------------------------------------------------------------------------------------------- 電柱 and wires
+
+#: The four pole pieces: (lit from the pole?, carries a transformer?) -> asset.
+DENCHU_ASSETS = {(False, False): "denchu", (False, True): "denchu_tr",
+                 (True, False): "denchu_lamp", (True, True): "denchu_tr_lamp"}
+
+
+def denchu_kind(table, road):
+    """What 電柱 a road carries (PLAN.md T1): None, "lamp" (a block street: a 防犯灯 on every pole, and no separate
+    street lamp) or "plain" (a wider road that keeps its own lamps and trees).
+
+    The Japanese rule this follows: overhead distribution lines run down ordinary streets and two-lane-each-way
+    roads; a trunk road and an expressway are undergrounded (無電柱化 starts with the widest roads). So it is the
+    LANE COUNT, `denchu_max_lanes` each way, and never the road's class name."""
+    r = table.rules
+    if float(r.get("denchu_spacing", 0.0)) <= 0.0 or "denchu" not in table.assets:
+        return None
+    if getattr(road, "road_class", "") in ("expressway", "ramp", "rail"):
+        return None
+    if not getattr(road, "ped_access", True) and getattr(road, "barrier_style", "") != "RAIL":
+        return None                                              # fenced with a wall: no verge to stand a pole on
+    if excluded(table.assets["denchu"], road.name):
+        return None
+    base = road.base
+    lanes = max(int(base.lanes_fwd), int(base.lanes_bwd))
+    if lanes > int(r.get("denchu_max_lanes", 2)):
+        return None
+    walk = max(float(base.left_walk_width), float(base.right_walk_width))
+    lit = lanes <= int(r.get("denchu_lamp_max_lanes", 1)) and walk > 0.0 and "denchu_lamp" in table.assets
+    return "lamp" if lit else "plain"
+
+
+def denchu_side(name):
+    """Which kerb a road's FIRST line of poles stands on (+1 = the left of its direction): one side per ROAD, by a
+    hash of its name with any `__n` split suffix dropped, so a road cut into several records keeps its side."""
+    return 1.0 if int(hashlib.sha1(name.split("__")[0].encode()).hexdigest()[:8], 16) % 2 else -1.0
+
+
+def denchu_sides(table, road):
+    """The kerbs a road's poles stand on, first line first. BOTH in town (user, 2026-10-11: "thought it should be
+    both sides") -- the second line is staggered half a pitch from the first; ONE on the roads
+    `denchu_one_side_roads` names (a mountain road: the line follows one verge)."""
+    first = denchu_side(road.name)
+    r = table.rules
+    if not r.get("denchu_both_sides", False) or any(
+            fnmatch.fnmatchcase(road.name, g) for g in r.get("denchu_one_side_roads", ())):
+        return (first,)
+    return (first, -first)
+
+
+def denchu_stations(length, kind, rules, stagger=False):
+    """Arc lengths of the poles along one kerb run; `stagger` is the SECOND kerb's line, half a pitch on.
+
+    "lamp": every `denchu_spacing`, CENTRED in the run, so the first and the last pole are equally near the two
+    junctions and the span over each junction is as short as it can be.
+    "plain": the road has lamps every `lamp_spacing` on this kerb or the other (half a pitch apart) and trees on
+    the half pitch between, all counted from `lamp_end_clear` -- so a pole a QUARTER of the lamp pitch on is
+    midway between a lamp and a tree, on either kerb. Poles go on that lattice every lamp pitch, and one more on
+    the last free lattice point before the run's end, which closes the gap to the junction."""
+    clear = float(rules["denchu_end_clear"])
+    if kind == "lamp":
+        spacing = float(rules["denchu_spacing"])
+        if length < 2.0 * clear:
+            return []
+        n = int((length - 2.0 * clear) // spacing) + 1
+        first = 0.5 * (length - (n - 1) * spacing)
+        if stagger and n > 1:
+            return [first + (k + 0.5) * spacing for k in range(n - 1)]
+        return [first + k * spacing for k in range(n)]
+    pitch = float(rules["lamp_spacing"])
+    first = float(rules["lamp_end_clear"]) + (0.75 if stagger else 0.25) * pitch
+    out, st = [], first
+    while st <= length - clear + 1e-9:
+        out.append(st)
+        st += pitch
+    if out and out[-1] + 0.5 * pitch <= length - clear + 1e-9:
+        out.append(out[-1] + 0.5 * pitch)
+    return out
+
+
+def _denchu_spot(fur, table, index, ground, pts, cum, walk, kerb, wall, drops, sgn, st, open_edge=False):
+    """Where a pole at arc length `st` of a kerb run stands -- (pos, along) -- or None when it may not: on a
+    barrier, at no kerb, over a drop, in a vehicle entry, a car-park keep-out or a lane, or on another solid."""
+    r = table.rules
+    if st < 0.0 or st > cum[-1] or any(abs(st - c) <= ped.ENTRY_RAMP + ENTRY_CLEAR for c in drops):
+        return None
+    p, d, i = _at(pts, cum, st)
+    j = min(i + 1, len(pts) - 1)
+    if max(float(wall[i]), float(wall[j])) > 0.0:
+        return None
+    k = min(float(kerb[i]), float(kerb[j]))
+    w = min(float(walk[i]), float(walk[j]))
+    if (k <= 0.0 and not open_edge) or not _grounded(ground, p, r["max_above_ground"]):
+        return None
+    lat = _left(d)
+    # on an open edge the pole stands BEHIND the guardrail, not at a kerb
+    o = sgn * float(r["denchu_inset"] if k > 0.0 else r.get("denchu_inset_open", 1.0))
+    pos = (p[0] + lat[0] * o, p[1] + lat[1] * o, p[2] + (k if w > 0.0 else 0.0))
+    pos = _out_of_lane(index, table, r, "denchu", pos, (sgn * lat[0], sgn * lat[1]))
+    if pos is None or fur.blocked("denchu", pos) or not fur.clear_of(pos, r["pole_clearance"]):
+        return None
+    return pos, d
+
+
+def wire_span(a, b, rules):
+    """The triangles of every wire in `denchu_wires` between two poles `a`, `b` -- each `(foot, fwd)` in the kit
+    frame, `fwd` the piece's forward, so its +X (the road side, where the 腕金 reaches) is `(fwd.y, -fwd.x)`.
+
+    A wire is a three-sided tube (it must read from below, from the side and end on), hanging in a parabola whose
+    sag grows with the square of the span -- the catenary of a wire at one tension. Outward-facing triangles."""
+    tris = []
+    span = math.hypot(b[0][0] - a[0][0], b[0][1] - a[0][1])
+    if span < 1.0:
+        return tris
+    segs = max(3, min(8, int(math.ceil(span / 6.0))))
+    k_sag = (span / float(rules.get("denchu_sag_span", 30.0))) ** 2
+    ax, ay = (b[0][0] - a[0][0]) / span, (b[0][1] - a[0][1]) / span
+    sx, sy = -ay, ax                                              # horizontal, across the wire
+    for w in rules.get("denchu_wires", ()):
+        ends = []
+        for foot, f in (a, b):
+            ends.append((foot[0] + f[1] * w["x"], foot[1] - f[0] * w["x"], foot[2] + w["z"]))
+        t = float(w["t"])
+        rings = []
+        for n in range(segs + 1):
+            u = n / float(segs)
+            c = [ends[0][q] + (ends[1][q] - ends[0][q]) * u for q in range(3)]
+            c[2] -= 4.0 * float(w["sag"]) * k_sag * u * (1.0 - u)
+            rings.append(((c[0], c[1], c[2] + 0.58 * t),
+                          (c[0] + sx * 0.5 * t, c[1] + sy * 0.5 * t, c[2] - 0.29 * t),
+                          (c[0] - sx * 0.5 * t, c[1] - sy * 0.5 * t, c[2] - 0.29 * t)))
+        for r0, r1 in zip(rings, rings[1:]):
+            for q in range(3):
+                # seen from outside with the wire running away, the ring top -> +side -> -side is clockwise
+                p0, p1, q0, q1 = r0[q], r0[(q + 1) % 3], r1[q], r1[(q + 1) % 3]
+                tris += [(p0, q0, q1), (p0, q1, p1)]
+    return tris
+
+
+def _utility_poles(fur, table, solves, bands, mine_run, ground, index):
+    """電柱 on one kerb of every road `denchu_kind` names, and the wires between them (PLAN.md T1; the notes in
+    `furniture.json` say what stands where and why). Runs after the signals and the lamps -- a pole keeps
+    `pole_clearance` from anything solid already standing, and is slid along the kerb (`denchu_shift`) before it
+    is given up -- and before the trees, which keep clear of it like any pole.
+
+    The WIRES go from each pole to the next of the same road, in the order the road runs, across the gaps the
+    kerb runs leave (a vehicle entry, a junction) while the two poles are within `denchu_max_span`; a span to a
+    pole in ANOTHER piece is not strung (each piece is built from what it owns), which leaves a gap only where a
+    zone boundary happens to fall between two poles."""
+    r = table.rules
+    shifts = [float(x) for x in r.get("denchu_shift", (0.0,))]
+    every = int(r.get("denchu_tr_every", 0))
+    mat = r.get("denchu_wire_material", "")
+    roads = {}
+    for s in solves:
+        kind = denchu_kind(table, s.road)
+        if kind is None or len(s.samples) < 2:
+            continue
+        sides = denchu_sides(table, s.road)
+        open_edge = getattr(s.road, "barrier_style", "") == "RAIL"
+        if not mine_run(s):
+            for sd in sides:                                     # another piece's run: the wire stops here
+                roads.setdefault((s.road.name.split("__")[0], sd), []).append(None)
+            continue
+        for _sfx, pts, walk, kerb, wall, sgn in ped.road_edge_runs(s, bands):
+            if sgn not in sides:
+                continue
+            chain = roads.setdefault((s.road.name.split("__")[0], sgn), [])
+            pts = [tuple(q) for q in pts]
+            cum = _lengths(pts)
+            drops = [cum[v] for v, k in enumerate(kerb) if isinstance(k, ped.EntryKerb)]
+            last = -math.inf
+            for st in denchu_stations(cum[-1], kind, r, stagger=sgn != sides[0]):
+                spot = None
+                for sh in shifts:
+                    if st + sh > last + 8.0:                     # a slid pole never lands on the one before it
+                        spot = _denchu_spot(fur, table, index, ground, pts, cum, walk, kerb, wall, drops, sgn, st + sh,
+                                            open_edge)
+                    if spot is not None:
+                        last = st + sh
+                        break
+                if spot is None:
+                    fur.counts["denchu_skipped"] = fur.counts.get("denchu_skipped", 0) + 1
+                    continue
+                pos, d = spot
+                n = sum(1 for c in chain if c is not None)
+                asset = DENCHU_ASSETS[(kind == "lamp", every > 0 and n % every == every // 2)]
+                fwd = (sgn * d[0], sgn * d[1])                   # the piece's +X (its arm, its lamp) toward the road
+                if fur.put(table, asset, pos, fwd, s.road.name):
+                    chain.append((pos, fwd))
+    if not mat:
+        return
+    reach = float(r.get("denchu_max_span", 60.0))
+    for name in sorted(roads):
+        prev = None
+        for node in roads[name]:
+            if node is not None and prev is not None and math.hypot(
+                    node[0][0] - prev[0][0], node[0][1] - prev[0][1]) <= reach:
+                tris = wire_span(prev, node, r)
+                if tris:
+                    fur.wires.setdefault(mat, []).extend(tris)
+                    fur.counts["wire_spans"] = fur.counts.get("wire_spans", 0) + 1
+            prev = node
+
+
+# ------------------------------------------------------------------------------------------- ガードレール
+
+def guardrail_kind(table, road):
+    """Where a road carries the white guardrail (the notes in `furniture.json`): None, "drop" (a mountain road: the
+    valley side only), "edge" (a no-pedestrian road whose `barrier_style` is RAIL: every ground-level edge the solver
+    left without a wall) or "kerb" (a wide city road: between the carriageway and the footway). "drop" is every
+    edge of a mountain road except where the HILL stands beside it."""
+    r = table.rules
+    a = table.assets.get("guardrail")
+    if a is None or getattr(road, "road_class", "") in ("expressway", "ramp", "rail") or excluded(a, road.name):
+        return None
+    if any(fnmatch.fnmatchcase(road.name, g) for g in r.get("guardrail_drop_roads", ())):
+        return "drop"
+    if not getattr(road, "ped_access", True):
+        return "edge" if getattr(road, "barrier_style", "") == "RAIL" else None
+    base = road.base
+    if (max(int(base.lanes_fwd), int(base.lanes_bwd)) >= int(r.get("guardrail_min_lanes", 2))
+            and max(float(base.left_walk_width), float(base.right_walk_width)) > 0.0):
+        return "kerb"
+    return None
+
+
+def _guardrails(fur, table, solves, bands, mine_run, ground, index):
+    """White ガードレール modules laid end to end along the edges `guardrail_kind` names, each turned to its edge and
+    pitched to its grade. Runs LAST: a rail keeps nothing away and asks only where it may not be -- on a barrier's
+    line, in a vehicle entry or a car-park keep-out, in a lane, within `guardrail_end_clear` of a run's end (the
+    crossing, where people step into the road)."""
+    a = table.assets.get("guardrail")
+    if a is None:
+        return
+    r = table.rules
+    length = (a["hi"][2] - a["lo"][2]) * a["scale"][2]
+    inset, clear = float(r.get("guardrail_inset", 0.25)), float(r.get("guardrail_end_clear", 9.0))
+    rise, reach = float(r.get("guardrail_hill_rise", 1.0)), float(r.get("guardrail_hill_reach", 4.0))
+    if length <= 0.5:
+        return
+    for s in solves:
+        kind = guardrail_kind(table, s.road)
+        if kind is None or not mine_run(s) or len(s.samples) < 2:
+            continue
+        for _sfx, pts, walk, kerb, wall, sgn in ped.road_edge_runs(s, bands):
+            pts = [tuple(q) for q in pts]
+            cum = _lengths(pts)
+            n = int((cum[-1] - 2.0 * clear) // length)
+            if n <= 0:
+                continue
+            drops = [cum[v] for v, k in enumerate(kerb) if isinstance(k, ped.EntryKerb)]
+            start = 0.5 * (cum[-1] - n * length) + 0.5 * length
+            for m in range(n):
+                st = start + m * length
+                if any(abs(st - c) <= ped.ENTRY_RAMP + ENTRY_CLEAR + 0.5 * length for c in drops):
+                    continue
+                p, d, i = _at(pts, cum, st)
+                j = min(i + 1, len(pts) - 1)
+                if max(float(wall[i]), float(wall[j])) > 0.0:
+                    continue
+                k = min(float(kerb[i]), float(kerb[j]))
+                w = min(float(walk[i]), float(walk[j]))
+                if kind == "kerb" and (k <= 0.0 or w <= 0.0):
+                    continue                                     # a level crossing, a dropped kerb: no rail across it
+                if not _grounded(ground, p, r["max_above_ground"]):
+                    continue
+                lat = _left(d)
+                out = (sgn * lat[0], sgn * lat[1])
+                if kind == "drop" and ground is not None:
+                    g = ground(p[0] + out[0] * reach, p[1] + out[1] * reach)
+                    if g is not None and g - p[2] >= rise:
+                        continue                                 # the hill stands here (the inner side): no rail
+                pos = (p[0] + out[0] * inset, p[1] + out[1] * inset, p[2] + (k if w > 0.0 else 0.0))
+                if index is not None and not index.clear_of(pos, 0.1):
+                    fur.counts["guardrail_in_lane"] = fur.counts.get("guardrail_in_lane", 0) + 1
+                    continue
+                # the piece's +X (the beam) toward the road, so its forward runs WITH the edge on the left kerb and
+                # against it on the right; the pitch is the edge's own grade along that forward
+                seg = math.hypot(pts[j][0] - pts[i][0], pts[j][1] - pts[i][1])
+                grade = (pts[j][2] - pts[i][2]) / seg if seg > 1e-6 else 0.0
+                if fur.put(table, "guardrail", pos, (sgn * d[0], sgn * d[1]), s.road.name):
+                    fur.placements[-1]["pitch"] = round(math.atan(sgn * grade), 5)
 
 
 class _LaneIndex(object):
@@ -1064,16 +1380,18 @@ def place(table, solved, lanes_doc, mine_lane, mine_run, mine_pad, mark_mat, gro
     fur.lane_index = index          # ...asked again by crossing_signals, which runs after `place`
     _signals(fur, table, lanes, ordered, mine_lane, ground, index)
     _ped_signals(fur, table, lanes, ordered, mine_lane, ground, index)
-    for site in expressway_sign_sites(table, lanes):
+    for site in expressway_sign_sites(table, lanes, lanes_doc.get("traffic_side") == "right"):
         if mine_lane(lanes[site["lane"]]) and fur.put(table, site["asset"], site["pos"], site["fwd"], site["road"]):
             fur.placements[-1].update({k: site[k] for k in ("sign", "dest", "route", "lane")})
     _lane_props(fur, table, dict(sorted(lanes.items())), mine_lane, ground)
     _edge_props(fur, table, solves, jsolves, bands, mine_run, mine_pad, ground, index)
     _lamps(fur, table, solves, bands, mine_run, ground, index)
+    _utility_poles(fur, table, solves, bands, mine_run, ground, index)
     # the trees ask the SAME lanes as every pole, the other network's tracks included (a tree and its pit stood 1.9 m
     # off a rail track, probe_rail_track's gauge 2026-09-26)
     _street_trees(fur, table, solves, bands, mine_run, ground, dict(lanes, **{"~" + str(l["id"]): l for l in keep_clear or ()}))
     _median_walls(fur, table, solves, mine_run)
+    _guardrails(fur, table, solves, bands, mine_run, ground, index)
     return fur
 
 
@@ -1083,10 +1401,17 @@ def _is_expressway(lane):
     return lane.get("road_class") in ("expressway", "ramp")
 
 
-def _leftmost_edge(lanes, q, d, half):
-    """How far left of `q` (kit frame, travel direction `d`) the outer edge of the leftmost lane running beside it is:
-    every lane with a sample within 6 m along and 3 m in height of `q`, left of it, counts; at least `half`."""
-    lft = _left(d)
+def _kerbward(d, right=False):
+    """The unit direction from a lane toward the kerb its traffic keeps to: its left, or -- `right` -- its right."""
+    l = _left(d)
+    return (-l[0], -l[1]) if right else l
+
+
+def _leftmost_edge(lanes, q, d, half, right=False):
+    """How far KERBWARD of `q` (kit frame, travel direction `d`) the outer edge of the outermost lane running beside
+    it is: every lane with a sample within 6 m along and 3 m in height of `q`, on that side of it, counts; at least
+    `half`. Kerbward is left on a keep-left network, right on a right-hand one."""
+    lft = _kerbward(d, right)
     best = half
     for l in lanes.values():
         hw = 0.5 * float(l.get("lane_width", 4.5))
@@ -1153,7 +1478,7 @@ def _destination(lanes, lane):
     return None, False
 
 
-def expressway_sign_sites(table, lanes):
+def expressway_sign_sites(table, lanes, right=False):
     """Japanese expressway GUIDE signs (PLAN.md item 1g, user 2026-09-30): white letters on green, text drawn at run
     time. For every RAMP (a lane of `road_class` "ramp" whose own road does not feed it):
       * fed by an EXPRESSWAY lane (an exit, or a JCT ramp): an `expwy_sign` cantilever on the mainline
@@ -1166,6 +1491,7 @@ def expressway_sign_sites(table, lanes):
         return []
     r = table.rules
     before = float(r.get("expwy_sign_before", 120.0))
+    cantilever = "expwy_sign_r" if right and "expwy_sign_r" in table.assets else "expwy_sign"
     edge = float(r.get("expwy_sign_edge", 1.2))
     inset = float(r.get("expwy_entrance_in", 12.0))
     preds = {}
@@ -1184,7 +1510,7 @@ def expressway_sign_sites(table, lanes):
         dest, dest_expwy = _destination(lanes, lane)
         main = [f for f in feeders if f.get("road_class") == "expressway"]
         street = [f for f in feeders if f.get("kind") == "connector"]
-        if main and "expwy_sign" in table.assets:
+        if main and cantilever in table.assets:
             m = sorted(main, key=lambda l: l["id"])[0]
             w = _walk(lanes, preds, m, before, back=True)
             if w is None or dest is None:
@@ -1193,19 +1519,19 @@ def expressway_sign_sites(table, lanes):
             # stand on one spot -- the next one stands `expwy_sign_stagger` m further back, so a driver reads them in turn
             k = 1
             while w is not None and any(math.dist(w[0][:2], o["pos"][:2]) < 12.0 for o in out
-                                        if o["asset"] == "expwy_sign"):
+                                        if o["asset"] == cantilever):
                 w = _walk(lanes, preds, m, before + k * float(r.get("expwy_sign_stagger", 60.0)), back=True)
                 k += 1
             if w is None:
                 continue
             q, d, at = w
             half = 0.5 * float(lanes[at].get("lane_width", 4.5))
-            lft = _left(d)
-            # the post stands outside the LEFTMOST lane at this cross-section, not just the lane walked back along: a
-            # lane carried across a joint (lane balance) runs left of it, and the post stood in that lane
-            off = _leftmost_edge(lanes, q, d, half) + edge
+            lft = _kerbward(d, right)
+            # the post stands outside the OUTERMOST lane at this cross-section, not just the lane walked back along: a
+            # lane carried across a joint (lane balance) runs kerbward of it, and the post stood in that lane
+            off = _leftmost_edge(lanes, q, d, half, right) + edge
             pos = (q[0] + lft[0] * off, q[1] + lft[1] * off, q[2])
-            out.append({"asset": "expwy_sign", "pos": pos, "fwd": d, "road": m.get("road_name", ""), "lane": m["id"],
+            out.append({"asset": cantilever, "pos": pos, "fwd": d, "road": m.get("road_name", ""), "lane": m["id"],
                         "sign": "jct" if dest_expwy else "exit", "dest": dest, "route": m.get("road_name", "")})
             done.add(road)
         elif street and "expwy_entrance_sign" in table.assets:
@@ -1215,11 +1541,11 @@ def expressway_sign_sites(table, lanes):
                 continue
             q, d, at = w
             half = 0.5 * float(lane.get("lane_width", 4.5))
-            lft = _left(d)
-            # a roadside sign, not an overhang: its whole panel clears the kerb -- of the LEFTMOST lane there (a ramp is two
-            # lanes now, and the sign stood in the second one, probe_road_clear 2026-10-04)
+            lft = _kerbward(d, right)
+            # a roadside sign, not an overhang: its whole panel clears the kerb -- of the OUTERMOST lane there (a ramp is
+            # two lanes now, and the sign stood in the second one, probe_road_clear 2026-10-04)
             e2 = float(r.get("expwy_entrance_edge", 2.9))
-            off = _leftmost_edge(lanes, q, d, half) + e2
+            off = _leftmost_edge(lanes, q, d, half, right) + e2
             pos = (q[0] + lft[0] * off, q[1] + lft[1] * off, q[2])
             out.append({"asset": "expwy_entrance_sign", "pos": pos, "fwd": d, "road": road, "lane": lid,
                         "sign": "entrance", "dest": route, "route": route})
@@ -1293,7 +1619,7 @@ def lane_splits(lanes):
     return out
 
 
-def lane_gantry_sites(table, lanes, taken=()):
+def lane_gantry_sites(table, lanes, taken=(), right=False):
     """Lane-designation signs (方面別車線案内) before each lane split: an `expwy_sign` cantilever over the carriageway
     every `expwy_lane_gantries` m back from the split, saying for each lane, left to right, where it goes (kind
     "lanes", destinations joined by "|")."""
@@ -1315,9 +1641,9 @@ def lane_gantry_sites(table, lanes, taken=()):
             if any(math.dist(q[:2], o["pos"][:2]) < 30.0 for o in list(taken) + out):
                 continue
             half = 0.5 * float(lanes[at].get("lane_width", 4.5))
-            lft = _left(d)
+            lft = _kerbward(d, right)
             pos = (q[0] + lft[0] * (half + edge), q[1] + lft[1] * (half + edge), q[2])
-            out.append({"asset": "expwy_sign", "pos": pos, "fwd": d, "road": lead.get("road_name", ""),
+            out.append({"asset": "expwy_sign_r" if right and "expwy_sign_r" in table.assets else "expwy_sign", "pos": pos, "fwd": d, "road": lead.get("road_name", ""),
                         "lane": lead["id"], "sign": "lanes", "dest": "|".join(dests),
                         "route": lead.get("road_name", "")})
     return out
@@ -1328,8 +1654,9 @@ def expressway_sign_plan(table, lanes_doc):
     the lanekit's frame (Godot axes), its size, and what it says (kind, destination road, route road)."""
     lanes = {l["id"]: l for l in lanes_doc.get("lanes", ()) if l.get("road_class") != "rail"}
     rows = []
-    sites = expressway_sign_sites(table, lanes)
-    sites += lane_gantry_sites(table, lanes, sites)
+    right = lanes_doc.get("traffic_side") == "right"
+    sites = expressway_sign_sites(table, lanes, right)
+    sites += lane_gantry_sites(table, lanes, sites, right)
     for site in sites:
         a = table.assets[site["asset"]]
         panel = a.get("panel")
@@ -1373,7 +1700,7 @@ def _crossing_unit_clear(index, table, r, pos, out, fwd, cross, normal, clear):
     return pos
 
 
-def crossing_signals(fur, table, crossings):
+def crossing_signals(fur, table, crossings, road_right=False):
     """踏切 signals (PLAN.md R4): at each level crossing a `crossing_signal` (警報機 + 遮断機, boom up) on the LEFT of
     each approach -- Japan drives on the left, so the unit a driver meets stands at their own kerb -- `crossing_track_
     clear` m before the rail's centreline (measured square to the track, so an oblique road takes it further along
@@ -1391,8 +1718,13 @@ def crossing_signals(fur, table, crossings):
         sin = abs(tx * ry - ty * rx)
         along = clear / max(0.3, sin)
         lx, ly = -ry, rx
-        for sgn, w in ((1.0, wl), (-1.0, wr)):
-            # approach heading sgn * r: it comes from -sgn * r, its left is sgn * l
+        for sgn, w, w_other in ((1.0, wl, wr), (-1.0, wr, wl)):
+            # approach heading sgn * r: it comes from -sgn * r, its left is sgn * l. The unit stands at the kerb the
+            # ROAD's traffic keeps to: that left, or (`road_right`: the road network is right-hand) the other side
+            ks = -1.0 if road_right else 1.0
+            if road_right:
+                w = w_other
+            lx, ly = ks * -ry, ks * rx
             pos = (x - sgn * rx * along + sgn * lx * (w + side), y - sgn * ry * along + sgn * ly * (w + side), z)
             # the unit must stand `clear` from the rail's centreline SQUARE to the rail, whatever the road frame says:
             # at a crossing beside a junction pad the band's spine is not the road's heading, and a pole landed
@@ -1635,6 +1967,56 @@ def self_test():
     assert not ko.blocked("tree", (0.0, 2.5, 0.0)) and not ko.blocked("ped_signal", (0.0, 0.0, 0.0))
     assert godot_to_kit((1.0, 2.0, 3.0)) == (1.0, -3.0, 2.0)
 
+    # 電柱 (T1): a block street is lit from its poles, a 2+2 keeps its lamps, a 3+3 trunk and a ramp carry none; the
+    # stations are centred on a block street and sit a quarter lamp pitch off the lamps on a wider road
+    tb = load()
+    if tb is not None and "denchu" in tb.assets:
+        def road(name, lanes, walk, cls="street", ped=True, style=""):
+            base = pm.PointData(uid="")
+            base.lanes_fwd = base.lanes_bwd = lanes
+            base.left_walk_width = base.right_walk_width = walk
+            return pm.RoadData(name, base, (), road_class=cls, ped_access=ped, barrier_style=style)
+        assert denchu_kind(tb, road("cho_1", 1, 2.0)) == "lamp" and denchu_kind(tb, road("dori", 2, 4.0)) == "plain"
+        assert denchu_kind(tb, road("hondori", 3, 4.0)) is None and denchu_kind(tb, road("r", 1, 0.0, "ramp")) is None
+        assert denchu_side("cho_1__2") == denchu_side("cho_1")
+        rr = tb.rules
+        st = denchu_stations(100.0, "lamp", rr)
+        assert st and abs(st[0] - (100.0 - st[-1])) < 1e-9 and st[0] >= rr["denchu_end_clear"], st
+        assert denchu_stations(2.0 * rr["denchu_end_clear"] - 1.0, "lamp", rr) == []
+        lamps = {rr["lamp_end_clear"] + k * 0.5 * rr["lamp_spacing"] for k in range(40)}       # lamps AND trees
+        for stg in (False, True):
+            for q in denchu_stations(400.0, "plain", rr, stg):
+                assert min(abs(q - x) for x in lamps) >= 0.25 * rr["lamp_spacing"] - 1e-9, q
+        a0, a1 = denchu_stations(100.0, "lamp", rr), denchu_stations(100.0, "lamp", rr, True)
+        assert a1 and all(min(abs(q - x) for x in a0) >= 0.5 * rr["denchu_spacing"] - 1e-9 for q in a1), (a0, a1)
+        assert len(denchu_sides(tb, road("cho_1", 1, 2.0))) == 2 and len(denchu_sides(tb, road("shrine_touge__2", 1, 0.0))) == 1
+        assert denchu_kind(tb, road("kaigan", 2, 0.0, "arterial", False, "RAIL")) == "plain"
+        assert denchu_kind(tb, road("kaigan", 2, 0.0, "arterial", False)) is None
+        # a wire is a closed tube facing out (positive volume), hangs BELOW its two ends, and reaches both poles
+        a_, b_ = ((0.0, 0.0, 0.0), (0.0, 1.0)), ((0.0, 30.0, 1.0), (0.0, 1.0))
+        tris = wire_span(a_, b_, rr)
+        assert len(tris) == len(rr["denchu_wires"]) * 5 * 6, len(tris)
+        cx = sum(v[0] for t in tris for v in t) / (3 * len(tris))
+        vol = sum(((a[0] - cx) * (b[1] * c[2] - b[2] * c[1]) - a[1] * ((b[0] - cx) * c[2] - b[2] * (c[0] - cx))
+                   + a[2] * ((b[0] - cx) * c[1] - b[1] * (c[0] - cx))) for a, b, c in tris) / 6.0
+        assert vol > 0.0, vol
+        top = max(w["z"] for w in rr["denchu_wires"])
+        assert max(v[2] for t in tris for v in t) <= top + 1.0 + 0.05
+        assert min(v[1] for t in tris for v in t) == 0.0 and max(v[1] for t in tris for v in t) == 30.0
+        # the 腕金 reaches toward the road: forward +Y puts the piece's +X at world +X
+        hv = max(w["x"] for w in rr["denchu_wires"])
+        assert abs(max(v[0] for t in tris for v in t) - hv) < 0.05
+        # ガードレール: a wide street's kerbs, a RAIL-style road's edges, the named mountain road's valley side
+        assert guardrail_kind(tb, road("dori", 2, 4.0)) == "kerb" and guardrail_kind(tb, road("cho_1", 1, 2.0)) is None
+        assert guardrail_kind(tb, road("kaigan", 2, 0.0, "arterial", False, "RAIL")) == "edge"
+        assert guardrail_kind(tb, road("kaigan", 2, 0.0, "arterial", False)) is None
+        assert guardrail_kind(tb, road("shrine_touge__3", 1, 0.0, "arterial")) == "drop"
+        fq = Furniture()
+        assert fq.put(tb, "guardrail", (0.0, 0.0, 0.0), (0.0, 1.0)) and "solid" not in fq.placements[-1]
+        assert fq.placements[-1]["breakable"]["pole_len"] == tb.assets["guardrail"]["rail"][2] and fq.clear_of((0, 0, 0), 5.0)
+        print("OK: 電柱 kinds, stations off the lamps and trees, wires closed and hanging, guardrail kinds, a rail is "
+              "not a solid to the spacing rules")
+
     # R4: a road along +Y crossing a rail along +X at the origin, 4.5 m of paving each side: one signal on the LEFT
     # of each approach (Japan keeps left), before the track, facing the traffic
     table = load()
@@ -1725,7 +2107,9 @@ def self_test():
     # a synthetic right-hand arm (the doc above) is refused, not mis-placed
     sig = dict(doc, junctions=[{"id": "j1", "arms": [dict(doc["junctions"][0]["arms"][0], traffic_light=True)]}])
     f = place(table, ([], [], [], []), sig, lambda l: True, lambda s: True, lambda j: True, lambda l: "M_LineW")
-    assert f.counts.get("signal_skipped_right_hand") == 1 and not f.counts.get("signal"), f.counts
+    assert f.counts.get("signal_r") == 1 and not f.counts.get("signal"), f.counts
+    rh = [p for p in f.placements if p["asset"] == "signal_r"][0]
+    assert table.assets["signal_r"]["hi"][0] < 1.0 < -table.assets["signal_r"]["lo"][0], "the twin's arm reaches -X"
     # keep-left: two lanes arriving +X on the LEFT (y > 0), one leaving on the right; the kerb lane is y 6.75
     kl = [{"id": "k_F0", "kind": "through", "lane_width": 4.5, "points": [g((0, 2.25, 0)), g((50, 2.25, 0))],
            "next": ["s0"]},

@@ -7,6 +7,9 @@ minimap.
 
 Writes `src/main/resources/com/openworld/world/IslandStreetNames.json`:
     {"roads": {<base road name>: {"ja": "中央通り", "en": "Chuo-dori", "kind": "arterial"}}, "chars": "..."}
+SINCE 2026-10-12 THIS FILE IS ONLY THE DEFAULT NAME OF A NEW ROAD: what the game shows is the string table
+`src/main/resources/com/openworld/i18n/signs.csv` (`street.<base name>`, one column per language), which
+`tools/build_sign_table.py` seeds from here for a road id it has not seen and never overwrites.
 A road's BASE name is its record name without the zone/joint suffixes (`chuo_dori__3__x1` -> `chuo_dori`): every
 piece of one street carries one name. `chars` is every character the game must draw (the font subset's input:
 `tools/make_jp_font.py`).

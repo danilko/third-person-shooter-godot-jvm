@@ -225,6 +225,40 @@ def verify(rows):
     return bad
 
 
+#: Where the road build reads the bridges' piers and stairs from (`roadkit_cli --keep-out`, beside the car parks'):
+#: nothing that stands up is placed in one. A kerb-long ガードレール (2026-10-11) is why -- a bridge is sited where no
+#: lamp or tree stands, but a rail runs the whole kerb, so the rail must yield to the bridge, not the bridge move.
+KEEPOUT = os.path.join(ROOT, "assets/world_source/pieces/IslandFootbridges.keepout.json")
+RAIL_HALF = 2.0             # half a guardrail module: a module is refused by its CENTRE
+
+
+def write_keepout(rows):
+    """Each frozen bridge's pier / stair rectangles (`rects`), grown by FURN_CLEAR (and half a rail module along the
+    kerb), as keep-out boxes in the Godot frame: [x, z, ux, uz, half across, half deep], u the arm's direction."""
+    lanes, junctions, _furniture = load()
+    byid = {j["id"]: j for j in junctions}
+    boxes = []
+    for r in rows:
+        j = byid.get(r["junction"])
+        arm = next((a for a in (j["arms"] if j else ()) if a["road"] == r["road"]), None)
+        f = arm_frame(arm, lanes) if arm else None
+        if f is None:
+            continue
+        (cx, _cy, cz), (ux, uz), _n, half, _len, _ls = f
+        t = (r["x"] - cx) * ux + (r["z"] - cz) * uz
+        for lat0, lat1, al0, al1 in rects(half, t)[0]:
+            lat, al = 0.5 * (lat0 + lat1), 0.5 * (al0 + al1)
+            boxes.append([round(cx + ux * al - uz * lat, 3), round(cz + uz * al + ux * lat, 3), round(ux, 5),
+                          round(uz, 5), round(0.5 * (lat1 - lat0) + FURN_CLEAR + 0.05, 3),
+                          round(0.5 * (al1 - al0) + FURN_CLEAR + RAIL_HALF, 3)])
+    text = json.dumps({"notes": "Written by tools/island_footbridges.py: the 横断歩道橋 piers and stairs road furniture "
+                                "keeps out of (roadkit_cli --keep-out). Godot frame [x, z, ux, uz, half across, "
+                                "half deep].", "boxes": boxes}, indent=1, ensure_ascii=False) + "\n"
+    if not os.path.exists(KEEPOUT) or open(KEEPOUT).read() != text:
+        open(KEEPOUT, "w").write(text)
+        print("island_footbridges: wrote %s (%d boxes)" % (os.path.relpath(KEEPOUT, ROOT), len(boxes)))
+
+
 def search(listing=False):
     lanes, junctions, furniture = load()
     furn = Grid(furniture)
@@ -287,6 +321,8 @@ def main(argv):
             if not os.path.exists(FROZEN) or open(FROZEN).read() != text:
                 open(FROZEN, "w").write(text)
                 print("island_footbridges: wrote %s (%d bridges)" % (os.path.relpath(FROZEN, ROOT), len(frozen)))
+    if "--check" not in argv:
+        write_keepout(frozen)
     text = open(SCENE).read()
     ny = float(re.search(r'\[node name="IslandRoads"[^\]]*\]\s*\ntransform = Transform3D\(([^)]*)\)', text)
                .group(1).split(",")[10])

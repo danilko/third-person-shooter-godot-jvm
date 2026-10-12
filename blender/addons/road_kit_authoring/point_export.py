@@ -914,8 +914,91 @@ def export_network(net):
               "ped_access": bool(net.roads[n].ped_access),
               "design_speed": round(float(net.roads[n].base.design_speed), 1)}
              for n in sorted(net.roads)]
-    return {"schema_ver": SCHEMA_VER, "roads": roads, "arms": arms,
-            "junctions": junctions, "lanes": lanes}
+    doc = {"schema_ver": SCHEMA_VER, "roads": roads, "arms": arms,
+           "junctions": junctions, "lanes": lanes}
+    if getattr(net, "traffic_side", "left") == "right":
+        reverse_traffic(doc)
+    return doc
+
+
+#: An edge's kind seen from the other end: a lane that handed over to a ramp is, reversed, a ramp joining a lane.
+REVERSED_KIND = {"chain": "chain", "ramp": "merge", "merge": "ramp"}
+REVERSED_TURN = {lm.TURN_L: lm.TURN_R, lm.TURN_R: lm.TURN_L}
+
+
+def reverse_traffic(doc):
+    """A RIGHT-HAND network from the keep-left one, in place (user, 2026-10-12: "drive on the right").
+
+    Every cross-section, ramp, taper and template of the kit is authored keep-left, and none of it is redrawn: a
+    lane graph run BACKWARDS is a legal lane graph of the same roads for traffic on the other side. Each lane keeps
+    its geometry and its id and runs the other way -- its points and curve reversed, its grade and banking negated;
+    an edge A -> B becomes B -> A (so `next` is rebuilt from the predecessors); a left turn, which is the tight
+    turn of a keep-left junction, is now a right turn and still the tight one; a junction arm's arriving and
+    leaving lanes swap; an off-ramp, whose lane a mainline lane handed over to, is now an on-ramp that joins it,
+    and every on-ramp an exit -- on the right, where a right-hand road's exits are. `inner_lane` / `outer_lane`
+    are about the median and the kerb, not about direction, and stay.
+
+    The ids keep their keep-left spelling (`<road>_F0` now runs against the road's point order, a connector's id
+    still reads from-to in the old sense): they are names, and every consumer follows `next`, never the name."""
+    lanes = doc["lanes"]
+    by_id = {l["id"]: l for l in lanes}
+    preds = {}
+    for l in lanes:
+        kinds = l.get("next_kinds") or []
+        for i, n in enumerate(l.get("next", ())):
+            preds.setdefault(n, []).append((l["id"], kinds[i] if i < len(kinds) else "chain"))
+    # a connector belongs to the arm it LEAVES: after the reversal that is the lane it used to feed
+    heads = {}
+    for l in lanes:
+        if l.get("kind") == "connector":
+            nx = [by_id[n] for n in l.get("next", ()) if n in by_id and by_id[n].get("kind") != "connector"]
+            if nx:
+                heads[l["id"]] = {k: nx[0][k] for k in ("from_arm", "road_name", "road_class", "speed_limit")
+                                  if k in nx[0]}
+    for l in lanes:
+        l["points"] = l["points"][::-1]
+        if l.get("curve"):
+            l["curve"] = [dict(k, **{"in": k["out"], "out": k["in"]}) for k in l["curve"][::-1]]
+        for key in ("grade", "banking"):
+            if l.get(key):
+                l[key] = -l[key]
+        if l.get("turn") in REVERSED_TURN:
+            l["turn"] = REVERSED_TURN[l["turn"]]
+        l.update(heads.get(l["id"], {}))
+    for l in lanes:
+        ps = sorted(preds.get(l["id"], ()))
+        for key in ("next", "next_weights", "next_kinds"):
+            l.pop(key, None)
+        if not ps:
+            continue
+        nxt, wts, kinds = [], [], []
+        for pid, kind in ps:
+            p = by_id[pid]
+            new_kind = REVERSED_KIND.get(kind, kind)
+            if p.get("kind") == "connector":
+                w = TURN_WEIGHTS.get(p.get("turn"), 0.2)
+            else:
+                w = RAMP_WEIGHT if new_kind == "ramp" and len(ps) > 1 else 1.0
+            nxt.append(pid)
+            wts.append(w)
+            kinds.append(new_kind)
+        l["next"], l["next_weights"], l["next_kinds"] = nxt, wts, kinds
+    # A lane that only BEGAN at a junction mouth (a second lane that opens after the pad: nothing feeds it, traffic
+    # reaches it by changing lanes) now ENDS there with no connector out -- a trap. It is what a lane drop is, and
+    # gets what `_merge_into` gives one: the lane beside it as its successor, kind `merge`.
+    for l in lanes:
+        if l.get("next") or l.get("kind") == "connector":
+            continue
+        for side in ("inner_lane", "outer_lane"):
+            nb = by_id.get(l.get(side) or "")
+            if nb is not None and nb.get("next"):
+                l["next"], l["next_weights"], l["next_kinds"] = [nb["id"]], [1.0], ["merge"]
+                break
+    for j in doc.get("junctions", ()):
+        for a in j.get("arms", ()):
+            a["in_lanes"], a["out_lanes"] = a.get("out_lanes", []), a.get("in_lanes", [])
+    doc["traffic_side"] = "right"
+    return doc
 
 
 def write(net, path):
