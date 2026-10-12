@@ -38,7 +38,7 @@ class DataTablesTest {
         assertTrue(Tables.GANGS.get().rules().gangs.containsKey("gang_a"));
         assertFalse(Tables.GANGS.get().bodies().get("gang_a").isEmpty());
         assertEquals(4, Tables.GANGS.get().hangout().count() > 0 ? 4 : 0, "a hangout has members");
-        assertEquals(5000, Tables.recovery().hospital);
+        assertEquals(500, Tables.recovery().hospital);
         assertTrue(Tables.recovery().ransomPerStar > 0);
         assertTrue(Tables.ECONOMY.get().startingCash > 0);
         assertTrue(Tables.SUPPLIES.get().containsKey("onigiri"));

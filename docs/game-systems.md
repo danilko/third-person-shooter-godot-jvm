@@ -406,10 +406,11 @@ showed the client's own body's 0. Now (`game.profile`, all engine-free and unit-
   start of each run, so one probe's money never leaks into the next probe's exact checks) and `user://test/saves`.
 
 **F3, prices on (same day).** `game/economy.json` is THE table (`EconomyTable`, parse unit-tested, and the test fails
-if a catalog weapon or a supply has no price): guns at ten times CS 1.6's prices, in dollars (PIS2 4 000 ... ASR1 25 000, SNR1
-47 500), a REFILL of one already carried at `refill_fraction` 0.2, supplies per unit (a purchase tops the stack up),
-`starting_cash` 20 000 for a profile created from nothing (a probe's is 0: it sets its own), rewards
-`mission_default` 10 000 / per mission (m01_konbini 15 000) / `race_by_place` [8 000, 4 000, 2 000]. Bills stay where
+if a catalog weapon or a supply has no price): guns at CS 1.6's own prices, in dollars (PIS2 400 ... ASR1 2 500, SNR1
+4 750; ten times that, as yen, until 2026-10-12 -- a v1 profile's balance and debts are divided by ten on load,
+`SaveMigrations.PROFILE`), a REFILL of one already carried at `refill_fraction` 0.2, supplies per unit (a purchase tops the stack up),
+`starting_cash` 2 000 for a profile created from nothing (a probe's is 0: it sets its own), rewards
+`mission_default` 1 000 / per mission (m01_konbini 1 500) / `race_by_place` [800, 400, 200]. Bills stay where
 they were authored (crimes.json / gangs.json, RecoveryRules). `ShopCounter.grantTo` charges FIRST (refused when short
 -> no MSG_SHOP_GRANT to a client; refunded if the grant fails) and returns whether it sold; the menu tags rows
 "$25,000" / "REFILL $5,000" / "SHORT $..." / "FULL". `Payouts`: a mission the players win (`winningFaction ==
@@ -419,8 +420,8 @@ each human finisher by place. The co-op gate's DebugHarness funds both profiles 
 Gates: `probe_profile.gd` 19/19 (the test file; grant / refused purchase / bill into debt through a body; checksum,
 .bak1 rotation, a TORN file falls back to .bak1 and the torn value never loads; a v1 slot migrates and loads, a newer
 one is refused; two beats in the window write once, the window writes the second, a mission end writes at once;
-a players' win pays 10 000, a police win nothing -- 21/21 with F3); `probe_weapon_counter` (no money: refused; the
-price taken; the refill price); `probe_race` (first place +8 000, once);
+a players' win pays 1 000, a police win nothing -- 21/21 with F3); `probe_weapon_counter` (no money: refused; the
+price taken; the refill price); `probe_race` (first place +800, once);
 `tools/net/run_title_coop.sh` now also runs the handshake (the joiner's 4321 dollars held by the host, the host pays the
 joiner's body 1000, the joiner gets 5321 back and saves it). Unit: `PlayerProfileTest`, `EconomyTest`, `SafeSaveTest`,
 `SaveMigrationsTest`. Both processes of the co-op test share `user://test/` (one machine); harmless today.

@@ -13,13 +13,13 @@ class EconomyTableTest {
     void theShippedTableParsesAndPricesEveryShopRow() throws Exception {
         EconomyTable t = EconomyTable.parse(Files.readString(Path.of("src/main/resources/com/openworld/game/economy.json")));
         assertTrue(t.startingCash > 0);
-        assertEquals(25000L, t.weaponPrice("ASR1", false));
-        assertEquals(5000L, t.weaponPrice("ASR1", true));    // a refill at 20 %
-        assertEquals(450L, t.supplyPrice("onigiri", 3));
+        assertEquals(2500L, t.weaponPrice("ASR1", false));
+        assertEquals(500L, t.weaponPrice("ASR1", true));     // a refill at 20 %
+        assertEquals(45L, t.supplyPrice("onigiri", 3));
         assertNull(t.weaponPrice("NOPE", false));
-        assertEquals(15000L, t.missionReward("m01_konbini"));
+        assertEquals(1500L, t.missionReward("m01_konbini"));
         assertEquals(t.missionDefault, t.missionReward("unknown_mission"));
-        assertEquals(8000L, t.racePrize(1));
+        assertEquals(800L, t.racePrize(1));
         assertEquals(0L, t.racePrize(9));
         // every weapon the catalog ships (bar the fist) has a price, so no shop row is accidentally free
         String catalog = Files.readString(Path.of("src/main/resources/com/openworld/weapon/weapon_catalog.json"));

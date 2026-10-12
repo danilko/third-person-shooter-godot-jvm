@@ -369,7 +369,7 @@ def counter_mark(x, z, yaw, stock, title, w=3.0, d=1.4, h=2.0):
             "props": {"stock": stock, "title": title, "w": w, "d": d, "h": h}}
 
 
-def clerk_mark(x, z, yaw, surrender=0.6, weapons="SHG1,ASR2,SMG1", till=30000):
+def clerk_mark(x, z, yaw, surrender=0.6, weapons="SHG1,ASR2,SMG1", till=3000):
     return {"kind": "clerk", "pos": [r(x), 0.0, r(z)], "yaw": float(yaw),
             "props": {"surrender": surrender, "weapons": weapons, "till": till}}
 
@@ -380,7 +380,7 @@ MARKS = {
     "KonbiniL": [counter_mark(3.83, 2.0, 90, KONBINI_L_STOCK, "KONBINI"), clerk_mark(5.95, 2.0, 90)],
     # the service counter in front of the pass (staff at -Z, toward the kitchen)
     "FamilyRestaurant": [counter_mark(-4.0, -1.38, 0, "teishoku,bento", "RESTAURANT"),
-                         clerk_mark(-3.0, -3.45, 180, surrender=0.9, weapons="MEW1", till=20000)],
+                         clerk_mark(-3.0, -3.45, 180, surrender=0.9, weapons="MEW1", till=2000)],
     # the konbini corner's counter at x 14.0 (staff at -X), customers between it and the right wall
     "Supermarket": [counter_mark(15.15, 7.5, 90, FOOD, "SUPERMARKET", d=1.2),
                     clerk_mark(13.05, 7.5, 270, surrender=0.8)],

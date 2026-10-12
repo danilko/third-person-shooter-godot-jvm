@@ -19,7 +19,27 @@ public final class SaveMigrations {
             // keys unchanged (campaign, factions, mission, players), so the step only stamps the version
             doc -> doc);
 
-    public static final List<UnaryOperator<Map<String, Object>>> PROFILE = List.of();
+    public static final List<UnaryOperator<Map<String, Object>>> PROFILE = List.of(
+            // v1 -> v2 (2026-10-12, user: "yes, please divide the number"): the currency became the dollar at a tenth
+            // of the yen's numbers, so what a player holds and owes is divided with the prices (rounded half up;
+            // a debt never rounds to nothing)
+            doc -> {
+                Map<String, Object> out = new LinkedHashMap<>(doc);
+                if (doc.get("balance") instanceof Number n) out.put("balance", Math.round(n.longValue() / 10.0));
+                if (doc.get("debts") instanceof List<?> debts) {
+                    List<Object> scaled = new java.util.ArrayList<>();
+                    for (Object o : debts) {
+                        if (o instanceof Map<?, ?> d && d.get("principal") instanceof Number pr) {
+                            Map<Object, Object> c = new LinkedHashMap<>(d);
+                            long was = pr.longValue();
+                            c.put("principal", was > 0 ? Math.max(1L, Math.round(was / 10.0)) : 0L);
+                            scaled.add(c);
+                        } else scaled.add(o);
+                    }
+                    out.put("debts", scaled);
+                }
+                return out;
+            });
 
     public static final int WORLD_VERSION = WORLD.size() + 1;
     public static final int PROFILE_VERSION = PROFILE.size() + 1;

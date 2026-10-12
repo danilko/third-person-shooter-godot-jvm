@@ -32,4 +32,26 @@ class SaveMigrationsTest {
         assertNull(SaveMigrations.migrate(new LinkedHashMap<>(Map.of("v", 4.0)), "v", steps));
         assertNull(SaveMigrations.migrate(new LinkedHashMap<>(Map.of()), "v", steps));
     }
+
+    @Test
+    void aV1ProfileHoldsATenthInDollars() {
+        Map<String, Object> debt = new java.util.LinkedHashMap<>();
+        debt.put("lender", "gang_a"); debt.put("principal", 50004L); debt.put("due_at", 7L);
+        Map<String, Object> small = new java.util.LinkedHashMap<>();
+        small.put("lender", "bank"); small.put("principal", 3L);
+        Map<String, Object> doc = new java.util.LinkedHashMap<>();
+        doc.put("version", 1L); doc.put("balance", -15005L); doc.put("debts", java.util.List.of(debt, small));
+        doc.put("something_new", "kept");
+        Map<String, Object> out = SaveMigrations.migrate(doc, "version", SaveMigrations.PROFILE);
+        assertEquals((long) SaveMigrations.PROFILE_VERSION, ((Number) out.get("version")).longValue());
+        PlayerProfile p = PlayerProfile.fromMap(out);
+        assertEquals(-1500L, p.balance);                       // -1500.5 rounds half up
+        assertEquals(5000L, p.debts.get(0).principal());
+        assertEquals(7L, p.debts.get(0).dueAtUnix());
+        assertEquals(1L, p.debts.get(1).principal(), "a debt never rounds to nothing");
+        assertEquals("kept", out.get("something_new"));
+        // a v2 profile is left alone
+        Map<String, Object> v2 = new java.util.LinkedHashMap<>(p.toMap());
+        assertEquals(-1500L, PlayerProfile.fromMap(SaveMigrations.migrate(v2, "version", SaveMigrations.PROFILE)).balance);
+    }
 }

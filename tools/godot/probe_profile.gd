@@ -135,7 +135,7 @@ func _initialize() -> void:
 	await _tick(4)
 	missions.call("complete_mission_now", "player", "CLEAN")
 	await _tick(4)
-	_check("the players won: the mission reward (economy.json mission_default)", int(p.call("cash_now")) - b0 == 10000,
+	_check("the players won: the mission reward (economy.json mission_default)", int(p.call("cash_now")) - b0 == 1000,
 		"%+d" % (int(p.call("cash_now")) - b0))
 
 	print("RESULT: %s (%d failure(s))" % ["PASS" if fails == 0 else "FAIL", fails])

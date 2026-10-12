@@ -119,8 +119,8 @@ Built first so peak performance can be measured with enforcement in the ring (us
   HUD its vehicle situation. Gate `tools/godot/probe_die_seated.gd [-- --seat=passenger] [--control]`.
 - **Where a downed player wakes** (`game.RecoveryRules`, user 2026-10-06): any gang standing -> **拉致 ABDUCTED**;
   else police stars -> **逮捕 ARRESTED** (jail, a death included); else **入院 HOSPITALIZED**. Bills from cash, never
-  below 0, carried to the new body: hospital `fees.hospital` ($5,000); arrested (hospital + `police_per_star`) x
-  stars ($15,000/star); abduction: a ransom `ransom_per_star` x that gang's stars ($100,000/star, the highest).
+  below 0, carried to the new body: hospital `fees.hospital` ($500); arrested (hospital + `police_per_star`) x
+  stars ($1,500/star); abduction: a ransom `ransom_per_star` x that gang's stars ($10,000/star, the highest; all a tenth of the yen figures since 2026-10-12).
   Abducted: woken at the nearest place of that gang (the places record's new `gang` field, from the civic plots),
   `gangs.json` `abduction.guards` guards cover them (ArrestState `pursuitStand`; the gang is held NON-hostile while
   the captive stays), prompt "拉致 ... [E] pay or run". Pay (`GangSystem.payRansom`, or a donation at that gang's

@@ -27,7 +27,7 @@ import java.util.Set;
 public final class PlayerProfile {
 
     /** The shape of {@link #toMap}; bumped with a step in {@link SaveMigrations#PROFILE}. */
-    public static final int VERSION = 1;
+    public static final int VERSION = SaveMigrations.PROFILE_VERSION;
 
     public String playerId = "";
     public long balance;

@@ -772,10 +772,10 @@ public class DebugHarness extends Node {
             if (!client) {
                 // shops charge since F3 (PLAN.md 1.4): the fixture pays for both purchases -- the host's own profile and
                 // every joined player's session copy (which MSG_PROFILE carries back to its owner)
-                com.openworld.game.profile.Economy.transfer(null, com.openworld.game.profile.Profiles.local(), 200000,
+                com.openworld.game.profile.Economy.transfer(null, com.openworld.game.profile.Profiles.local(), 20000,
                         com.openworld.game.profile.Economy.Reason.GRANT);
                 for (com.openworld.game.profile.PlayerProfile rp : com.openworld.game.profile.Profiles.remotes().values())
-                    com.openworld.game.profile.Economy.transfer(null, rp, 200000, com.openworld.game.profile.Economy.Reason.GRANT);
+                    com.openworld.game.profile.Economy.transfer(null, rp, 20000, com.openworld.game.profile.Economy.Reason.GRANT);
                 GD.print("[coop] funded " + (1 + com.openworld.game.profile.Profiles.remotes().size()) + " profile(s)");
             }
             if (!client && me != null) {

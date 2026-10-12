@@ -150,7 +150,7 @@ hospital / arrest card carried the bill as a third line that pushed the English 
 card is the two words only (`入院 HOSPITALIZED`, `逮捕 ARRESTED`, `拉致 ABDUCTED` -- never money;
 `probe_wanted_respawn` asserts the exact text), and the money is its own right-aligned row under the clock and the two
 star rows (`HUDManager.cashTop()`; the feed starts under it). It reads `Profiles.local().balance`. On a change the
-amount moved is drawn left of the balance for 4 s (`-$15,000  $5,000`, red out / green in; two changes inside the 4 s
+amount moved is drawn left of the balance for 4 s (`-$1,500  $500`, red out / green in; two changes inside the 4 s
 are summed), so that is where a bill is told. A negative balance (a debt, CR4) is red. Full HUD: always up; minimal:
 fade id `cash`, back on a change, held while in debt. The pause menu shows the balance under its title at all times.
 The captive's ransom prompt keeps its amounts (it is a decision, not a card).

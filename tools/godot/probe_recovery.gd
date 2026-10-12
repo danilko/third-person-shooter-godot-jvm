@@ -81,12 +81,12 @@ func _initialize() -> void:
 	var p := _player()
 
 	# 1. hospital
-	p.call("give_cash_now", 100000)
+	p.call("give_cash_now", 10000)
 	var r := await _go_down(p)
 	p = r[1]
 	print("  1: card '%s', cash %d" % [String(r[0]).replace("\n", " "), int(p.call("cash_now"))])
 	_check(String(r[0]).begins_with("入院"), "no standing: 入院 HOSPITALIZED")
-	_check(int(p.call("cash_now")) == 95000, "the hospital fee was taken and the rest carried over (%d)" % int(p.call("cash_now")))
+	_check(int(p.call("cash_now")) == 9500, "the hospital fee was taken and the rest carried over (%d)" % int(p.call("cash_now")))
 
 	# 2. jail, even on a death
 	ws.call("set_stars_now", _pid(p), 2, false)
@@ -94,7 +94,7 @@ func _initialize() -> void:
 	p = r[1]
 	print("  2: card '%s', cash %d" % [String(r[0]).replace("\n", " "), int(p.call("cash_now"))])
 	_check(String(r[0]).begins_with("逮捕"), "down while wanted: 逮捕 ARRESTED")
-	_check(int(p.call("cash_now")) == 95000 - 30000, "(hospital + police) x 2 stars was taken (%d)" % int(p.call("cash_now")))
+	_check(int(p.call("cash_now")) == 9500 - 3000, "(hospital + police) x 2 stars was taken (%d)" % int(p.call("cash_now")))
 	_check(int(ws.call("stars_now", _pid(p))) == 0, "the wanted level is cleared")
 
 	# 3. abducted (a gang outranks the police), then pay
@@ -110,19 +110,19 @@ func _initialize() -> void:
 			int(ed.call("guards_now")), String(rs.call("captive_prompt_now")).replace("\n", " ")])
 	_check(String(r[0]).begins_with("拉致"), "a gang standing wins: 拉致 ABDUCTED")
 	_check(bool(gs.call("captive_now", pid)), "the player is held")
-	_check(int(gs.call("ransom_now", pid)) == 200000, "the ransom is 2 stars x 100,000 (%d)" % int(gs.call("ransom_now", pid)))
+	_check(int(gs.call("ransom_now", pid)) == 20000, "the ransom is 2 stars x 10,000 (%d)" % int(gs.call("ransom_now", pid)))
 	_check(int(p.call("cash_now")) == cash_before, "waking up held costs nothing yet")
 	_check(int(ed.call("guards_now")) >= 2, "guards stand over them (%d)" % int(ed.call("guards_now")))
 	_check(String(rs.call("captive_prompt_now")).find("ransom") >= 0, "the ransom prompt is up")
 	_check(not bool(fm.call("hostile_now", "gang_a", "player")), "the guards do not shoot a captive who stays")
 	_check(not bool(gs.call("pay_ransom_now", p)), "too little cash: no release")
-	p.call("give_cash_now", 300000)
+	p.call("give_cash_now", 30000)
 	var c0 := int(p.call("cash_now"))
 	_check(bool(gs.call("pay_ransom_now", p)), "paying the ransom")
 	await _tick(60)
 	_check(not bool(gs.call("captive_now", pid)) and int(gs.call("gang_stars_now", pid, "gang_a")) == 0,
 			"released, and the standing with gang_a cleared")
-	_check(int(p.call("cash_now")) == c0 - 200000, "the ransom came out of their cash")
+	_check(int(p.call("cash_now")) == c0 - 20000, "the ransom came out of their cash")
 	_check(int(ed.call("guards_now")) == 0, "the guards stood down")
 
 	# 4. abducted again, and they run

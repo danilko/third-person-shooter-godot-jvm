@@ -220,7 +220,7 @@ func _initialize() -> void:
 	_check("the mission completed as WON", completed == ["WON"], str(completed))
 	# F3 (PLAN.md 1.4): a race pays by PLACE (economy.json race_by_place), and the mission seam does not pay again
 	var won := int(player.call("cash_now")) - cash_before
-	_check("first place paid the race prize, once", won == 8000, "+$%d" % won)
+	_check("first place paid the race prize, once", won == 800, "+$%d" % won)
 	_check("the race is no longer active", not bool(race.call("race_active_now")),
 		str(race.call("race_phase_now")))
 	_check("but its results are still readable (the finish panel's whole point)",

@@ -54,7 +54,7 @@ public class ShopClerkSpot extends Node3D {
      */
     @Export public String responders = "";
     /** Dollars in the till (the robbery's take; a counter beside the clerk hands it over once). */
-    @Export public int till = 30000;
+    @Export public int till = 3000;
 
     public static final String GROUP = "shop_clerk";
     private boolean tillTaken;

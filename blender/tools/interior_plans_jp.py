@@ -473,7 +473,7 @@ def izakaya(b):
     # the counter sells food, and the master behind it is the clerk (PLAN.md W3)
     b.mark("shop_counter", -0.25, -1.5, F1, 90.0, stock="teishoku,bento,onigiri", title="IZAKAYA", w=3.0, d=1.2,
            h=2.0)
-    b.mark("clerk", 1.8, -1.5, F1, 90.0, surrender=0.7, weapons="MEW1,PIS1", till=15000)
+    b.mark("clerk", 1.8, -1.5, F1, 90.0, surrender=0.7, weapons="MEW1,PIS1", till=1500)
     # F2: the 座敷 (a private tatami banquet room) and the staff room
     H2 = TOP - F2 - 0.2
     part(b, "x", 1.1, xi0, xi1, F2, H2, doors=[(1.5, -1, 0.9, "slide", "door", 2.0)])
@@ -794,7 +794,7 @@ def adult_services(b):
     # the reception counter sells the "strange" supplies; the house is a gang front (a GRAY-AREA shop, PLAN.md W3):
     # threaten the receptionist and the gang comes out of the waiting room
     b.mark("shop_counter", -1.2, -5.0, 0.0, 0.0, stock="tonic,pills", title="RECEPTION", w=3.0, d=1.4, h=2.0)
-    b.mark("clerk", 0.8, -4.0, 0.0, 180.0, surrender=0.3, weapons="SMG1,SHG1", till=80000,
+    b.mark("clerk", 0.8, -4.0, 0.0, 180.0, surrender=0.3, weapons="SMG1,SHG1", till=8000,
            responders="gang_a:3:SMG1,SHG1,ASR2")
     for x in (-1.8, 1.0):
         b.mark("spawn", x, -2.5, 0.0, 180.0, team="gang", note="the gang's people, out when the reception is hit")
