@@ -150,6 +150,13 @@ func _ray_down(p: Vector3, height: float) -> Dictionary:
 	var q := PhysicsRayQueryParameters3D.create(p + Vector3(0, height + 2.0, 0), p + Vector3(0, height - 1.0, 0))
 	return world.get_world_3d().direct_space_state.intersect_ray(q)
 
+var rails_dropped := 0
+
+func _drop_rail(n: Node) -> void:
+	if n is MultiMeshInstance3D and String(n.name).begins_with("Breakable_Guardrail"):
+		n.queue_free()
+		rails_dropped += 1
+
 func _initialize() -> void:
 	var control := "--control" in OS.get_cmdline_user_args()
 	world = (load(WORLD) as PackedScene).instantiate()
@@ -169,6 +176,12 @@ func _initialize() -> void:
 	print("probe: %d lamp batches, %d lamps, streamed after %.1f s%s" % [batches.size(), poles, waited / 60.0,
 			" (CONTROL: breaking off)" if control else ""])
 	_check(batches.size() >= 2 and poles > 10, "both DebugRoads pieces carry a BreakableProps lamp batch")
+	# since s8 a white ガードレール runs along the kerb between the lane and the lamps; a slow car slides along it
+	# and passes the lamp 1.7 m to the side (measured 2026-10-12: the slow case ended 1.81 m PAST a standing lamp).
+	# This probe is about the lamp: the rails go (they have their own, probe_guardrail.gd).
+	for n in world.find_children("Breakable_Guardrail*", "MultiMeshInstance3D", true, false):
+		_drop_rail(n)
+	node_added.connect(_drop_rail)      # and the ones of a piece that streams in later
 	if control:
 		for n in world.find_children("Breakable_*", "MultiMeshInstance3D", true, false):
 			n.set("breaking_enabled", false)
@@ -203,6 +216,7 @@ func _initialize() -> void:
 			"nothing is left standing in the shaft (ray hit %s)" % [hit.collider.name if not hit.is_empty() else "nothing"])
 	(r["car"] as Node).queue_free()
 
+	print("probe: %d guardrail batches removed so far" % rails_dropped)
 	# --- 2. 3 m/s held against another lamp
 	var slow := _pick_lamp([fast[3]])
 	if not slow.is_empty():

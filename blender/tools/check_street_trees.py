@@ -128,6 +128,9 @@ def main(argv):
         if d > half + walk + OUTBOARD_SLACK:
             adrift += 1
             worst_out = max(worst_out, d - (half + walk + OUTBOARD_SLACK))
+            print("  adrift: tree on road %r at (%.2f, %.2f, %.2f): %.2f m from the nearest lane, allowed %.2f "
+                  "(half lane %.2f + footway %.2f + slack %.2f)" % (t.get("road", ""), t["pos"][0], t["pos"][1], t["pos"][2],
+                                                                   d, half + walk + OUTBOARD_SLACK, half, walk, OUTBOARD_SLACK))
         if walk + 1e-6 < table.rules["tree_min_footway"]:
             narrow += 1
             thinnest = min(thinnest, walk)
