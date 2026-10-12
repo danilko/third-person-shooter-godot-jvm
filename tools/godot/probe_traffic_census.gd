@@ -4,7 +4,7 @@ extends SceneTree
 ## player is stood at each site in turn, the streamer is given time to go quiet, then the ambient cars are counted
 ## every 2 s for --seconds (default 40).
 ##   stdbuf -oL <godot> --headless --fixed-fps 60 --path . --script tools/godot/probe_traffic_census.gd -- \
-##       [--seconds=40] [--sites=downtown_core,farm] [--budget=N] [--near-target=N] [--along-lanes | --along-share=0.5] [--on-road]
+##       [--seconds=40] [--sites=downtown_core,farm] [--budget=N] [--near-target=N] [--along-lanes | --along-share=0.5] [--on-road] [--no-grid-at-spawn]
 ## A MEASUREMENT (it prints a table and exits 0); --min-near=<n> turns it into a gate: every site's mean count of
 ## simulated cars within 200 m must reach n.
 const WORLD := "res://src/main/resources/com/openworld/world/World.tscn"
@@ -83,6 +83,8 @@ func _run() -> void:
 		zm.set("traffic_lazy_drivers", false)
 	if args.has("no-cross-gap"):
 		zm.set("traffic_gap_across_lanes", false)   # the control: an on-rails car joins a queue it cannot see
+	if args.has("no-grid-at-spawn"):
+		zm.set("traffic_grid_at_spawn", false)   # the control: a new car is at the world origin in the grid for 0.25 s
 	if args.has("no-cap"):
 		zm.set("traffic_speed_cap", false)   # V6's control: the brain fades its own throttle, the car has no limit
 	if args.has("along-share"):

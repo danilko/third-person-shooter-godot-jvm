@@ -22,6 +22,10 @@ extends SceneTree
 ##                  ring and the leaving-car recycle distance (0 = off)
 ##       [--walker-budget=N] [--promote-ring=M]   crowd sweeps: ZoneManager.walkerBudget / every PedCrowd.promoteDistance
 ##       [--haze=<end m>]   PLAN.md 2b: Sky3D's distance haze on, ending at that distance (start at a third of it)
+##       [--no-furniture]   control (PLAN.md S9 Q2): the 電柱 and ガードレール batches (`Breakable_Pole_Denchu*`,
+##                  `Breakable_Guardrail_JP*`) hidden and every M_Wire surface removed from its mesh as pieces stream in
+##                  (engine sound has its own switch: run with OW_ENGINE_AUDIO=0). Every leg prints an `AUDIO` line:
+##                  engine players and sirens sounding, sampled once a second
 ##       [--deck]   the Steam Deck PROXY (PLAN.md R-9): 1280x800, each frame's deck_ms = max(cpu x cpu_factor,
 ##                  gpu x gpu_factor) from tools/godot/perf_budget.json, judged against its frame and count budgets;
 ##                  prints a `DECK <leg> p50 p95` line per leg that tools/perf_gate.sh reads for per-system attribution
@@ -141,6 +145,8 @@ func _leg(label: String, path: Array, speed: float) -> void:
 	var gp := []
 	var dcs := []
 	var chs := []
+	var eng := []
+	var sir := []
 	var seg := 0
 	var along := 0.0
 	var t_prev := Time.get_ticks_usec()
@@ -185,6 +191,16 @@ func _leg(label: String, path: Array, speed: float) -> void:
 				near_sum[0] += int(zmn.call("traffic_near_now", 100.0))
 				near_sum[1] += int(zmn.call("traffic_near_now", 200.0))
 				near_n += 1
+			var e := 0
+			var sn := 0
+			for v in get_nodes_in_group("characters"):
+				if v is RigidBody3D and v.has_method("engine_voices_now"):
+					e += int(v.call("engine_voices_now"))
+					var sp := v.get_node_or_null("Siren") as AudioStreamPlayer3D
+					if sp != null and sp.playing:
+						sn += 1
+			eng.append(e)
+			sir.append(sn)
 		var code := _code(player.global_position)
 		if not cells.has(code):
 			cells[code] = {"ft": [], "phys": [], "proc": [], "ticks": [], "dc": [], "tris": [], "chars": [], "legs": {}}
@@ -264,6 +280,10 @@ func _leg(label: String, path: Array, speed: float) -> void:
 	print("  %-22s %5d frames | frame ms p50 %6.2f p95 %6.2f p99 %6.2f worst %7.2f | %4.1f%% over 16.7 ms | %4.1f%% under 30 fps | phys ms p50 %.2f p95 %.2f | ticks/frame p95 %d"
 			% [label, ft.size(), _pct(ft, 0.5), _pct(ft, 0.95), _pct(ft, 0.99), ft.max() if not ft.is_empty() else 0.0,
 			100.0 * over60 / max(1, ft.size()), 100.0 * slow / max(1, ft.size()), _pct(ph, 0.5), _pct(ph, 0.95), int(_pct(ticks, 0.95))])
+	print("AUDIO %s engine players mean %.1f max %d, sirens max %d (%d samples)%s" % [label,
+			float(eng.reduce(func(x, y): return x + y, 0)) / maxf(1.0, eng.size()), int(eng.max()) if not eng.is_empty() else 0,
+			int(sir.max()) if not sir.is_empty() else 0, eng.size(),
+			"; furniture control hid %d batches, removed %d wire surfaces" % furniture_hidden if _arg("no-furniture", false) else ""])
 	if deck:
 		var fb := float(budget_cfg.get("frame_deck_ms_p95", 33.3))
 		var cb: Dictionary = budget_cfg.get("counts_p95", {})
@@ -275,6 +295,20 @@ func _leg(label: String, path: Array, speed: float) -> void:
 			deck_fail.append("%s draws p95 %d > %d" % [label, int(_pct(dcs, 0.95)), int(cb["draws"])])
 		if cb.has("characters") and _pct(chs, 0.95) > float(cb["characters"]):
 			deck_fail.append("%s characters p95 %d > %d" % [label, int(_pct(chs, 0.95)), int(cb["characters"])])
+
+var furniture_hidden := [0, 0]
+
+func _strip_furniture(n: Node) -> void:
+	if n is MultiMeshInstance3D and (String(n.name).begins_with("Breakable_Pole_Denchu") or String(n.name).begins_with("Breakable_Guardrail_JP")):
+		(n as MultiMeshInstance3D).visible = false
+		furniture_hidden[0] += 1
+	elif n is MeshInstance3D and (n as MeshInstance3D).mesh is ArrayMesh:
+		var m := (n as MeshInstance3D).mesh as ArrayMesh
+		for i in range(m.get_surface_count() - 1, -1, -1):
+			var mat := m.surface_get_material(i)
+			if mat != null and mat.resource_path.ends_with("M_Wire.tres"):
+				m.surface_remove(i)
+				furniture_hidden[1] += 1
 
 func _strip_hlod(n: Node) -> void:
 	if n is MeshInstance3D and n.name == "HLOD":
@@ -301,6 +335,9 @@ func _initialize() -> void:
 	var zm := root.get_node_or_null("ZoneManager")
 	if zm != null:
 		zm.set("debug_log", false)
+	if _arg("no-furniture", false):
+		node_added.connect(_strip_furniture)
+		print("CONTROL: no poles, guardrails or wires")
 	if _arg("no-hlod", false):
 		# R9's control: every cell's HLOD hidden and its buildings freed of it, i.e. the city as it was before
 		node_added.connect(_strip_hlod)

@@ -295,6 +295,12 @@ public class ZoneManager extends Node {
 	@Export public float trafficSpawnViewDist = 160.0f;
 	private int spawnsRefusedNearPlayer = 0;
 
+	/** A spawned car is put in the spatial grid at its lane slot at once (off = the control: it sits at the world
+	 *  origin for a quarter of a second, and a second car can be spawned into it). */
+	@Export public boolean trafficGridAtSpawn = true;
+	public boolean isTrafficGridAtSpawn() { return trafficGridAtSpawn; }
+	public void setTrafficGridAtSpawn(boolean v) { trafficGridAtSpawn = v; }
+
 	/** How many traffic placements the player rules refused (probe readout). */
 	@Register
 	public int trafficSpawnsRefusedNow() { return spawnsRefusedNearPlayer; }
@@ -2372,6 +2378,13 @@ public class ZoneManager extends Node {
 		// ran: one set down across a west-running lane crept 6 m north on full steer and cut throttle
 		// and stopped for good (measured, probe_traffic_spawn.gd) — the "car at ~0 m/s" shape.
 		if (at.facing() != null) v.lookAt(pos.plus(at.facing()), up);
+		// Vehicle._ready registered the car in the spatial grid where addChild left it -- the world origin -- and
+		// the grid is only told again a quarter of a second later. Until then isClear() could not see this car, and
+		// a second spawn (another traffic zone sharing the lane, the next top-up tick) took the SAME slot: three
+		// cars in one place at a lane's entry, thrown straight up at 30-40 m/s as the solver parted them (census
+		// trace 2026-10-12, koba_waku_w__x1_R0 at (-838, 785): contact normals straight down, both runs).
+		// trafficGridAtSpawn off is the control.
+		if (trafficGridAtSpawn && SpatialEntityGrid.get() != null) SpatialEntityGrid.get().move(v, pos);
 
 		VehicleAIController ctrl = new VehicleAIController();
 		ctrl.cruiseThrottle = vc.cruiseThrottle;

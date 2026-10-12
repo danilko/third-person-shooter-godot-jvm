@@ -3,6 +3,7 @@
 Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 
 - Open World Simulation (Part E)
+- Three cars in one spawn slot: a new car was at the world origin in the grid for 0.25 s (2026-10-12)
 
 ---
 
@@ -1285,3 +1286,47 @@ brain writes the lane's limit, the car holds it: over the limit by 2 m/s 15.4 % 
 `VehicleAIController.dummyGapAcrossLanes` (traffic crashes 94 -> 52 per ~40 car-minutes), and the census' `safety:`
 line (`ZoneManager.trafficSafetyNow`: scored crashes of brain-driven cars, car-minutes, seconds over the limit).
 `probe_traffic_census -- --no-cap` / `--no-cross-gap` are the controls.
+
+## Three cars in one spawn slot: a new car was at the world origin in the grid for 0.25 s (2026-10-12)
+
+PLAN.md S9 Q3, found by doing its "cheaper first step" (stand at the hottest crash cell and read what collides)
+instead of the 2 h keep-left control. **The traffic "crash rate" the census reported since s7 was mostly this one
+bug**, and it is not about which side cars drive on.
+
+- **What the trace showed.** `OW_CRASH_TRACE=all` now names each car's lane, tier and speed on both sides of a
+  contact (`Vehicle.traceStateNow`: `[lane <id> rails|sim v <m/s>]`). At the `residential` site, in every run, the
+  first scored contacts were on `koba_waku_w__x1_R0` at Godot (-838, 785) and on `koba_waku_w__x2__x1_F0` at
+  (-862, 781): two or three cars at the SAME point from their first tick, the contact normal straight down, and a
+  velocity "after" of up to 39.6 m/s **upward** -- the solver parting bodies created inside each other.
+- **Cause.** `ZoneManager.spawnVehicle` does `container.addChild(v)` and only then sets the car's position;
+  `Vehicle._ready` registers the car in `SpatialEntityGrid` where `addChild` left it -- the world origin -- and the
+  grid hears of the car again 0.25 s later (`GRID_UPDATE_INTERVAL`). `isClear()` asks the grid, so for a quarter of
+  a second the slot looked empty and a second spawn (another traffic zone sharing the lane, the next top-up tick)
+  took it. It needs a burst of spawns, i.e. an arrival: a teleport, a respawn, a loaded save, a fast drive into an
+  empty district -- which is exactly what the census does eleven times.
+- **Fix.** `spawnVehicle` tells the grid the car's slot as soon as it is placed (`ZoneManager.trafficGridAtSpawn`,
+  on; off is the control, the census' `--no-grid-at-spawn`).
+- **Measured** (probe_traffic_census, right-hand island, `OW_CRASH_TRACE=all`):
+
+  | | crashes / car-minutes | of the scored contacts, stacked (normal straight down) |
+  |---|---|---|
+  | s7, keep-left, before the poles | 52 / ~40 | not counted |
+  | s8, right-hand | 39 / 21.1 and 76 / 19.0 | not counted |
+  | s9 control (`--no-grid-at-spawn`), island | 56 / 18.8 | 46 of 56 |
+  | **s9 fix, island, two runs** | **5 / 19.3 and 7 / 21.3** | **0 and 0** |
+  | s9 `residential` only, 300 s: control (6 runs) | 8 - 25 a run | 5, 5, 6, 7, 11, 13 |
+  | s9 `residential` only, 300 s: fix (2 runs) | 6 and 11 | 0 and 0 |
+
+  So "did right-hand traffic raise the crash rate" is answered without the control: the count was a bug whose size
+  varied 2x run to run, and with it gone the right-hand island crashes about a fifth as often as the keep-left one
+  was measured to. The keep-left census control (PLAN S9 Q3) was NOT run.
+- **Tried and reverted:** letting an on-rails car see a car standing on its OWN lane by position (the rule that
+  already covers other lanes). The stacked contacts did not fall (6 and 5 before, 13 and 7 after): they were never
+  drive-ins.
+- **What is left at that cell** (all car-on-car, horizontal): `koba_waku_w__x2` turns a right angle at record
+  (-960, -655) with an inside-lane radius of 2.9 m (outside 7.4 m). A car cannot follow it: it swings into the
+  oncoming lane, one hit the building on the corner (`Danchi_005`), and the queue behind it bumps (hundreds of
+  contact lines of under 1 m/s, a handful scored). 20 street lanes on the island have a bend under 4 m of radius --
+  the list is in PLAN.md S9 "TIGHT CORNERS". A geometry fix (a fillet in the record, then the road stage and
+  whatever stands on the inside corner): not done, the user's call.
+

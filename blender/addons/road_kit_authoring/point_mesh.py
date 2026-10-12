@@ -1205,11 +1205,12 @@ def clip_crossings(line, near):
     return [c for c in out if len(c) >= 2 and sum(math.dist(c[i], c[i + 1]) for i in range(len(c) - 1)) >= 0.05]
 
 
-def crossing_stop_lines(pts, values, near):
+def crossing_stop_lines(pts, values, near, right=False):
     """The 一時停止 stop lines a road carrier `pts` / `values` paints before each level crossing (`near`, the crossed
     tracks' bands): per approach, square to the road across that direction's half (keep-left: travel along the
-    carrier arrives on the LEFT, against it on the right), its downstream edge CROSSING_STOP_GAP outside the band
-    where the band comes nearest along the stop line's own width. `[tri]`."""
+    carrier arrives on the LEFT, against it on the right; `right` = a right-hand network, the halves swapped -- the
+    island had them on the DEPARTING half until 2026-10-12, seen in a picture), its downstream edge
+    CROSSING_STOP_GAP outside the band where the band comes nearest along the stop line's own width. `[tri]`."""
     out = []
     if len(pts) < 2:
         return out
@@ -1251,7 +1252,7 @@ def crossing_stop_lines(pts, values, near):
             p, f, l, v = frame(s_edge)
             med = float(v.get("rka_med_c", 0.0)) if float(v.get("rka_med_h", 0.0)) > 0.0 else 0.0
             mh = float(v.get("rka_med_h", 0.0))
-            if sgn > 0:
+            if (sgn > 0) != right:
                 lo, hi = med + mh, float(v.get("rka_curb_ol", 0.0))
             else:
                 lo, hi = float(v.get("rka_curb_or", 0.0)), med - mh
@@ -1536,7 +1537,8 @@ def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=
                 continue
             xnear = _near_bands(foreign, pts) if foreign and not rail else []
             if xnear:
-                _add(objs, "%s__marks_w" % name, style.material("mark_w"), crossing_stop_lines(pts, values, xnear))
+                _add(objs, "%s__marks_w" % name, style.material("mark_w"), crossing_stop_lines(pts, values, xnear,
+                                                                                         getattr(net, "traffic_side", "left") == "right"))
             for yellow in (False, True):
                 for r in (r for r in ps.solve_marks(s) if r.yellow is yellow):
                     for line in (q for l0 in pfu.clip_outside(list(r.points), clear)
@@ -1955,6 +1957,15 @@ def self_test():
                              for t in marks), "a lane mark inside the 踏切"
     ys = sorted({round(_centroid(t)[1], 1) for t in crossing_stop_lines(*_street_carrier(so, fnet), [rbx])})
     assert len(ys) >= 2 and ys[0] < 0.0 < ys[-1], ("one stop line per approach", ys)
+    # ... each on the half its traffic ARRIVES on: keep-left, the line before the track (the street runs +y, so at
+    # y < 0) is left of travel (x below the street's own); on a right-hand network it is the other half
+    sx = _street_carrier(so, fnet)[0][0][0]
+    for rh in (False, True):
+        tris = crossing_stop_lines(*_street_carrier(so, fnet), [rbx], rh)
+        before = [_centroid(t)[0] - sx for t in tris if _centroid(t)[1] < 0.0]
+        after = [_centroid(t)[0] - sx for t in tris if _centroid(t)[1] > 0.0]
+        assert before and after and (max(before) < 0.0) == (not rh) and (min(after) > 0.0) == (not rh), \
+            ("a 踏切 stop line on the departing half", rh, before, after)
     # ...and the STREET brings its kerb and footway DOWN to road level across the track (one plane), ramped back up
     # OUTSIDE the panel: nothing of the edge stands over road + PANEL_RISE inside the panel's reach, and the kerb is
     # its full height again ENTRY_RAMP + LEVEL_MARGIN past the rail band

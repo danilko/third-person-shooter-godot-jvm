@@ -1322,6 +1322,19 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     private OmniLight3D barLight;
     private godot.api.AudioStreamPlayer3D siren;
 
+    /** Which siren a model sounds (user, 2026-10-12: police, fire and ambulance are "quite different"): the fire
+     *  engine and the ladder truck wail fast and high, every police vehicle wails slowly, the ambulance (and anything
+     *  else that is ever sent on a call) keeps the two-tone ピーポー. */
+    static com.openworld.audio.Sound sirenSound(String model) {
+        return switch (model == null ? "" : model) {
+            case "FIE1", "LAT1" -> com.openworld.audio.Sound.SIREN_FIRE;
+            case "POC1", "MPC1", "ARV1" -> com.openworld.audio.Sound.SIREN_POLICE;
+            default -> com.openworld.audio.Sound.SIREN;
+        };
+    }
+    /** The file this car's siren plays (probes). */
+    @Register public String sirenSoundNow() { return sirenSound(modelId()).name(); }
+
     /** On a call (lights + siren) or not. */
     public void setEmergency(boolean on) { emergency = on; }
 
@@ -1356,7 +1369,8 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         }
         if (barLight != null) barLight.setVisible(phase);
         if (on && siren == null) {
-            godot.api.AudioStream st = com.openworld.audio.Sounds.stream(com.openworld.audio.Sound.SIREN);
+            godot.api.AudioStream st = com.openworld.audio.Sounds.stream(sirenSound(modelId()));
+            if (st == null) st = com.openworld.audio.Sounds.stream(com.openworld.audio.Sound.SIREN);
             if (st != null) {
                 siren = new godot.api.AudioStreamPlayer3D();
                 siren.setName(new StringName("Siren"));
@@ -1835,6 +1849,12 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     static final boolean CRASH_TRACE = System.getenv("OW_CRASH_TRACE") != null;
     /** {@code OW_CRASH_TRACE=all}: every car, not only a player's (probes drive cars with no player in them). */
     static final boolean CRASH_TRACE_ALL = "all".equals(System.getenv("OW_CRASH_TRACE"));
+    /** CRASH_TRACE: who drives this car and where -- "lane <id> rails|sim v <m/s>", "player", "empty". */
+    String traceStateNow() {
+        String who = controller instanceof VehicleAIController ai ? "lane " + ai.laneNow() + (dummyMode ? " rails" : " sim")
+                : occupant instanceof Player ? "player" : "empty";
+        return who + String.format(java.util.Locale.ROOT, " v %.1f", getLinearVelocity().length());
+    }
     /** The collider of the hardest contact in the crash being summed (CRASH_TRACE only). */
     String crashCollider = "";
 
@@ -1868,6 +1888,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
                 bestD = d;
                 Object o = state.getContactColliderObject(i);
                 crashCollider = (o instanceof Node n ? String.valueOf(n.getPath().getPath()) : String.valueOf(o))
+                        + (o instanceof Vehicle ov ? " [" + ov.traceStateNow() + "]" : "")
                         + " n " + state.getContactLocalNormal(i) + " at " + state.getContactLocalPosition(i)
                         + " carUp " + up + " carPos " + state.getTransform().getOrigin();
             }

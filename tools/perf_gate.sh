@@ -16,7 +16,7 @@ run() {   # name, flags...
     echo "── $n"
     timeout -k 5 3600 stdbuf -oL "$G" --path . --script tools/godot/probe_walk_perf.gd -- --deck "${EXTRA[@]}" "$@" \
         > "$OUT/$n.log" 2>&1
-    grep -E "^DECK|RESULT|OVER BUDGET|under the terrain" "$OUT/$n.log"
+    grep -E "^DECK|^AUDIO|RESULT|OVER BUDGET|under the terrain" "$OUT/$n.log"
 }
 run shipped
 RC=$?

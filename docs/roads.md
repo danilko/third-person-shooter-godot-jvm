@@ -1873,3 +1873,11 @@ on its roads), and the user chose "Drive on the right" when asked what "rightway
   re-read; the cars are right-hand drive; `RaceDirector` routes and any authored lane names in missions were not
   checked on the island.
 
+**Fixed 2026-10-12 (s9), found by the owed 踏切 picture:** the 一時停止 stop line before a level crossing was still
+painted for keep-left traffic -- on a right-hand island it lay on the DEPARTING half of each approach, past the track.
+`point_mesh.crossing_stop_lines(..., right)` swaps the halves for a right-hand network (the self-test checks both
+sides: the line before the track is on the arriving half); the seven road pieces that hold the island's 12 crossings
+were rebuilt (their entries cleared from `IslandRoads.build.json`, `DIRTY_ONLY=1`). The units were already right: the
+near-side unit stands on the right kerb. Not checked by a picture yet: the expressway cantilever at an EXIT on the
+rebuilt pieces (unchanged code).
+
