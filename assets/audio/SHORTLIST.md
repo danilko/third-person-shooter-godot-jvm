@@ -70,6 +70,9 @@ contact-mic recording below). Gunshots are layered offline: body + mechanical + 
 
 | need | pick | URL | notes |
 |---|---|---|---|
+| engine START (chosen 2026-10-12) | toyota camry startup better — vacuumfan7072 | https://freesound.org/people/vacuumfan7072/sounds/322552/ | CC0, phone recording; starter ~9 s, ~4 s of idle after; preview downloaded |
+| engine RUNNING (chosen 2026-10-12) | DynoJet Scion FR-S — dezoris | https://freesound.org/people/dezoris/sounds/183654/ | CC0, Tascam + ME-66; one rev idle -> redline (~22 s) and back: cut rpm loops; dyno-room roar; preview downloaded |
+| engine idle, fallback | Toyota Matrix exterior chimes, car start, idle ... — MixMessiah | https://freesound.org/people/MixMessiah/sounds/628547/ | CC0; idle steady 47-56 s but ~12 dB over its noise; doors too quiet; cut the chime; preview downloaded |
 | car engine "RPM set" | racing car engine loops — domasx2 (OGA) | https://opengameart.org/content/racing-car-engine-sound-loops | one PD sample pitched 6 ways; nearest to a set |
 | small car idle + doors | car_idle_ext_loop + pack (one Honda CR-V) — AndrewAlexander | https://freesound.org/people/AndrewAlexander/sounds/369054/ (pack /packs/20743/) | idle, ignition, decel, reverse, doors from one car |
 | sports car | Muscle_Idle / Revving — FreeCarSoundsGaming (pack /packs/30160/) | https://freesound.org/people/FreeCarSoundsGaming/sounds/535038/ | looped; also truck idles |
@@ -85,7 +88,8 @@ contact-mic recording below). Gunshots are layered offline: body + mechanical + 
 | tyre squeal | Chrysler LHS tire squeal 02 — audible-edge | https://freesound.org/people/audible-edge/sounds/71737/ | |
 | tyre burst | Tire Puncture Pop — JohnsonBrandEditing | https://freesound.org/people/JohnsonBrandEditing/sounds/243375/ | designed |
 | horn | Car horn inside, Fiat Panda — misperpodcast | https://freesound.org/people/misperpodcast/sounds/733553/ | small-car horn, suits kei |
-| siren (`siren`) | SS2000_wail_seamless — ThePeasantJoe | https://freesound.org/people/ThePeasantJoe/sounds/800708/ | seamless wail |
+| siren (`siren`) | Japan Nara Medic Sirene ... Passing By — thabigm | https://freesound.org/people/thabigm/sounds/758375/ |IN (HQ preview, 2026-10-12; a Japanese ambulance ピーポー, used for every emergency vehicle) |
+| siren, not used | SS2000_wail_seamless — ThePeasantJoe | https://freesound.org/people/ThePeasantJoe/sounds/800708/ | seamless wail (a US-style wail) |
 | gear shift | Lotus Elise shifting — conicity | https://freesound.org/people/conicity/sounds/697837/ | |
 | NOS boost | Rocket Boost Engine Loop — qubodup | https://freesound.org/people/qubodup/sounds/146770/ | |
 

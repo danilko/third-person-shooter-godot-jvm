@@ -23,7 +23,7 @@ const FOOT_HUD := "res://src/main/resources/com/openworld/ui/FootHUD.tscn"
 const WATER  := "res://src/main/java/com/openworld/world/WaterVolume.java"
 const TRACER := "res://src/main/java/com/openworld/world/manager/BulletTracerManager.java"
 ## Sounds that may have no file yet (README "Wired in code" says missing).
-const ALLOWED_MISSING := ["SIREN"]
+const ALLOWED_MISSING := []
 
 var fails := 0
 var checks := 0

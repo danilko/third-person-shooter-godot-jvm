@@ -94,7 +94,8 @@ There is a per-folder copy of this list in `assets/terrain3d/textures/asset_lice
 | Dry fire, weapon draw | `assets/audio/sfx/dry_fire_*.wav`, `sfx/weapon_draw_*.wav` | Still North Media, [The Free Firearm Sound Effects Library](https://opengameart.org/content/the-free-firearm-sound-library) (Raw edition) | CC0 |
 | Water splash (body entering) | `assets/audio/sfx/splash_*.wav` (built by `tools/audio/build_sfx.py` from the HQ preview) | Nox_Sound, [Foley_Natural_Water_Jump_Mono.wav](https://freesound.org/s/585744/) (Freesound) | CC0 |
 | Small splash (bullet / grenade / wading) | `assets/audio/sfx/splash_small.wav` (same) | Robo9418, [Small Puddle Splash](https://freesound.org/s/841834/) (Freesound) | CC0 |
-| Swim strokes | `assets/audio/sfx/swim_stroke_*.wav` (same) | craigsmith, [G54-26-Person Swimming.wav](https://freesound.org/s/438845/) (Freesound) | CC0 |
+| Swim strokes | `assets/audio/sfx/swim_stroke_*.wav` (same) | craigsmith, [G54-26-Person Swimming.wav](https://freesound.org/s/438845/) (Freesound) | CC0 (as tagged on the page; provenance doubted, to be replaced: PLAN.md P2b) |
+| Emergency siren | `assets/audio/siren.wav` (built by `tools/audio/build_siren.py` from the HQ preview) | thabigm, [Japan Nara Medic Sirene Vehicle Car Sound Distant Passing By City](https://freesound.org/s/758375/) (Freesound) | CC0 |
 | Melee contact on hard surfaces | `assets/audio/sfx/melee_hit_hard_*.wav` | Still North Media, [Medieval sound effects (weapon on weapon)](https://opengameart.org/content/medieval-sound-effects-weapon-textures) | CC0 |
 | Aldrich font | `assets/ui/Aldrich-Regular.ttf` | Matthew Desmond (MADType) | SIL Open Font License 1.1 |
 | Keycap and pad glyphs for HUD prompts | `assets/ui/prompts/keyboard_*.png`, `steamdeck_*.png` | Kenney, [Input Prompts](https://kenney.nl/assets/input-prompts) (Keyboard & Mouse, Steam Deck; Double) | CC0 |

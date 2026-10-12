@@ -150,7 +150,7 @@ hospital / arrest card carried the bill as a third line that pushed the English 
 card is the two words only (`入院 HOSPITALIZED`, `逮捕 ARRESTED`, `拉致 ABDUCTED` -- never money;
 `probe_wanted_respawn` asserts the exact text), and the money is its own right-aligned row under the clock and the two
 star rows (`HUDManager.cashTop()`; the feed starts under it). It reads `Profiles.local().balance`. On a change the
-amount moved is drawn left of the balance for 4 s (`-¥15,000  ¥5,000`, red out / green in; two changes inside the 4 s
+amount moved is drawn left of the balance for 4 s (`-$15,000  $5,000`, red out / green in; two changes inside the 4 s
 are summed), so that is where a bill is told. A negative balance (a debt, CR4) is red. Full HUD: always up; minimal:
 fade id `cash`, back on a change, held while in debt. The pause menu shows the balance under its title at all times.
 The captive's ransom prompt keeps its amounts (it is a decision, not a card).
@@ -161,6 +161,16 @@ The captive's ransom prompt keeps its amounts (it is a decision, not a card).
 has the `DebugHarness` node, so the island has none of F1-F12, Shift/Ctrl variants or the debug console; DebugWorld
 (and the hosts/ test scenes) keep it. Consequence: the Ctrl+F9 bug-report line exists in DebugWorld only -- in the
 main world a position is reported from the map's postal grid.
+
+## The fiction notice (user, 2026-10-12)
+
+The first title of a run is covered by a full-screen notice (`TitleScreen.NOTICE`, node `Notice`): a work of fiction,
+not intended to depict any real person, organisation, religion, nation, place or event, any resemblance coincidental.
+One button (`Understood`) holds the focus and removes the page; a process-wide flag keeps "Quit to title" from showing
+it again. The menu is built underneath as before, so the gates that press its buttons by name are unaffected, and "a
+button has focus" still holds (it is the notice's). NOT built, NOT run and not seen yet (written while another
+session held the build): `./gradlew build`, then `probe_front_end.gd` and a look at the screen. The wording is a
+draft for the user (and a lawyer) to settle: a notice lowers the risk, it does not remove a claim.
 
 ## Gate
 
@@ -298,6 +308,6 @@ US influence on its roads.
   `TrafficSignals`' sign tags. `IslandStreetNames.json` is no longer read by the game; `StationNames.json` is only
   the seed and `TrainDisplays`' fallback.
 - **Not done:** the English column is still Hepburn romaji ("Nishi-dori", "Kaito Expwy") under both languages (the
-  user's "English subtitle on both"); the currency sign is still ¥; map place labels and the menus are English and
+  user's "English subtitle on both"); map place labels and the menus are English and
   not in the table; shop fronts carry no text at all (new work, not a conversion); no system-font fallback yet for a
   glyph outside the subsets; `build_sign_table.py --check` is not in `island_world.sh` or the nightly gates yet.

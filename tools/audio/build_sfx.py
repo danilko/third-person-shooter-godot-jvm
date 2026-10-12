@@ -66,7 +66,7 @@ SPECS = {
                                    f"{FS}/water_jump_mono_nox_sound_585744.mp3@9.70"]),
     "sfx/splash_small": (-24, 0.4, 1.0, [f"{FS}/small_puddle_splash_robo9418_841834.mp3"]),
     "sfx/swim_stroke": (-27, 0.8, 1.0, [f"{FS}/person_swimming_craigsmith_438845.mp3@{t}"
-                                        for t in (0.40, 8.90, 18.05, 22.10)]),
+                                        for t in (3.75, 8.90, 18.05, 22.10)]),   # not 0.40: a voice (155 Hz + harmonics) at 0.54-0.80 s
     "sfx/door_open": (-25, 1.0, 1.0, [f"{RPG}/doorOpen_1.ogg", f"{RPG}/doorOpen_2.ogg"]),
     "sfx/door_close": (-23, 1.0, 1.0, [f"{RPG}/doorClose_{i}.ogg" for i in range(1, 5)]),
     "sfx/door_slide": (-22,   # a 0.29 s take: the 400 ms window under-reads it, so +3 dB to sit at door_open's level

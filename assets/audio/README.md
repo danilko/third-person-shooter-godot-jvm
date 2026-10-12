@@ -37,14 +37,14 @@ missing: `SHORTLIST.md`.
 ## Wired in code (`SoundTest` checks this table lists every `Sound`)
 
 A `Sound` with N takes is `<file>_1` .. `<file>_N` (one picked per play). Everything except `hit_marker` and
-`siren` is BUILT by `python3 tools/audio/build_sfx.py` (its `SPECS` table: source takes, layers, loudness), then
+`siren` (`python3 tools/audio/build_siren.py`) is BUILT by `python3 tools/audio/build_sfx.py` (its `SPECS` table: source takes, layers, loudness), then
 `godot --headless --path . --import`. **None of it was auditioned by ear** (2026-10-08): the picks are by name and
 waveform; listen in game and change the row. Gate: `tools/godot/probe_sfx.gd`.
 
 | file | `Sound` | what plays it | source (all CC0) |
 |---|---|---|---|
 | `hit_marker` | `HIT_MARKER` | the local player's hit confirmed (HitMarker), 2D, short tick | shipped |
-| `siren` | `SIREN` | an emergency vehicle on a call (Vehicle.refreshEmergency), 3D, LOOPING (import with loop on) | missing |
+| `siren` | `SIREN` | an emergency vehicle on a call (Vehicle.refreshEmergency), 3D, LOOPING (the loop is in the WAV's `smpl` chunk). ONE siren for police, fire and ambulance alike (user 2026-10-12): the ambulance's two-tone ピーポー | Freesound thabigm 758375 (CC0; HQ preview, 2 cycles looped by `tools/audio/build_siren.py`) |
 | `sfx/impact_flesh` | `IMPACT_FLESH` | a bullet into a body (ImpactManager, by SurfaceType) | Kenney `impactPunch_medium` |
 | `sfx/impact_metal` | `IMPACT_METAL` | a bullet into metal (vehicles, machinery) | Kenney `impactMetal_light` |
 | `sfx/impact_stone` | `IMPACT_STONE` | a bullet into stone / concrete / anything untagged | Kenney `impactPlate_light` |
