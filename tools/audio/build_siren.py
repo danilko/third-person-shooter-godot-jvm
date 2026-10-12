@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Builds assets/audio/siren.wav (audio.Sound.SIREN): the ONE looping siren every emergency vehicle plays.
+"""Builds the looping sirens: assets/audio/siren.wav (audio.Sound.SIREN, the ambulance's ピーポー and the fallback for
+the other two), siren_police.wav and siren_fire.wav (WAILS below). What follows describes the ambulance's.
 
 Source: a street recording of a Japanese ambulance passing (the two-tone ピーポー, ~960 / 770 Hz, one cycle every
 ~1.3 s) -- Freesound thabigm 758375, CC0 (CREDITS.md). It is a pass-by, so this cuts whole cycles out of the loud,
@@ -90,12 +91,74 @@ def write_loop_wav(path, x):
         f.write(b"RIFF" + struct.pack("<I", len(body)) + body)
 
 
+#: The WAILS (user, 2026-10-12, after hearing the one siren on every vehicle: "quite different, so may still need to
+#: split"). No CC0 recording of a JAPANESE patrol car (ウー) or fire engine (ウー + カンカン) was found on Freesound
+#: (the Tokyo / Kyoto ones are NonCommercial), so these are the nearest CC0 own-recordings: file -> (source, search
+#: from s, search to s, shortest cycle s). One whole sweep, from one LOW point of the tone to the next.
+WAILS = {
+    "siren_police": ("freesound_cc0/police_siren_nyc_multimax2121_156869.mp3", 4.2, 11.0, 4.5),   # the first slow wail; it yelps from 11 s
+    "siren_fire": ("freesound_cc0/firetruck_siren_toronto_trp_717906.mp3", 14.6, 20.7, 3.5),   # after 21 s it has stopped: engine only
+}
+
+
+def pitch_track(x, lo=450.0, hi=1900.0):
+    """(times s, dominant tone Hz) every 10 ms over 60 ms windows, median-smoothed over 90 ms."""
+    hop, w = int(0.01 * SR), int(0.06 * SR)
+    f = np.fft.rfftfreq(w, 1.0 / SR)
+    m = (f > lo) & (f < hi)
+    win = np.hanning(w)
+    hz = np.array([f[m][np.argmax(np.abs(np.fft.rfft(x[i:i + w] * win))[m])] for i in range(0, len(x) - w, hop)])
+    k = 9
+    pad = np.pad(hz, k // 2, mode="edge")
+    hz = np.array([np.median(pad[i:i + k]) for i in range(len(hz))])
+    return np.arange(len(hz)) * hop / SR + w / (2.0 * SR), hz
+
+
+def build_wail(src, name, source, t0, t1, min_cycle):
+    """Cuts one sweep of a wailing siren: from the lowest tone in the first part of [t0, t1] to the lowest tone at
+    least `min_cycle` later, the end moved up to 3 ms to match the start's phase, cross-faded, levelled."""
+    x = level(highpass(load(os.path.join(src, source))))
+    t, hz = pitch_track(x)
+    sel = (t >= t0) & (t <= t1)
+    ts, hs = t[sel], hz[sel]
+    first = ts <= ts[0] + (t1 - t0 - min_cycle) * 0.6
+    a = ts[first][np.argmin(hs[first])]
+    later = ts >= a + min_cycle
+    b = ts[later][np.argmin(hs[later])]
+    start, nominal = int(a * SR), int((b - a) * SR)
+    w = int(0.03 * SR)
+    ref = x[start:start + w]
+    best, lag = -2.0, nominal
+    for d in range(nominal - int(0.003 * SR), nominal + int(0.003 * SR)):
+        c = x[start + d:start + d + w]
+        v = float(np.dot(ref, c) / (np.linalg.norm(ref) * np.linalg.norm(c) + 1e-12))
+        if v > best:
+            best, lag = v, d
+    fade = int(FADE * SR)
+    seg = x[start:start + lag].copy()
+    k = np.linspace(0.0, 1.0, fade)
+    seg[:fade] = seg[:fade] * np.sqrt(k) + x[start + lag:start + lag + fade] * np.sqrt(1.0 - k)
+    seg = normalise(seg, TARGET)
+    out = os.path.join(REPO, "assets", "audio", name + ".wav")
+    write_loop_wav(out, seg)
+    inside = (t >= a) & (t <= b)
+    print(f"{os.path.relpath(out, REPO)}: {lag / SR:.3f} s loop from {a:.2f} s, tone {hz[inside].min():.0f}-"
+          f"{hz[inside].max():.0f} Hz ({hs[np.argmin(np.abs(ts - a))]:.0f} Hz at the seam's start, "
+          f"{hs[np.argmin(np.abs(ts - b))]:.0f} at its end), self-match {best:.3f}, {loudness(seg):.1f} LUFS")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", default="/data/danilko/game_assets/audio")
     ap.add_argument("--at", type=float, default=3.8, help="the loop starts at the tone change nearest this (s)")
     ap.add_argument("--cycles", type=int, default=2)
+    ap.add_argument("--only", default="", help="siren | siren_police | siren_fire (default: all three)")
     a = ap.parse_args()
+    for name, (source, t0, t1, min_cycle) in WAILS.items():
+        if a.only in ("", name):
+            build_wail(a.src, name, source, t0, t1, min_cycle)
+    if a.only not in ("", "siren"):
+        return
     x = level(highpass(load(os.path.join(a.src, SOURCE))))
     start, n, corr = loop_cut(x, int(a.at * SR), a.cycles)
     fade = int(FADE * SR)

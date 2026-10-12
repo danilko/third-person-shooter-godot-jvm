@@ -318,5 +318,15 @@ func _initialize() -> void:
 	foot.queue_free()
 
 	print("")
+	print("=== sirens: one per service (user 2026-10-12), each a LOOP ===")
+	for row in [["POC1", "SIREN_POLICE"], ["MPC1", "SIREN_POLICE"], ["FIE1", "SIREN_FIRE"], ["LAT1", "SIREN_FIRE"],
+			["AMB1", "SIREN"], ["TAX1", "SIREN"]]:
+		var v: Node = (load("res://src/main/resources/com/openworld/vehicle/%s.tscn" % row[0]) as PackedScene).instantiate()
+		_check("%s sounds %s" % row, String(v.call("siren_sound_now")) == row[1], String(v.call("siren_sound_now")))
+		v.free()
+	for f in ["siren", "siren_police", "siren_fire"]:
+		var st := load("res://assets/audio/%s.wav" % f) as AudioStreamWAV
+		_check("%s.wav loops (the smpl chunk)" % f, st != null and st.loop_mode == AudioStreamWAV.LOOP_FORWARD,
+			"%.2f s" % st.get_length() if st else "missing")
 	print("RESULT %s (%d checks, %d failures)" % ["PASS" if fails == 0 else "FAIL", checks, fails])
 	quit(1 if fails > 0 else 0)

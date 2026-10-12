@@ -88,7 +88,10 @@ contact-mic recording below). Gunshots are layered offline: body + mechanical + 
 | tyre squeal | Chrysler LHS tire squeal 02 — audible-edge | https://freesound.org/people/audible-edge/sounds/71737/ | |
 | tyre burst | Tire Puncture Pop — JohnsonBrandEditing | https://freesound.org/people/JohnsonBrandEditing/sounds/243375/ | designed |
 | horn | Car horn inside, Fiat Panda — misperpodcast | https://freesound.org/people/misperpodcast/sounds/733553/ | small-car horn, suits kei |
-| siren (`siren`) | Japan Nara Medic Sirene ... Passing By — thabigm | https://freesound.org/people/thabigm/sounds/758375/ |IN (HQ preview, 2026-10-12; a Japanese ambulance ピーポー, used for every emergency vehicle) |
+| siren (`siren`) | Japan Nara Medic Sirene ... Passing By — thabigm | https://freesound.org/people/thabigm/sounds/758375/ |IN (HQ preview, 2026-10-12; a Japanese ambulance ピーポー: AMB1, and the fallback) |
+| police siren (`siren_police`) | Police siren.mp3 — MultiMax2121 | https://freesound.org/people/MultiMax2121/sounds/156869/ |IN (HQ preview, 2026-10-12). CC0, "recorded from a street in the NYC suburbs": a slow wail from 5 s, yelps from 11 s. NOT Japanese |
+| fire engine siren (`siren_fire`) | 230222 Siren ... firetruck engine, R-07 near TPM Toronto — TRP | https://freesound.org/people/TRP/sounds/717906/ |IN (HQ preview, 2026-10-12). CC0, own recording (date + recorder in the name); approach, loud 16-20 s, stops at 21 s. NOT Japanese (no bell) |
+| sirens looked at and left (2026-10-12) | — | — | JAPANESE but not CC0: eyecandyuk 34952 "Police_Siren_Tokyo" (BY-NC), a Kyoto ambulance (BY-NC). CC0 but provenance doubted: mrrap4food 619050 / 619087 (no description, generic names), snapssound 536387 (".sse" in the description, the mark of the library rejected above). CC BY: CGEffex 121900. Freesound's own search with the CC0 filter returns nothing for "japan police siren" / "japan fire truck siren" |
 | siren, not used | SS2000_wail_seamless — ThePeasantJoe | https://freesound.org/people/ThePeasantJoe/sounds/800708/ | seamless wail (a US-style wail) |
 | gear shift | Lotus Elise shifting — conicity | https://freesound.org/people/conicity/sounds/697837/ | |
 | NOS boost | Rocket Boost Engine Loop — qubodup | https://freesound.org/people/qubodup/sounds/146770/ | |

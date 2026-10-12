@@ -12,9 +12,13 @@ package com.openworld.audio;
 public enum Sound {
     /** The local player's damage was confirmed (HitMarker). 2D. */
     HIT_MARKER("hit_marker"),
-    /** An emergency vehicle on a call (Vehicle.refreshEmergency): a LOOPING Japanese siren (police: the wailing
-     *  ウーウー; an ambulance's ピーポー can be a second file later). 3D, on the car. */
+    /** An emergency vehicle on a call (Vehicle.refreshEmergency): a LOOPING siren, 3D, on the car. This one is the
+     *  ambulance's two-tone ピーポー, and what any other emergency vehicle plays when its own file is missing. */
     SIREN("siren"),
+    /** A patrol car's siren: a slow wail (ウー). Falls back to {@link #SIREN} while the file is missing. */
+    SIREN_POLICE("siren_police"),
+    /** A fire engine's / ladder truck's siren: a faster, higher wail. Falls back to {@link #SIREN}. */
+    SIREN_FIRE("siren_fire"),
 
     // a running car's engine (carrier.vehicle.EngineAudio): the starter, then LOOPING takes at idle and three engine
     // speeds, cross-faded and pitched. 3D, on the car, only for cars near the camera.
