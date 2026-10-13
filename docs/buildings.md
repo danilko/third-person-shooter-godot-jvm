@@ -1073,3 +1073,44 @@ cell-wide MultiMesh that gets a range needs the same sum (the lot plinths and ap
 **Looked at** (`shot_city.gd`, noon): a shop street (awnings, projecting signs, vending machines), a bicycle and a
 置き看板 close up, the three scatter meshes alone. **Not looked at:** the office name board (two pictures landed inside
 a building; `probe_buildings` passes it), anything at night, the flats' bicycles.
+
+## Interior lighting, measured (PLAN.md L1, 2026-10-12) -- a first reading, not a decision
+
+User, 2026-10-11: "stores such as the konbini have room light meshes, but no actual light on ... not sure if baked
+light will be cheaper for interiors -- do a performance test and suggest."
+
+`tools/godot/measure_interior_light.gd` (needs a display): one interior standing ALONE (its `_Shop` scene, no city),
+two cameras (standing inside; on the street 14 m from the front), day and night, and per variant the draw calls,
+the GPU's own frame time over 240 frames and a picture. Variants: **control** (as shipped), **omni N** (an
+`OmniLight3D`, no shadow, range 7 m, at the N ceiling points nearest the camera: 12 and 4), **fill** (no light node;
+the environment's ambient raised to a flat warm colour, what a per-interior ambient would do).
+
+**What the pictures show (KonbiniL, the clear result).** Control at night is BLACK inside: the emissive strips light
+nothing. Omni gives the room pools of light and shaded walls, and from the street at night the shop front glows
+through its glass, which is the konbini's whole look. Fill makes every surface the same flat white: it reads as
+unlit, only brighter, and as built here it changes the ambient of the whole scene, not the room.
+
+**What the timings show: less than they should.** GPU ms, control -> omni 12 / omni 4 / fill:
+
+| | KonbiniL inside | KonbiniL street | Hospital inside | Hospital street |
+|---|---|---|---|---|
+| day | 0.38 -> 2.39 / 0.61 / 1.34 | 0.81 -> 1.28 / 1.12 / 0.81 | 2.35 -> 2.53 / 2.49 / 2.41 | 1.39 -> 1.69 / 1.72 / 1.79 |
+| night | 0.92 -> 1.97 / 1.40 / 0.97 | 0.71 -> 1.11 / 1.04 / 0.60 | 1.11 -> 1.36 / 1.16 / 0.92 | 0.72 -> 0.97 / 0.85 / 0.60 |
+
+Draw calls are unchanged in every cell (lights without shadows add none). The times are NOISY at this scale: the
+same control scene reads 0.38 and 0.92 ms, and "fill" (no light at all) reads from -0.19 to +0.97 against its
+control -- so the noise is about +-0.5 ms, as large as most of the differences. What can be said: 4 lights cost
+somewhere between nothing and 0.5 ms, 12 lights between 0.2 and 2.0 ms, in a frame that is otherwise almost empty.
+One run; an isolated room, not a frame of the game.
+
+**Not built, so not measured:** (c) a LightmapGI per building scene and (d) vertex-baked light. Both are free at
+run time by construction; (c) needs UV2 on the merged mesh and a bake step, (d) needs the scene build to write a
+colour attribute.
+
+**Suggestion, to confirm with a proper measurement:** real lights, pooled like `world.StreetLights` -- an unshadowed
+OmniLight3D at the ceiling points of the interior the player is in or looking into, capped at 4-6 -- because it is
+the only variant here that gives the room form and the lit shop front, it adds no draws, and its cost is at the
+noise floor of this test. Before building it: repeat the timing INSIDE the game at a busy site (the perf gate's
+cameras), several runs, so the number is real. Two traps found on the way: the konbini's `MI_Light` surfaces are
+shelf and fridge strips under 2 m, not ceiling panels (the script falls back to a 4.5 m grid under a 2.85 m
+ceiling), and a `_Shop` scene already uses the `_Open` mesh -- instancing both doubles the building.

@@ -1395,3 +1395,44 @@ leading ring reaches past (210 + 85..150 m) but which was not measured. (2) It i
 (3) Nobody has driven it: whether cars now pop in at the far end of a long straight is for a play test
 (`traffic_lead_seconds 0` in the inspector, or `--lead=0`, is the old behaviour). Crash counts are the same with
 and without the weighting (35-48 scored contacts per ~85 car-minutes over the four sites in every run).
+
+### Both ways on a driver's road (2026-10-12, after the user drove the leading ring)
+
+User: "the cars seem to pop, not always on a long straight, but only the opposite way, so only one lane is heavy.
+The weight seems good ... on the far way some spread on both lines would be great."
+
+**Why it was one-sided.** `placementInRing` scores its candidates by `passDistance`: how near the car's road AHEAD
+comes to a player. Ahead of a driver that is always the ONCOMING lane (it runs straight at them); a car going the
+driver's way runs away from them, so it never won a draw. On foot the rule is right; for a driver it fills one
+carriageway.
+
+**The probe first.** `probe_traffic_census --drive` now carries its OWN camera, made current every frame and
+looking along the travel (the player's rig rewrote the one it used to turn: the dot with the travel read -0.7, now
+1.00), so "never born in view" is finally asked as a driver's camera asks it; and it counts the ambient cars ahead
+on the line of travel by HEADING, within 150 m and within 400 m.
+
+**The change** (`ZoneManager.trafficBalanceWays`, on; `--balance-ways=0` is the control): when a player is driving
+(8 m/s and up), the top-up counts the ambient cars ahead on their line of travel by heading (`wantedWay`: a band
+20 m + 15 % of the distance either side, heading within ~53 degrees of the travel or against it) and, of its
+candidates, takes one going the way that has FEWER -- the nearest to the line -- when there is one; otherwise the old
+pick. And `trafficSpawnViewLead` (0.5): the in-view refusal distance grows by half the ring's lead for a driver
+(160 m on foot, 210 m at 20 m/s, 235 m from 30 m/s), because a car born in view at 160-200 m on a straight reads as
+a pop.
+
+Cars ahead on the line of travel, **same way / oncoming**, trunk + expressway + arterial, 2 runs each (mean of 6):
+
+| | within 150 m | within 400 m |
+|---|---|---|
+| 20 m/s, control | 0.9 / 0.7 | 1.4 / 1.1 |
+| 20 m/s, both ways, view lead 0 | 1.1 / 0.8 | 1.9 / 1.2 |
+| 20 m/s, both ways, view lead 0.5 (shipped) | 1.3 / 0.7 | 2.2 / 1.2 |
+| 20 m/s, both ways, view lead 1.0 | 0.8 / 0.6 | 1.5 / 0.9 |
+| 32 m/s, control | 0.65 / 1.25 | 1.1 / 2.4 |
+| 32 m/s, both ways, view lead 0.5 (shipped) | 1.2 / 1.0 | 2.2 / 1.9 |
+
+At 32 m/s the control IS the report: twice as many oncoming as going the driver's way. Shipped, the two are level
+and there are more in all (3.5 -> 4.1 within 400 m). A full view lead costs cars (the band left in view is too
+thin), so it is half. Single cells swing by +-0.5 between runs; the means are what to read.
+
+**Not shown:** nobody has driven it since; whether a car born at 210-235 m still reads as a pop is for a play test
+(`traffic_spawn_view_lead` in the inspector). The budget (20) is unchanged and is the next lever if it is thin.

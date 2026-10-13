@@ -25,9 +25,9 @@ public class VehicleHUD extends Control {
 
     @Export public NodePath speedLabelPath = new NodePath("Speed/Value");
     @Export public NodePath unitLabelPath = new NodePath("Speed/Unit");
-    /** Show mph instead of km/h. ON by default since 2026-10-12 (user: US influence on the roads -- "mph", with
-     *  distances kept in metres on the GPS and the guide signs). */
-    @Export public boolean imperial = true;
+    /** Show mph instead of km/h. OFF: km/h, like the limits painted on the road and on the signs (user,
+     *  2026-10-12: "please do km/h -- I thought mph was metres, it is miles"; it had been on for half a day). */
+    @Export public boolean imperial = false;
 
     @Export public NodePath healthLabelPath = new NodePath("Speed/Health");
 

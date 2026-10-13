@@ -1967,3 +1967,40 @@ corner is gone); `danchi` and `hospital_west` re-sited by `island_civic_sites.py
 along its own road away from the corner, frontage check clean (only `super_sento_city`, the known plot under the
 connector deck, still reports). `check_roads.sh` 44 PASS + the old sample street-tree FAIL; `island_downstream.sh
 --check` PASS. The sample (`Roads_RoadKitZones`) was rebuilt for the hedge.
+
+## Legends painted on the carriageway: 止まれ and the limit (PLAN.md T4, 2026-10-12)
+
+User: "for now, please do Japanese text" and "km/h" (the speedometer went back to km/h the same day).
+
+**A legend is geometry in the road's own mark surface**, like the stop line and the zebra: no texture, no decal.
+`tools/build_paint_glyphs.py` triangulates the characters once (the signs' own face, Noto Sans CJK JP at weight 700,
+OFL; fontTools for the outlines, shapely for the constrained triangulation; a check that the triangles' area is the
+ink's) into `assets/world_source/kits/road_kit/paint_glyphs.json` -- 13 characters, 452 triangles, 22 KB -- and the
+kit reads that file with no font library (`point_furniture.glyphs`, `legend`). The file is in `Table.files()`, so it
+salts every piece's digest. A legend in another language is `stop_text` in furniture.json plus
+`build_paint_glyphs.py --chars`: the paint is baked into the piece and CANNOT follow the sign-language setting.
+
+**止まれ** (`_junction_marks`, rules `stop_text*`): behind the stop line of every arriving lane of an arm that must
+stop, one character after another along the lane, 止 nearest the line so it reads top to bottom from the driver's
+seat; 1.5 x 2.2 m a character (narrower in a narrow lane), 0.7 m apart, starting 1.5 m behind the line. No arrow is
+painted under it. WHICH ARMS (`yield_arms`): at a junction of three or more arms with no signals (`_signalised`,
+the Japanese rule already there), one road has priority -- the arm with the highest limit and the most lanes, plus
+the arm most nearly straight across from it (within 40 degrees), or, when arms tie, the two of them most nearly
+opposite, then by name -- and every other arm stops. So the stem of a T stops and at a cross of equals one street
+does. Never at a junction with an expressway, ramp or rail lane. **The island has 21 such arms**: most 3-arm
+junctions are signalised by the existing rule. THE AI DOES NOT READ IT: the paint says who should stop, the traffic
+brain's own junction rule is unchanged.
+
+**The limit** (`_speed_text`, rules `speed_text*`): its numerals in km/h in EVERY through lane 70 m or longer, 14 m
+after the lane begins (past the junction and the far arm's zebra) and again every 320 m while 34 m remain before
+the lane's own stop line; 0.8 x 3.2 m a digit, side by side; `M_LineY` (yellow: a regulation). **992 on the island**
+(60: 325, 50: 304, 40: 108, 30: 175, 80: 80). Japan does not paint 60 on an ordinary road (it is the legal default):
+`speed_text_material` / a per-limit rule can drop it later -- painted everywhere now because the user asked for the
+numbers. COST: the yellow is one more surface in each piece's `FURN__marks_w` mesh, so up to one draw per streamed
+road piece; not measured (perf_gate not run).
+
+**Checked:** `point_furniture --self-test` (the stem of an unsignalised T only; the legend inside its lane, behind
+the line, facing up; the first character furthest ahead; "50" left to right; an unknown character paints nothing;
+six numerals on the fixture; control: both off paint nothing). Island road stage rebuilt (41 road pieces + the 15
+rail pieces, gate 0 errors, 2 624 lanes as before). Pictures: 止まれ at j056aaf1a (-850, 659) and "30" in both
+lanes of the street it meets, each the right way up for its own direction.

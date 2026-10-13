@@ -133,7 +133,7 @@ class Table(object):
 
     def files(self):
         """Every file the placements depend on: the table and each piece (the digest salts them)."""
-        return [self.path] + sorted({a["file"] for a in self.assets.values()})
+        return [self.path, GLYPH_PATH] + sorted({a["file"] for a in self.assets.values()})
 
 
 def load(path=TABLE_PATH):
@@ -481,9 +481,110 @@ def _norm_len(a, b):
     return math.sqrt(sum((a[k] - b[k]) ** 2 for k in range(3)))
 
 
+GLYPH_PATH = os.path.join(REPO, "assets", "world_source", "kits", "road_kit", "paint_glyphs.json")
+_GLYPHS = {}
+
+
+def glyphs(path=GLYPH_PATH):
+    """The characters a legend can be painted in (tools/build_paint_glyphs.py): `{char: {w, h, tris}}`, em about
+    the ink's centre. Empty when the file is missing -- a legend is then simply not painted."""
+    if path not in _GLYPHS:
+        doc = {}
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as fh:
+                doc = json.load(fh).get("glyphs", {})
+        _GLYPHS[path] = doc
+    return _GLYPHS[path]
+
+
+def legend(text, cell_w, cell_len, gap, stacked, table=None):
+    """A legend's triangles in ITS OWN frame, `[((right, ahead), (right, ahead), (right, ahead)), ...]` and its
+    length along the road: `right` to the reader's right about the legend's centre line, `ahead` the way they
+    travel, 0 at the edge they reach first. `stacked` (止まれ) puts one character after another along the lane,
+    the FIRST one furthest ahead, so it reads top to bottom from the driver's seat; otherwise (a limit's numerals)
+    side by side, left to right. Every character is scaled by the same factors -- the legend's widest ink to
+    `cell_w`, its tallest to `cell_len` -- so a road legend is the font's shape stretched along the road, as painted.
+    `(None, 0.0)` when a character is not in the glyph file."""
+    table_g = glyphs() if table is None else table
+    chars = [table_g.get(c) for c in text]
+    if not chars or any(c is None for c in chars):
+        return None, 0.0
+    sx = cell_w / max(c["w"] for c in chars)
+    sy = cell_len / max(c["h"] for c in chars)
+    n = len(chars)
+    total = n * cell_len + (n - 1) * gap if stacked else cell_len
+    tris = []
+    for i, c in enumerate(chars):
+        if stacked:
+            cx, cy = 0.0, total - 0.5 * cell_len - i * (cell_len + gap)
+        else:
+            cx, cy = (i - 0.5 * (n - 1)) * (cell_w + gap), 0.5 * cell_len
+        t = c["tris"]
+        for k in range(0, len(t) - 2, 3):
+            tris.append(tuple((cx + t[k + j][0] * sx, cy + t[k + j][1] * sy) for j in range(3)))
+    return tris, total
+
+
+def _up_tri(a, b, c):
+    n = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+    return (a, b, c) if n > 0.0 else (a, c, b)
+
+
+#: 止まれ is for a street meeting a street: a ramp's or an expressway's mouth merges, it does not stop
+NO_STOP_TEXT_CLASSES = ("expressway", "ramp", "rail")
+#: how far from straight across (degrees) two arms may be and still be one road through the junction
+THROUGH_BEND_MAX = 40.0
+
+
+def yield_arms(table, lanes, junctions):
+    """The arms that must STOP at an unsignalised junction, as a set of `id(arm)` (PLAN.md T4; the Japanese rule
+    `_signalised` already names: "the minor approach has a stop line and 止まれ, and that is all"). At a junction
+    of three or more arms with no signals, ONE road has priority -- the arm carrying the highest limit and the
+    most lanes, with the arm most nearly opposite it, or, when several arms tie, the two of them most nearly
+    opposite (then by name, so the answer does not depend on the order of the file) -- and every other arm stops.
+    So the stem of a T stops, and at a cross of two equal streets one of them does."""
+    out = set()
+    for j in junctions:
+        arms = [a for a in j.get("arms", ()) if any(i in lanes for i in tuple(a.get("in_lanes", ()))
+                                                        + tuple(a.get("out_lanes", ())))]
+        if len(arms) < 3 or _signalised(table, j, lanes):
+            continue
+
+        def mine_lanes(a):
+            return [lanes[i] for i in tuple(a.get("in_lanes", ())) + tuple(a.get("out_lanes", ())) if i in lanes]
+        if any(l.get("road_class") in NO_STOP_TEXT_CLASSES for a in arms for l in mine_lanes(a)):
+            continue
+
+        def rank(a):
+            ls = mine_lanes(a)
+            return (max(float(l.get("speed_limit", 0.0)) for l in ls), len(ls))
+
+        def bend(a, b):
+            d = abs(float(a.get("bearing", 0.0)) - float(b.get("bearing", 0.0))) % 360.0
+            return abs(180.0 - (360.0 - d if d > 180.0 else d))
+        best = max(rank(a) for a in arms)
+        top = [a for a in arms if rank(a) == best]
+        if len(top) >= 2:
+            pairs = [(round(bend(a, b), 1), tuple(sorted((str(a.get("road")), str(b.get("road"))))), i, k)
+                     for i, a in enumerate(top) for k, b in enumerate(top) if i < k]
+            _d, _n, i, k = min(pairs)
+            priority = [top[i], top[k]]
+        else:
+            priority = [top[0]]
+            rest = [a for a in arms if a is not top[0]]
+            other = min(rest, key=lambda a: (round(bend(top[0], a), 1), str(a.get("road"))))
+            if bend(top[0], other) <= THROUGH_BEND_MAX:
+                priority.append(other)
+        for a in arms:
+            if not any(a is q for q in priority) and a.get("in_lanes"):
+                out.add(id(a))
+    return out
+
+
 def _junction_marks(fur, table, lanes, junctions, mine, mark_mat):
     r = table.rules
     lift = float(r["paint_lift"])
+    stops = yield_arms(table, lanes, junctions) if r.get("stop_text") else set()
     for arm in _arms(lanes, junctions):
             fwd, left, anchor, ins, rows = arm["fwd"], arm["left"], arm["anchor"], arm["ins"], arm["rows"]
 
@@ -524,6 +625,24 @@ def _junction_marks(fur, table, lanes, junctions, mine, mark_mat):
                         corners.append((x, y, row["sample"](back)[2] + lift))
                     fur.paint_tris(mark_mat(row["lane"]), _up_quad(*corners))
                     fur.counts["stop_line"] = fur.counts.get("stop_line", 0) + 1
+                    # ---- 止まれ behind it, on an arm that must stop (yield_arms)
+                    if id(arm["arm"]) in stops and row["length"] >= r["stop_text_min_lane"]:
+                        cw = min(float(r["stop_text_w"]), 2.0 * row["half"] - 2.0 * float(r["stop_text_margin"]))
+                        tris, total = legend(str(r["stop_text"]), cw, float(r["stop_text_len"]),
+                                             float(r["stop_text_gap"]), True)
+                        b0 = sb + sw + float(r["stop_text_back"])
+                        if tris and cw > 0.5 and row["length"] >= b0 + total:
+                            out = []
+                            for tri in tris:
+                                vs = []
+                                for right, ahead in tri:
+                                    back = b0 + total - ahead
+                                    x, y = plan(row["lat"] - right, back)
+                                    vs.append((x, y, row["sample"](back)[2] + lift))
+                                out.append(_up_tri(*vs))
+                            fur.paint_tris(mark_mat(row["lane"]), out)
+                            fur.counts["stop_text"] = fur.counts.get("stop_text", 0) + 1
+                            continue                 # no arrow under the legend
                 turns = frozenset(lanes[n].get("turn", "") for n in row["lane"].get("next", ())
                                   if n in lanes and lanes[n].get("kind") == "connector" and lanes[n].get("turn"))
                 asset = ARROW_FOR.get(turns)
@@ -532,6 +651,56 @@ def _junction_marks(fur, table, lanes, junctions, mine, mark_mat):
                     cum = _lengths(pts)
                     p, d, _i = _at(pts, cum, cum[-1] - r["arrow_back"])
                     fur.put(table, asset, p, d)
+
+
+def _speed_text(fur, table, lanes, mine, mark_mat):
+    """THE LIMIT, PAINTED IN THE LANE (PLAN.md T4): its numerals in km/h (user, 2026-10-12), `speed_text_from` m
+    after a through lane begins -- past the junction and the far arm's zebra -- and again every `speed_text_every`
+    m while the lane has `speed_text_end_clear` left before its own stop line, arrow and 止まれ. In every lane of a
+    carriageway, as Japan paints it. `speed_text_material` (yellow: a regulation, like the no-overtaking line) or
+    the road's own white when that is empty. Off with `speed_text_len` 0."""
+    r = table.rules
+    cell_len = float(r.get("speed_text_len", 0.0))
+    if cell_len <= 0.0:
+        return
+    lift = float(r["paint_lift"])
+    for lid in sorted(lanes):
+        l = lanes[lid]
+        limit = float(l.get("speed_limit", 0.0))
+        if l.get("kind") != "through" or limit <= 0.0 or l.get("road_class") == "rail" or not mine(l):
+            continue
+        pts = _lane_kit(l)
+        if len(pts) < 2:
+            continue
+        cum = _lengths(pts)
+        if cum[-1] < r["speed_text_min_lane"]:
+            continue
+        text = "%d" % round(limit)
+        n = len(text)
+        gap = float(r["speed_text_gap"])
+        room = float(l.get("lane_width", 3.5)) - 2.0 * float(r["speed_text_margin"])
+        cw = min(float(r["speed_text_w"]), (room - (n - 1) * gap) / n)
+        tris, total = legend(text, cw, cell_len, gap, False)
+        if not tris or cw < 0.3:
+            continue
+        mat = r.get("speed_text_material") or mark_mat(l)
+        s = float(r["speed_text_from"])
+        while s + total <= cum[-1] - r["speed_text_end_clear"]:
+            p, d, _i = _at(pts, cum, s + 0.5 * total)
+            left = _left(d)
+            out = []
+            for tri in tris:
+                vs = []
+                for right, ahead in tri:
+                    a = ahead - 0.5 * total
+                    vs.append((p[0] + d[0] * a - left[0] * right, p[1] + d[1] * a - left[1] * right,
+                               _at(pts, cum, s + ahead)[0][2] + lift))
+                out.append(_up_tri(*vs))
+            fur.paint_tris(mat, out)
+            fur.counts["speed_text"] = fur.counts.get("speed_text", 0) + 1
+            if r["speed_text_every"] <= 0.0:
+                break
+            s += float(r["speed_text_every"])
 
 
 def _lane_props(fur, table, lanes, mine, ground):
@@ -1447,6 +1616,7 @@ def place(table, solved, lanes_doc, mine_lane, mine_run, mine_pad, mark_mat, gro
     junctions = {j["id"]: j for j in lanes_doc.get("junctions", ())}
     ordered = [junctions[k] for k in sorted(junctions)]
     _junction_marks(fur, table, lanes, ordered, mine_lane, mark_mat)
+    _speed_text(fur, table, lanes, mine_lane, mark_mat)
     # the signals first: every later solid prop (planter, bollard, lamp) keeps clear of a pole already standing
     # ONE lane index, shared: "may a solid thing stand here" is one question, and a functional pole that skips
     # it is how a signal came to stand in a turn connector and a median lamp in a neighbouring road's lane.
@@ -2330,6 +2500,60 @@ def self_test():
     assert js[0]["coord"] == {"root": "j1", "rel": 0.0}
     assert js[1]["coord"]["root"] == "j1" and abs(js[1]["coord"]["rel"] - ((27.0 - 74.0 / COORD_SPEED) % 54.0)) < 1e-3
     assert "coord" not in js[2] and "coord" not in js[3]
+    # ---- PLAN.md T4: 止まれ on the arm that must stop, the limit's numerals in the lane
+    def ln(i, a, b, limit, nxt=()):
+        return {"id": i, "kind": "through", "lane_width": 3.5, "speed_limit": limit, "road_class": "street",
+                "points": [g(a), g(b)], "next": list(nxt)}
+    t_lanes = [ln("w_F", (-120, -1.75, 0), (-8, -1.75, 0), 50.0), ln("w_R", (-8, 1.75, 0), (-120, 1.75, 0), 50.0),
+               ln("e_F", (120, 1.75, 0), (8, 1.75, 0), 50.0), ln("e_R", (8, -1.75, 0), (120, -1.75, 0), 50.0),
+               ln("s_F", (1.75, -120, 0), (1.75, -8, 0), 30.0), ln("s_R", (-1.75, -8, 0), (-1.75, -120, 0), 30.0)]
+    t_arms = [{"road": "main", "bearing": 180.0, "in_lanes": ["w_F"], "out_lanes": ["w_R"]},
+              {"road": "main", "bearing": 0.0, "in_lanes": ["e_F"], "out_lanes": ["e_R"]},
+              {"road": "side", "bearing": 270.0, "in_lanes": ["s_F"], "out_lanes": ["s_R"]}]
+    t_doc = {"lanes": t_lanes, "junctions": [{"id": "jt", "arms": t_arms}]}
+    by_id = {l["id"]: l for l in t_lanes}
+    assert not _signalised(table, t_doc["junctions"][0], by_id), "the fixture must be an unsignalised T"
+    assert yield_arms(table, by_id, t_doc["junctions"]) == {id(t_arms[2])}, "the slower stem stops, the road does not"
+    # equal limits: still the stem (the two arms straight across are the road)
+    for l in t_lanes:
+        l["speed_limit"] = 30.0
+    assert yield_arms(table, by_id, t_doc["junctions"]) == {id(t_arms[2])}
+    t_lanes[4]["speed_limit"] = t_lanes[5]["speed_limit"] = 30.0
+    for l in t_lanes[:4]:
+        l["speed_limit"] = 50.0
+    ft = place(table, ([], [], [], []), t_doc, lambda l: True, lambda s: True, lambda j: True, lambda l: "M_LineW")
+    assert ft.counts.get("stop_text") == 1, ft.counts
+    rr = table.rules
+    white = ft.paint["M_LineW"]
+    # the legend lies in the stem's arriving lane (x 0 .. 3.5), behind its stop line, and nowhere else
+    b_lo = rr["stop_back"] + rr["stop_width"] + rr["stop_text_back"]
+    b_hi = b_lo + 3 * rr["stop_text_len"] + 2 * rr["stop_text_gap"]
+    in_stem = [t for t in white if all(-8.0 - b_hi - 1e-6 <= v[1] <= -8.0 - b_lo + 1e-6 for v in t)]
+    assert len(in_stem) == sum(len(glyphs()[c]["tris"]) // 3 for c in rr["stop_text"]), len(in_stem)
+    xs = [v[0] for t in in_stem for v in t]
+    assert min(xs) >= rr["stop_text_margin"] - 1e-6 and max(xs) <= 3.5 - rr["stop_text_margin"] + 1e-6, (min(xs), max(xs))
+    assert all((t[1][0] - t[0][0]) * (t[2][1] - t[0][1]) - (t[1][1] - t[0][1]) * (t[2][0] - t[0][0]) > 0 for t in in_stem), \
+        "paint faces up"
+    # read from the driver's seat (travelling +Y): the first character is the one furthest AHEAD
+    first, _tot = legend(rr["stop_text"][0], 1.0, 1.0, 0.0, True)
+    tri3, tot3 = legend(rr["stop_text"], 1.0, 1.0, 0.5, True)
+    assert abs(tot3 - (len(rr["stop_text"]) * 1.0 + (len(rr["stop_text"]) - 1) * 0.5)) < 1e-9
+    assert min(v[1] for t in tri3[:len(first)] for v in t) >= tot3 - 1.0 - 1e-6, "the first character leads"
+    # numerals side by side, left to right for the reader, and the whole legend inside its cells
+    two, _t = legend("50", 0.8, 3.0, 0.3, False)
+    n5 = len(glyphs()["5"]["tris"]) // 3
+    assert max(v[0] for t in two[:n5] for v in t) <= 0.0 < min(v[0] for t in two[n5:] for v in t)
+    assert legend("?", 1.0, 1.0, 0.0, False) == (None, 0.0), "an unknown character paints nothing"
+    # the limit in every through lane long enough, in the regulation colour; control: off paints none
+    assert ft.counts.get("speed_text") == 6, ft.counts
+    assert len(ft.paint[rr["speed_text_material"]]) == 4 * sum(len(glyphs()[c]["tris"]) // 3 for c in "50") \
+        + 2 * sum(len(glyphs()[c]["tris"]) // 3 for c in "30")
+    keep = rr["speed_text_len"], rr["stop_text"]
+    rr["speed_text_len"], rr["stop_text"] = 0.0, ""
+    off = place(table, ([], [], [], []), t_doc, lambda l: True, lambda s: True, lambda j: True, lambda l: "M_LineW")
+    rr["speed_text_len"], rr["stop_text"] = keep
+    assert "speed_text" not in off.counts and "stop_text" not in off.counts and rr["speed_text_material"] not in off.paint
+    print("OK: 止まれ on the stem of an unsignalised T only, read top to bottom; the limit's numerals in each lane")
     print("point_furniture self-test OK")
 
 

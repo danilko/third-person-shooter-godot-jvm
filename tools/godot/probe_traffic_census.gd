@@ -95,7 +95,13 @@ func _lane_node(name: String) -> Node3D:
 
 ## Carry the player `metres` along `lane` and its straightest successors at `speed`; returns [mean cars on `road`
 ## within 150 m, mean of those AHEAD of the player, samples, metres actually covered].
+var _drive_cam: Camera3D = null
+var _way_near := [0.0, 0.0]   # cars ahead within 150 m heading [the player's way, against], summed over the samples
+var _way_far := [0.0, 0.0]    # the same out to 400 m
+
 func _drive(p: CharacterBody3D, lane: String, road: String, speed: float, metres: float) -> Array:
+	_way_near = [0.0, 0.0]
+	_way_far = [0.0, 0.0]
 	var node := _lane_node(lane)
 	var done := 0.0
 	var own := 0.0
@@ -121,9 +127,13 @@ func _drive(p: CharacterBody3D, lane: String, road: String, speed: float, metres
 			p.global_position = at + Vector3(0, 30.0, 0)
 			p.velocity = dir * speed
 			# a driver looks where they are going, and "never born in view within 160 m" is asked of this camera
-			var cam := root.get_viewport().get_camera_3d()
-			if cam != null:
-				cam.global_transform = Transform3D(Basis.looking_at(dir, Vector3.UP), at + Vector3(0, 2.0, 0))
+			# (the probe's OWN camera, made current every frame: the player's rig rewrites its own and read -0.7)
+			if _drive_cam == null:
+				_drive_cam = Camera3D.new()
+				_drive_cam.far = 1200.0
+				root.add_child(_drive_cam)
+			_drive_cam.global_transform = Transform3D(Basis.looking_at(dir, Vector3.UP), at + Vector3(0, 2.0, 0))
+			_drive_cam.make_current()
 			await physics_frame
 			s += speed / 60.0
 			done += speed / 60.0
@@ -133,22 +143,32 @@ func _drive(p: CharacterBody3D, lane: String, road: String, speed: float, metres
 				var cam2 := root.get_viewport().get_camera_3d()
 				if cam2 != null:
 					faced += (-cam2.global_transform.basis.z).dot(dir)
-				for c in _cars(p.global_position, 150.0):
-					var rel: Vector3 = c.global_position - p.global_position
-					var along := rel.x * dir.x + rel.z * dir.z
-					if along > 0.0 and absf(rel.x * dir.z - rel.z * dir.x) < 25.0:
-						for ch0 in c.get_children():
-							var sc0: Script = ch0.get_script()
-							if sc0 != null and str(sc0.resource_path).ends_with("VehicleAIController.java"):
-								any_ahead += 1
+				for c in _cars(p.global_position, 400.0):
+					var ai := false
+					var lane_now := ""
 					for ch in c.get_children():
 						var sc: Script = ch.get_script()
-						if sc != null and str(sc.resource_path).ends_with("VehicleAIController.java") \
-								and _road_of(str(ch.call("lane_now"))) == road:
-							own += 1
-							var to: Vector3 = c.global_position - p.global_position
-							if to.x * dir.x + to.z * dir.z > 0.0:
-								ahead += 1
+						if sc != null and str(sc.resource_path).ends_with("VehicleAIController.java"):
+							ai = true
+							lane_now = str(ch.call("lane_now"))
+					if not ai:
+						continue
+					var rel: Vector3 = c.global_position - p.global_position
+					var along := rel.x * dir.x + rel.z * dir.z
+					var near := Vector2(rel.x, rel.z).length() <= 150.0
+					if along > 0.0 and absf(rel.x * dir.z - rel.z * dir.x) < 25.0 + 0.1 * along:
+						var h: float = (-c.global_transform.basis.z).dot(dir)
+						var k := 0 if h > 0.6 else (1 if h < -0.6 else -1)
+						if k >= 0:
+							_way_far[k] += 1
+							if near:
+								_way_near[k] += 1
+						if near:
+							any_ahead += 1
+					if near and _road_of(lane_now) == road:
+						own += 1
+						if along > 0.0:
+							ahead += 1
 		# straight on: of the lanes this one names, the one whose first metre runs most nearly the way this ended
 		var end_a := path.to_global(path.curve.sample_baked(maxf(0.0, total - 1.0)))
 		var end_b := path.to_global(path.curve.sample_baked(total))
@@ -227,6 +247,10 @@ func _run() -> void:
 		zm.set("traffic_spawn_along_lanes", true)
 	if args.has("lead"):
 		zm.set("traffic_lead_seconds", float(args["lead"]))    # 0 = the control: the ring stays on the player
+	if args.has("balance-ways"):
+		zm.set("traffic_balance_ways", int(args["balance-ways"]) != 0)   # 0 = the control: oncoming wins every draw
+	if args.has("view-lead"):
+		zm.set("traffic_spawn_view_lead", float(args["view-lead"]))      # 0 = the control: born in view from 160 m
 	if args.has("big-road-bias"):
 		zm.set("traffic_big_road_bias", float(args["big-road-bias"]))
 	var sites := SITES.duplicate()
@@ -339,6 +363,9 @@ func _run() -> void:
 			var r := await _drive(p, own_lane, own_road, float(args["drive"]), float(args.get("drive-metres", "1500")))
 			print("    DRIVEN at %.0f m/s for %.0f m (%d samples): %.1f cars AHEAD within 150 m x 25 m (any road); on '%s' %.1f, %.1f of them ahead; camera along the travel %.2f" % [
 				float(args["drive"]), r[3], r[2], r[4], own_road, r[0], r[1], r[5]])
+			var nn := maxf(float(r[2]), 1.0)
+			print("      ahead by heading, same way / oncoming: within 150 m %.1f / %.1f, within 400 m %.1f / %.1f; top-ups placed by the both-ways rule %d" % [
+				_way_near[0] / nn, _way_near[1] / nn, _way_far[0] / nn, _way_far[1] / nn, int(zm.call("traffic_spawns_balanced_now"))])
 		if min_near >= 0.0 and s200 / d < min_near:
 			fails += 1
 	if min_near >= 0.0:

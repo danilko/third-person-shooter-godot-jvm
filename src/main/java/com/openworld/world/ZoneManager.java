@@ -366,12 +366,16 @@ public class ZoneManager extends Node {
 					trafficSpawnMinDist, trafficSpawnLeadSeconds)) return true;
 		}
 		if (trafficSpawnViewDist > 0f) {
+			// a driver sees further down their road than a walker: the unseen distance grows with the ring's lead
+			double sp = fastestPlayerSpeed();
+			double viewDist = trafficSpawnViewDist + (sp >= TRAFFIC_LEAD_MIN_SPEED && trafficLeadSeconds > 0f
+					? trafficSpawnViewLead * Math.min(trafficLeadMax, sp * trafficLeadSeconds) : 0.0);
 			godot.api.Viewport vp = getViewport();
 			godot.api.Camera3D cam = vp != null ? vp.getCamera3d() : null;
 			if (cam != null && GD.isInstanceValid(cam)) {
 				Vector3 c = cam.getGlobalPosition();
 				double dx = p.getX() - c.getX(), dz = p.getZ() - c.getZ();
-				if (dx * dx + dz * dz < (double) trafficSpawnViewDist * trafficSpawnViewDist
+				if (dx * dx + dz * dz < viewDist * viewDist
 						&& cam.isPositionInFrustum(p.plus(new Vector3(0, 1.0, 0)))) return true;
 			}
 		}
@@ -2674,6 +2678,9 @@ public class ZoneManager extends Node {
 		Placement best = null;
 		double bestScore = -Double.MAX_VALUE;
 		int found = 0;
+		int want = wantedWay();
+		Placement wayBest = null;
+		double wayLateral = Double.MAX_VALUE;
 		int start = sidewalkRng.nextInt(lanes.size());
 		// weighted by length and road class (trafficBigRoadBias); the uniform walk from a random lane is the control
 		double[] cum = null;
@@ -2707,9 +2714,76 @@ public class ZoneManager extends Node {
 				// "sees 1 or 2" of a dozen)
 				double score = -passDistance(lane, s);
 				if (score > bestScore) { bestScore = score; best = new Placement(lane, p, dir); }
+				// ... and, for a driver, the car on their own road ahead going the way that has fewer (below)
+				if (want != 0 && dir != null) {
+					double[] w = wayAhead(p, dir);
+					if (w != null && (int) w[0] == want && w[1] < wayLateral) {
+						wayLateral = w[1];
+						wayBest = new Placement(lane, p, dir);
+					}
+				}
 			}
 		}
+		if (wayBest != null) { spawnsBalancedByWay++; return wayBest; }
 		return best;
+	}
+
+	/**
+	 * BOTH WAYS ON A DRIVER'S ROAD (user, 2026-10-12, after driving the leading ring: "the cars pop only the opposite
+	 * way, so only one lane is heavy ... on the far way some spread on both lines"). The score above takes the car
+	 * whose road ahead comes nearest a player, and ahead of a driver that is always the ONCOMING lane -- a car going
+	 * the driver's way runs away from them, so it never won a draw. With this on, the top-up counts the ambient cars
+	 * ahead of a moving player on their line of travel by heading, and of its candidates takes one going the way that
+	 * has FEWER (the nearest to the line), when there is one; otherwise the old pick. false = the control.
+	 */
+	@Export public boolean trafficBalanceWays = true;
+	/** How much of the ring's lead is added to {@code trafficSpawnViewDist} for a driver (0 = the control): at
+	 *  20 m/s a car was born in view at 200 m, which reads as a pop on a straight. */
+	@Export public float trafficSpawnViewLead = 1.0f;
+	private int spawnsBalancedByWay = 0;
+	/** Probe readout: top-ups placed by the both-ways rule. */
+	@Register
+	public int trafficSpawnsBalancedNow() { return spawnsBalancedByWay; }
+
+	/**
+	 * {way, lateral} for a car at {@code p} heading {@code dir}, when it is AHEAD of a moving player and on their line
+	 * of travel (a band that widens with distance, for a road that bends): way +1 = going the player's way, -1 =
+	 * against. null when it is neither (a side street, behind them, crossing), or no player is driving.
+	 */
+	private double[] wayAhead(Vector3 p, Vector3 dir) {
+		for (Player pl : PlayerRegistry.getPlayers()) {
+			if (!GD.isInstanceValid(pl)) continue;
+			Vector3 v = playerVelocity(pl);
+			double sp = Math.sqrt(v.getX() * v.getX() + v.getZ() * v.getZ());
+			if (sp < TRAFFIC_LEAD_MIN_SPEED) continue;
+			double fx = v.getX() / sp, fz = v.getZ() / sp;
+			Vector3 pp = pl.getGlobalPosition();
+			double dx = p.getX() - pp.getX(), dz = p.getZ() - pp.getZ();
+			double along = dx * fx + dz * fz;
+			if (along <= 0.0) continue;
+			double lateral = Math.abs(dx * fz - dz * fx);
+			if (lateral > 20.0 + 0.15 * along) continue;
+			double dot = dir.getX() * fx + dir.getZ() * fz;
+			if (Math.abs(dot) < 0.6) continue;
+			return new double[] {dot > 0 ? 1.0 : -1.0, lateral};
+		}
+		return null;
+	}
+
+	/** Which way a driver's road ahead has fewer ambient cars: +1 theirs, -1 oncoming, 0 = nobody is driving. */
+	private int wantedWay() {
+		if (!trafficBalanceWays || fastestPlayerSpeed() < TRAFFIC_LEAD_MIN_SPEED) return 0;
+		int same = 0, against = 0;
+		for (LoadedZone lz : loaded.values()) {
+			for (Vehicle v : lz.vehicles) {
+				if (!GD.isInstanceValid(v) || !v.isInsideTree()) continue;
+				Vector3 f = v.getGlobalTransform().getBasis().getColumn(2);
+				double[] w = wayAhead(v.getGlobalPosition(), new Vector3(-f.getX(), 0, -f.getZ()).normalized());
+				if (w == null) continue;
+				if (w[0] > 0) same++; else against++;
+			}
+		}
+		return same <= against ? 1 : -1;
 	}
 
 	/** How far ahead of a new car its road is followed to see whether it passes a player (m). */
