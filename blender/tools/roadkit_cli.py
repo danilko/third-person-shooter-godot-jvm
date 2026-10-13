@@ -542,6 +542,8 @@ def cmd_gltf(a):
             objs.setdefault(pfu.PAINT_OBJECT, {}).setdefault(mat, []).extend(tris)
         for mat, tris in fur.wires.items():
             objs.setdefault(pfu.WIRE_OBJECT, {}).setdefault(mat, []).extend(tris)
+        for mat, tris in fur.hedge.items():
+            objs.setdefault(pfu.HEDGE_OBJECT, {}).setdefault(mat, []).extend(tris)
         if fur.collision:
             objs.setdefault(pfu.COLLISION_OBJECT, {}).setdefault(pfu.NO_MATERIAL, []).extend(fur.collision)
         path = os.path.join(a.out_dir, piece + ".gltf")

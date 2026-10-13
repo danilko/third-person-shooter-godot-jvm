@@ -290,6 +290,31 @@ public class ZoneManager extends Node {
 	/** The share of top-ups placed by the along-lane rule when {@link #trafficSpawnAlongLanes} is off (the rest
 	 *  take the entry queue slots). See the knob's note for the measurement. */
 	@Export public float trafficSpawnAlongShare = 0.5f;
+	/**
+	 * MORE OF THE BUDGET ON THE BIG ROADS (user, 2026-10-12: "a tiny road will see more traffic, but on a big road I
+	 * barely see any"). The along-lane top-up took its candidate lanes uniformly, so a district's many short street
+	 * lanes drew as often as its trunk; with this the draw is weighted by the lane's LENGTH x (its speed limit over a
+	 * block street's 30 km/h) ^ this. 1.5 makes a metre of any big road (a 50 km/h arterial, a trunk, the
+	 * expressway: one class, or the fastest takes the others' cars) 2.8x as likely as a metre of block street. The budget is unchanged, so it costs nothing.
+	 * 0 = the control (the uniform draw).
+	 */
+	@Export public float trafficBigRoadBias = 1.5f;
+	/** The speed limit (km/h) of the road class every other is weighed against by {@link #trafficBigRoadBias}. */
+	private static final double TRAFFIC_BASE_LIMIT_KMH = 30.0;
+	/** From this limit (km/h) up a road is a big road: a 2+2 arterial, a trunk, the expressway. */
+	private static final double TRAFFIC_BIG_LIMIT_KMH = 50.0;
+
+	/** How likely {@code lane} is to be drawn for an along-lane spawn, relative to the others in its zone. */
+	private double laneSpawnWeight(Lane lane) {
+		double w = Math.max(lane.total(), 1.0);
+		if (lane instanceof PathLaneRoute p && p.speedLimit > 0f) {
+			// every road from a 2+2 arterial up is ONE class: weighed by its own limit, the trunk and the expressway
+			// beside a 50 km/h arterial took its cars (census: 9 -> 7 on the arterial while the trunk went 8 -> 12)
+			double limit = p.speedLimit >= TRAFFIC_BIG_LIMIT_KMH ? 60.0 : p.speedLimit;
+			w *= Math.pow(Math.max(1.0, limit / TRAFFIC_BASE_LIMIT_KMH), trafficBigRoadBias);
+		}
+		return w;
+	}
 	@Export public float trafficSpawnMinDist = 80.0f;
 	@Export public float trafficSpawnLeadSeconds = 6.0f;
 	@Export public float trafficSpawnViewDist = 160.0f;
@@ -1250,7 +1275,10 @@ public class ZoneManager extends Node {
 		shedTrafficOverBudget(net);
 		updateDummyTier();
 		boolean recycledThisTick = trafficRecycleDist <= 0f
-				|| godot.api.Time.INSTANCE.getTicksMsec() - lastRecycleMsec < (long) (trafficRecycleSeconds * 1000f)
+				// a driver leaves cars behind faster than one every trafficRecycleSeconds can follow: the interval
+				// shrinks with the player's speed (at 30 m/s a quarter of it)
+				|| godot.api.Time.INSTANCE.getTicksMsec() - lastRecycleMsec < (long) (trafficRecycleSeconds * 1000f
+						/ (trafficLeadSeconds > 0f ? 1.0 + fastestPlayerSpeed() / 10.0 : 1.0))
 				|| trafficNearNow(trafficNearRadius) >= trafficNearTarget;
 		java.util.Map<Long, Float> seenDist = new java.util.HashMap<>();
 
@@ -1273,8 +1301,12 @@ public class ZoneManager extends Node {
 				// A car that left the road (junction overshoot, deck edge) free-falls forever —
 				// its XZ stays inside the zone so the range check never reclaims it.
 				boolean fell = !dead && v.getGlobalPosition().getY() < FELL_OUT_Y;
+				// out of the ring -- the ring that leads a moving player; a car that is only behind a driver (still
+				// inside the plain radius) goes when it is not on this peer's screen
 				boolean far = !dead && !fin && !fell
-						&& nearestPlayerDistXZ(v.getGlobalPosition()) > trafficReclaimRadius(marker.zone);
+						&& nearestTrafficFocusDistXZ(v.getGlobalPosition()) > trafficReclaimRadius(marker.zone)
+						&& (nearestPlayerDistXZ(v.getGlobalPosition()) > trafficReclaimRadius(marker.zone)
+							|| !inThisCameraView(v.getGlobalPosition()));
 				// A car with no Lane cannot drive: it sits where it spawned, forever. That used to be
 				// impossible — baked VehicleRoutes register in _ready, so the registry was complete
 				// before the first eval tick — but road-generator builds its RoadLanes through
@@ -1332,7 +1364,7 @@ public class ZoneManager extends Node {
 				if (!dead && !fin && !fell && !far && !unrouted && !stalled && !abandoned && trafficRecycleDist > 0f
 						&& !(v.getOccupant() instanceof Player)) {
 					long key = v.getInstanceId();
-					float dn = nearestPlayerDistXZ(v.getGlobalPosition());
+					float dn = nearestTrafficFocusDistXZ(v.getGlobalPosition());
 					Float before = lastTrafficDist.get(key);
 					seenDist.put(key, dn);
 					// ... or one that has not come CLOSER for trafficIdleRecycleSeconds: a car waiting at a far light or
@@ -1467,6 +1499,60 @@ public class ZoneManager extends Node {
 		if (streamFocus == null) return d;
 		float dx = (float) (streamFocus.getX() - center.getX()), dz = (float) (streamFocus.getZ() - center.getZ());
 		return Math.min(d, (float) Math.sqrt(dx * dx + dz * dz));
+	}
+
+	/**
+	 * THE RING LEADS A MOVING PLAYER (2026-10-12; user: "on a big road I barely see any", "in current driving").
+	 * Measured by carrying the player down a trunk at 17 and 30 m/s (probe_traffic_census --drive): 1.3 cars on the
+	 * road within 150 m and 0.0-0.1 of them AHEAD, against 11 standing still. A car may not be born within 160 m in
+	 * view or in the corridor the player covers in 6 s, and the ring ended at 210 m -- so ahead of a driver the band
+	 * a car could appear in was a few metres deep, while the budget sat on the roads behind. The ring's centre is
+	 * therefore this many seconds of the player's own travel AHEAD of them (capped), for where a car may be born,
+	 * which cars are "leaving" and which are out of range. A player on foot (under {@link #TRAFFIC_LEAD_MIN_SPEED})
+	 * keeps the ring on themselves. 0 = the control.
+	 */
+	@Export public float trafficLeadSeconds = 5.0f;
+	/** The furthest the ring's centre runs ahead of a player (m). */
+	@Export public float trafficLeadMax = 150.0f;
+	private static final double TRAFFIC_LEAD_MIN_SPEED = 8.0;
+
+	/** A player's velocity: their vehicle's when they are in one. */
+	private static Vector3 playerVelocity(Player pl) {
+		return pl.currentVehicleNode instanceof godot.api.RigidBody3D rb && GD.isInstanceValid(rb)
+				? rb.getLinearVelocity() : pl.getVelocity();
+	}
+
+	/** Distance (XZ) from {@code center} to the nearest player's traffic FOCUS: the player, led by their travel. */
+	private float nearestTrafficFocusDistXZ(Vector3 center) {
+		if (trafficLeadSeconds <= 0f) return nearestPlayerDistXZ(center);
+		float min = Float.MAX_VALUE;
+		for (Player p : PlayerRegistry.getPlayers()) {
+			if (!GD.isInstanceValid(p)) continue;
+			Vector3 pp = p.getGlobalPosition();
+			Vector3 v = playerVelocity(p);
+			double fx = pp.getX(), fz = pp.getZ();
+			double sp = Math.sqrt(v.getX() * v.getX() + v.getZ() * v.getZ());
+			if (sp >= TRAFFIC_LEAD_MIN_SPEED) {
+				double lead = Math.min(trafficLeadMax, sp * trafficLeadSeconds);
+				fx += v.getX() / sp * lead;
+				fz += v.getZ() / sp * lead;
+			}
+			float dx = (float) (fx - center.getX()), dz = (float) (fz - center.getZ());
+			float d = (float) Math.sqrt(dx * dx + dz * dz);
+			if (d < min) min = d;
+		}
+		return min;
+	}
+
+	/** How fast the fastest player is travelling (m/s, XZ). */
+	private double fastestPlayerSpeed() {
+		double best = 0.0;
+		for (Player p : PlayerRegistry.getPlayers()) {
+			if (!GD.isInstanceValid(p)) continue;
+			Vector3 v = playerVelocity(p);
+			best = Math.max(best, Math.sqrt(v.getX() * v.getX() + v.getZ() * v.getZ()));
+		}
+		return best;
 	}
 
 	private float nearestPlayerDistXZ(Vector3 center) {
@@ -2556,7 +2642,7 @@ public class ZoneManager extends Node {
 			Vector3 entry = lane.entryPoint();
 			// 0.9 leaves hysteresis between this gate and the out-of-range reclaim radius.
 			if (gateOnPlayers && entry != null
-					&& nearestPlayerDistXZ(entry) > trafficSpawnGate(zone)) continue;
+					&& nearestTrafficFocusDistXZ(entry) > trafficSpawnGate(zone)) continue;
 			Placement at = placementOn(lane);
 			if (at == null) continue;
 			if (gateOnPlayers && spawnRefusedByPlayers(at.position)) {
@@ -2589,8 +2675,21 @@ public class ZoneManager extends Node {
 		double bestScore = -Double.MAX_VALUE;
 		int found = 0;
 		int start = sidewalkRng.nextInt(lanes.size());
+		// weighted by length and road class (trafficBigRoadBias); the uniform walk from a random lane is the control
+		double[] cum = null;
+		if (trafficBigRoadBias > 0f && lanes.size() > 1) {
+			cum = new double[lanes.size()];
+			double sum = 0.0;
+			for (int i = 0; i < cum.length; i++) cum[i] = sum += laneSpawnWeight(lanes.get(i));
+		}
 		for (int i = 0; i < lanes.size() && found < TRAFFIC_RING_CANDIDATES; i++) {
-			Lane lane = lanes.get((start + i) % lanes.size());
+			Lane lane;
+			if (cum != null) {
+				int at = java.util.Arrays.binarySearch(cum, sidewalkRng.nextDouble() * cum[cum.length - 1]);
+				lane = lanes.get(Math.min(at < 0 ? -at - 1 : at, cum.length - 1));
+			} else {
+				lane = lanes.get((start + i) % lanes.size());
+			}
 			double total = lane.total();
 			if (total < TRAFFIC_SPAWN_CLEARANCE * 2) continue;
 			// two tries a lane, away from its ends (the junction mouths)
@@ -2598,8 +2697,7 @@ public class ZoneManager extends Node {
 				double s = TRAFFIC_SPAWN_CLEARANCE + sidewalkRng.nextDouble() * (total - 2 * TRAFFIC_SPAWN_CLEARANCE);
 				Vector3 p = lane.pointAtLength(s);
 				if (p == null) continue;
-				float d = nearestPlayerDistXZ(p);
-				if (d < trafficSpawnMinDist || d > gate) continue;
+				if (nearestPlayerDistXZ(p) < trafficSpawnMinDist || nearestTrafficFocusDistXZ(p) > gate) continue;
 				if (onCrossing(lane, s) || !isClear(p)) continue;
 				if (spawnRefusedByPlayers(p)) { spawnsRefusedNearPlayer++; continue; }
 				Vector3 dir = travelDirection(lane, s, total);

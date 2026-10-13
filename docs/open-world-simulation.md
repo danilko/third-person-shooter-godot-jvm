@@ -1330,3 +1330,68 @@ bug**, and it is not about which side cars drive on.
   the list is in PLAN.md S9 "TIGHT CORNERS". A geometry fix (a fillet in the record, then the road stage and
   whatever stands on the inside corner): not done, the user's call.
 
+
+## More of the traffic budget on the big roads (2026-10-12, s10; user: "on a big road I barely see any")
+
+**Measured first.** `probe_traffic_census.gd -- --at=name:x:z,...` stands the player on the street nearest each
+hand-given site and counts the ambient cars ON THE PLAYER'S OWN ROAD within 150 m (a car counts when its lane's name
+starts with the road's), 180 s a site, twice. Sites: a 3+3 trunk (`higashi_hondori`, 962, 82), a 2+2 arterial
+(`rinkai_dori`, 872, 250), the expressway (`shuto_wangan_c1`, -110, 607), a block street (`machi_n_830`, 828, -375).
+
+| own road, cars within 150 m | control (uniform draw) | weighted, final |
+|---|---|---|
+| trunk 3+3, 60 km/h | 8.1, 7.7 | 13.3, 12.2 |
+| expressway, 80 km/h | 2.2, 3.5 | 5.7, 7.3 |
+| arterial 2+2, 50 km/h | 9.5, 8.4 | 6.5, 7.8 |
+| block street, 30 km/h | 0.5, 1.0 | 2.2, 0.6 |
+
+So the complaint was half right: the expressway WAS nearly empty (2-3 cars in 300 m of six lanes) and the trunk thin
+for its width; a block street was never busier in count (about one car), it only looks it because it is narrow.
+
+**Why.** Half the top-ups are placed by `placementInRing`, which drew its candidate lanes UNIFORMLY. A road cut into
+many short lanes (an arterial between junctions: 166 m a lane) was drawn far more often per metre than one of few
+long lanes (the expressway: 350 m), whatever either carries.
+
+**The change** (`ZoneManager.trafficBigRoadBias`, 1.5; `laneSpawnWeight`): the draw is weighted by the lane's
+LENGTH x (its limit over a block street's 30 km/h) ^ bias, with every road of 50 km/h and up counted as ONE class
+at 60 -- so a metre of arterial, trunk or expressway is 2.8x as likely as a metre of block street. Same budget, same
+refusal rules (never near, ahead of or in view of a player), so no cost. 0 = the control.
+
+Two variants were measured before this one and are in the table's shape only: weighing each road by its OWN limit
+(the expressway at 4.4x) gave trunk 11.3 / 13.1, expressway 8.2 / 9.3, arterial 7.0 / 6.4. The flat class was kept
+because it is one rule, and the arterial does not come back either way.
+
+**What it costs: the 2+2 arterial lost about a fifth** (9 -> 7 cars on 300 m). That is the per-metre fairness
+itself -- it had been drawn above its share for having short lanes -- and it is still seven times a block street.
+If it reads thin in play, raise `traffic_near_target` (the budget) before touching the weight.
+
+**A MOVING player: the ring leads them** (`ZoneManager.trafficLeadSeconds` 5 s, `trafficLeadMax` 150 m). The
+user's words were "in current driving", and the standing census cannot see it, so `--drive=<m/s>` carries the player
+along the site's road (30 m above the lanes, velocity set, straight on at each junction, 1 500 m) and counts every
+2 s. First reading, before any change -- on the trunk at 17 and 30 m/s: **1.3 cars on the road within 150 m and
+0.0-0.1 of them AHEAD**, against 11 standing still, with or without the weighting above. That is the complaint.
+
+Why: a car may not be born within 80 m, in the corridor the player covers in 6 s, or in view within 160 m, and the
+ring ended 210 m from the player -- ahead of a driver the band a car could appear in was a few metres deep, the
+budget sat on roads already passed, and "leaving" cars were recycled one every 2 s while the player covered 60 m.
+Now, for a player above 8 m/s (never on foot): the ring's CENTRE is `speed x trafficLeadSeconds` ahead of them
+(`nearestTrafficFocusDistXZ`) for the spawn gate, the along-lane band, "leaving" and the out-of-range reclaim (a car
+only behind the driver goes when it is off this peer's screen); the recycle interval shrinks with speed
+(`/ (1 + v / 10)`). The three refusal rules are asked of the real player, unchanged.
+
+| any ambient car AHEAD, 150 m x +-25 m | ring on the player (`--lead=0`) | leading ring |
+|---|---|---|
+| trunk, 17 / 30 m/s | 0.8 / 0.5 | 1.8 / 1.9 |
+| arterial, 17 / 30 m/s | 0.8 / 0.6 | 1.8 / 1.5 |
+| expressway, 17 / 30 m/s | 1.0 / 0.6 | 1.9 / 2.0 |
+
+Two to three times as many, same budget. Still about two cars: what bounds it now is the budget (20) and that
+traffic the same way moves at the limit, so a driver at the limit never closes on it.
+
+**What that measurement does NOT show.** (1) The probe's camera did not stay along the travel (its dot with the
+travel read -0.7 on two sites, +0.35 on the third: the camera rig overwrote the probe), so "never born in view" was
+exercised against a camera looking mostly BACK -- a real driver's camera forbids the first 160 m ahead, which the
+leading ring reaches past (210 + 85..150 m) but which was not measured. (2) It is one run per cell of the table.
+(3) Nobody has driven it: whether cars now pop in at the far end of a long straight is for a play test
+(`traffic_lead_seconds 0` in the inspector, or `--lead=0`, is the old behaviour). Crash counts are the same with
+and without the weighting (35-48 scored contacts per ~85 car-minutes over the four sites in every run).

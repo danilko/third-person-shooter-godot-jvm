@@ -2681,7 +2681,86 @@ APRONS = os.path.join(ROOT, "assets", "world_source", "buildings", "IslandEdgeAp
 APRON_DEPTH = 0.4      # the apron box reaches this far down from its top: into the footway-edge dip it covers
 
 
-def cell_scene(name, blds, passages=(), fields=(), aprons=()):
+# ── the KERB-ZONE SCATTER (PLAN.md T5, 2026-10-12): what a Japanese frontage keeps in its own strip ────────────────
+# Between the footway's outer edge and a building's front there is KERB_GAP of the lot's own ground. A shop keeps a
+# parked bicycle or two, a 置き看板, planters and sometimes a pair of vending machines there; a block of flats keeps
+# bicycles. One MultiMesh per piece per cell (`cell_scene`), chosen by a hash of the building's key so an unchanged
+# record rebuilds byte-identically; nothing within SCATTER_DOOR_CLEAR of a front door, nothing on a lot with a
+# driveway across its front, nothing behind the frontage row (`deep`). Only the vending machines collide.
+SCATTER_RES = BLD_RES + "/scatter"
+SCATTER_DIR = os.path.join(BLD_DIR, "scatter")
+#: piece -> (res path of its kit glTF, length along the front, depth off the wall, collides)
+SCATTER_PIECES = {
+    "Prop_Bicycle": ("res://assets/world_source/kits/library/pieces/street/Prop_Bicycle.gltf", 1.76, 0.5, False),
+    "Prop_AFrameSign": ("res://assets/world_source/kits/library/pieces/street/Prop_AFrameSign.gltf", 0.5, 0.44, False),
+    "Prop_PlanterBox": ("res://assets/world_source/kits/library/pieces/street/Prop_PlanterBox.gltf", 0.9, 0.32, False),
+    "Station_VendingMachine": ("res://assets/world_source/kits/library/pieces/station/Station_VendingMachine.gltf",
+                               1.0, 0.72, True),
+}
+SCATTER_VENDING_BOX = (1.0, 1.83, 0.72)
+#: base type -> [(piece, chance of a group, most in the group)]
+_SHOP_SCATTER = [("Station_VendingMachine", 0.12, 2), ("Prop_Bicycle", 0.5, 2), ("Prop_AFrameSign", 0.45, 1),
+                 ("Prop_PlanterBox", 0.35, 2)]
+_HOME_SCATTER = [("Prop_Bicycle", 0.85, 4), ("Prop_PlanterBox", 0.25, 2)]
+SCATTER_MIX = dict({t: _SHOP_SCATTER for t in ("ShopHouse", "PencilBuilding", "YokochoRow", "AkibaElectric", "ShopRamen",
+                                               "ShopCoinLaundry", "ShopBookstore", "ShopGyudon", "ShopHundredYen",
+                                               "ShopDrugstore")},
+                   **{t: _HOME_SCATTER for t in ("Apartment", "ApartRC3F", "Apato2F4", "Apato2F6", "MansionPencil")})
+SCATTER_DOOR_CLEAR = 0.9     # m either side of a front door's opening kept free
+SCATTER_WALL_GAP = 0.12      # m between the wall and a thing standing against it
+SCATTER_RANGE = 110.0        # m past the set's own reach: beyond it the scatter is not drawn (small things)
+SCATTER_ON = True            # the control: off writes the cells without it
+
+
+def kerb_scatter(buildings, aabbs=None):
+    """[(piece, x, y, z, yaw deg)] in the Godot frame: every frontage building's own-strip clutter."""
+    out = []
+    if not SCATTER_ON:
+        return out
+    aabbs = {} if aabbs is None else aabbs
+    for b in buildings:
+        t = b["type"]
+        mix = SCATTER_MIX.get(BASE_OF.get(SIGN_OF.get(t, t), SIGN_OF.get(t, t)))
+        if not mix or b.get("deep") or "drive" in b or b.get("hand"):
+            continue
+        if t not in aabbs:
+            aabbs[t] = type_aabb(SIGN_OF.get(t, t))
+        x0, _z0, x1, z1, _h = aabbs[t]
+        doors = [(d["center"][0], float(d.get("width", 1.0))) for d in type_doors(t)
+                 if d.get("side", "front") == "front"]
+        rng = random.Random(zlib.crc32(("scatter|%s" % b["key"]).encode()))
+        a = math.radians(b["yaw"])
+        c, s = math.cos(a), math.sin(a)
+        taken = [(dx - dw / 2.0 - SCATTER_DOOR_CLEAR, dx + dw / 2.0 + SCATTER_DOOR_CLEAR) for dx, dw in doors]
+        for piece, chance, most in mix:
+            if rng.random() >= chance:
+                continue
+            _res, ln, dp, _col = SCATTER_PIECES[piece]
+            n = rng.randint(1, most)
+            gap = 0.08 if piece == "Station_VendingMachine" else 0.25
+            span = n * ln + (n - 1) * gap
+            lo, hi = x0 + 0.35, x1 - 0.35 - span
+            if hi <= lo:
+                continue
+            for _try in range(8):
+                at = lo + rng.random() * (hi - lo)
+                if all(at + span <= t0 or at >= t1 for t0, t1 in taken):
+                    break
+            else:
+                continue
+            taken.append((at - 0.3, at + span + 0.3))
+            for k in range(n):
+                lx = at + ln / 2.0 + k * (ln + gap)
+                lz = z1 + SCATTER_WALL_GAP + dp / 2.0
+                # a bicycle leans a few degrees off the wall and may face either way; the rest stand square
+                yaw = b["yaw"] + ((rng.random() * 14.0 - 7.0) + (180.0 if rng.random() < 0.5 else 0.0)
+                                  if piece == "Prop_Bicycle" else 0.0)
+                out.append((piece, round(b["pos"][0] + c * lx + s * lz, 3), round(b["pos"][1] + LOT_RAISE, 3),
+                            round(b["pos"][2] - s * lx + c * lz, 3), round(yaw, 2)))
+    return out
+
+
+def cell_scene(name, blds, passages=(), fields=(), aprons=(), scatter=()):
     """One streamed cell: every building instanced, and its lot slabs as ONE MultiMesh (+ box collision).
 
     A 路地 is NOT drawn here (PLAN.md 3.18(c3a)): it is a RESERVATION (`field.passage`, 接道義務) and its ground is
@@ -2720,6 +2799,11 @@ def cell_scene(name, blds, passages=(), fields=(), aprons=()):
         ext.append('[ext_resource type="ArrayMesh" path="%s/%s.res" id="hlod"]\n' % (HLOD_RES, name))
     if fields:
         ext.append('[ext_resource type="Script" path="%s" id="crop"]\n' % CROP_SCRIPT)
+    scat = {}
+    for row in scatter:
+        scat.setdefault(row[0], []).append(row)
+    for piece in sorted(scat):
+        ext.append('[ext_resource type="ArrayMesh" path="%s/%s.res" id="sc_%s"]\n' % (SCATTER_RES, piece, piece))
     ext.append("\n")
     if fields:
         # the paddy (user, 2026-09-25): world.CropField builds the crop quads from these chunks at load
@@ -2822,6 +2906,34 @@ def cell_scene(name, blds, passages=(), fields=(), aprons=()):
             nodes.append('\n[node name="Apron%d" type="CollisionShape3D" parent="ApronCollision"]\n'
                          'transform = Transform3D(%.6f, 0, %.6f, 0, 1, 0, %.6f, 0, %.6f, %.3f, %.3f, %.3f)\n'
                          'shape = SubResource("ApronShape")\n' % (k, c, s, -s, c, x, top - APRON_DEPTH / 2.0, z))
+    for piece in sorted(scat):
+        rows = scat[piece]
+        buf = []
+        for (_p, x, y, z, yaw) in rows:
+            c, s = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
+            buf += [c, 0.0, s, x, 0.0, 1.0, 0.0, y, -s, 0.0, c, z]
+        # a visibility range is measured to the instance's AABB CENTRE, and this one MultiMesh spans the cell: with the
+        # bare range a sign 6 m from the camera was not drawn because its set's centre was 120 m away (2026-10-12)
+        mx = 0.5 * (min(r[1] for r in rows) + max(r[1] for r in rows))
+        mz = 0.5 * (min(r[3] for r in rows) + max(r[3] for r in rows))
+        reach = max(math.hypot(r[1] - mx, r[3] - mz) for r in rows)
+        sub.append('[sub_resource type="MultiMesh" id="Scatter_%s"]\ntransform_format = 1\ninstance_count = %d\n'
+                   'mesh = ExtResource("sc_%s")\nbuffer = PackedFloat32Array(%s)\n\n'
+                   % (piece, len(rows), piece, ", ".join("%.4f" % v for v in buf)))
+        nodes.append('\n[node name="Scatter_%s" type="MultiMeshInstance3D" parent="."]\n'
+                     'multimesh = SubResource("Scatter_%s")\ncast_shadow = 0\nvisibility_range_end = %.1f\n'
+                     'visibility_range_end_margin = 10.0\nvisibility_range_fade_mode = 1\n'
+                     % (piece, piece, SCATTER_RANGE + reach))
+        if SCATTER_PIECES[piece][3]:
+            sub.append('[sub_resource type="BoxShape3D" id="ScatterShape_%s"]\nsize = Vector3(%.3f, %.3f, %.3f)\n\n'
+                       % ((piece,) + SCATTER_VENDING_BOX))
+            nodes.append('\n[node name="ScatterCollision_%s" type="StaticBody3D" parent="."]\ncollision_mask = 0\n' % piece)
+            for k, (_p, x, y, z, yaw) in enumerate(rows):
+                c, s = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
+                nodes.append('\n[node name="S%d" type="CollisionShape3D" parent="ScatterCollision_%s"]\n'
+                             'transform = Transform3D(%.6f, 0, %.6f, 0, 1, 0, %.6f, 0, %.6f, %.3f, %.3f, %.3f)\n'
+                             'shape = SubResource("ScatterShape_%s")\n'
+                             % (k, piece, c, s, -s, c, x, y + SCATTER_VENDING_BOX[1] / 2.0, z, piece))
     return "".join(ext + sub + nodes)
 
 
@@ -3421,12 +3533,16 @@ def write(check):
         changed.append(bpath)
         if not check:
             open(bpath, "w").write(body)
+    # a building's clutter streams with the building: its own cell, even where a bicycle stands over the cell line
+    scatter_cells = {k: kerb_scatter(blds, aabbs) for k, blds in cells.items()}
+    print("island_buildings: %d kerb-zone props (%s)" % (sum(len(v) for v in scatter_cells.values()), ", ".join(
+        "%s %d" % (p, sum(1 for v in scatter_cells.values() for r in v if r[0] == p)) for p in sorted(SCATTER_PIECES))))
     for (gx, gz), blds in sorted(cells.items()):
         name = "Bld_island_%d_%d" % (gx, gz)
         path = os.path.join(CELL_DIR, name + ".tscn")
         want.add(name + ".tscn")
         body = cell_scene(name, blds, pass_cells.get((gx, gz), ()), field_cells.get((gx, gz), ()),
-                          apron_cells.get((gx, gz), ()))
+                          apron_cells.get((gx, gz), ()), scatter_cells.get((gx, gz), ()))
         if not os.path.exists(path) or open(path).read() != body:
             changed.append(path)
             if not check:

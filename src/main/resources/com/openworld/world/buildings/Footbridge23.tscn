@@ -15,7 +15,7 @@ points = PackedVector3Array(11.8, 0.15139, -14, 11.8, -0.14861, -14, 11.8, 2.975
 [sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_wfpt3"]
 points = PackedVector3Array(11.8, 2.975, -6.8, 11.8, 2.675, -6.8, 11.8, 5.65, -1.4, 11.8, 5.35, -1.4, 13.4, 2.975, -6.8, 13.4, 2.675, -6.8, 13.4, 5.65, -1.4, 13.4, 5.35, -1.4)
 
-[node name="Footbridge23" type="Node3D" unique_id=2103629446]
+[node name="Footbridge23" type="Node3D" unique_id=2091746948]
 metadata/building = {
 "aabb": [Vector3(-13.58, 0, -13.4), Vector3(27.16, 6.75, 14.53)],
 "base_m": 0.0,
@@ -75,53 +75,53 @@ metadata/building = {
 "wall_top_m": 6.75
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=2040284727]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=345094444]
 visibility_range_end = 381.0
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_1naq3")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=1100028228]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=2053957115]
 collision_mask = 0
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=544019163]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=27983912]
 shape = ExtResource("2_a8pjd")
 
-[node name="StairRamps" type="StaticBody3D" parent="." unique_id=1769597737]
+[node name="StairRamps" type="StaticBody3D" parent="." unique_id=1655211711]
 collision_layer = 64
 collision_mask = 0
 
-[node name="Ramp0" type="CollisionShape3D" parent="StairRamps" unique_id=1078931494]
+[node name="Ramp0" type="CollisionShape3D" parent="StairRamps" unique_id=243842130]
 shape = SubResource("ConvexPolygonShape3D_mldxc")
 
-[node name="Ramp1" type="CollisionShape3D" parent="StairRamps" unique_id=781078906]
+[node name="Ramp1" type="CollisionShape3D" parent="StairRamps" unique_id=823905671]
 shape = SubResource("ConvexPolygonShape3D_47liu")
 
-[node name="Ramp2" type="CollisionShape3D" parent="StairRamps" unique_id=1164551578]
+[node name="Ramp2" type="CollisionShape3D" parent="StairRamps" unique_id=1364200345]
 shape = SubResource("ConvexPolygonShape3D_4tddn")
 
-[node name="Ramp3" type="CollisionShape3D" parent="StairRamps" unique_id=238726384]
+[node name="Ramp3" type="CollisionShape3D" parent="StairRamps" unique_id=120116164]
 shape = SubResource("ConvexPolygonShape3D_wfpt3")
 
-[node name="Markers" type="Node3D" parent="." unique_id=1796357131]
+[node name="Markers" type="Node3D" parent="." unique_id=1265727516]
 
-[node name="MARK_footbridge_foot_01" type="Marker3D" parent="Markers" unique_id=1250067213 groups=["mission_marker"]]
+[node name="MARK_footbridge_foot_01" type="Marker3D" parent="Markers" unique_id=617890862 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.6, 0.3, -14.4)
 metadata/side = -1.0
 metadata/kind = "footbridge_foot"
 
-[node name="MARK_footbridge_foot_02" type="Marker3D" parent="Markers" unique_id=1453993608 groups=["mission_marker"]]
+[node name="MARK_footbridge_foot_02" type="Marker3D" parent="Markers" unique_id=101575407 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.6, 0.3, -14.4)
 metadata/side = 1.0
 metadata/kind = "footbridge_foot"
 
-[node name="MARK_name_plate_01" type="Marker3D" parent="Markers" unique_id=2118729576 groups=["mission_marker"]]
+[node name="MARK_name_plate_01" type="Marker3D" parent="Markers" unique_id=1774585482 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.25, 1.13)
 metadata/w = 3.2
 metadata/h = 0.46
 metadata/kind = "name_plate"
 
-[node name="MARK_name_plate_02" type="Marker3D" parent="Markers" unique_id=1843432917 groups=["mission_marker"]]
+[node name="MARK_name_plate_02" type="Marker3D" parent="Markers" unique_id=1424957484 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 5.25, -1.13)
 metadata/w = 3.2
 metadata/h = 0.46

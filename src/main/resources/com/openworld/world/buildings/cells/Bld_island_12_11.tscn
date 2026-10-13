@@ -29,6 +29,9 @@
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_MidWarm.tres" id="tone7_6"]
 [ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_12_11.res" id="hlod"]
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/scatter/Prop_AFrameSign.res" id="sc_Prop_AFrameSign"]
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/scatter/Prop_Bicycle.res" id="sc_Prop_Bicycle"]
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/scatter/Prop_PlanterBox.res" id="sc_Prop_PlanterBox"]
 
 [sub_resource type="BoxMesh" id="LotBox"]
 material = ExtResource("lotmat")
@@ -128,6 +131,24 @@ buffer = PackedFloat32Array(0.0000, 0.0000, -2.0000, 1199.7500, 0.0000, 0.4000, 
 
 [sub_resource type="BoxShape3D" id="ApronShape"]
 size = Vector3(2.100, 0.400, 2.000)
+
+[sub_resource type="MultiMesh" id="Scatter_Prop_AFrameSign"]
+transform_format = 1
+instance_count = 3
+mesh = ExtResource("sc_Prop_AFrameSign")
+buffer = PackedFloat32Array(0.0003, 0.0000, 1.0000, 1108.6590, 0.0000, 1.0000, 0.0000, 5.7300, -1.0000, 0.0000, 0.0003, 945.3880, 0.0002, 0.0000, -1.0000, 1125.4600, 0.0000, 1.0000, 0.0000, 5.7300, 1.0000, 0.0000, 0.0002, 908.7970, 0.0045, 0.0000, -1.0000, 1125.5380, 0.0000, 1.0000, 0.0000, 5.7300, 1.0000, 0.0000, 0.0045, 931.7320)
+
+[sub_resource type="MultiMesh" id="Scatter_Prop_Bicycle"]
+transform_format = 1
+instance_count = 16
+mesh = ExtResource("sc_Prop_Bicycle")
+buffer = PackedFloat32Array(-0.0223, 0.0000, 0.9998, 1021.4160, 0.0000, 1.0000, 0.0000, 5.7300, -0.9998, 0.0000, -0.0223, 917.6810, -0.1004, 0.0000, -0.9950, 1021.4110, 0.0000, 1.0000, 0.0000, 5.7300, 0.9950, 0.0000, -0.1004, 919.6910, -0.0555, 0.0000, -0.9985, 1021.4070, 0.0000, 1.0000, 0.0000, 5.7300, 0.9985, 0.0000, -0.0555, 921.7010, -0.0844, 0.0000, 0.9964, 1021.4300, 0.0000, 1.0000, 0.0000, 5.7300, -0.9964, 0.0000, -0.0844, 897.8910, 0.0365, 0.0000, 0.9993, 1021.4300, 0.0000, 1.0000, 0.0000, 5.7300, -0.9993, 0.0000, 0.0365, 899.9010, 0.0087, 0.0000, -1.0000, 1021.4300, 0.0000, 1.0000, 0.0000, 5.7300, 1.0000, 0.0000, 0.0087, 797.6630, 0.0792, 0.0000, 0.9969, 1021.4300, 0.0000, 1.0000, 0.0000, 5.7300, -0.9969, 0.0000, 0.0792, 799.6730, -0.0112, 0.0000, -0.9999, 1021.4300, 0.0000, 1.0000, 0.0000, 5.7300, 0.9999, 0.0000, -0.0112, 761.5380, 0.0169, 0.0000, -0.9999, 1021.4300, 0.0000, 1.0000, 0.0000, 5.7300, 0.9999, 0.0000, 0.0169, 763.5480, -0.0805, 0.0000, -0.9968, 1021.4300, 0.0000, 1.0000, 0.0000, 5.7300, 0.9968, 0.0000, -0.0805, 765.5580, -0.0073, 0.0000, -1.0000, 1108.6080, 0.0000, 1.0000, 0.0000, 5.7300, 1.0000, 0.0000, -0.0073, 923.1850, -0.1129, 0.0000, -0.9936, 1108.5990, 0.0000, 1.0000, 0.0000, 5.7300, 0.9936, 0.0000, -0.1129, 921.1750, 0.0710, 0.0000, -0.9975, 1125.4550, 0.0000, 1.0000, 0.0000, 5.7300, 0.9975, 0.0000, 0.0710, 782.7270, 0.0828, 0.0000, 0.9966, 1125.4470, 0.0000, 1.0000, 0.0000, 5.7300, -0.9966, 0.0000, 0.0828, 784.7370, -0.1134, 0.0000, 0.9936, 1125.4300, 0.0000, 1.0000, 0.0000, 5.7300, -0.9936, 0.0000, -0.1134, 892.4810, 0.0230, 0.0000, 0.9997, 1125.4300, 0.0000, 1.0000, 0.0000, 5.7300, -0.9997, 0.0000, 0.0230, 802.1340)
+
+[sub_resource type="MultiMesh" id="Scatter_Prop_PlanterBox"]
+transform_format = 1
+instance_count = 7
+mesh = ExtResource("sc_Prop_PlanterBox")
+buffer = PackedFloat32Array(0.0000, 0.0000, -1.0000, 1021.5200, 0.0000, 1.0000, 0.0000, 5.7300, 1.0000, 0.0000, 0.0000, 839.6250, 0.0000, 0.0000, -1.0000, 1021.5200, 0.0000, 1.0000, 0.0000, 5.7300, 1.0000, 0.0000, 0.0000, 840.7750, -0.0021, 0.0000, -1.0000, 1021.5170, 0.0000, 1.0000, 0.0000, 5.7300, 1.0000, 0.0000, -0.0021, 912.4140, -0.0021, 0.0000, -1.0000, 1021.5150, 0.0000, 1.0000, 0.0000, 5.7300, 1.0000, 0.0000, -0.0021, 913.5640, 0.0000, 0.0000, -1.0000, 1021.5200, 0.0000, 1.0000, 0.0000, 5.7300, 1.0000, 0.0000, 0.0000, 786.7900, 0.0000, 0.0000, -1.0000, 1125.5200, 0.0000, 1.0000, 0.0000, 5.7300, 1.0000, 0.0000, 0.0000, 794.0110, 0.0000, 0.0000, -1.0000, 1125.5200, 0.0000, 1.0000, 0.0000, 5.7300, 1.0000, 0.0000, 0.0000, 795.1610)
 
 [node name="Bld_island_12_11" type="Node3D"]
 
@@ -468,3 +489,24 @@ shape = SubResource("ApronShape")
 [node name="Apron4" type="CollisionShape3D" parent="ApronCollision"]
 transform = Transform3D(0.000698, 0, -1.000000, 0, 1, 0, 1.000000, 0, 0.000698, 1170.251, 14.641, 966.168)
 shape = SubResource("ApronShape")
+
+[node name="Scatter_Prop_AFrameSign" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("Scatter_Prop_AFrameSign")
+cast_shadow = 0
+visibility_range_end = 130.1
+visibility_range_end_margin = 10.0
+visibility_range_fade_mode = 1
+
+[node name="Scatter_Prop_Bicycle" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("Scatter_Prop_Bicycle")
+cast_shadow = 0
+visibility_range_end = 206.1
+visibility_range_end_margin = 10.0
+visibility_range_fade_mode = 1
+
+[node name="Scatter_Prop_PlanterBox" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("Scatter_Prop_PlanterBox")
+cast_shadow = 0
+visibility_range_end = 192.0
+visibility_range_end_margin = 10.0
+visibility_range_fade_mode = 1

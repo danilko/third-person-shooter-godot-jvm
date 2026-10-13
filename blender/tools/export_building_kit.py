@@ -257,6 +257,10 @@ for dirpath, _dirs, files in os.walk(os.path.join(OUT, "pieces")):
         rel = os.path.relpath(os.path.join(dirpath, f), OUT)
         if MULTI and os.path.basename(os.path.dirname(os.path.join(dirpath, f))) not in OWN_CATS:
             continue
+        # a right-hand TWIN (tools/mirror_piece.py: <Piece>_R.*) is owned by its source piece, not by the .blend
+        stem = f.split(".")[0]
+        if stem.endswith("_R") and os.path.join(os.path.dirname(rel), stem[:-2] + ".gltf") in keep:
+            continue
         if f.endswith((".gltf", ".bin")) and rel not in keep:
             os.remove(os.path.join(OUT, rel))
             print("[export_building_kit] removed %s" % rel)

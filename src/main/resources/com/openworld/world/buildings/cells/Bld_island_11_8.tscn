@@ -40,6 +40,10 @@
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_CharcoalCool.tres" id="tone11_7"]
 [ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_11_8.res" id="hlod"]
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/scatter/Prop_AFrameSign.res" id="sc_Prop_AFrameSign"]
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/scatter/Prop_Bicycle.res" id="sc_Prop_Bicycle"]
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/scatter/Prop_PlanterBox.res" id="sc_Prop_PlanterBox"]
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/scatter/Station_VendingMachine.res" id="sc_Station_VendingMachine"]
 
 [sub_resource type="BoxMesh" id="LotBox"]
 material = ExtResource("lotmat")
@@ -154,6 +158,33 @@ buffer = PackedFloat32Array(-0.0209, 0.0000, 1.9999, 955.3280, 0.0000, 0.4000, 0
 
 [sub_resource type="BoxShape3D" id="ApronShape"]
 size = Vector3(2.100, 0.400, 2.000)
+
+[sub_resource type="MultiMesh" id="Scatter_Prop_AFrameSign"]
+transform_format = 1
+instance_count = 5
+mesh = ExtResource("sc_Prop_AFrameSign")
+buffer = PackedFloat32Array(0.9985, 0.0000, -0.0543, 862.1640, 0.0000, 1.0000, 0.0000, 5.7300, 0.0543, 0.0000, 0.9985, 239.7510, 0.0000, 0.0000, 1.0000, 954.2900, 0.0000, 1.0000, 0.0000, 5.7300, -1.0000, 0.0000, 0.0000, 50.8230, -0.0106, 0.0000, 0.9999, 954.4730, 0.0000, 1.0000, 0.0000, 5.7300, -0.9999, 0.0000, -0.0106, 198.9220, -0.0028, 0.0000, 1.0000, 954.2680, 0.0000, 1.0000, 0.0000, 5.7300, -1.0000, 0.0000, -0.0028, 170.2960, 0.0000, 0.0000, -1.0000, 995.7100, 0.0000, 1.0000, 0.0000, 5.7300, 1.0000, 0.0000, 0.0000, 44.9710)
+
+[sub_resource type="MultiMesh" id="Scatter_Prop_Bicycle"]
+transform_format = 1
+instance_count = 14
+mesh = ExtResource("sc_Prop_Bicycle")
+buffer = PackedFloat32Array(-0.9994, 0.0000, 0.0347, 759.3400, 0.0000, 1.0000, 0.0000, 5.7300, -0.0347, 0.0000, -0.9994, 234.2800, 0.9992, 0.0000, -0.0396, 840.8180, 0.0000, 1.0000, 0.0000, 5.7300, 0.0396, 0.0000, 0.9992, 238.4690, 0.9994, 0.0000, 0.0354, 847.1540, 0.0000, 1.0000, 0.0000, 5.7300, -0.0354, 0.0000, 0.9994, 238.8710, 0.9932, 0.0000, -0.1167, 849.1600, 0.0000, 1.0000, 0.0000, 5.7300, 0.1167, 0.0000, 0.9932, 238.9960, 0.9999, 0.0000, -0.0110, 851.1660, 0.0000, 1.0000, 0.0000, 5.7300, 0.0110, 0.0000, 0.9999, 239.1210, 0.9999, 0.0000, -0.0112, 853.1720, 0.0000, 1.0000, 0.0000, 5.7300, 0.0112, 0.0000, 0.9999, 239.2460, 0.9992, 0.0000, 0.0389, 865.7240, 0.0000, 1.0000, 0.0000, 5.7300, -0.0389, 0.0000, 0.9992, 239.9750, 0.1127, 0.0000, -0.9936, 954.2820, 0.0000, 1.0000, 0.0000, 5.7300, 0.9936, 0.0000, 0.1127, 145.2390, 0.0089, 0.0000, 1.0000, 954.3200, 0.0000, 1.0000, 0.0000, 5.7300, -1.0000, 0.0000, 0.0089, 76.9780, 0.0281, 0.0000, -0.9996, 954.3200, 0.0000, 1.0000, 0.0000, 5.7300, 0.9996, 0.0000, 0.0281, 74.9680, -0.0023, 0.0000, -1.0000, 995.6800, 0.0000, 1.0000, 0.0000, 5.7300, 1.0000, 0.0000, -0.0023, 1.0070, 0.0847, 0.0000, -0.9964, 995.6800, 0.0000, 1.0000, 0.0000, 5.7300, 0.9964, 0.0000, 0.0847, 3.0170, 0.0251, 0.0000, -0.9997, 995.8960, 0.0000, 1.0000, 0.0000, 5.7300, 0.9997, 0.0000, 0.0251, 201.7580, 0.0468, 0.0000, -0.9989, 995.9180, 0.0000, 1.0000, 0.0000, 5.7300, 0.9989, 0.0000, 0.0468, 203.7680)
+
+[sub_resource type="MultiMesh" id="Scatter_Prop_PlanterBox"]
+transform_format = 1
+instance_count = 1
+mesh = ExtResource("sc_Prop_PlanterBox")
+buffer = PackedFloat32Array(-0.0106, 0.0000, 0.9999, 954.4690, 0.0000, 1.0000, 0.0000, 5.7300, -0.9999, 0.0000, -0.0106, 204.1990)
+
+[sub_resource type="MultiMesh" id="Scatter_Station_VendingMachine"]
+transform_format = 1
+instance_count = 2
+mesh = ExtResource("sc_Station_VendingMachine")
+buffer = PackedFloat32Array(0.0112, 0.0000, -0.9999, 995.8570, 0.0000, 1.0000, 0.0000, 5.7300, 0.9999, 0.0000, 0.0112, 208.3140, 0.0112, 0.0000, -0.9999, 995.8690, 0.0000, 1.0000, 0.0000, 5.7300, 0.9999, 0.0000, 0.0112, 209.3930)
+
+[sub_resource type="BoxShape3D" id="ScatterShape_Station_VendingMachine"]
+size = Vector3(1.000, 1.830, 0.720)
 
 [node name="Bld_island_11_8" type="Node3D"]
 
@@ -594,3 +625,42 @@ shape = SubResource("ApronShape")
 [node name="Apron15" type="CollisionShape3D" parent="ApronCollision"]
 transform = Transform3D(0.999590, 0, 0.028619, 0, 1, 0, -0.028619, 0, 0.999590, 1001.548, 5.570, 238.256)
 shape = SubResource("ApronShape")
+
+[node name="Scatter_Prop_AFrameSign" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("Scatter_Prop_AFrameSign")
+cast_shadow = 0
+visibility_range_end = 228.1
+visibility_range_end_margin = 10.0
+visibility_range_fade_mode = 1
+
+[node name="Scatter_Prop_Bicycle" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("Scatter_Prop_Bicycle")
+cast_shadow = 0
+visibility_range_end = 278.0
+visibility_range_end_margin = 10.0
+visibility_range_fade_mode = 1
+
+[node name="Scatter_Prop_PlanterBox" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("Scatter_Prop_PlanterBox")
+cast_shadow = 0
+visibility_range_end = 110.0
+visibility_range_end_margin = 10.0
+visibility_range_fade_mode = 1
+
+[node name="Scatter_Station_VendingMachine" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("Scatter_Station_VendingMachine")
+cast_shadow = 0
+visibility_range_end = 110.5
+visibility_range_end_margin = 10.0
+visibility_range_fade_mode = 1
+
+[node name="ScatterCollision_Station_VendingMachine" type="StaticBody3D" parent="."]
+collision_mask = 0
+
+[node name="S0" type="CollisionShape3D" parent="ScatterCollision_Station_VendingMachine"]
+transform = Transform3D(0.011170, 0, -0.999938, 0, 1, 0, 0.999938, 0, 0.011170, 995.857, 6.645, 208.314)
+shape = SubResource("ScatterShape_Station_VendingMachine")
+
+[node name="S1" type="CollisionShape3D" parent="ScatterCollision_Station_VendingMachine"]
+transform = Transform3D(0.011170, 0, -0.999938, 0, 1, 0, 0.999938, 0, 0.011170, 995.869, 6.645, 209.393)
+shape = SubResource("ScatterShape_Station_VendingMachine")

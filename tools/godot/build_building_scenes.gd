@@ -460,6 +460,11 @@ func _build(b: Dictionary, variant: String) -> bool:
 	var see_through: bool = bool(b.get("has_interior", false))
 	var band_panels := []       # [transform, glass AABB] of every shopfront panel that gets the strip
 	var panes := []             # open variants: [{xf, glass AABB, surfaces, piece path}] -- breakable shop windows
+	# the plan bounds of everything that CLAIMS GROUND: an `overhang` piece (an awning, a projecting sign) is drawn
+	# but left out, so dressing a shop front does not move the lot the building is placed by
+	var ground_ab := AABB()
+	var ground_any := false
+	var overhangs := 0
 	for p in pieces:
 		var path: String = p["path"]
 		var kit_res := _kit_res(path)
@@ -468,6 +473,13 @@ func _build(b: Dictionary, variant: String) -> bool:
 		var surfs := _surfaces(path)
 		if surfs.is_empty():
 			return false
+		if bool(p.get("overhang", false)):
+			overhangs += 1
+		else:
+			for s0 in surfs:
+				var pab: AABB = (xf * (s0[2] as Transform3D)) * (s0[0] as Mesh).get_aabb()
+				ground_ab = ground_ab.merge(pab) if ground_any else pab
+				ground_any = true
 		var shop_window := see_through and shop_rows.has(str(p.get("row", "")))
 		var glass := AABB()
 		var has_glass := false
@@ -1070,7 +1082,13 @@ func _build(b: Dictionary, variant: String) -> bool:
 	meta["doors_closed"] = not open_variant
 	meta["doors_locked"] = open_variant and not shop
 	meta["doors_shop"] = shop
-	meta["aabb"] = [mesh.get_aabb().position, mesh.get_aabb().size]
+	var full_ab := mesh.get_aabb()
+	if overhangs > 0 and ground_any:
+		# x / z from what stands on the ground, y from everything drawn
+		var g_lo := Vector3(maxf(full_ab.position.x, ground_ab.position.x), full_ab.position.y, maxf(full_ab.position.z, ground_ab.position.z))
+		var g_hi := Vector3(minf(full_ab.end.x, ground_ab.end.x), full_ab.end.y, minf(full_ab.end.z, ground_ab.end.z))
+		full_ab = AABB(g_lo, g_hi - g_lo)
+	meta["aabb"] = [full_ab.position, full_ab.size]
 	# which merged surface each facade family is, for the per-building tone override (PLAN.md 3.18p). An empty
 	# map is a legitimate answer (a landmark built of library pieces wears neither), not a failure.
 	meta["facade_surfaces"] = _facade_surfaces(order, mats)

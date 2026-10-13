@@ -54,6 +54,8 @@ except ImportError:
 PAINT_OBJECT = "FURN__marks_w"
 COLLISION_OBJECT = "FURN_props-prop-colonly"
 WIRE_OBJECT = "FURN__wires"
+#: the median hedges (`_median_hedge`): swept into the piece, no collision (the island they stand on is kerbed)
+HEDGE_OBJECT = "FURN__hedge"
 #: `point_mesh.NO_MATERIAL` (restated: importing point_mesh here would be a cycle).
 NO_MATERIAL = ""
 #: How far a cleared zone reaches past the lines it clears, sideways (a centre line sits ON the arriving lanes'
@@ -225,6 +227,8 @@ class Furniture(object):
         self.paint = {}
         #: `{material: [tri]}` of the overhead wires strung between the 電柱 (`_utility_poles`): the piece's own mesh
         self.wires = {}
+        #: `{material: [tri]}` of the hedge boxes on raised medians (`_median_hedge`)
+        self.hedge = {}
         self.collision = []
         self.placements = []
         self.counts = {}
@@ -621,7 +625,7 @@ def _edge_props(fur, table, solves, jsolves, bands, mine_run, mine_pad, ground, 
                 pos = (p[0] + lat[0] * off, p[1] + lat[1] * off, p[2] + k)
                 if fur.clear_of(pos, r.get("pole_clearance", 0.0) + 0.5 * (a["hi"][2] - a["lo"][2]) * a["scale"][2],
                                 poles_only=True) and (index is None or index.clear_of(
-                                    pos, r.get("prop_lane_clear", 0.0) + half)):
+                                    pos, r.get("prop_lane_clear", 0.0) + half, asset_height(table, "planter"))):
                     fur.put(table, "planter", pos, d, s.road.name)
     for j in jsolves:
         if not mine_pad(j):
@@ -638,7 +642,7 @@ def _edge_props(fur, table, solves, jsolves, bands, mine_run, mine_pad, ground, 
                 # every traffic car reclaimed as `stalled` (34 in one run) stood beside corner bollards with its
                 # throttle on. So a bollard keeps clear of every lane, the rule a tree already had.
                 if fur.clear_of(pos, r.get("pole_clearance", 0.0), poles_only=True) and (
-                        index is None or index.clear_of(pos, r.get("prop_lane_clear", 0.0))):
+                        index is None or index.clear_of(pos, r.get("prop_lane_clear", 0.0), asset_height(table, "bollard"))):
                     fur.put(table, "bollard", pos, d)
 
 
@@ -691,14 +695,15 @@ def _out_of_lane(index, table, rules, asset, pos, out, push=True):
     if index is None:
         return pos
     margin = _pole_half(table, asset) + float(rules.get("pole_lane_clear", 0.15))
-    if index.clear_of(pos, margin):
+    tall = asset_height(table, asset)
+    if index.clear_of(pos, margin, tall):
         return pos
     if not push:
         return None
     d = POLE_PUSH_STEP
     while d <= POLE_PUSH_MAX + 1e-9:
         cand = (pos[0] + out[0] * d, pos[1] + out[1] * d, pos[2])
-        if index.clear_of(cand, margin):
+        if index.clear_of(cand, margin, tall):
             return cand
         d += POLE_PUSH_STEP
     return None
@@ -1199,7 +1204,7 @@ def _guardrails(fur, table, solves, bands, mine_run, ground, index):
                     if g is not None and g - p[2] >= rise:
                         continue                                 # the hill stands here (the inner side): no rail
                 pos = (p[0] + out[0] * inset, p[1] + out[1] * inset, p[2] + (k if w > 0.0 else 0.0))
-                if index is not None and not index.clear_of(pos, 0.1):
+                if index is not None and not index.clear_of(pos, 0.1, asset_height(table, "guardrail")):
                     fur.counts["guardrail_in_lane"] = fur.counts.get("guardrail_in_lane", 0) + 1
                     continue
                 # the piece's +X (the beam) toward the road, so its forward runs WITH the edge on the left kerb and
@@ -1215,9 +1220,19 @@ class _LaneIndex(object):
 
     A footway is a fact about ONE road, so a spot on it can still be in the CARRIAGEWAY of another that runs
     alongside -- a ramp beside its mainline is the case (measured on the sample network: a tree on `demo_main`'s
-    footway stood 0.23 m off `demo_ramp_b_F0`'s centreline). A lamp post there is bad; a 9 m tree is worse."""
+    footway stood 0.23 m off `demo_ramp_b_F0`'s centreline). A lamp post there is bad; a 9 m tree is worse.
+
+    The question is asked in THREE dimensions when the caller says how tall its thing is (`height`): a lane that
+    passes OVER the spot with room for the thing under its deck, or runs under the deck the spot stands on, is
+    not in the way. Asked in plan only, a street under a viaduct lost one whole kerb of furniture (measured on the
+    island 2026-10-12: `chuo_dori__3` under the expressway carried 6 rail modules on one kerb and 50 on the other,
+    1 lamp against 7, no tree against 6)."""
 
     CELL = 20.0
+    #: what hangs below a lane's surface where it is a deck (slab + girder): a thing under it must end below this
+    DECK_DEPTH = 1.6
+    #: air between a thing's top and the underside of the deck above it
+    HEADROOM = 0.3
 
     def __init__(self, lanes):
         self.cells = {}
@@ -1231,8 +1246,12 @@ class _LaneIndex(object):
                     for j in range(int(math.floor(lo_y / self.CELL)), int(math.floor(hi_y / self.CELL)) + 1):
                         self.cells.setdefault((i, j), []).append((a, b, half))
 
-    def clear_of(self, p, margin):
-        """True when `p` is more than that lane's half width plus `margin` from every lane centreline."""
+    def clear_of(self, p, margin, height=None, spread=0.0):
+        """True when `p` is more than that lane's half width plus `margin` from every lane centreline. With a
+        `height` (the thing's top above `p`), a lane on another LEVEL does not count: one whose deck clears the
+        thing's top, or one more than a deck's depth below the spot. `spread` is how far the thing's TOP reaches
+        in plan (a tree's crown): a deck that close overhead without room for the top refuses the spot too (seven
+        9 m trees stood beside a viaduct's edge with their crowns in its deck, check_street_trees 2026-10-12)."""
         i0, j0 = int(math.floor(p[0] / self.CELL)), int(math.floor(p[1] / self.CELL))
         for i in range(i0 - 1, i0 + 2):
             for j in range(j0 - 1, j0 + 2):
@@ -1240,9 +1259,26 @@ class _LaneIndex(object):
                     vx, vy = b[0] - a[0], b[1] - a[1]
                     n = vx * vx + vy * vy
                     t = 0.0 if n <= 1e-12 else max(0.0, min(1.0, ((p[0] - a[0]) * vx + (p[1] - a[1]) * vy) / n))
-                    if math.hypot(p[0] - (a[0] + vx * t), p[1] - (a[1] + vy * t)) < half + margin:
+                    dist = math.hypot(p[0] - (a[0] + vx * t), p[1] - (a[1] + vy * t))
+                    levelled = height is not None and len(p) > 2 and len(a) > 2 and len(b) > 2
+                    z = a[2] + (b[2] - a[2]) * t if levelled else 0.0
+                    if dist < half + margin:
+                        if levelled and (z - self.DECK_DEPTH >= p[2] + height + self.HEADROOM
+                                         or z <= p[2] - self.DECK_DEPTH):
+                            continue
+                        return False
+                    if levelled and spread > 0.0 and dist < half + spread and z > p[2] + self.DECK_DEPTH \
+                            and z - self.DECK_DEPTH < p[2] + height + self.HEADROOM:
                         return False
         return True
+
+
+def asset_height(table, asset):
+    """How far an asset's top stands above its foot, metres (the piece's own bounds, Y up, scaled)."""
+    a = table.assets.get(asset) or {}
+    if "hi" not in a:
+        return None
+    return max(0.0, float(a["hi"][1]) * float(a.get("scale", (1.0, 1.0, 1.0))[1]))
 
 
 def _street_trees(fur, table, solves, bands, mine_run, ground, lanes):
@@ -1274,7 +1310,8 @@ def _street_trees(fur, table, solves, bands, mine_run, ground, lanes):
                 lat = _left(d)
                 off = sgn * tree_kerb_offset(table)
                 pos = (p[0] + lat[0] * off, p[1] + lat[1] * off, p[2] + k)
-                if fur.clear_of(pos, r["tree_clearance"]) and index.clear_of(pos, r["tree_lane_clear"]):
+                if fur.clear_of(pos, r["tree_clearance"]) and index.clear_of(
+                        pos, r["tree_lane_clear"], asset_height(table, asset), float(r.get("tree_crown_radius", 3.5))):
                     if fur.put(table, asset, pos, d, s.road.name):
                         # The planter IS the tree's socket (PLAN.md 3.18m, user-reported with a screenshot: a
                         # tree and a planter standing side by side on one footway "appear at the same time and
@@ -1325,6 +1362,43 @@ def _tree_pit(fur, r, pos, fwd, material):
     cs = [(pos[0] + f[0] * h * sf + l[0] * h * sl, pos[1] + f[1] * h * sf + l[1] * h * sl)
           for sf, sl in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
     fur.paint_tris(material, _up_quad(*[(x, y, z) for x, y in cs]))
+
+
+def _median_hedge(fur, table, solves, mine_run, index=None):
+    """植樹帯: a clipped hedge down every RAISED median wide enough for one (PLAN.md T3, the half the guardrail did
+    not take). Boxes `median_hedge_unit` long with `median_hedge_gap` between them, `median_hedge_height` tall, as
+    wide as the island allows up to `median_hedge_half` and never nearer its kerb than `median_hedge_kerb_gap`;
+    none within `median_hedge_end_clear` of a run's end (the junction: a driver turning must see over the median),
+    none round a median lamp (`pole_clearance`), none where a lane or a track crosses the island. Swept INTO the
+    piece like the wires (`HEDGE_OBJECT`, no collision: the island is kerbed and a hedge is soft); placed after the
+    lamps so it yields to them."""
+    r = table.rules
+    unit = float(r.get("median_hedge_unit", 0.0))
+    mat = r.get("median_hedge_material", "")
+    if unit <= 0.0 or not mat:
+        return
+    gap, tall = float(r.get("median_hedge_gap", 1.0)), float(r.get("median_hedge_height", 0.8))
+    half_max, kerb_gap = float(r.get("median_hedge_half", 0.6)), float(r.get("median_hedge_kerb_gap", 0.4))
+    for s in solves:
+        if not mine_run(s) or len(s.samples) < 2 or getattr(s.road, "median_style", None) != pm.MED_RAISED:
+            continue
+        pts = [tuple(sm.pos) for sm in s.samples]
+        cum = _lengths(pts)
+        for st in _stations(cum[-1], unit + gap, float(r.get("median_hedge_end_clear", 12.0))):
+            p, d, i = _at(pts, cum, st)
+            j = min(i + 1, len(pts) - 1)
+            mh = min(s.values[i]["rka_med_h"], s.values[j]["rka_med_h"])
+            mz = min(s.values[i]["rka_med_z"], s.values[j]["rka_med_z"])
+            half = min(half_max, mh - kerb_gap)
+            if mz <= 0.0 or half < float(r.get("median_hedge_min_half", 0.3)):
+                continue
+            pos = (p[0], p[1], p[2] + mz)
+            if not fur.clear_of(pos, r["pole_clearance"] + 0.5 * unit):
+                continue
+            if index is not None and not index.clear_of(pos, 0.0, tall):
+                continue
+            fur.hedge.setdefault(mat, []).extend(_box(pos, d, 0.5 * unit, half, tall))
+            fur.counts["median_hedge"] = fur.counts.get("median_hedge", 0) + 1
 
 
 def _median_walls(fur, table, solves, mine_run):
@@ -1391,6 +1465,7 @@ def place(table, solved, lanes_doc, mine_lane, mine_run, mine_pad, mark_mat, gro
     # off a rail track, probe_rail_track's gauge 2026-09-26)
     _street_trees(fur, table, solves, bands, mine_run, ground, dict(lanes, **{"~" + str(l["id"]): l for l in keep_clear or ()}))
     _median_walls(fur, table, solves, mine_run)
+    _median_hedge(fur, table, solves, mine_run, index)
     _guardrails(fur, table, solves, bands, mine_run, ground, index)
     return fur
 
@@ -2165,6 +2240,41 @@ def self_test():
     assert sigs[0]["pos"][1] > authored + 0.1, sigs
     assert idx.clear_of(sigs[0]["pos"], margin), sigs
     assert not idx.clear_of((sigs[0]["pos"][0], authored, 0.0), margin), "the fixture must carry the defect"
+    # A LANE ON ANOTHER LEVEL (2026-10-12): a viaduct 10 m up does not take the kerb under it from a 0.8 m rail or
+    # an 8 m lamp's worth of nothing -- asked with a height, only a thing that reaches the deck is "in the lane";
+    # asked in plan (the control: no height) the spot under the deck is refused whatever stands there.
+    deck = _LaneIndex({"up": {"id": "up", "lane_width": 4.5, "points": [(-50.0, 10.0, 0.0), (50.0, 10.0, 0.0)]}})
+    under = (0.0, 0.0, 0.0)
+    assert not deck.clear_of(under, 0.1), "the plan-only control must refuse the spot under a deck"
+    assert deck.clear_of(under, 0.1, 0.8) and deck.clear_of(under, 0.1, 8.0)
+    assert not deck.clear_of(under, 0.1, 8.2) and not deck.clear_of(under, 0.1, 11.67)
+    assert deck.clear_of((0.0, 0.0, 12.0), 0.1, 1.0), "a spot on a deck above a lane is not in that lane"
+    assert not deck.clear_of((0.0, 0.0, 9.5), 0.1, 1.0), "a spot at the lane's own level is"
+    beside = (0.0, 4.5, 0.0)                    # 4.5 m off the deck's centreline: clear of its lane in plan
+    assert deck.clear_of(beside, 0.1, 9.0), "a trunk beside a deck is clear of it"
+    assert not deck.clear_of(beside, 0.1, 9.0, 3.5), "a 9 m crown 3.5 m wide beside a 10 m deck is in it"
+    assert deck.clear_of(beside, 0.1, 6.0, 3.5), "a 6 m tree is under it"
+    # THE MEDIAN HEDGE: boxes on a raised median, none at the run's ends, none round a median lamp; off = none.
+    class _S(object):
+        pass
+    hs = _S(); hs.road = _S(); hs.road.name = "hedge"; hs.road.median_style = pm.MED_RAISED
+    hs.samples = []
+    for k in range(0, 101, 5):
+        sm = _S(); sm.pos = (float(k), 0.0, 0.0); hs.samples.append(sm)
+    hs.values = [{"rka_med_h": 2.0, "rka_med_z": 0.15}] * len(hs.samples)
+    fh = Furniture()
+    _median_hedge(fh, table, [hs], lambda s: True, None)
+    n_free = fh.counts.get("median_hedge", 0)
+    assert n_free >= 10 and len(fh.hedge[table.rules["median_hedge_material"]]) == 12 * n_free, fh.counts
+    xs = [t[0][0] for t in fh.hedge[table.rules["median_hedge_material"]]]
+    assert min(xs) >= table.rules["median_hedge_end_clear"] - 3.0 and max(xs) <= 100.0 - table.rules["median_hedge_end_clear"] + 3.0
+    fl = Furniture()
+    assert fl.put(table, "lamp_twin", (50.0, 0.0, 0.15), (1.0, 0.0), "hedge")
+    _median_hedge(fl, table, [hs], lambda s: True, None)
+    assert fl.counts.get("median_hedge", 0) < n_free, "a hedge must yield to a median lamp"
+    t_off = Table(); t_off.rules = dict(table.rules, median_hedge_unit=0.0)
+    f0 = Furniture(); _median_hedge(f0, t_off, [hs], lambda s: True, None)
+    assert not f0.hedge, "the control: unit 0 lays no hedge"
     # CONTROL: with no index the placer is what it was, and the pole stands in the turn.
     f_ctl = Furniture()
     _signals(f_ctl, table, {l["id"]: l for l in kl3}, [{"id": "j3", "arms": arms}], lambda l: True, None, None)

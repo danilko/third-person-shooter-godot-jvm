@@ -407,8 +407,12 @@ def layout_type(t, root):
     # 2026-09-28) -- the mesh is that much deeper than the footprint, on the street side only
     front = max([b["center"][2] + b["size"][2] / 2 for b in out["boxes"]] + [D / 2]
                 + [p["at"][1] + lib_piece(p["piece"], root)[1]["max"][2] for p in t.get("props", [])
-                   if p.get("facade") and not p.get("yaw")])
+                   if p.get("facade") and not p.get("yaw") and not p.get("overhang")])
     out["forecourt_m"] = round(max(0.0, front - D / 2), 4)
+    # how far the OVERHANGS (an awning, a projecting sign) stand out past the footprint's front line: drawn, so the
+    # mesh is that much deeper, but no ground is claimed (probe_buildings allows it; the placement aabb leaves it out)
+    out["overhang_m"] = round(max([0.0] + [p["at"][1] + lib_piece(p["piece"], root)[1]["max"][2] - D / 2
+                                           for p in t.get("props", []) if p.get("overhang") and not p.get("yaw")]), 4)
 
     jp = t.get("jp", {})
     for key, got, tol in (("frontage_m", W, m), ("depth_m", D, m), ("height_m", total, storey)):  # roofline
@@ -505,6 +509,10 @@ def place_props(props, out, root, footprint=None):
             if footprint and (abs(pos[0]) > footprint[0] / 2 + 0.5 or abs(pos[2]) > footprint[1] / 2 + 0.5):
                 raise SystemExit(f"{out['id']}: prop {name} at {pos} stands outside the footprint {footprint}")
             out["pieces"].append({"piece": name, "path": path, "pos": [round(v, 5) for v in pos], "yaw": yaw})
+            if p.get("overhang"):
+                # an OVERHANG (an awning, a projecting sign: over head height, over the lot's own strip) is drawn but
+                # claims no ground: build_building_scenes.gd leaves it out of the footprint `island_buildings` places by
+                out["pieces"][-1]["overhang"] = True
             if p.get("door"):
                 # an INTERIOR hinged door (user, 2026-09-26: a konbini's staff room and toilets): the doorway is the
                 # prop's own hole (a `Wall_PartitionDoor`), and `door` is its opening {w, h} in metres; the scene

@@ -65,9 +65,9 @@ size = Vector3(21.84, 0.2, 1.82)
 [sub_resource type="BoxShape3D" id="BoxShape3D_vyqii"]
 size = Vector3(3.64, 3.64, 3.64)
 
-[node name="OfficeMid_H5_BB" type="Node3D" unique_id=1038876102]
+[node name="OfficeMid_H5_BB" type="Node3D" unique_id=2080693832]
 metadata/building = {
-"aabb": [Vector3(-11.178897, -0.091, -7.5066905), Vector3(22.325378, 32.400997, 15.045789)],
+"aabb": [Vector3(-11.178897, -0.091, -7.5066905), Vector3(22.325378, 32.400997, 15.045788)],
 "door_style": "slide",
 "doors": [{
 "center": [0.91, 0.0, 7.28],
@@ -99,7 +99,8 @@ metadata/building = {
 "kit": "quaternius_downtown_city",
 "module_m": 1.82,
 "modules": [12.0, 8.0],
-"piece_count": 884,
+"overhang_m": 0.12,
+"piece_count": 885,
 "props_top_m": 32.31,
 "roofline_m": 23.66,
 "setback_m": 1.82,
@@ -120,98 +121,98 @@ metadata/building = {
 "wall_top_m": 21.84
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1783702782]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1627790301]
 visibility_range_end = 687.72
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_keu6n")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=1651889220]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1361243537]
 collision_mask = 0
 
-[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=759769927]
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=1176091590]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.335, 1.05, 7.28)
 shape = SubResource("BoxShape3D_8kwhd")
 
-[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=1820727861]
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=1085886669]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.485, 1.05, 7.28)
 shape = SubResource("BoxShape3D_w138q")
 
-[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=1011366590]
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=78296288]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.19, 22.84, -1.9100001)
 shape = SubResource("BoxShape3D_0yukm")
 
-[node name="Box3" type="CollisionShape3D" parent="Collision" unique_id=1147921151]
+[node name="Box3" type="CollisionShape3D" parent="Collision" unique_id=936877020]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 18.655, 5.35485)
 shape = SubResource("BoxShape3D_xindc")
 
-[node name="Box4" type="CollisionShape3D" parent="Collision" unique_id=1771645820]
+[node name="Box4" type="CollisionShape3D" parent="Collision" unique_id=1110053955]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9.1, 7.17485)
 shape = SubResource("BoxShape3D_1vvs0")
 
-[node name="Box5" type="CollisionShape3D" parent="Collision" unique_id=505950806]
+[node name="Box5" type="CollisionShape3D" parent="Collision" unique_id=903978563]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.4300003, 1.82, 7.17485)
 shape = SubResource("BoxShape3D_yabdk")
 
-[node name="Box6" type="CollisionShape3D" parent="Collision" unique_id=1649335843]
+[node name="Box6" type="CollisionShape3D" parent="Collision" unique_id=927765637]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.91, 2.87, 7.17485)
 shape = SubResource("BoxShape3D_f3vkt")
 
-[node name="Box7" type="CollisionShape3D" parent="Collision" unique_id=1830201605]
+[node name="Box7" type="CollisionShape3D" parent="Collision" unique_id=1424874631]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.34, 1.82, 7.17485)
 shape = SubResource("BoxShape3D_rjmxk")
 
-[node name="Box8" type="CollisionShape3D" parent="Collision" unique_id=187878775]
+[node name="Box8" type="CollisionShape3D" parent="Collision" unique_id=425592279]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.81485, 18.655, -0.90999985)
 shape = SubResource("BoxShape3D_bfbiq")
 
-[node name="Box9" type="CollisionShape3D" parent="Collision" unique_id=509111540]
+[node name="Box9" type="CollisionShape3D" parent="Collision" unique_id=1835227977]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.81485, 7.28, 0)
 shape = SubResource("BoxShape3D_awky8")
 
-[node name="Box10" type="CollisionShape3D" parent="Collision" unique_id=909758924]
+[node name="Box10" type="CollisionShape3D" parent="Collision" unique_id=1697198986]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 18.655, -7.17485)
 shape = SubResource("BoxShape3D_ptqdv")
 
-[node name="Box11" type="CollisionShape3D" parent="Collision" unique_id=1216506576]
+[node name="Box11" type="CollisionShape3D" parent="Collision" unique_id=2084584508]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 7.28, -7.17485)
 shape = SubResource("BoxShape3D_wtckn")
 
-[node name="Box12" type="CollisionShape3D" parent="Collision" unique_id=72229686]
+[node name="Box12" type="CollisionShape3D" parent="Collision" unique_id=992420581]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.81485, 18.655, -0.90999985)
 shape = SubResource("BoxShape3D_r36qs")
 
-[node name="Box13" type="CollisionShape3D" parent="Collision" unique_id=1837237275]
+[node name="Box13" type="CollisionShape3D" parent="Collision" unique_id=916344832]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.81485, 7.28, 0)
 shape = SubResource("BoxShape3D_b0dt3")
 
-[node name="Box14" type="CollisionShape3D" parent="Collision" unique_id=282844621]
+[node name="Box14" type="CollisionShape3D" parent="Collision" unique_id=905883555]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 15.015, 7.17485)
 shape = SubResource("BoxShape3D_1u4xi")
 
-[node name="Box15" type="CollisionShape3D" parent="Collision" unique_id=365883169]
+[node name="Box15" type="CollisionShape3D" parent="Collision" unique_id=1824467682]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.81485, 15.015, 6.37)
 shape = SubResource("BoxShape3D_a3r7f")
 
-[node name="Box16" type="CollisionShape3D" parent="Collision" unique_id=1057339208]
+[node name="Box16" type="CollisionShape3D" parent="Collision" unique_id=84625480]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.81485, 15.015, 6.37)
 shape = SubResource("BoxShape3D_p8283")
 
-[node name="Box17" type="CollisionShape3D" parent="Collision" unique_id=950169441]
+[node name="Box17" type="CollisionShape3D" parent="Collision" unique_id=814952350]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
 shape = SubResource("BoxShape3D_hsuyi")
 
-[node name="Box18" type="CollisionShape3D" parent="Collision" unique_id=2141261842]
+[node name="Box18" type="CollisionShape3D" parent="Collision" unique_id=1319494202]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 21.74, -0.90999985)
 shape = SubResource("BoxShape3D_radh5")
 
-[node name="Box19" type="CollisionShape3D" parent="Collision" unique_id=1268773515]
+[node name="Box19" type="CollisionShape3D" parent="Collision" unique_id=430145016]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 14.46, 6.37)
 shape = SubResource("BoxShape3D_7mcaj")
 
-[node name="Box20" type="CollisionShape3D" parent="Collision" unique_id=1629014601]
+[node name="Box20" type="CollisionShape3D" parent="Collision" unique_id=520140671]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.28, 23.66, -3.6399999)
 shape = SubResource("BoxShape3D_vyqii")
 
-[node name="Door_front_6" type="Marker3D" parent="." unique_id=759823816]
+[node name="Door_front_6" type="Marker3D" parent="." unique_id=1126559096]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0.91, 0, 7.28)

@@ -36,6 +36,9 @@ for kit in assets/world_source/kits/*/kit.json; do
         grep "\[export_building_kit\]" "$TMP/export.log"
     done
 done
+# the export removes every file in a kit's pieces/ that its .blend does not own -- which includes the right-hand
+# twins tools/mirror_piece.py writes (Sign_ExpwyCantilever_R: found gone after a library export, 2026-10-12)
+python3 tools/mirror_piece.py | tail -1
 timeout -k 5 900 "$GODOT" --headless --path . --import > "$TMP/import.log" 2>&1 || { tail -20 "$TMP/import.log"; exit 1; }
 python3 tools/building_kit/layout_buildings.py --self-test | tail -1
 python3 tools/building_kit/layout_buildings.py assets/world_source/buildings/building_types.json "$TMP/layout.json"

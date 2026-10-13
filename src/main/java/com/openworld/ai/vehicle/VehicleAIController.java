@@ -820,6 +820,7 @@ public class VehicleAIController extends Controller {
      * still has ONE owner.
      */
     /** Debug: what this car is waiting on (a stalled-reclaim log line reads it). */
+    @Register
     public String describeBlock() {
         StringBuilder b = new StringBuilder();
         b.append("lane=").append(route == null ? "none" : (route instanceof Node rn ? rn.getName().toString() : route.toString())).append(String.format(" at %.1f", routeProgress));
@@ -856,6 +857,7 @@ public class VehicleAIController extends Controller {
      * {@code yield} = a junction another car holds, {@code end} = out of lane, {@code hold} = a dispatched car
      * arrived, {@code slow} = nothing in the way (pulling away, or creeping).
      */
+    @Register
     public String standingReason() {
         if (currentSpeed() > 1.0f) return "moving";
         if (finished || route == null) return "end";

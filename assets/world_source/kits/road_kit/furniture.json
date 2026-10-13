@@ -19,6 +19,7 @@
   "guardrail is the white ガードレール (user, 2026-10-11), kits/library Guardrail_JP: one 4 m module, a post in its middle, tiled end to end by its own length along an edge, guardrail_inset behind the edge line, the beam toward the road. `rail` [half thickness, height, half length] is its collider and what makes it a RAIL to the placer: it keeps nothing else away (a tree, a lamp and a pole stand behind it) and it is breakable like a pole (BreakableProps builds a long box per module). WHERE (point_furniture.guardrail_kind): (1) `kerb` -- both kerbs of a road with at least guardrail_min_lanes lanes each way and a footway, between carriageway and footway, never within guardrail_end_clear of the run's ends (the crossings, where people walk into the road), a vehicle entry or a car-park keep-out; (2) `edge` -- a road whose barrier_style is RAIL (the coast road), wherever the solver stood no wall: on the ground and outside a rock shed; (3) `drop` -- the roads guardrail_drop_roads names (the mountain road): EVERY edge except where the hill stands beside it (the ground guardrail_hill_reach outboard is guardrail_hill_rise or more ABOVE the road: the inner side).",
   "crosswalk_min_lane: an arm whose lanes are shorter than this gets no zebra and no pedestrian signal -- a link that short joins two junctions that are really one, and two zebras back to back with four pedestrian heads stood in it.",
   "signal_r / expwy_sign_r are the RIGHT-HAND twins of signal / expwy_sign (tools/mirror_piece.py reflects the piece and its lamps.json in X): on a network whose traffic keeps right (`<stem>.network.json` traffic_side, read by point_model.load_network) the pole stands on the RIGHT kerb and the arm reaches left over the lanes. Everything else follows the lane graph by itself.",
+  "median_hedge_*: a clipped hedge down every RAISED median (point_furniture._median_hedge): boxes `unit` long with `gap` between, `height` tall, up to `half` wide and `kerb_gap` in from the island's kerb, none within `end_clear` of a junction or beside a median lamp. Swept into the piece (FURN__hedge), no collision. unit 0 = none.",
   "Edit and rebuild: the Road Kit digest salts this file and every piece it names, so a change here rebuilds every road piece."
  ],
  "kit": "res://assets/world_source/kits/quaternius_downtown_city/",
@@ -502,6 +503,14 @@
   "denchu_one_side_roads": [
    "shrine_touge*"
   ],
-  "denchu_inset_open": 1.0
+  "denchu_inset_open": 1.0,
+  "median_hedge_unit": 5.0,
+  "median_hedge_gap": 1.0,
+  "median_hedge_height": 0.8,
+  "median_hedge_half": 0.6,
+  "median_hedge_kerb_gap": 0.4,
+  "median_hedge_min_half": 0.3,
+  "median_hedge_end_clear": 12.0,
+  "median_hedge_material": "M_Hedge"
  }
 }

@@ -5,6 +5,15 @@ extends SceneTree
 ## every 2 s for --seconds (default 40).
 ##   stdbuf -oL <godot> --headless --fixed-fps 60 --path . --script tools/godot/probe_traffic_census.gd -- \
 ##       [--seconds=40] [--sites=downtown_core,farm] [--budget=N] [--near-target=N] [--along-lanes | --along-share=0.5] [--on-road] [--no-grid-at-spawn]
+##       [--at=trunk:15:420,street:-958:657] [--big-road-bias=0]
+## --at adds sites by hand (name:x:z, Godot frame) and implies --on-road for them: each is moved to the nearest
+## street and ALSO reports the cars ON THE PLAYER'S OWN ROAD within 150 m (the user, 2026-10-12: "on a big road I
+## barely see any") -- a car counts when its lane's name starts with the road's (`chuo_dori__3_F1` -> `chuo_dori`).
+## --big-road-bias=0 is that measurement's control (ZoneManager.trafficBigRoadBias: the uniform lane draw).
+## --drive=<m/s> [--drive-metres=1500]: after the standing sample at an --at site the player is CARRIED along that
+## road's lanes at that speed (30 m above them, the velocity set, so the spawn rules see a moving player and no car
+## brakes for a person), straight on at each junction, and the own-road count is taken again every 2 s -- the user's
+## words were "in current driving", and a standing census cannot see what the corridor and view rules refuse.
 ## A MEASUREMENT (it prints a table and exits 0); --min-near=<n> turns it into a gate: every site's mean count of
 ## simulated cars within 200 m must reach n.
 const WORLD := "res://src/main/resources/com/openworld/world/World.tscn"
@@ -55,6 +64,131 @@ func _on_road(p: Vector3) -> Vector3:
 			best = Vector3(at.x, p.y, at.z)
 	return best
 
+## The through lane nearest `p`: its node name and speed limit (km/h), or ["", 0.0].
+func _lane_at(p: Vector3) -> Array:
+	var best := ["", 0.0]
+	var best_d := 60.0
+	for n in root.find_children("*", "Node3D", true, false):
+		var sc: Script = n.get_script()
+		if sc == null or not str(sc.resource_path).ends_with("PathLaneRoute.java") or str(n.name).begins_with("c"):
+			continue
+		var path: Path3D = n.get_node_or_null("Path3D")
+		if path == null or path.curve == null:
+			continue
+		var off := path.curve.get_closest_offset(path.to_local(p))
+		if not is_finite(off):
+			continue
+		var at := path.to_global(path.curve.sample_baked(off))
+		var d := Vector2(at.x - p.x, at.z - p.z).length()
+		if d < best_d:
+			best_d = d
+			best = [str(n.name), float(n.get("speed_limit"))]
+	return best
+
+## The lane node called `name` (a PathLaneRoute currently in the tree), or null.
+func _lane_node(name: String) -> Node3D:
+	for n in root.find_children(name, "Node3D", true, false):
+		var sc: Script = n.get_script()
+		if sc != null and str(sc.resource_path).ends_with("PathLaneRoute.java"):
+			return n
+	return null
+
+## Carry the player `metres` along `lane` and its straightest successors at `speed`; returns [mean cars on `road`
+## within 150 m, mean of those AHEAD of the player, samples, metres actually covered].
+func _drive(p: CharacterBody3D, lane: String, road: String, speed: float, metres: float) -> Array:
+	var node := _lane_node(lane)
+	var done := 0.0
+	var own := 0.0
+	var ahead := 0.0
+	var any_ahead := 0.0      # any ambient car within 150 m ahead and 25 m either side of the line of travel
+	var faced := 0.0          # how squarely this peer's camera looked along the travel (1 = dead ahead)
+	var n := 0
+	var frame := 0
+	var s := -1.0
+	while node != null and done < metres:
+		var path: Path3D = node.get_node_or_null("Path3D")
+		if path == null or path.curve == null:
+			break
+		var total := path.curve.get_baked_length()
+		if s < 0.0:
+			s = path.curve.get_closest_offset(path.to_local(p.global_position))
+		var dir := Vector3.FORWARD
+		while s < total and done < metres:
+			var at := path.to_global(path.curve.sample_baked(s))
+			var nxt := path.to_global(path.curve.sample_baked(minf(total, s + 1.0)))
+			if nxt.distance_to(at) > 0.01:
+				dir = (nxt - at).normalized()
+			p.global_position = at + Vector3(0, 30.0, 0)
+			p.velocity = dir * speed
+			# a driver looks where they are going, and "never born in view within 160 m" is asked of this camera
+			var cam := root.get_viewport().get_camera_3d()
+			if cam != null:
+				cam.global_transform = Transform3D(Basis.looking_at(dir, Vector3.UP), at + Vector3(0, 2.0, 0))
+			await physics_frame
+			s += speed / 60.0
+			done += speed / 60.0
+			frame += 1
+			if frame % 120 == 0:
+				n += 1
+				var cam2 := root.get_viewport().get_camera_3d()
+				if cam2 != null:
+					faced += (-cam2.global_transform.basis.z).dot(dir)
+				for c in _cars(p.global_position, 150.0):
+					var rel: Vector3 = c.global_position - p.global_position
+					var along := rel.x * dir.x + rel.z * dir.z
+					if along > 0.0 and absf(rel.x * dir.z - rel.z * dir.x) < 25.0:
+						for ch0 in c.get_children():
+							var sc0: Script = ch0.get_script()
+							if sc0 != null and str(sc0.resource_path).ends_with("VehicleAIController.java"):
+								any_ahead += 1
+					for ch in c.get_children():
+						var sc: Script = ch.get_script()
+						if sc != null and str(sc.resource_path).ends_with("VehicleAIController.java") \
+								and _road_of(str(ch.call("lane_now"))) == road:
+							own += 1
+							var to: Vector3 = c.global_position - p.global_position
+							if to.x * dir.x + to.z * dir.z > 0.0:
+								ahead += 1
+		# straight on: of the lanes this one names, the one whose first metre runs most nearly the way this ended
+		var end_a := path.to_global(path.curve.sample_baked(maxf(0.0, total - 1.0)))
+		var end_b := path.to_global(path.curve.sample_baked(total))
+		var out := (end_b - end_a).normalized()
+		var best: Node3D = null
+		var best_dot := -2.0
+		for nm in str(node.get("next_routes")).split(",", false):
+			var cand := _lane_node(nm.strip_edges())
+			if cand == null:
+				continue
+			var cp: Path3D = cand.get_node_or_null("Path3D")
+			if cp == null or cp.curve == null or cp.curve.get_baked_length() < 1.0:
+				continue
+			var d0 := (cp.to_global(cp.curve.sample_baked(1.0)) - cp.to_global(cp.curve.sample_baked(0.0))).normalized()
+			if d0.dot(out) > best_dot:
+				best_dot = d0.dot(out)
+				best = cand
+		node = best
+		s = 0.0
+	p.velocity = Vector3.ZERO
+	return [own / maxf(n, 1), ahead / maxf(n, 1), n, done, any_ahead / maxf(n, 1), faced / maxf(n, 1)]
+
+## `chuo_dori__3_F1` -> `chuo_dori`: a road cut into several records keeps one name before the first `__`.
+func _road_of(lane: String) -> String:
+	var cut := lane.rfind("_")
+	var road := lane.substr(0, cut) if cut > 0 else lane
+	var split := road.find("__")
+	return road.substr(0, split) if split > 0 else road
+
+## How many ambient cars within `r` of `p` drive a lane of `road`.
+func _on_own_road(p: Vector3, r: float, road: String) -> int:
+	var n := 0
+	for c in _cars(p, r):
+		for ch in c.get_children():
+			var sc: Script = ch.get_script()
+			if sc != null and str(sc.resource_path).ends_with("VehicleAIController.java"):
+				if _road_of(str(ch.call("lane_now"))) == road:
+					n += 1
+	return n
+
 func _run() -> void:
 	var w: Node = (load(WORLD) as PackedScene).instantiate()
 	root.add_child(w)
@@ -91,6 +225,17 @@ func _run() -> void:
 		zm.set("traffic_spawn_along_share", float(args["along-share"]))
 	if args.has("along-lanes"):
 		zm.set("traffic_spawn_along_lanes", true)
+	if args.has("lead"):
+		zm.set("traffic_lead_seconds", float(args["lead"]))    # 0 = the control: the ring stays on the player
+	if args.has("big-road-bias"):
+		zm.set("traffic_big_road_bias", float(args["big-road-bias"]))
+	var sites := SITES.duplicate()
+	var by_hand := {}
+	for spec in str(args.get("at", "")).split(",", false):
+		var f := spec.split(":")
+		if f.size() == 3:
+			sites.append([f[0], float(f[1]), float(f[2])])
+			by_hand[f[0]] = true
 	var car := w.get_node_or_null("VehicleRoot")
 	if car != null:
 		car.queue_free()
@@ -105,9 +250,11 @@ func _run() -> void:
 	print("budget %d, near target %d within %.0f m, sim ring %.0f m" % [int(zm.get("traffic_budget")),
 		int(zm.get("traffic_near_target")), float(zm.get("traffic_near_radius")), float(zm.get("traffic_sim_radius"))])
 	print("%-18s %6s %6s %6s %6s %6s %6s  %s" % ["site", "<60m", "<100m", "<200m", "alive", "far", "refuse", "traffic models at the end"])
-	for site in SITES:
+	for site in sites:
 		if not only.is_empty() and not only.has(site[0]):
 			continue
+		if only.is_empty() and not by_hand.is_empty() and not by_hand.has(site[0]):
+			continue      # --at alone: only the sites named by hand
 		if not is_instance_valid(p):
 			# the respawn system replaced the body (something killed it between sites): take the new one
 			p = current_scene.get_node("Characters/Player") as CharacterBody3D
@@ -123,12 +270,20 @@ func _run() -> void:
 			if waited > 240 and int(zm.call("streaming_pending_now")) == 0:
 				break
 		var moved := 0.0
-		if args.has("on-road"):
+		var own_road := ""
+		var own_lane := ""
+		var own_limit := 0.0
+		var own := 0.0
+		if args.has("on-road") or by_hand.has(site[0]):
 			var q := _on_road(p.global_position)
 			moved = (q - p.global_position).length()
 			p.global_position = q
 			for i in 600:
 				await physics_frame
+			var la := _lane_at(p.global_position)
+			own_lane = la[0]
+			own_road = _road_of(la[0])
+			own_limit = la[1]
 		var refused0: int = zm.call("traffic_spawns_refused_now")
 		var s60 := 0.0
 		var s100 := 0.0
@@ -150,6 +305,8 @@ func _run() -> void:
 				far += int(zm.call("far_traffic_cars_now"))
 				# what the cars are DOING (an on-rails body's velocity reads zero: the brain is asked)
 				mov += int(zm.call("traffic_moving_now", 200.0))
+				if own_road != "":
+					own += _on_own_road(p.global_position, 150.0, own_road)
 				for kv in str(zm.call("traffic_state_now", 200.0)).split(" "):
 					var e := kv.split("=")
 					if e[0] != "n" and e[0] != "moving":
@@ -176,6 +333,12 @@ func _run() -> void:
 			parts.append("%s %.1f" % [k, float(why[k]) / d])
 		print("    of the %.1f within 200 m: moving %.1f; %s%s" % [s200 / d, mov / d, ", ".join(parts),
 			"  (stood on a street %.0f m from the site)" % moved if args.has("on-road") else ""])
+		if own_road != "":
+			print("    OWN ROAD '%s' (%.0f km/h): %.1f cars on it within 150 m" % [own_road, own_limit, own / d])
+		if own_lane != "" and args.has("drive"):
+			var r := await _drive(p, own_lane, own_road, float(args["drive"]), float(args.get("drive-metres", "1500")))
+			print("    DRIVEN at %.0f m/s for %.0f m (%d samples): %.1f cars AHEAD within 150 m x 25 m (any road); on '%s' %.1f, %.1f of them ahead; camera along the travel %.2f" % [
+				float(args["drive"]), r[3], r[2], r[4], own_road, r[0], r[1], r[5]])
 		if min_near >= 0.0 and s200 / d < min_near:
 			fails += 1
 	if min_near >= 0.0:

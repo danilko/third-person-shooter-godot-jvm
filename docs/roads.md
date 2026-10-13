@@ -1914,3 +1914,56 @@ opposing cars touching at `koba_waku_w__x2`, one into the building on the corner
   `hospital_west`, now report "lost their frontage": their front stands ~2 m further from the road than the check
   allows (the road pulled in from the corner). Not re-sited; (3) `probe_road_clear` was not re-run (1 h).
 
+
+## Furniture on both kerbs: measured; a street under a viaduct had lost one; the median hedge (2026-10-12, s10)
+
+User: "check if poles / other should be on both sides of street".
+
+**The rule was already both kerbs; the island was measured against it** (every placement of `point_furniture.place`
+over the whole record, sided against its own road's centreline): lamps 860 left / 931 right, street trees 462 / 462,
+guardrail modules 7 002 / 7 060, 電柱 1 134 / 838. One-sided roads, and why:
+
+- `shrine_touge*` -- poles on one verge, 311 of them: `denchu_one_side_roads`, by design (a mountain line follows
+  one verge). Lamps and rails there are on both.
+- `kuko_rotary`, `ekimae_rotary` -- trees on the outer kerb only: a one-way ring, the inside is the island.
+- **`chuo_dori` (six records of it) and `ring_kita__4` -- a DEFECT.** They run under the elevated expressway, and
+  `_LaneIndex.clear_of` ("is this spot in a lane") was asked in PLAN only, so the viaduct's lanes 8-10 m overhead
+  counted as lanes at street level: `chuo_dori__3` carried 6 rail modules on one kerb and 50 on the other, 1 lamp
+  against 7, no tree against 6.
+
+**Fix: the lane index is asked in three dimensions when the caller knows how tall its thing is.**
+`clear_of(p, margin, height)`: a lane whose deck (`DECK_DEPTH` 1.6 m under its surface) clears the thing's top by
+`HEADROOM` 0.3 m, or that runs more than a deck's depth BELOW the spot, is on another level and does not count.
+`asset_height` reads the top off the piece's own bounds. Every caller with an asset passes it (`_out_of_lane`:
+signals, lamps, poles; trees; planters; bollards; guardrails); the 踏切 unit's search still asks in plan. A 0.8 m
+rail and an 8 m lamp fit under a 10 m deck; an 11.67 m 電柱 does not, so a street under a viaduct still carries no
+overhead line -- which is right. Island, same record: guardrail modules 14 062 -> 14 547 (refused "in a lane" 486 ->
+1), lamps 1 791 -> 1 847 (+15 median lamps), trees 924 -> 980, signals +9, pedestrian heads +17; `chuo_dori__3` is
+balanced. Self-test: a lane 10 m up -- the plan-only question refuses the spot under it (the control), 0.8 m and
+8.0 m pass, 8.2 m and 11.67 m do not; a spot on the deck is not in a lane below it.
+
+**The median hedge (PLAN.md T3's other half).** `_median_hedge`: a clipped hedge down every RAISED median wide
+enough -- boxes `median_hedge_unit` 5 m long with 1 m between, 0.8 m tall, up to 1.2 m wide and 0.4 m in from the
+island's kerb, none within 12 m of a run's end (a turning driver sees over the median), none beside a median lamp,
+none where a lane or a track crosses. Swept into the piece (`FURN__hedge`, `M_Hedge` in `road_kit/materials`, no collision: the island is
+kerbed). 1 193 on the island. `median_hedge_unit` 0 = none (the self-test's control).
+
+**Not done:** T3's 横断防止柵 between the trees stays replaced by the guardrail; a wire span is still not checked
+against a deck it may pass under (the poles either side of an overpass, <= 62 m apart).
+
+**Same day, found by the gates after the rebuild:** `check_street_trees` asked the lanes in plan too, so the 45
+trees newly planted under the viaduct read as "in a lane"; it is level-aware now (a lane >= 4 m above a tree's foot
+is a deck, one >= 1.6 m below is a street under the tree's own deck; `--plan-only` is the old question and fails 45)
+and it gained a check of its own: a tree under a deck must end below it. That found 7 trees whose 9 m crowns stood
+BESIDE a viaduct's edge and in its deck -- the placer asks the deck within the trunk's reach only. `clear_of(...,
+spread)` (a tree's crown, `tree_crown_radius` 3.5 m by default) refuses a spot that close to a deck without room
+for the top: 980 -> 970 trees, 65 under a deck, 0 reaching one. The check's `--control` (kerb gap inside the kerb,
+lane guard off) still fails, on the new line (41 reaching a deck).
+
+**The rebuild that carried it** (`tools/island_world.sh --from terrain`, twice): road gate 0 errors, 2 624 lanes as
+before; the buildings RE-DERIVED on the rounded-corner alignment (2 031; the four hand moves of
+`island_corner_buildings.py` are superseded, the block ground re-derived so the road-level sliver outside each
+corner is gone); `danchi` and `hospital_west` re-sited by `island_civic_sites.py --resite` -- each slid 13.85 m
+along its own road away from the corner, frontage check clean (only `super_sento_city`, the known plot under the
+connector deck, still reports). `check_roads.sh` 44 PASS + the old sample street-tree FAIL; `island_downstream.sh
+--check` PASS. The sample (`Roads_RoadKitZones`) was rebuilt for the hedge.

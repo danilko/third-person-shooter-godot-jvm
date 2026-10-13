@@ -29,6 +29,8 @@
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_MidWarm.tres" id="tone4_6"]
 [ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_9_9.res" id="hlod"]
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/scatter/Prop_AFrameSign.res" id="sc_Prop_AFrameSign"]
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/scatter/Prop_Bicycle.res" id="sc_Prop_Bicycle"]
 
 [sub_resource type="BoxMesh" id="LotBox"]
 material = ExtResource("lotmat")
@@ -95,6 +97,18 @@ buffer = PackedFloat32Array(0.3993, 0.0000, -1.9635, 483.4440, 0.0000, 0.4000, 0
 
 [sub_resource type="BoxShape3D" id="ApronShape"]
 size = Vector3(2.100, 0.400, 2.000)
+
+[sub_resource type="MultiMesh" id="Scatter_Prop_AFrameSign"]
+transform_format = 1
+instance_count = 4
+mesh = ExtResource("sc_Prop_AFrameSign")
+buffer = PackedFloat32Array(0.0000, 0.0000, -1.0000, 295.7100, 0.0000, 1.0000, 0.0000, 5.7300, 1.0000, 0.0000, 0.0000, 301.5910, 1.0000, 0.0000, -0.0000, 469.3180, 0.0000, 1.0000, 0.0000, 5.7300, 0.0000, 0.0000, 1.0000, 348.0460, -0.1901, 0.0000, 0.9818, 488.8360, 0.0000, 1.0000, 0.0000, 5.7300, -0.9818, 0.0000, -0.1901, 294.7690, -0.1901, 0.0000, 0.9818, 497.3090, 0.0000, 1.0000, 0.0000, 5.7300, -0.9818, 0.0000, -0.1901, 338.5150)
+
+[sub_resource type="MultiMesh" id="Scatter_Prop_Bicycle"]
+transform_format = 1
+instance_count = 7
+mesh = ExtResource("sc_Prop_Bicycle")
+buffer = PackedFloat32Array(0.1104, 0.0000, 0.9939, 295.6800, 0.0000, 1.0000, 0.0000, 5.7300, -0.9939, 0.0000, 0.1104, 269.5290, 0.0541, 0.0000, 0.9985, 295.6800, 0.0000, 1.0000, 0.0000, 5.7300, -0.9985, 0.0000, 0.0541, 329.9640, -0.0190, 0.0000, 0.9998, 295.6800, 0.0000, 1.0000, 0.0000, 5.7300, -0.9998, 0.0000, -0.0190, 303.7580, 0.2619, 0.0000, -0.9651, 492.3020, 0.0000, 1.0000, 0.0000, 5.7300, 0.9651, 0.0000, 0.2619, 312.5050, 0.1687, 0.0000, -0.9857, 491.9200, 0.0000, 1.0000, 0.0000, 5.7300, 0.9857, 0.0000, 0.1687, 310.5320, -0.2251, 0.0000, 0.9743, 491.5380, 0.0000, 1.0000, 0.0000, 5.7300, -0.9743, 0.0000, -0.2251, 308.5580, 0.1411, 0.0000, -0.9900, 491.1560, 0.0000, 1.0000, 0.0000, 5.7300, 0.9900, 0.0000, 0.1411, 306.5850)
 
 [node name="Bld_island_9_9" type="Node3D"]
 
@@ -517,3 +531,17 @@ shape = SubResource("ApronShape")
 [node name="Apron49" type="CollisionShape3D" parent="ApronCollision"]
 transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, 252.896, 5.540, 450.250)
 shape = SubResource("ApronShape")
+
+[node name="Scatter_Prop_AFrameSign" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("Scatter_Prop_AFrameSign")
+cast_shadow = 0
+visibility_range_end = 212.7
+visibility_range_end_margin = 10.0
+visibility_range_fade_mode = 1
+
+[node name="Scatter_Prop_Bicycle" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("Scatter_Prop_Bicycle")
+cast_shadow = 0
+visibility_range_end = 212.9
+visibility_range_end_margin = 10.0
+visibility_range_fade_mode = 1

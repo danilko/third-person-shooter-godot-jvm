@@ -1013,3 +1013,63 @@ stacked 15 % ramps: up west, down east), `AirportControlTower` (civil, lift to a
   and one more layout + `--resite=water_resort --avoid-streets` found it a plot 117 m from Waterpark station on
   wangan_dori. Re-run `island_civic_sites.py --check` after every layout and re-site what it names.
 
+
+## Shop fronts and the kerb zone: awnings, signs, bicycles, 置き看板 (PLAN.md T2 + T5, 2026-10-12, s10)
+
+**T2 -- what a frontage wears.** Data, in `building_types.json` `props`:
+
+- `ShopHouse` (372 placed, every variant and `_BB` twin): a テント awning over one bay (`Prop_Awning_Navy`, 3.4 m
+  wide, 0.9 m out, valance foot 2.28 m up; `left: 1.9` so it follows each width) and the small projecting shop sign
+  (`Sign_ShopVertical`, `right: 0.35`, from 3.3 m).
+- `OfficeMid` (79): a name board over the lobby (`Sign_OfficeName`, 6.0 x 0.7 m at 4.3 m).
+- New library pieces (`blender/tools/library_civic.py`, in `library.blend`): `Prop_Awning_Navy / _Red / _Olive`,
+  `Sign_OfficeName`. Only Navy is used; the other two are there for an artist or a per-street choice.
+
+**`"overhang": true` -- a prop that is drawn but claims no ground.** A building is PLACED by its scene's
+`metadata/building.aabb`, which was the merged mesh's bounds: anything standing out of the front wall made the
+footprint deeper and pushed the building back from its frontage line on the next derive (PencilBuilding's 袖看板
+already does, by 0.8 m). An awning is over head height and over the lot's own strip, so:
+`layout_buildings.place_props` marks the piece, leaves it out of `forecourt_m` and reports `overhang_m` (how far it
+stands out); `build_building_scenes.gd` takes the aabb's x / z from the pieces that stand on the ground only (y from
+everything drawn); `probe_buildings` allows the mesh to be up to `overhang_m` deeper than the declared footprint.
+Measured: ShopHouse's aabb is byte-identical before and after (z -5.498 .. 5.719), so the shop fronts were added
+with `island_buildings.py write` alone -- no derive. `probe_buildings` 18 163 of 18 163 (it failed 24 on the size rule
+before the allowance: the control).
+
+**T5 -- the kerb-zone scatter** (`island_buildings.kerb_scatter`, written by `write`). Between the footway's outer
+edge and a building's front there is `KERB_GAP` (1.5 m) of the lot's own ground. Each frontage building gets, by a
+hash of its record key (an unchanged record rebuilds byte-identically):
+
+| stands in front of | what | chance, count |
+|---|---|---|
+| shops (ShopHouse, PencilBuilding, YokochoRow, AkibaElectric, the six `Shop*`) | a pair of vending machines | 12 %, 1-2 |
+| | parked bicycles (`Prop_Bicycle`, along the wall, +-7 deg) | 50 %, 1-2 |
+| | a 置き看板 (`Prop_AFrameSign`) | 45 % |
+| | planters (`Prop_PlanterBox`) | 35 %, 1-2 |
+| flats (Apartment, ApartRC3F, Apato2F4 / 6, MansionPencil) | bicycles | 85 %, 1-4 |
+| | planters | 25 %, 1-2 |
+
+Nothing within 0.9 m of a front door's opening, nothing on a lot with a driveway across its front, nothing behind
+the frontage row (`deep`) or on a hand-placed building. 1 234 on the island (bicycles 551, signs 318, planters 274,
+vending machines 91). **One MultiMesh per piece per cell** (at most four draws a cell, `visibility_range_end` 110 m,
+no shadows); only the vending machines collide (a box each). The MultiMesh draws a mesh resource, not a glTF scene:
+`tools/godot/extract_piece_meshes.gd` merges a kit piece into `world/buildings/scatter/<Piece>.res` -- re-run it
+when one of the four pieces changes in `library.blend`. `SCATTER_ON = False` is the control.
+
+**A trap found on the way:** `export_building_kit.py` removes every file in a kit's `pieces/` its `.blend` does not
+own, which includes the right-hand twins `tools/mirror_piece.py` writes (`Sign_ExpwyCantilever_R.*` was deleted by a
+library export). `build_buildings.sh` now runs `mirror_piece.py` after the export.
+
+**Not done:** a rolled-down shutter (a closed shop) -- props are per type, and a shutter on every ShopHouse reads as
+a dead street; the awning's colour is one per type; more `_BB` roof billboards in nightlife / ekimae (the pick is
+made in `derive`: `SIGN_REGIONS`); 止まれ / speed numbers painted on the road (T4: which language? the signs switch
+at run time, paint baked into a road piece cannot).
+
+**A second trap, found by a picture** (a standing sign 6 m from the camera was not drawn; the bicycle beside it
+was): `visibility_range_end` is measured to the instance's AABB CENTRE, and one MultiMesh per piece spans its whole
+252 m cell. Each scatter set's range is `SCATTER_RANGE` (110 m) plus the set's own reach from its centre. Any other
+cell-wide MultiMesh that gets a range needs the same sum (the lot plinths and aprons carry none).
+
+**Looked at** (`shot_city.gd`, noon): a shop street (awnings, projecting signs, vending machines), a bicycle and a
+置き看板 close up, the three scatter meshes alone. **Not looked at:** the office name board (two pictures landed inside
+a building; `probe_buildings` passes it), anything at night, the flats' bicycles.

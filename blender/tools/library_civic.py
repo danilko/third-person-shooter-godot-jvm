@@ -1050,6 +1050,10 @@ CIVIC_NOTES = {
                       "(type DetachedHouse): front (-Y) to the street; the carport's gap in the wall at the front.",
     "House_DetachedB": "Placeholder 一戸建て, the hipped (寄棟) variant: brown roof, white siding, parking and 玄関 on the left "
                        "(type DetachedHouseB).",
+    "Prop_Awning_Navy": "Shop-front テント over one bay (3.4 m wide, 0.9 m out, valance foot 0.62 m below the origin); "
+                        "ShopHouse mounts it at 2.9 m. Keep it above 2.2 m and within 0.9 m of the facade (it claims no "
+                        "ground). _Red and _Olive are the same piece in another cloth.",
+    "Sign_OfficeName": "Office name board over the lobby (6.0 x 0.7 m, 0.12 m proud). Plain face.",
     "Sign_Sodekanban": "Placeholder 袖看板 for the PencilBuilding front corner: stacked lit tenant panels 4-12.5 m.",
     "Mil_PatrolShip": "Placeholder patrol ship, 90 x 12 m, bow -Y, origin AT THE WATERLINE (the MilitaryPier composite "
                       "sets it 9.6 m below the pier deck: the pier's land height). Static prop, collider = its box.",
@@ -1086,7 +1090,8 @@ def build_all(material, Builder):
            mil_armoury, mil_motor_pool, mil_truck, mil_parade_ground, mil_helipad, mil_fuel_depot, mil_patrol_ship,
            expwy_cantilever_sign, expwy_entrance_sign)
     return [f(material, Builder) for f in fns] + roof_billboards(material, Builder) + denchu_poles(material, Builder) + [
-        guardrail(material, Builder)]
+        guardrail(material, Builder), office_name_board(material, Builder), parked_bicycle(material, Builder),
+        a_frame_sign(material, Builder), planter_box(material, Builder)] + awnings(material, Builder)
 
 
 # ── the Japanese house and the 雑居ビル's sign (JAPAN_ART_REVIEW.md §3: "the whole residential texture of Japan is
@@ -1203,6 +1208,75 @@ def detached_house_b(material, Builder):
     b = Builder("House_DetachedB", material)
     _house(b, "MI_TileBrown", "MI_PaintWhite", -1.0, hipped=True)
     return "House_DetachedB", "civic", b.mesh()
+
+
+def parked_bicycle(material, Builder):
+    """A parked ママチャリ, low-poly: 1.7 m long (along X), 0.5 m wide, saddle 0.85 m, bars 1.05 m; two wheels as flat
+    discs, a step-through frame, a front basket. Origin: on the ground under its middle. Kerb-zone scatter (T5)."""
+    b = Builder("Prop_Bicycle", material)
+    for x in (-0.55, 0.55):                                                               # the wheels: 12-sided discs
+        b.convex([(x + 0.33 * math.cos(math.pi * k / 6.0), y, 0.33 + 0.33 * math.sin(math.pi * k / 6.0))
+                  for k in range(12) for y in (-0.02, 0.02)], "MI_PlasticDark")
+    b.beam((-0.55, 0.0, 0.33), (0.1, 0.0, 0.3), 0.04, "MI_PaintedMetal")                  # chain stay
+    b.beam((0.1, 0.0, 0.3), (0.45, 0.0, 0.8), 0.04, "MI_PaintedMetal")                    # the step-through tube
+    b.beam((-0.2, 0.0, 0.32), (-0.3, 0.0, 0.82), 0.04, "MI_PaintedMetal")                 # seat tube
+    b.beam((0.55, 0.0, 0.33), (0.42, 0.0, 1.0), 0.035, "MI_Steel")                        # the fork and head tube
+    b.box((-0.42, -0.09, 0.82), (-0.18, 0.09, 0.88), "MI_PlasticDark")                    # saddle
+    b.box((0.38, -0.25, 1.0), (0.44, 0.25, 1.04), "MI_Steel")                             # handlebar
+    b.box((0.5, -0.17, 0.72), (0.82, 0.17, 0.95), "MI_Steel")                             # basket
+    b.box((-0.75, -0.08, 0.68), (-0.4, 0.08, 0.7), "MI_Steel")                            # rear carrier
+    return "Prop_Bicycle", "street", b.mesh()
+
+
+def a_frame_sign(material, Builder):
+    """A 置き看板 (A-frame standing sign): 0.5 m wide, 0.95 m tall, its two faces along +-Y. Origin: on the ground."""
+    b = Builder("Prop_AFrameSign", material)
+    b.convex([(-0.25, -0.22, 0.0), (0.25, -0.22, 0.0), (-0.25, -0.18, 0.0), (0.25, -0.18, 0.0),
+              (-0.25, -0.03, 0.95), (0.25, -0.03, 0.95), (-0.25, 0.01, 0.95), (0.25, 0.01, 0.95)], "MI_SignYellow")
+    b.convex([(-0.25, 0.22, 0.0), (0.25, 0.22, 0.0), (-0.25, 0.18, 0.0), (0.25, 0.18, 0.0),
+              (-0.25, 0.03, 0.95), (0.25, 0.03, 0.95), (-0.25, -0.01, 0.95), (0.25, -0.01, 0.95)], "MI_PlasticDark")
+    return "Prop_AFrameSign", "street", b.mesh()
+
+
+def planter_box(material, Builder):
+    """A shop's own プランター: a 0.9 x 0.32 m trough 0.3 m tall with a clipped green block to 0.62 m. Origin: ground."""
+    b = Builder("Prop_PlanterBox", material)
+    b.box((-0.45, -0.16, 0.0), (0.45, 0.16, 0.3), "MI_TileBrown")
+    b.box((-0.41, -0.13, 0.3), (0.41, 0.13, 0.62), "MI_Grass")
+    return "Prop_PlanterBox", "street", b.mesh()
+
+
+def _awning(material, Builder, colour, mat):
+    """A shop-front テント (fixed canvas awning) over ONE shop bay: 3.4 m wide, standing 0.9 m out from a facade at -Y,
+    its canvas falling 0.3 m to the front edge, a 0.32 m valance hanging there (where a shop's name goes). Origin: on
+    the facade line at the awning's TOP (mount it at 2.9 m: the valance's foot is then 2.28 m up, over a walker's
+    head and over the door). It overhangs the lot's own strip and claims no ground (`overhang` in building_types)."""
+    name = "Prop_Awning_%s" % colour
+    b = Builder(name, material)
+    hw = 1.7
+    b.convex([(-hw, 0.0, -0.06), (hw, 0.0, -0.06), (-hw, 0.0, 0.0), (hw, 0.0, 0.0),
+              (-hw, -0.9, -0.36), (hw, -0.9, -0.36), (-hw, -0.9, -0.3), (hw, -0.9, -0.3)], mat)
+    b.box((-hw, -0.9, -0.62), (hw, -0.87, -0.3), mat)                                     # the valance
+    for x in (-hw + 0.02, hw - 0.06):                                                     # the two arms under it
+        b.box((x, -0.88, -0.4), (x + 0.04, 0.0, -0.36), "MI_Steel")
+    return name, "street", b.mesh()
+
+
+AWNING_COLOURS = (("Navy", "MI_NorenNavy"), ("Red", "MI_LacquerRed"), ("Olive", "MI_Olive"))
+
+
+def awnings(material, Builder):
+    return [_awning(material, Builder, c, m) for c, m in AWNING_COLOURS]
+
+
+def office_name_board(material, Builder):
+    """An office building's name board (ビル名板) over its lobby: a lit band 6.0 x 0.7 m in a dark frame, 0.12 m proud of
+    a facade at -Y. Origin: on the facade line at the board's centre foot. The face is plain (a fictional name is
+    drawn by whoever dresses the building)."""
+    b = Builder("Sign_OfficeName", material)
+    b.box((-3.1, -0.1, -0.05), (3.1, 0.0, 0.75), "MI_PlasticDark")
+    b.box((-3.0, -0.12, 0.0), (3.0, -0.1, 0.7), "MI_Sign")
+    return "Sign_OfficeName", "street", b.mesh()
 
 
 def sode_kanban(material, Builder):

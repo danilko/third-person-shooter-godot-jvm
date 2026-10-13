@@ -194,6 +194,20 @@ func _initialize() -> void:
 		if OS.get_environment("PROBE_TRACE") != "" and t % 300 == 0:
 			print("    t %.0f real %.0f at (%.0f, %.0f) v %.1f  %s" % [t / 60.0, (Time.get_ticks_msec() - t0) / 1000.0, car.global_position.x, car.global_position.z,
 					car.linear_velocity.length(), pc.call("auto_drive_debug_now")])
+			# what the cars AHEAD say when ours stands (PLAN.md S9 Q4: 415 s behind a taxi at a signal that cycled)
+			if car.linear_velocity.length() < 0.5:
+				var fwd := -car.global_transform.basis.z
+				for n in get_nodes_in_group("characters"):
+					if n is RigidBody3D and n != car and is_instance_valid(n):
+						var rel: Vector3 = n.global_position - car.global_position
+						if rel.length() < 40.0 and rel.dot(fwd) > 0.0:
+							for ch in n.get_children():
+								var sc: Script = ch.get_script()
+								if sc != null and str(sc.resource_path).ends_with("VehicleAIController.java"):
+									print("      ahead %.0f m: %s v %.1f lane %s rails=%s why=%s | %s" % [rel.length(), n.name,
+										(n as RigidBody3D).linear_velocity.length(), ch.call("lane_now"), ch.call("dummy_now"),
+										ch.call("standing_reason") if ch.has_method("standing_reason") else "?",
+										ch.call("describe_block") if ch.has_method("describe_block") else "?"])
 		if not control and not bool(pc.call("auto_driving_now")):
 			break
 		if control and t > 60 * (int(OS.get_environment("CONTROL_SECONDS")) if OS.get_environment("CONTROL_SECONDS") != "" else 20):

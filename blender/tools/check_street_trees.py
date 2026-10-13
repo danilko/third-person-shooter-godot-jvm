@@ -65,19 +65,37 @@ def load_lanes(directory, prefix=""):
         for lane in doc.get("lanes", ()):
             pts = [pfu.godot_to_kit(p) for p in lane.get("points", ())]
             if len(pts) >= 2:
-                out.append(([(p[0], p[1]) for p in pts], 0.5 * float(lane.get("lane_width", DEFAULT_LANE_W))))
+                out.append((pts, 0.5 * float(lane.get("lane_width", DEFAULT_LANE_W))))
     return out
 
 
-def nearest_lane(lanes, p):
-    """(distance, that lane's half width) to the nearest lane centreline."""
+#: A lane this far ABOVE a tree's foot is a deck over it, one this far BELOW is a street under the tree's own deck:
+#: neither is the carriageway the tree stands beside (2026-10-12: a street under the expressway is planted on both
+#: kerbs; asked in plan, 45 of its trees read as standing in the viaduct's lanes).
+LEVEL_ABOVE = 4.0
+LEVEL_BELOW = 1.6
+#: air a tree's crown must keep under the deck above it (the lane surface less the deck's own depth)
+DECK_DEPTH = 1.6
+
+
+def nearest_lane(lanes, p, levels=True):
+    """(distance, that lane's half width, lowest deck over the spot or None) for the nearest lane centreline ON
+    THE TREE'S OWN LEVEL. `levels=False` is the plan-only question (the control)."""
     best = (1e18, 0.0)
+    deck = None
     for pts, half in lanes:
         for a, b in zip(pts, pts[1:]):
             d = _seg_dist(p, a, b)
+            if levels and d < half + 3.0:
+                z = min(a[2], b[2])
+                if z - p[2] >= LEVEL_ABOVE:
+                    deck = z if deck is None else min(deck, z)
+                    continue
+                if p[2] - max(a[2], b[2]) >= LEVEL_BELOW:
+                    continue
             if d < best[0]:
                 best = (d, half)
-    return best
+    return best[0], best[1], deck
 
 
 def main(argv):
@@ -89,6 +107,8 @@ def main(argv):
                          "and another world's lanes overlap these coordinates")
     ap.add_argument("--ground")
     ap.add_argument("--control", action="store_true")
+    ap.add_argument("--plan-only", action="store_true",
+                    help="ask the lanes in plan, as before 2026-10-12: a tree under a viaduct reads as in its lanes")
     a = ap.parse_args(argv)
 
     net = pm.load_network(a.record)
@@ -117,10 +137,17 @@ def main(argv):
     if not lanes:
         print("check_street_trees: %s -- FAIL, no lanekit in %s" % (stem, a.lanekits))
         return 1
-    on_lane, narrow, adrift = 0, 0, 0
+    on_lane, narrow, adrift, in_deck, under = 0, 0, 0, 0, 0
     worst_in, worst_out, thinnest = 0.0, 0.0, 1e9
     for t in trees:
-        d, half = nearest_lane(lanes, t["pos"])
+        d, half, deck = nearest_lane(lanes, t["pos"], not a.plan_only)
+        if deck is not None:
+            under += 1
+            tall = pfu.asset_height(table, t["asset"]) or 0.0
+            if t["pos"][2] + tall > deck - DECK_DEPTH:
+                in_deck += 1
+                print("  in a deck: tree on road %r at (%.2f, %.2f, %.2f) is %.2f m tall under a lane at %.2f"
+                      % (t.get("road", ""), t["pos"][0], t["pos"][1], t["pos"][2], tall, deck))
         walk = road_walk(net, t.get("road", ""))
         if d < half + TRUNK_R:
             on_lane += 1
@@ -134,11 +161,11 @@ def main(argv):
         if walk + 1e-6 < table.rules["tree_min_footway"]:
             narrow += 1
             thinnest = min(thinnest, walk)
-    ok = on_lane == 0 and narrow == 0 and adrift == 0
+    ok = on_lane == 0 and narrow == 0 and adrift == 0 and in_deck == 0
     print("check_street_trees: %s -- %d trees; in a lane %d (worst %.2f m in), adrift of the footway %d "
-          "(worst %.2f m out), on a footway under %.1f m %d%s -- %s"
+          "(worst %.2f m out), on a footway under %.1f m %d%s; under a deck %d, reaching it %d -- %s"
           % (stem, len(trees), on_lane, worst_in, adrift, worst_out, table.rules["tree_min_footway"], narrow,
-             "" if thinnest > 1e8 else " (thinnest %.2f m)" % thinnest, "PASS" if ok else "FAIL"))
+             "" if thinnest > 1e8 else " (thinnest %.2f m)" % thinnest, under, in_deck, "PASS" if ok else "FAIL"))
     return 0 if ok else 1
 
 
