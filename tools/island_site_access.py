@@ -130,6 +130,11 @@ ACCESS = [
          via=[(1065.0, -1145.0)], end=(895.0, -1145.0), parking="ParkingLot14"),
     dict(name="butsuryu_michi", site="logistics_yard", from_road="kichi_dori", at=(-280.0, -1230.0),
          end=(-280.0, -1440.0), parking="ParkingLot14"),     # its car park short of the runway band (z 1480)
+    #  * the SUMMIT 展望 car park (S15, user: "a small parking lot ... as some japanese mountains does"): off the
+    #    summit straight's south-east side a quarter of the way from its west end (the onsen ryokan's plot fronts its
+    #    north-west side mid-way, kita_touge's T is near its east end)
+    dict(name="sancho_tenbo", site="summit_lookout", from_road="shrine_touge", at=(-733.3, 1066.7),
+         end=(-709.3, 1042.7), parking="ParkingLot14", signal=False),
     #  * the FISH MARKET's VISITORS (S15 V-C, user 2026-10-14): they come from the EAST, ring_kita -> kanransha_michi ->
     #    the through link, and never enter the trading yard; their lot north of the link on the 5.6 m strip, beside the
     #    直売所 + 食堂 (x 725-800). LAST: its road leaves the link, which ichiba_michi's loop lays.

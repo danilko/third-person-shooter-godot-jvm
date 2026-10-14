@@ -38,6 +38,7 @@ import island_shrine_touge as ST                 # noqa: E402
 import island_plan as PL                         # noqa: E402
 from island_roadgen import cut_road, nearest_span, make_junction, NET_Y   # noqa: E402
 import point_model as pm                         # noqa: E402
+import point_presets as ppr                       # noqa: E402
 
 ALIGNMENT = os.path.join(ROOT, "assets", "world_source", "pieces", "IslandTouge.json")
 NAME = "shrine_touge"
@@ -301,8 +302,183 @@ def add(net, doc=None):
         prev = p.uid
     make_junction(net, arms[0] + [road.points[0]], signal=False)
     make_junction(net, arms[1] + [road.points[-1]], signal=False)
+    ppr.apply_preset(net, NAME, "mountain")                         # S15: no kerb, a 0.75 m shoulder
     return "%s: %d stations, %.0f m, T's at %s and %s" % (NAME, len(road.points), doc["report"]["length_m"],
                                                         [round(v) for v in jn], [round(v) for v in ej])
+
+
+# ------------------------------------------------------------------ the second mountain road and the 林道 (S15)
+#: S15 (user, 2026-10-14: "north road + (A) 中腹林道"; reviewers: no road round the whole mountain, ONE north road
+#: summit -> north coast on long legs, <= 10 %, R 18, 4-6 hairpins, T's only). Each is derived ONCE into its own file (IslandTouge_<name>.json) with
+#: shrine_touge held fixed (its alignment is read, never rewritten), and `add` lays it after shrine_touge. Its ends are
+#: Ts: `ends` = [(record (x, y), the road-name prefix the T is cut in)] in chain order.
+#: kita_touge: from the cape T on the north coast road (the game designer's 10-3 point; its 4th arm is the cape's 道の駅,
+#: PLAN [I3]) up the north face -- measured on the land grid 2026-10-14: a 90 deg wedge from the summit's east end with
+#: 800 m legs gives 4.4 km and 6 hairpins and reaches the summit level (60 deg / 500 m legs: 7.4 km, 13 hairpins, stalled
+#: at 367 m against shrine_touge's west climb) -- then LEVEL onto a T on the summit straight (the 展望 point).
+EXTRA = {
+    "kita_touge": dict(file="IslandTouge_kita_touge.json", foot=(-292.0, 1952.0), foot_road="kaigan_dori",
+                       wedge=90.0, leg=800.0, clear=70.0, along=-1.0, grade=0.095,
+                       lock_foot=True),
+}
+#: (the 中腹林道 -- from the shrine plateau (-1005, 713) to the east descent (-316, 1009) along the 220 m contour -- was
+#: CUT from S15, measured 2026-10-14: the straight between its ends crosses the summit dome (395 m), and a shortest-path
+#: search on a 10 m grid round it found NO route clear of shrine_touge even at 30 m: both ends sit inside stacks of the
+#: touge's own switchbacks, so any 林道 there crosses another touge leg -- a 4-arm crossing on a 10 % leg, which the
+#: review ruled out. A re-sited 林道 needs ends outside the switchback stacks; see PLAN.md S15.)
+EXTRA_ORDER = ("kita_touge",)
+RECORD = os.path.join(ROOT, "assets", "world_source", "pieces", "IslandRoads.roads.json")
+
+
+def _touge_clear(d):
+    st = [tuple(p[:2]) for p in json.load(open(ALIGNMENT))["stations"]]
+    grid = {}
+    for p in st:
+        grid.setdefault((int(p[0] // 50), int(p[1] // 50)), []).append(p)
+    k = int(math.ceil(d / 50.0))
+
+    def f(x, y):
+        gx, gy = int(x // 50), int(y // 50)
+        for i in range(-k, k + 1):
+            for j in range(-k, k + 1):
+                for q in grid.get((gx + i, gy + j), ()):
+                    if (q[0] - x) ** 2 + (q[1] - y) ** 2 < d * d:
+                        return False
+        return True
+    return f, st
+
+
+def _on_touge(st_doc, xy):
+    """(x, y, z) of the touge's own alignment at its station nearest `xy` (a T arrives at the road it meets)."""
+    return min((tuple(p) for p in st_doc), key=lambda p: math.dist(p[:2], xy))
+
+
+def _finish(name, line, keep, nodrop, raw, fixed_xy_z, ends, report):
+    line, _arc = ST.fillet(line, keep=keep, nodrop=nodrop)
+    st = ST._stations(line)
+    ground = [raw(*p) for p in st]
+    fixed = {}
+    for xy, z, reach in fixed_xy_z:
+        fixed.update({k: z for k in range(len(st)) if math.dist(st[k], xy) <= reach})
+    z = ST.vertical_curves(st, ST._profile(st, ground, fixed))
+    L = [0.0]
+    for a, b in zip(st, st[1:]):
+        L.append(L[-1] + math.dist(a, b))
+    grades = [abs(z[i + 1] - z[i]) / max(1e-6, L[i + 1] - L[i]) for i in range(len(st) - 1)]
+    report.update({"length_m": round(L[-1]), "stations": len(st), "max_grade_pct": round(100 * max(grades), 1),
+                   "z": [round(min(z), 1), round(max(z), 1)]})
+    doc = {"note": "S15: derived once by tools/island_touges.py derive --extra %s with shrine_touge held fixed. "
+                   "Re-derive only on purpose." % name,
+           "ends": [{"at": [round(xy[0], 2), round(xy[1], 2)], "on": on} for xy, on in ends], "report": report,
+           "stations": [[round(p[0], 2), round(p[1], 2), round(zz, 2)] for p, zz in zip(st, z)]}
+    path = os.path.join(os.path.dirname(ALIGNMENT), EXTRA[name]["file"])
+    with open(path, "w") as f:
+        json.dump(doc, f, indent=1)
+        f.write("\n")
+    print("island_touges: %s %s -> %s" % (name, json.dumps(report), os.path.relpath(path, ROOT)))
+    return 0 if max(grades) <= LIMIT + 1e-3 and report.get("reached", True) else 1
+
+
+def _self_crossings(line):
+    """Where a polyline crosses itself (non-adjacent spans; hill_road never looks at its own earlier legs, and a lead
+    along the coast then a switchback back over it crossed at grade -- dry layout mo2)."""
+    out = []
+    for i in range(len(line) - 1):
+        for j in range(i + 2, len(line) - 1):
+            (ax, ay), (bx, by), (cx, cy), (dx, dy) = line[i][:2], line[i + 1][:2], line[j][:2], line[j + 1][:2]
+            den = (bx - ax) * (dy - cy) - (by - ay) * (dx - cx)
+            if abs(den) < 1e-9:
+                continue
+            t = ((cx - ax) * (dy - cy) - (cy - ay) * (dx - cx)) / den
+            u = ((cx - ax) * (by - ay) - (cy - ay) * (bx - ax)) / den
+            if 0.0 < t < 1.0 and 0.0 < u < 1.0:
+                out.append([round(ax + (bx - ax) * t), round(ay + (by - ay) * t)])
+    return out
+
+
+def derive_north(land_path):
+    spec = EXTRA["kita_touge"]
+    raw, walk, dsea, free = Land(land_path), Land(land_path, smooth_m=20.0), sea_distance(land_path), site_free()
+    A, B = crest_record()
+    plat = RS.PLATEAU_Z + RS.RAISE - NET_Y
+    clear, touge = _touge_clear(spec["clear"])
+    rec = pm.load_network(RECORD)
+    name, i, t, _d = nearest_span(rec, spec["foot"], spec["foot_road"])
+    pa, pb = (rec.points[u].pos for u in rec.roads[name].points[i:i + 2])
+    foot = tuple(pa[k] + (pb[k] - pa[k]) * t for k in range(3))
+    # THE NORTH COAST IS THE MASSIF'S 45 deg FLANK everywhere (measured: ~1 m of rise per metre inland all along the
+    # coast road): a walk started inland stood 17-29 m over the T and the lead-in climbed 14-19 %. The road leaves the
+    # coast road ALONG it (`along`: -1 = toward the chain's start) and climbs across the slope, as a real 峠 does
+    cu = unit(pa[:2], pb[:2])
+    v = (cu[0] * spec["along"], cu[1] * spec["along"])
+    start = (foot[0] + v[0] * LEAD_IN, foot[1] + v[1] * LEAD_IN)
+    wb = wedge(B, (foot[0] - B[0], foot[1] - B[1]), spec["wedge"])
+    pts, arcs = IT.hill_road(walk, start, plat - 4.0, spec["grade"], leg=spec["leg"], step=10.0, radius=ST.HAIRPIN_R,
+                             inside=lambda x, y: ((dsea(x, y) > 15.0 if math.dist((x, y), foot[:2]) < 350.0
+                                                   else dsea(x, y) > 40.0)
+                                                  and (wb(x, y) or math.dist((x, y), foot[:2]) < 350.0)
+                                                  and free(x, y) and clear(x, y)),
+                             heading=v, lookahead=ST.HAIRPIN_R + 10.0)
+    end = pts[-1]
+    # the T on the summit straight: the walk's end projected square onto A -> B
+    ab = (B[0] - A[0], B[1] - A[1])
+    tt = max(0.1, min(0.85, ((end[0] - A[0]) * ab[0] + (end[1] - A[1]) * ab[1]) / (ab[0] ** 2 + ab[1] ** 2)))
+    want = (A[0] + ab[0] * tt, A[1] + ab[1] * tt)
+    # ON the touge's own level summit stations, short of B's corner (the crest line A -> B is the touge's design line,
+    # and at t 0.95 the built road had already turned off it: the T missed it by 36 m -- dry layout mo1)
+    summit = [p for p in json.load(open(ALIGNMENT))["stations"] if p[2] >= plat - 0.5]
+    top = tuple(min(summit, key=lambda p: math.dist(p[:2], want))[:2])
+    p_, inner = ST._protect_hairpins(arcs)
+    simp = IT.simplify(pts, 3.0, protect=p_)
+    keep = {pts[i] for i in inner}
+    nodrop = {pts[i] for i in p_} | {foot[:2], top}
+    lead = (foot[0] + v[0] * LEAD_IN, foot[1] + v[1] * LEAD_IN)
+    line = [foot[:2], lead] + simp + [top]
+    rep = {"hairpins": len(arcs) // IT.HAIRPIN_POINTS, "reached": walk(*end) >= plat - 5.0,
+           "self_crossings": _self_crossings(line)}
+    rep["reached"] = rep["reached"] and not rep["self_crossings"]
+    return _finish("kita_touge", line, keep, nodrop, raw,
+                   [(foot[:2], foot[2], LEAD_IN + 0.5), (top, plat, 2.0)],
+                   [(foot[:2], spec["foot_road"]), (top, NAME)], rep)
+
+
+def add_extra(net):
+    """Every EXTRA road whose alignment file exists, after shrine_touge: a 1+1 road with a T cut at each end."""
+    out = []
+    for name in EXTRA_ORDER:
+        path = os.path.join(os.path.dirname(ALIGNMENT), EXTRA[name]["file"])
+        if not os.path.exists(path) or name in net.roads:
+            continue
+        doc = json.load(open(path))
+        sts = [tuple(p) for p in doc["stations"]]
+        arms = []
+        for e in doc["ends"]:
+            c = tuple(e["at"])
+            rn = nearest_span(net, c, e["on"])[0]
+            arms.append(list(cut_road(net, c, rn, MOUTH)))
+        e0, e1 = tuple(doc["ends"][0]["at"]), tuple(doc["ends"][1]["at"])
+        body = [p for p in sts if math.dist(p[:2], e0) >= MOUTH - 0.5 and math.dist(p[:2], e1) >= MOUTH - 0.5]
+        road = net.add_road(pm.RoadData(name, pm.PointData(uid=""), ()))
+        road.road_class = "arterial"
+        road.base.lanes_fwd, road.base.lanes_bwd = 1, 1
+        prev = None
+        for q in body:
+            p = net.add_station(road, q)
+            p.lanes_fwd, p.lanes_bwd = 1, 1
+            if prev is not None:
+                net.link(prev, p.uid)
+            prev = p.uid
+        make_junction(net, arms[0] + [road.points[0]], signal=False)
+        make_junction(net, arms[1] + [road.points[-1]], signal=False)
+        if EXTRA[name].get("lock_foot"):
+            # a SHALLOW T: the 45 deg coast leaves the road only one low line, along the slope's toe beside the coast
+            # road, so the arm leaves at a few degrees off it; solved, its mouth was thrown 70 m out and folded
+            # kaigan_dori (dry layout mo3). All three mouths keep their laid places (the market's J / K trick)
+            for u in arms[0] + [road.points[0]]:
+                net.points[u].setback_locked = True
+        ppr.apply_preset(net, name, "mountain")
+        out.append("%s: %d stations, %.0f m" % (name, len(road.points), doc["report"]["length_m"]))
+    return "; ".join(out)
 
 
 # ------------------------------------------------------------------ sculpt
@@ -384,13 +560,19 @@ def main(argv):
     ap.add_argument("args", nargs="*")
     ap.add_argument("--land", default=RS.LAND)
     ap.add_argument("--from", dest="src", default="")
+    ap.add_argument("--extra", default="", help="derive one of EXTRA (kita_touge) instead")
     a = ap.parse_args(argv)
     if a.cmd == "derive":
+        if a.extra == "kita_touge":
+            return derive_north(a.land)
         return derive(a.land)
     if a.cmd == "add":
         out = a.args[0]
         net = pm.load_network(a.src or out)
         print("island_touges: " + add(net))
+        extra = add_extra(net)
+        if extra:
+            print("island_touges: " + extra)
         pm.save_network(net, out)
         return 0
     cmd_sculpt(a.args[0], a.args[1], a.args[2])

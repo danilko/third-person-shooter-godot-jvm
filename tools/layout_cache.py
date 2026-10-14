@@ -34,7 +34,7 @@ W = os.path.join(ROOT, "assets", "world_source")
 DATA = ["terrain/island_land.f32", "island_dike.json", "island_coast.json",
         "buildings/IslandRailReserve.json", "buildings/IslandSites.json", "buildings/IslandCivicSites.json",
         "buildings/building_types.json",
-        "pieces/IslandRoads.arterials.roads.json", "pieces/IslandCoastRoad.json", "pieces/IslandTouge.json",
+        "pieces/IslandRoads.arterials.roads.json", "pieces/IslandCoastRoad.json", "pieces/IslandTouge.json", "pieces/IslandTouge_kita_touge.json",
         "pieces/IslandRail.roads.json",
         "kits/road_kit/road_kit.json", "kits/road_kit/furniture.json"]
 VOLATILE = ["island_dike_line.json"]

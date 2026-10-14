@@ -74,6 +74,7 @@ NAMED = {
     "airport_dori": ("空港通り", "Kuko-dori", "arterial"),
     "airport_dori_loop": ("空港通り", "Kuko-dori", "arterial"),
     "shrine_touge": ("神社峠", "Jinja-toge", "arterial"),
+    "kita_touge": ("北峠", "Kita-toge", "arterial"),          # S15: the north road, summit -> the cape
     "c1_ura_nishi": ("裏西通り", "Ura-nishi-dori", "street"),
     "c1_ura_higashi": ("裏東通り", "Ura-higashi-dori", "street"),
     "nodo_waku": ("田園通り", "Den-en-dori", "farm"),

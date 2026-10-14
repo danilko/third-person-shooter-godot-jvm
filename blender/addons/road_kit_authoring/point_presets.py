@@ -67,6 +67,15 @@ PRESETS = {
                  "left_walk_width": 0.0, "right_walk_width": 0.0, "left_kerb_height": 0.0,
                  "right_kerb_height": 0.0, "design_speed": 30.0},
     },
+    # S15 (the mountain review, user default kept): a 峠 has no kerb and no footway -- a 0.75 m 路肩 outside the edge
+    # line on both sides (the U字溝 is dressing); today's 0.15 m kerbs made a bump at every hairpin apex. Lanes stay 4.5.
+    "mountain": {
+        "road": {"ped_access": True, "median_style": pm.MED_NONE},
+        "base": {"lanes_fwd": 1, "lanes_bwd": 1, "lane_width": 4.5, "median_width": 0.0,
+                 "shoulder_left_width": 0.75, "shoulder_right_width": 0.75,
+                 "left_walk_width": 0.0, "right_walk_width": 0.0, "left_kerb_height": 0.0,
+                 "right_kerb_height": 0.0, "design_speed": 40.0},
+    },
     "farm": {
         "road": {"road_class": "farm", "ped_access": True, "barrier_height": 1.0, "median_style": pm.MED_NONE},
         "base": {"lanes_fwd": 1, "lanes_bwd": 1, "lane_width": 3.5, "median_width": 0.0,

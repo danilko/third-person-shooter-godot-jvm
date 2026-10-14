@@ -70,7 +70,7 @@ def g2r(pts):
 #: THE MOUNTAIN ROADS, by name prefix (S15: one owner -- ~15 tools keyed off the literal `shrine_touge`). Every tool
 #: that treats the touge specially (no wiggle / fillet / align pass, no building or civic frontage, no block-split end,
 #: its own picture colour, the touge sculpt) reads this; a new mountain road joins the tuple when it is derived.
-MOUNTAIN_ROADS = ("shrine_touge",)
+MOUNTAIN_ROADS = ("shrine_touge", "kita_touge")
 DROPPED = MOUNTAIN_ROADS + ("kaigan_dori", "port_road", "futo_dori", "kitahama_dori", "nishihama_dori", "kuko_dori",
            "hama_dori")
 
