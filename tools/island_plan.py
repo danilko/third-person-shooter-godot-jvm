@@ -531,8 +531,14 @@ WG_J0 = (880.0, -530.0)
 #: second, joined by one tangent heading 3.8 deg north of east: R 200 right, 91 m straight (x 454..545), R 200 left. That
 #: tangent lies 16-20 m further SOUTH over x 450..580 than the old line: the water in front of the fish market's quay
 #: (z 780) is 29 m to the deck's edge where it was 9, and the two Suburb gores stand on a straight.
-WG_BAY_W = (378.9, -831.1)
-WG_BAY_E = (620.0, -815.0)
+#: S15 (user, 2026-10-14: "Move Wangan ~75 m south"): the whole jog slid 75 m south-west along BOTH 45 deg lines (each
+#: corner (-75, -75)), so the arcs, the straight's 91 m and its 3.8 deg heading are unchanged and only its place moves:
+#: the straight now runs at y ~-895..-901 (x 379..470) over open water, south of the fish market's quay (z 842 / 848),
+#: and the mainline's piers leave the market's apron. Line 2 (into J0) is the same line, so east of x ~560 the deck
+#: crosses the market's strip as before. Was (378.9, -831.1) / (620.0, -815.0).
+WG_BAY_SHIFT = 75.0
+WG_BAY_W = (378.9 - WG_BAY_SHIFT, -831.1 - WG_BAY_SHIFT)
+WG_BAY_E = (620.0 - WG_BAY_SHIFT, -815.0 - WG_BAY_SHIFT)
 WG_MAIN = [(-850.0, -1128.0), (-700.0, -1128.0), (-350.0, -1130.0), (-60.0, -1133.0),
            (150.0, -1060.0), WG_BAY_W, WG_BAY_E, (780.0, -655.0), WG_J0]
 #: THE WEST END IS A TERMINAL LOOP (NEXT PASS step 2, 2026-10-02, user: "ground terminal loop"; the second independent
@@ -551,7 +557,7 @@ WG_LOOP_R = 38.0
 WG_LOOP_Z = 5.75                   # the platform (the plain, 5.6) + the stamp's clearance
 WG_WEST_RISE = 230.0               # the mainline climbs from the junction to WG_Z over this far (2.7 %), level by Y1's gore
 WG_APPROACH = 85.0                 # the approach's last stretch, posted 50 (its own road `shuto_wangan`)
-WG_MAIN_R = [90.0, 600.0, 1500.0, 1500.0, 250.0, 200.0, 200.0, 120.0, 0.0]
+WG_MAIN_R = [90.0, 600.0, 1500.0, 1500.0, 250.0, 150.0, 200.0, 120.0, 0.0]   # S15: WG_BAY_W 200 -> 150 (see Y3_OFF_X)
 #: THE LANE-SPLIT T at the spur (2026-10-01, island_expressway.t_split): T1 (Wangan EB -> spur SB) runs along J0's
 #: line, turns right OVER T4, and makes ONE clockwise circle of T1_R over the spur (centre (T1_LEG_X - T1_R, T1_LOOP_Y)),
 #: then straight down the spur's east side at T1_LEG_X to its merge
@@ -596,7 +602,12 @@ SPUR_CUT_Y = -410.0
 #: on its south side, runs straight on west while the mainline bends south-west beneath it, crosses it, Y4 and the
 #: connector on ONE large right-hand turn (each crossing at that road's own height + 6.3 m), and merges into the
 #: connector's west (NB) side at Y3_ON_Y.
-Y3_OFF_X = 220.0
+#: S15: the bay jog slid 75 m south-west (WG_BAY_SHIFT) and its first arc came 75 m nearer this gore: 44 m of straight
+#: was left upstream of it (150 before) and Y3 bent back ACROSS the WB lanes (validate: ramp_wrong_side, 2.7 m); x 160
+#: put it on the mainline's corner at x 150 and on Y4's aux slot. The arc at WG_BAY_W is tightened instead (WG_MAIN_R),
+#: and the gore swept (Y3's JCT grade, limit 6 %, measured on the exported lanes): x 210 5.95 %, 215 5.75 % K 9.6, 220
+#: 6.4 %, 225 6.5 % K 4.9 -- 215 (was 220).
+Y3_OFF_X = 215.0
 Y3_CLIMB = 150.0             # Y3 keeps beside (not over) the mainline this far from its gore...
 Y3_KEEP = 11.0               # ...its station at least this far off the mainline's centreline
 #: the SUBURB EXIT (user, 2026-09-30: "can that ramp be on the Suburb side"): Wangan EB -> the ground, off the waterfront
