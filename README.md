@@ -10,7 +10,7 @@ Watch the gameplay demo on **YouTube**: [third-person-shooter-godot-jvm](https:/
 
 ## 🛠 Tech Stack
 * **Engine:** Godot **4.7.2** or newer, the official editor (no custom engine build)
-* **Binding:** [godot-jvm](https://github.com/utopia-rise/godot-jvm) `1.0.0-rc1`, shipped in this repo as the `addons/jvm/` GDExtension ([docs](https://godot-jvm.dev/en/1.0/))
+* **Binding:** [godot-jvm](https://github.com/utopia-rise/godot-jvm) `1.0.0-rc2`, shipped in this repo as the `addons/jvm/` GDExtension ([docs](https://godot-jvm.dev/en/1.0/))
 * **Language:** Java (a few Kotlin stubs)
 * **JDK:** 17 or newer (set by the Gradle JVM toolchain, which downloads it if missing)
 
@@ -66,6 +66,14 @@ This project is based on:
 	* `EventBus` AutoLoad singleton for decoupled kill/death/HUD events.
 	* `GameManager` AutoLoad singleton (PLAYING / PAUSED / GAME_OVER).
 	* `AmmoRefill` station that replenishes all weapons on contact.
+* **Front End & Settings:** a title screen (Continue / New game / Host co-op / Join co-op / Settings), a full-screen pause menu (status, missions, controls, display, game), graphics presets with fairness floors, key and controller rebinding, and a loading screen that warms up the world before play.
+* **Gamepad:** one binding table for Xbox / Steam Deck layouts, analog walk, a look rate with turn boost, pad-only aim assist, triggers as analog pedals in a car, and button glyphs in prompts.
+* **Missions & Campaign:** typed Java missions (`game.activity`) on a campaign graph of flags, requirements and effects (checked by a lint), offered in the world and started with `E`; story beats via `MissionDirector`; street races via `RaceDirector`.
+* **Wanted Level & Enforcement:** crimes raise a wanted level; police and gangs are dispatched to you, search when they lose you, and an arrest, hospital stay or abduction each has its own outcome and fee.
+* **Profile, Economy & Save:** money, purchases at konbini (every konbini sells weapons), a garage at the safe house, and a versioned save with migrations.
+* **Weapons:** rifles, shotguns, sniper rifles with scopes and hold-breath, dual pistols, melee, grenades, remote charges, and a rocket launcher; a weapon wheel; holstered weapons visible on the body; first-person aim-down-sights.
+* **Vehicles:** component damage (doors, lamps, panels, tyres you can shoot out), NOS, a rear-view mirror, armoured vehicles and a helicopter.
+* **Living City:** a two-tier crowd (full characters near you, vertex-animated instances further out), lane-following traffic with signals, 踏切 level crossings and right-hand driving, boardable trains with stations, ticket gates, departure boards and in-car screens, a day/night clock with street lights, and Japanese street names and signs (Traditional Chinese selectable).
 
 ---
 
@@ -118,7 +126,7 @@ players move. A zone is a `ZoneMarker` placed in the level with a `Zone` `.tres`
   at a time. `RegionConfig` (optional, per zone) scales ambient AI/vehicle density and swaps
   lighting/fog/faction rules as players cross into a differently-themed area.
 
-See `CLAUDE.md` ("Open World Simulation (Part E)") for the full streaming/authority details.
+See [`docs/open-world-simulation.md`](docs/open-world-simulation.md) for the full streaming/authority details.
 
 ---
 
@@ -168,27 +176,25 @@ LoS is detected via a dedicated **SightRay** that is completely independent of t
 
 ## 🗾 Open World
 
-A ~3 km × 3 km, 36-district open world assembled from a Blender-authored layout (an arterial road
-backbone + individually-built district pieces) and baked into native Godot scenes by a custom Java
-bake pipeline — godot-jvm ships no editor scripting API, so the
-"turn named Blender markers into gameplay nodes" step runs as ordinary game code instead of an
-editor plugin.
+One continuous, fictional island, about 4 km across, set in a Japan-like city with some US influence: a
+station-front centre, residential wards, light industry, a fish market and port outside the sea dike, beaches, an
+airport across a bridge, and a mountain with a winding road. Traffic drives on the right, speeds are in km/h, and
+every street, station and landmark name shown to the player is made up.
 
-Every district's building/road footprint is **real extracted geospatial data** from
-[Project PLATEAU](https://www.mlit.go.jp/plateau/) (Japan's MLIT open 3D city model program) — real
-Tokyo Bay waterfront, real residential wards, a real mountain village's road network, and several
-well-known real precincts — composited into one condensed map rather than a literal geographic
-reconstruction (see **Credits & Assets** below for the required data attribution). District pieces
-stream in/out as players approach (zone-based, host-authoritative and replicated), each with its own
-baked pedestrian navmesh so AI can path through the real building layouts.
+The island is generated and then baked into native Godot scenes:
 
-**Modifying the world:** each district is a Blender file under `assets/world_source/districts/`;
-one command (`assets/world_source/tools/build_piece.sh`) rebuilds/exports/bakes a district into the
-game, and `tools/link_neighbors.py` links the adjacent districts into the file you're editing so
-borders can be fixed in context. The full artist workflow — what survives a regeneration, the
-bake-only loop for hand edits, cross-district border editing — is documented in
-[`assets/world_source/AUTHORING_GUIDE.md`](assets/world_source/AUTHORING_GUIDE.md); naming and
-structural conventions live in [`BLENDER_CONVENTIONS.md`](BLENDER_CONVENTIONS.md).
+- **Terrain:** one height field (Terrain3D) that the roads carve into.
+- **Roads and rail:** a Road Kit network (Blender authoring add-on + Godot editor plugin in `addons/road_kit/`) that
+  exports lanes, junctions, signals, ramps, the expressway and the rail lines. Traffic and the GPS route use the same
+  lane graph.
+- **Buildings:** building kits and a piece library placed on lots along the streets, with enterable shops, stations
+  and mission interiors.
+- **Streaming:** zones (`ZoneManager`) load buildings, roads, crowd and traffic around players and unload them
+  behind, host-authoritatively. One zone can be a whole district or a single interior.
+
+**Modifying the world:** `assets/world_source/HAND_AUTHORING.md` explains which record owns each thing (roads, lanes,
+buildings, terrain) and what to re-run after an edit. Naming and structural conventions for Blender files are in
+[`BLENDER_CONVENTIONS.md`](BLENDER_CONVENTIONS.md). Each system's design notes live in [`docs/`](docs/).
 
 ---
 
@@ -259,7 +265,7 @@ sampling pitch/yaw independently). When `spread == 0` the cone math is skipped e
 
 **Crosshair** (`Crosshair.java`) reads `getCurrentSpreadDeg() × spreadPixelsPerDeg` (default **100 px/deg**) every frame and lerps the four reticle arms: instant snap outward on each shot, fast contract during recovery. At scale 100 the pistol's 0.05° base spread produces a 5 px arm gap from the moment it is drawn — giving an immediate visual "this is less precise than the rifle" signal without any shots fired.
 
-**Camera recoil** is routed through `CameraController.applyRecoil()`: each shot subtracts from `recoilPitch` (negative = look up in Godot's convention) and adds a small random `recoilYaw`. Both decay via exponential lerp at `recoilRecoverySpeed = 8.0`, clearing in ~0.3 s — producing a snappy per-shot kick and a learnable upward drift during sustained spray, independent of spread.
+**Camera recoil** is routed through `CameraController.applyRecoil()`: each shot adds to `recoilPitch` (positive pitch = look up) and adds a small random `recoilYaw`. Both decay via exponential lerp at `recoilRecoverySpeed = 8.0`, clearing in ~0.3 s — producing a snappy per-shot kick and a learnable upward drift during sustained spray, independent of spread.
 
 ### Skeleton Hitbox & Damage Zones
 
@@ -326,47 +332,55 @@ Keep the Gradle plugin version (`com.utopia-rise.godot-jvm` in `build.gradle.kts
 `addons/jvm/` addon version. When upgrading, replace both together, following the
 [godot-jvm documentation](https://godot-jvm.dev/en/1.0/).
 
-### World Authoring Setup (optional — only if you're editing districts/roads, not just playing)
+### World Authoring Setup (optional — only if you're editing the island, not just playing)
 
-The open world (`assets/world_source/`) is authored in Blender via the **Road Kit Authoring**
-addon (mesh-first road pieces + lane connectivity export). Requires Blender **4.0+**.
+Roads, rail and building kits are authored in Blender (the project uses **Blender 5.2**) with the **Road Kit
+Authoring** add-on, and in the Godot editor with the Road Kit plugin (`addons/road_kit/`).
 
 1. Install Blender.
 2. From the repo root, run:
    ```bash
-   tools/install_blender_addon.sh
+   blender/tools/install_blender_addon.sh
    ```
-   This symlinks the addon into every Blender version you have installed and enables it —
-   no manual Preferences step needed. **Re-run this after every Blender version upgrade**:
-   Blender keeps addon config per-version (`~/.config/blender/<X.Y>/scripts/addons/`), and a
-   fresh version directory does not inherit addons from the old one, so the panel silently
-   disappears after an in-place Blender update until you re-run this script.
-3. Open a district `.blend` under `assets/world_source/districts/` (or `kit/` for the piece
-   library) — the "Road Kit" tab appears in the 3D Viewport sidebar (`N`).
-4. See `assets/world_source/AUTHORING_GUIDE.md` for the authoring workflow and
-   `assets/world_source/addons/road_kit_authoring/README.md` for the addon's own panel reference.
+   This symlinks the add-on into every Blender version you have installed and enables it.
+   **Re-run it after every Blender upgrade**: Blender keeps add-on config per version, and a new
+   version directory does not inherit add-ons from the old one, so the panel silently disappears.
+3. Open a `.blend` under `assets/world_source/` (for example a kit under `kits/`). The "Road Kit"
+   tab is in the 3D Viewport sidebar (`N`).
+4. Read `assets/world_source/HAND_AUTHORING.md` for the workflow, and
+   `blender/addons/road_kit_authoring/README.md` for the add-on's panels.
 
 ---
 
 ## 🎮 Controls
 
+Every key can be rebound in the pause menu (**Controls** tab), and a gamepad works throughout (layout in
+[`docs/input.md`](docs/input.md)).
+
 ### On Foot
 
-| Action                                         | Input                        |
-|:-----------------------------------------------|:-----------------------------|
-| **Move**                                       | `W` `A` `S` `D`              |
-| **Jump** (also stands up if crouched/crawling) | `Space`                      |
-| **Walk (hold/toggle — run is the default)**    | `Shift`                      |
-| **Crouch (hold/toggle) / Crawl (hold/toggle)** | `Ctrl` / `Alt`               |
-| **Aim (Third Person) / Fire**                  | `Mouse Right` / `Mouse Left` |
-| **Reload**                                     | `R`                          |
-| **Switch Weapon (cycle)**                      | `G`                          |
-| **Select Weapon Slot (quick-switch)**          | `0` – `6` (see table below)  |
-| **Drop Weapon**                                | `X`                          |
-| **Equip/Use/Enter**                            | `E`                          |
-| **Swap Camera Shoulder (Third Person)**        | `Q`                          |
-| **View Change to FPS/TPS**                      | `V`                          |
-| **Menu**                                       | `Esc`                        |
+| Action                                         | Keyboard / mouse             | Gamepad            |
+|:-----------------------------------------------|:-----------------------------|:-------------------|
+| **Move**                                       | `W` `A` `S` `D`              | left stick (part way = walk) |
+| **Look**                                       | mouse                        | right stick        |
+| **Jump** (also stands up if crouched/crawling) | `Space`                      | A                  |
+| **Walk quietly (run is the default)** / hold breath while scoped | `Shift`    | L3                 |
+| **Crouch / Crawl (hold or toggle)**            | `Ctrl` / `Alt`               | B / D-pad down     |
+| **Aim / Fire**                                 | `Mouse Right` / `Mouse Left` | LT / RT            |
+| **Scope zoom**                                 | `Mouse Middle` / wheel       | RB                 |
+| **Reload**                                     | `R`                          | X                  |
+| **Weapon wheel**                               | `G`                          | LB                 |
+| **Select weapon slot**                         | `0` – `6` (see table below)  | (wheel)            |
+| **Holster**                                    | `H`                          | D-pad left         |
+| **Drop weapon**                                | `X`                          | —                  |
+| **Detonate remote charges**                    | `B`                          | RB                 |
+| **Interact** (pick up, doors, shops, start a mission) | `E`                   | D-pad right        |
+| **Enter vehicle**                              | `F`                          | Y                  |
+| **Swap shoulder**                              | `Q`                          | R3                 |
+| **First / third person**                       | `V`                          | View              |
+| **Map** (click to set a GPS waypoint)          | `M`                          | D-pad up           |
+| **Pause menu**                                 | `Esc`                        | Start              |
+| **Debug console**                              | `` ` `` (backtick)           | —                  |
 
 #### Weapon Slot Quick-Switch
 
@@ -380,48 +394,41 @@ addon (mesh-first road pieces + lane connectivity export). Requires Blender **4.
 | `5` | 5 | Throwable | Grenade (FRG1) |
 | `6` | 6 | Consumable | — |
 
-### On Vehicle
+### In a Vehicle
 
-| Action                                  | Input                        |
-|:----------------------------------------|:-----------------------------|
-| **Accelerate / Reverse**                | `W` `S`                      |
-| **Steer**                               | `A` `D`                      |
-| **Handbrake**                           | `Space`                      |
-| **Brake**                               | `Shift`                      |
-| **Aim (Hold to change angle) / Fire**   | `Mouse Right` / `Mouse Left` |
-| **Reload**                              | `R`                          |
-| **Switch Weapon (cycle)**               | `G`                          |
-| **Select Weapon Slot (quick-switch)**   | `0` – `6` (passenger weapon mode — see table above) |
-| **Drop Weapon**                         | `F`                          |
-| **Exit**                                | `E`                          |
-| **Swap Camera Shoulder (Third Person)** | `Q`                          |
-| **Menu**                                | `Esc`                        |
+| Action                                  | Keyboard / mouse             | Gamepad            |
+|:----------------------------------------|:-----------------------------|:-------------------|
+| **Throttle / Reverse** (reverse brakes first) | `W` / `S`              | RT / LT (analog)   |
+| **Steer**                               | `A` `D`                      | left stick         |
+| **Handbrake / drift**                   | `Space`                      | A                  |
+| **Brake / NOS**                         | `Shift`                      | L3 (NOS)           |
+| **Fire a passenger weapon**             | `Mouse Left`                 | RB                 |
+| **Reload**                              | `R`                          | X                  |
+| **Flip upright** (car on its side)      | `Space`                      | X                  |
+| **Rear view**                           | `C`                          | R3                 |
+| **Exit**                                | `F`                          | Y                  |
+| **Pause menu**                          | `Esc`                        | Start              |
+
 ---
 
-## 🧪 Debug Harness (Temporary)
+## 🧪 Debug Console
 
-`DebugHarness` wires a set of function keys for exercising missions, AI population, traffic, and
-world-scale testing without the (not-yet-built) unlock-graph/console flow. It's a throwaway tool —
-slated for removal once the real debug console lands. `hosts/WorldMasterDebug.tscn` is the
-full-open-world host scene with this harness attached (`hosts/WorldMaster.tscn` is the same world
-without it, for a "clean" run).
+Press `` ` `` (backtick) in the game to open the debug console; `help` lists every command. Some useful ones:
 
-| Key | Action |
-|:---:|:-------|
-| `F1`  | Teleport-cycles the player through every registered district in the open world — quick way to jump around the map without walking/driving. |
-| `F2`  | Drops a weapon pickup at the player's feet (for testing pickup flow in whichever district `F1` landed on). |
-| `F4`  | Spawns one AI vehicle on every authored traffic route in the current scene. |
-| `F5`  | Re-bakes the Blender-authored world source into a native scene (world-build iteration tool). |
-| `F6`  | Hosts a debug LAN server. |
-| `F7`  | Joins a debug LAN server on localhost. |
-| `F8`  | Posts a synthetic gunshot noise event near the player, so nearby AI investigate it. |
-| `F9`  | Starts a basic `ELIMINATE_ALL` debug mission targeting the `"enemy"` faction (spawns a few hostiles first if none are present). |
-| `F10` | Spawns 5 additional `"enemy"`-faction AI characters into the world (more enemies). |
-| `F11` | Spawns 1 additional `"player"`-faction AI ally into the world (more allies, e.g. for escort/squad testing). |
-| `F12` | Places a debug world zone near the player that streams in a small enemy group on approach (zone-streaming walk-test). |
+| Command | What it does |
+|:--------|:-------------|
+| `where` | the bug-report line: postal code, position, zone and road |
+| `postal <x-y[-s]> [tp]` / `tp <x> <y> <z>` | set a waypoint to, or teleport to, a postal code or a position |
+| `give <id>` / `drop all` / `weapons` / `ammo` | weapons: one in your hands, every weapon laid out, the list of ids, a refill |
+| `activity [start\|replay\|retry\|abort\|why <id>]` | the missions: start, replay or retry one, or ask why it is locked |
+| `traffic` | the cars round you: count, distance, budget, region mix |
+| `autodrive` | the car drives itself to the GPS waypoint until you steer |
+| `hud 0-3` | debug HUD: off / FPS / performance graph / game state |
+| `save [slot]` / `load [slot]` | write or restore the campaign save |
+| `signs [ja\|zh_TW]` | the language of street plates, signs and station boards |
 
-Every AI spawned via `F10`/`F11` is auto-equipped with an ASR1 rifle so it fights at
-range instead of relying on bare fists.
+The older F-key `DebugHarness` (spawn AI, host/join on localhost, and so on) is only in the test scenes
+(`DebugWorld.tscn` and `hosts/`), not in the real world. Co-op is started from the title screen.
 
 ---
 
@@ -503,6 +510,18 @@ textures, and the Project PLATEAU data ("Data: Project PLATEAU (MLIT)", CC BY 4.
 ---
 
 ## 🎮 Screenshots
-![screenshot1.png](images/screenshot1.png)
-![screenshot2.png](images/screenshot2.png)
-![screenshot3.png](images/screenshot3.png)
+
+Captured 2026-10-14 from the current build (Godot 4.7.2, 1920×1080, software renderer), with the in-game HUD.
+
+| | |
+|:---:|:---:|
+| ![Aiming a rifle on foot](images/play_aim.jpg) | ![A city street beside the expressway](images/city_street.jpg) |
+| On foot, aiming a rifle (ASR-1) | A street with lane markings and speed limits beside the expressway |
+| ![The island from the air](images/island_overview.jpg) | ![The hospital and its block](images/hospital.jpg) |
+| The island from the air: city, rail, expressway and the mountain | The hospital block, its car park and an elevated road |
+| ![A street at night](images/night.jpg) | ![A shopping arcade](images/shopping_arcade.jpg) |
+| 20:00: street lights and car headlights | A covered shopping arcade (商店街) |
+| ![A train at a station platform](images/station.jpg) | ![Inside a train](images/train_interior.jpg) |
+| A boardable train at a station, with the departure board | Inside a train car, with the screen over the doors |
+| ![A grenade blast](images/grenade.jpg) | |
+| A grenade blast (Binbun3D effect) | |
