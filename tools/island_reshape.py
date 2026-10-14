@@ -359,20 +359,37 @@ def reshape(base):
     land = land | tbox | (tzone & (out > LAND_Z))
     # THE FISH MARKET: its quay line, the west inlet slot, and the low yard (MARKET_QUAY / MARKET_WEDGE / MARKET_YARD)
     sea_was = open_sea(~(out > LAND_Z))
-    for x0, x1, z0, z1 in (MARKET_QUAY, MARKET_WEDGE):
+    for x0, x1, z0, z1 in (MARKET_QUAY, MARKET_WEDGE) + MARKET_QUAY_S:
         mbox = (xx >= x0) & (xx <= x1) & (zz >= z0) & (zz <= z1)
         out = np.where(mbox, np.maximum(out, FLOOR_Z + RAISE), out)
         land = land | mbox
     # every cell that WAS open sea and is not now: the filled ones, and the slot's blind end north of the wedge (under
     # and behind the dike's crest), which the fill cut off from the bay
-    reclaimed = sea_was & ~open_sea(~(out > LAND_Z)) & (xx >= 200.0) & (xx <= 760.0) & (zz >= 560.0) & (zz <= 820.0)
+    reclaimed = sea_was & ~open_sea(~(out > LAND_Z)) & (xx >= 200.0) & (xx <= 760.0) & (zz >= 560.0) & (zz <= 860.0)
     # ...and the yard itself stands LOW, a fishing port's quay height (MARKET_YARD): set, not filled
-    x0, x1, z0, z1 = MARKET_YARD
-    mbox = (xx >= x0) & (xx <= x1) & (zz >= z0) & (zz <= z1)
-    out = np.where(mbox, MARKET_YARD_Z, out)
+    for x0, x1, z0, z1 in (MARKET_YARD,) + MARKET_QUAY_S:
+        mbox = (xx >= x0) & (xx <= x1) & (zz >= z0) & (zz <= z1)
+        out = np.where(mbox, MARKET_YARD_Z, out)
     # ...with its 物揚場 (MARKET_LANDING) half a metre lower again at the quay's west end, for the small craft
     x0, x1, z0, z1 = MARKET_LANDING
     out = np.where((xx >= x0) & (xx <= x1) & (zz >= z0) & (zz <= z1), MARKET_LANDING_Z, out)
+    # ...and the through link's RAMP through the strip's 4.1 m retaining wall (S15, island_site_access.LINK): within
+    # LINK_CORRIDOR of its centreline the ground is the link's own height -- an embankment on the yard, a cut (擁壁 both
+    # sides) in the strip
+    import island_site_access as SA
+    cl = SA.link_corridor()
+    d = np.full(out.shape, np.inf)
+    zc = np.zeros(out.shape)
+    win = (xx >= cl[0][0] - LINK_CORRIDOR) & (xx <= cl[-1][0] + LINK_CORRIDOR) & (zz >= 740.0) & (zz <= 820.0)
+    for (ax, az), (bx, bz) in zip(cl, cl[1:]):
+        ex, ez = bx - ax, bz - az
+        t = np.clip(((xx - ax) * ex + (zz - az) * ez) / (ex * ex + ez * ez), 0.0, 1.0)
+        dd = np.hypot(xx - (ax + ex * t), zz - (az + ez * t))
+        closer = dd < d
+        d = np.where(closer, dd, d)
+        zc = np.where(closer, ax + ex * t, zc)
+    yz = np.vectorize(lambda x: SA.link_z(x) + SA.rg.NET_Y)(np.clip(zc, cl[0][0], cl[-1][0]))
+    out = np.where(win & (d <= LINK_CORRIDOR), yz, out)
     # THE AIRPORT ISLAND REACHES 60 m FURTHER SOUTH (user, 2026-09-29: "the airport's runway/island may need to extend,
     # or change side -- the runway may hit the bridge"): the runway moved to the island's SOUTH edge, behind the terminal,
     # away from the bridge, and at the old coast (z 1980) its paved strip stood 4 m from the water. A reclaimed strip at
@@ -438,7 +455,7 @@ def walk_banks(out, xx, zz):
     for kind in WALK_BANK_KEEP:
         for x0, x1, z0, z1 in zones.get(kind, ()):
             keep |= (xx >= x0) & (xx <= x1) & (zz >= z0) & (zz <= z1)
-    for x0, x1, z0, z1 in (MARKET_QUAY, MARKET_WEDGE, MARKET_YARD, MARKET_LANDING):
+    for x0, x1, z0, z1 in (MARKET_QUAY, MARKET_WEDGE, MARKET_YARD, MARKET_LANDING) + MARKET_QUAY_S:
         keep |= (xx >= x0 - 20.0) & (xx <= x1 + 20.0) & (zz >= z0 - 20.0) & (zz <= z1 + 20.0)
     # the Wangan terminal sits inside the military harbour's box but is no harbour: its west and south beach are its own
     x0, x1, z0, z1 = WANGAN_TERMINAL_FILL
@@ -540,7 +557,14 @@ MARKET_YARD_Z = 1.5
 #: THE 物揚場 (landing quay for small craft) at the quay's WEST end, half a metre under the yard (the planner: a low
 #: strip 15-20 m deep beside the slipway, short steps up to the yard). Godot x0, x1, z0, z1: from the coast road's
 #: embankment (x 290) to the yard street's U at the ramp's foot (its outer kerb x ~336), the last 18 m before the wall.
-MARKET_LANDING = (290.0, 332.0, 790.0, 808.0)
+#: S15 (all three reviewers, user-approved): the quay moves SOUTH to z 842 (x 262-445) and z 848 (x 445-525, the
+#: protected mooring band between the old Wangan's piers -- clear of the moved Wangan now), the yard's level with it;
+#: east of x 525 the quay stays at z 808. The row (hall, ice, cold store) stands from z 811.5 behind the yard's 4.5 m
+#: forklift strip, the apron in front of it (library_civic.fish_market).
+MARKET_QUAY_S = ((262.0, 445.0, 730.0, 842.0), (445.0, 525.0, 730.0, 848.0))
+#: the 物揚場 moves to the new quay's WEST end with its slipway (x 262-300, in front of the 漁具倉庫)
+MARKET_LANDING = (262.0, 300.0, 811.5, 842.0)
+LINK_CORRIDOR = 7.0           # m either side of the through link's centreline laid at its height (4.5 m half + verge)
 MARKET_LANDING_Z = 1.0
 #: the airport island's south extension (Godot x0, x1, z0, z1): the strip south of the old coast (z ~1980) to z1, over
 #: the island's own width there (x0..x1 only bound the search). See `reshape`.

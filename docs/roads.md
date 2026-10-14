@@ -21,6 +21,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - Right-hand traffic is the keep-left lane graph run backwards (2026-10-12, user: "drive on the right")
 - The fish market's two gates, the Wangan's bay jog as two arcs, both Suburb ramps one-way (PLAN S11 P12, 2026-10-13)
 - The yard's street and rectangle: why the fish market has no junction at the ramp's foot (PLAN S13, 2026-10-13)
+- The fish market's ring: a junction at the ramp's foot after all, and four traps it took (PLAN S14 step 1, 2026-10-14)
 
 ---
 
@@ -2173,3 +2174,70 @@ larger vehicles", the T "slightly more straight". Owner: `tools/island_site_acce
   kerbless, corners R 16 -- inner edge R 12) out north and back from the east, every turn a right turn. Dry layout 3:
   the T solves 12 m with no slide; flow clean. It is in `authored_roads()` (the grade smoothing holds it).
 
+
+## The fish market's ring: a junction at the ramp's foot after all, and four traps it took (PLAN S14 step 1, 2026-10-14)
+
+User: one big one-way loop instead of the U ("more toward japanese markets shape"); rounds 1-2 of the fresh-agent
+reviews agreed. Owner: `tools/island_site_access.py` (ICHIBA_BEND_R, YARD_*, `_arc`, `yard_ring`, `ichiba_loop`).
+DRY ONLY: nothing was built; the land, the piece and the record are still S13's. Picture:
+`docs/previews/market_s14_plan.png` (`tools/scratch/market_s14/built_s14.py <record>`, every lane drawn from the
+export); numbers: `tools/scratch/market_s14/radii.py <record>`.
+
+* **The shape.** The ramp `ichiba_michi` is unchanged to its foot (372.6, 734); a LEVEL R 20 left bend turns it due
+  south onto **J at (356.4, 770)**, an unsignalled 4-arm junction with square arms (the S13 failure was a pad whose
+  arms met ~50 deg apart): north the ramp, south and east the ring, west `ichiba_chushajo` to the public car park (a
+  declared dead end, `access_roads()`). The ring is `ichiba_michi_loop_in` (from J's east mouth) + `ichiba_michi_loop`
+  (to J's south mouth), joined mid south leg; DRIVEN counter-clockwise: in = straight on from the ramp's down lanes,
+  out = a right turn up the ramp, crossing nothing.
+* **Measured on the exported lanes (the final dry layout):** J's mouths 16.2 / 16.2 (the exit's, locked) and 13.4 /
+  13.4 m; in R 88, out R 11.3, a second lap R 12.0; every ring lane R >= 13.3 (the east end one half-circle, R ~16 on
+  the carriageway); the bend's inside lane R 14.3; the public arm's turns R 5.7-6.2 (cars only). The south leg's
+  outer edge z 803.3, the north leg's z 764.3 (~20 m from the ramp's fill toe, z ~744). Every expressway pier >= 25 m
+  from a ring lane. Layout gate: 0 errors, flow 2 490 lanes clean, 27 ramps 6.7 %; road names against HEAD: +
+  `ichiba_chushajo`, `ichiba_michi_loop_in`, nothing lost.
+* **TRAP 1 -- a road with both ends on one pad is a road THROUGH it** to `check_mouth_sides` (two mouths of one base
+  name): one ring road made its south-to-east line the "through road", the ramp's mouth "17 m past its centreline",
+  and `--fix` + the setback + the unclamp loop threw J's mouths 23-40 m out and ate the ring to 2 stations (dry 1).
+  The ring is two roads. Also: any two head-on mouths pair as one through road, so the ring's north leg and the
+  public arm must leave J on ONE line through its centre (dry 4: offset, the ramp's mouth read "past" it again).
+* **TRAP 2 -- MIN_MOUTH_CLEAR.** The kit keeps a mouth 10 m from the next station on its road; a nearer station holds
+  the mouth short, and the layout's unclamp deletes it. An arc ending on a mouth gets its last span >= 13 m
+  (`_arc(..., end_is_mouth=True)`, `MOUTH_CLEAR`).
+* **TRAP 3 -- the kit's curve between two frozen stations is tightest at its ends**, 0.65-0.8 of the arc's radius
+  (measured on the centreline of 83-180 deg spans: R 20 read 16, R 14 read 10). Arcs get a station every 30 deg.
+* **TRAP 4 -- right-hand traffic is a reversal, so a ONE-WAY road drives against its station order and its lanes lie
+  all on one side of its line** (1.8 and 5.3 m off it: to the right of the way it is driven). Authored
+  counter-clockwise the ring DROVE CLOCKWISE (dry 2-4: in by a left turn across the up lanes). It is authored
+  clockwise, its line `YARD_SHIFT` (3.55) inside the carriageway: with both mouths on J's axes the west leg's lanes
+  continue the ramp's down lanes within 0.2 m and the north leg arrives on the up lanes' side. Any one-way road a
+  generator authors has this; judge direction on the exported lanes, never the record.
+* **The exit's corner.** Right-hand traffic turns right round the NEAR corner, on about the mouth distance less the
+  lanes' offset: at 12 m the exit was R 6.2. `YARD_EXIT_MOUTH` 17.5 (both mouths `setback_locked`) gives R 11.3 and
+  moves J 4 m south -- the depth the hall then took back west of x 445, where the piers stand further south.
+* NOT DONE (step 2): the land (quay z ~842), `library_civic.fish_market` (its `_fm_roads` reads the new geometry but
+  the piece is still S13's layout and will not match until re-laid), the rebuild and every S13 gate.
+
+
+## The fish market's K and through link: no dead end, visitors from the east (PLAN S15, 2026-10-14)
+
+User decisions on the three-reviewer replan: visitors V-C (from the east, never in the yard), the second exit = the game
+developer's THROUGH link. `island_site_access`:
+* J is a plain 3-arm T (the public arm `ichiba_chushajo` is gone). The ring is two roads J -> K, so no road has both ends
+  on one pad any more (trap 1 above disappears by construction): `ichiba_michi_loop` (south half) and `_in` (north half),
+  authored clockwise, driven counter-clockwise (trap 2).
+* K, the ring's east end, is a square 3-arm T at x 525: the south leg in from the west, the north arm out north, the link
+  east. The north-east corner's arc ENDS on K's north mouth (`_arc(end_is_mouth=True)`), which fixes its radius at the
+  legs' spacing less the mouth: line 12.45, carriageway R 16.
+* A right turn round a T's near corner is tight unless both mouths stand off (J's exit again): solved, K's ring mouth
+  slid in to 8 m and the link's right turn in came out R 6.1. `LINK_K_MOUTH` 17.5 + both mouths `setback_locked`: R 12.
+* The link `ichiba_ura_michi` (1+1) is authored from a JOINT with `kanransha_michi`'s end -- the joint hands one road's
+  END to the other's START, so the link starts there -- west along the strip and down 4.1 m to K. Its corner off the
+  joint: at 14 m of depth it solved R 4.8, at 28 m with frozen stations every 30 deg R 8.6 (trap 4, the kit's curve is
+  tightest at frozen stations), unfrozen inner stations R 11.5+. A station 5.5 m from the next kinked the bend to K
+  (R 6.3): stations closer than ~15 m on a bend are a kink.
+* `link_z` is the link's ONE height profile; `island_reshape` lays the ramp's ground (embankment on the yard, cut through
+  the strip's 4.1 m wall) from it. The visitor lot is an ACCESS row off the link (`from_road=None` = "the link", run
+  after the joint); `kanransha_michi` lost its end lot.
+Measured on exported lanes: J exit R 14.5 / 11.3, re-lap R 12, in R 85; K straight R 48, left R 12, right-in R 12; ring
+R >= 13.3; link R >= 11.5. Dry layout: 0 errors, flow 2500 clean, no road lost. The piece (`library_civic.fish_market`) is
+NOT re-laid yet (PLAN.md S15).

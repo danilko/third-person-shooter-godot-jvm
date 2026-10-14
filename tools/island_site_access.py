@@ -101,8 +101,8 @@ ACCESS = [
     #  (The first build had a second gate, `ichiba_chushajo`: a T at x 375 to a car park on a terrace at the crest's
     #  height. With the yard lowered to a quay's height the ramp falls 10 m and its foot lands where the terrace stood;
     #  the public and the buyers park on the yard's east end instead. `signal` / `allow_cross` stay as ACCESS keys.)
-    #  (S13, 2026-10-13: the ramp is 2 + 2 and ends on a junction at its foot with the yard's one-way lane loop,
-    #  YARD_LOOP: it is no longer a dead end.)
+    #  (S13, 2026-10-13: the ramp is 2 + 2 and no longer a dead end. S14, 2026-10-14: it ends on J at its foot, the
+    #  yard's one big one-way ring and the public car park's arm -- YARD_LOOP / YARD_PUBLIC.)
     dict(name="ichiba_michi", site="fish_market", from_road="ring_kita", at=(567.0, -672.0),
          stations="ichiba", section="ichiba", loop="ichiba",
          end=(379.0, -729.0), parking=None),
@@ -114,8 +114,11 @@ ACCESS = [
     # They replace island_reshape.DIKE_ACCESS's six points: "lighthouse" is todai_michi above, "farm" and
     # "residential_ne" share the north lane, "suburb" moved with the suburb fill (its old point is open sea now).
     #  * the FERRIS-WHEEL PARK (the "city" point): off ring_kita__13's west leg, north along the toe at x 893
+    #    (S15: its end is no longer a dead end -- the fish market's through link `ichiba_ura_michi` continues it, end to
+    #    end, west to the market's K -- so its car park went to the visitor lot off the link, `ichiba_chokubaijo`)
     dict(name="kanransha_michi", site="waterfront_park", from_road="ring_kita", at=(945.0, -899.0),
-         via=[(893.0, -899.0)], end=(893.0, -790.0), parking="ParkingLot14"),
+         via=[(893.0, -899.0)], end=(893.0, -800.0), parking=None),     # S15: end 10 m south (was -790), room
+    #    for the link's corner off it (LINK)
     #  * the NORTH COAST beach (farm + residential north-east): west along the toe from x 840 to the farm's beach
     dict(name="kitahama_michi", site="north_beach", from_road="ring_kita", at=(852.0, 1541.0),
          via=[(845.0, 1598.0)], end=(705.0, 1628.0), parking="ParkingLot14"),
@@ -127,6 +130,11 @@ ACCESS = [
          via=[(1065.0, -1145.0)], end=(895.0, -1145.0), parking="ParkingLot14"),
     dict(name="butsuryu_michi", site="logistics_yard", from_road="kichi_dori", at=(-280.0, -1230.0),
          end=(-280.0, -1440.0), parking="ParkingLot14"),     # its car park short of the runway band (z 1480)
+    #  * the FISH MARKET's VISITORS (S15 V-C, user 2026-10-14): they come from the EAST, ring_kita -> kanransha_michi ->
+    #    the through link, and never enter the trading yard; their lot north of the link on the 5.6 m strip, beside the
+    #    直売所 + 食堂 (x 725-800). LAST: its road leaves the link, which ichiba_michi's loop lays.
+    dict(name="ichiba_chokubaijo", site="fish_market_visitors", from_road=None, at=(820.0, -772.0),
+         end=(820.0, -740.0), parking="ParkingLot28", signal=False),
 ]
 
 
@@ -148,7 +156,7 @@ ICHIBA_SKEW = 6.9               # deg: the ramp runs this far SEAWARD of the dik
 #                                 Skewed, its land-side edge follows the face down: seaward fill only, never a notch
 ICHIBA_GRADE = 0.07             # its fall: 10.4 m in ~170 m (a ramp's limit at 40 km/h; trucks take it at 20)
 ICHIBA_VCURVE = 20.0            # a vertical curve this long at the top and at the foot (MLIT: >= 20 m at 20 km/h)
-ICHIBA_FOOT_RUN = 4.0           # m of level road past the foot before the U
+ICHIBA_FOOT_RUN = 4.0           # m of level road past the foot before its bend
 #: THE RAMP'S SECTION (S13 D2b, user: "add 2 lane for each way to enter market for the truck and other larger
 #: vehicles"): 2 + 2 lanes of 3.5 m (a 4.5 m lane is the city's; a yard ramp at 20 km/h takes the 第3種 3.5), a
 #: painted centre, one 2 m footway on the land (north) side -- the public walks down from the crest; the sea side is a
@@ -157,31 +165,102 @@ ICHIBA_SECTION = {"lanes_fwd": 2, "lanes_bwd": 2, "lane_width": 3.5, "median_wid
                   "shoulder_left_width": 0.5, "shoulder_right_width": 0.5,
                   "left_walk_width": 0.0, "right_walk_width": 2.0, "left_kerb_height": 0.15,
                   "right_kerb_height": 0.15, "design_speed": 20.0}
-#: THE YARD'S ROADS (S13 D2, user: "will the navigation map on the yard to let it walk around, or rectangle counter map
-#: will be better?"): walking needs nothing -- the navmesh is baked from the yard -- but a CAR (traffic, police
-#: dispatch, a gang's car) follows lanes, and with the ramp's foot a dead end every AI car stopped there.
-#:  * The ramp does not END at its foot: it turns, level, through a U of ICHIBA_U_R (a 2 + 2 road turning 173 deg: its
-#:    inside lane on R ~23) and runs on EAST along the quay as the yard's street (YARD_STREET_Z) -- its footway falls on
-#:    the quay side, the public's walk along the boats. A junction at the foot was tried first (2026-10-13 dry layouts):
-#:    the ramp comes down PARALLEL to every lane the yard can hold, its arms met at 50 deg, and the setback solve threw
-#:    the mouths 38-60 m out (locked, the mouth-side fix slid the ramp's end up the dike's face instead).
-#:  * The street ends on ONE plain T at the yard's east end (YARD_LOOP["j_x"]): a ONE-WAY rounded RECTANGLE (the
-#:    user's "rectangle") of two 3.5 m lanes, kerbless, leaves it north and comes back into it from the east round the
-#:    cold store and the trucks' turning ground -- every turn in it a RIGHT turn. Cars go down, along the quay, round
-#:    the rectangle and back up without reversing; nothing on the yard is more than ~45 m from a lane.
-ICHIBA_U_R = 30.0
-YARD_LOOP = dict(name="ichiba_michi_loop", j_x=522.0, mouth=20.0, north_z=755.0, east_x=592.0, radius=16.0)
+#: THE YARD'S ROADS -- ONE BIG ONE-WAY RING (S14, user 2026-10-14: "a big loop ... instead of need a u-turn ... more
+#: toward japanese markets shape"). S13 ran the ramp through a U and east along the quay as a street, so every fish
+#: box crossed a truck street between the hall and the boats; a 産地市場 runs boat -> apron -> 荷捌き所 -> trucks on the
+#: LAND side -> road (round-1 review). Now:
+#:  * at the ramp's foot a LEVEL LEFT bend of ICHIBA_BEND_R turns it due SOUTH onto J, a plain junction whose arms are
+#:    all square (the shape the setback solves; S13's pad at the foot failed because its arms came in ~50 deg apart);
+#:  * the RING (YARD_LOOP) leaves J south and comes back into it from the east: one-way, counter-clockwise on the map
+#:    (west leg south, south leg east, east leg north, north leg west), every corner a LEFT turn, and out of it a RIGHT
+#:    turn onto the ramp's up lanes -- it crosses nothing (right-hand traffic). Truck bays go on the south leg's RIGHT
+#:    (the hall's) side, as parking bands of the piece, never lanes;
+#:  * J's 4th arm, YARD_PUBLIC, runs WEST to the public car park and 直売所: visitors never enter the ring.
+ICHIBA_BEND_R = 20.0            # the foot's bend: R 20 is a 10 t truck's minimum (the planner: R 25 if it fits)
+YARD_MOUTH = 12.0               # J's mouths this far from its centre (a square junction solves ~12 m, docs/roads.md)
+#: ...except the two of the ring's EXIT, a right turn from its north leg up the ramp: right-hand traffic turns right
+#: round J's near (north-east) corner, on about the mouth's distance less the lanes' offset (5.3 m) -- at 12 m that is
+#: R 6.2 (S14 dry layout 5), a car's turn, no truck's. At 17.5 the outer lane turns on ~R 12. Both mouths LOCKED (the
+#: setback would solve them back to ~12); J moves 5.5 m south with the ramp's mouth.
+YARD_EXIT_MOUTH = 17.5
+#: the ring, by its CARRIAGEWAY: J's south mouth ends the south-west corner (R `r_in`, so the south leg runs at J's z +
+#: YARD_MOUTH + r_in, z ~794) and the east end is ONE half-circle between the legs (R ~16). Radii are the
+#: carriageway's: its inside lane turns on r - 1.75, a 10 t truck's inside wheel path wants >= 12.
+YARD_LOOP = dict(name="ichiba_michi_loop", east_x=520.0, r_in=16.0)
+#: RIGHT-HAND TRAFFIC IS A REVERSAL: every generator authors keep-left and `point_export` reverses every lane, so a
+#: one-way road drives AGAINST its station order and its lanes lie to the RIGHT of the way it is driven, all on one
+#: side of the line (measured on the exported S14 dry layout: 1.8 and 5.3 m off it). The ring, driven
+#: counter-clockwise, is therefore authored CLOCKWISE (from J's east mouth round to its south mouth), and its line
+#: runs YARD_SHIFT INSIDE its carriageway. With the line on J's axes at both mouths, the west leg's lanes continue the
+#: ramp's down lanes (x 349.7-353.2 against 349.5-353.0) and the north leg comes in on its up lanes' side.
+#: (S14 dry layouts 2-4 authored it counter-clockwise: it drove clockwise -- in by a left turn across the up lanes.)
+YARD_SHIFT = 3.55
+#: the kit's curve between two frozen stations is tightest at its ends (0.65-0.8 of the arc's radius, measured on the
+#: centreline of a 90 deg span): an arc gets a station every ARC_STEP_DEG, but none within MOUTH_CLEAR of a mouth
+ARC_STEP_DEG = 30.0
+MOUTH_CLEAR = 13.0              # > the kit's MIN_MOUTH_CLEAR, 10 m, with room for the solve to slide a mouth ~2 m
+#: S15 (the whole-market replan, user decisions 2026-10-14): J is a plain 3-arm T (the public arm `ichiba_chushajo` is
+#: gone: visitors come from the east, V-C), and the ring's EAST END is a square 3-arm T, K, instead of a half circle:
+#: the south leg arrives from the west, the ring's north-east corner leaves north (its arc ENDS on K's north mouth, so
+#: the corner's line radius is the legs' spacing less the mouth, r_in - YARD_SHIFT = 12.45, a carriageway R 16), and
+#: the through link leaves east. Every ring road now runs J -> K (no road has both ends on one pad).
+YARD_K_X = 525.0                # record x of K's centre (the row ends at x ~525; the nearest pier is sb_off (539, 806))
+#: THE THROUGH LINK (S15, the game developer's second exit; user: "the through link"): `ichiba_ura_michi`, 1 + 1, from
+#: kanransha_michi's old dead end (893, -790) -- joined END TO END, no arm added anywhere -- west along the 5.6 m strip
+#: (z 776), down past the retaining wall at x 608 onto the yard's level, into K's east mouth. Its climb is LINK_CLIMB of
+#: run between two LINK_VCURVE vertical curves. Authored from the joint (west), so kanransha_michi's end hands over to
+#: its start. Godot (x, z) corners of its plan; the pier clearances are on its centreline (sb_off (616, 762) 17 m,
+#: Wangan (636, 789) 13 m, (608, 802) 20 m); a pier left on it is dropped by the build (point_mesh.pier_on_road).
+#: (dry layout mk1: a joint at z 790 left the corner 14 m of depth to the strip's line and it solved R 4.8 -- the joint
+#: moved south and the line north for R 28)
+LINK = dict(name="ichiba_ura_michi", joint=(893.0, 800.0), corner_r=28.0, strip_z=772.0,
+            plan=[(840.0, 772.0), (800.0, 772.0), (760.0, 772.0), (720.0, 772.0), (680.0, 772.0), (660.0, 772.0),
+                  (640.0, 772.5), (620.0, 775.0), (600.0, 780.0), (580.0, 787.5)])
+#: K's two mouths of the link's inbound RIGHT turn (link westbound -> the ring's north arm) are LOCKED, J's exit trick:
+#: solved, the arm's slid in to 8 m and the turn was R 6.1 (dry layout mk3), a car's, no truck's
+LINK_K_MOUTH = 17.5
+LINK_CLIMB = (560.0, 655.0)     # Godot x where its climb starts (the yard) and ends (the strip)
+LINK_VCURVE = 20.0
+LINK_SECTION = {"lanes_fwd": 1, "lanes_bwd": 1, "lane_width": 3.5, "median_width": 0.0,
+                "shoulder_left_width": 0.5, "shoulder_right_width": 0.5, "design_speed": 30.0}
 YARD_SECTION = {"lanes_fwd": 2, "lanes_bwd": 0, "lane_width": 3.5, "median_width": 0.0,
                 "shoulder_left_width": 0.5, "shoulder_right_width": 0.5,
                 "left_walk_width": 0.0, "right_walk_width": 0.0, "left_kerb_height": 0.0,
                 "right_kerb_height": 0.0, "design_speed": 20.0}
 
 
+def _arc(p, t, turn, r, end_is_mouth=False, start_is_mouth=False, right=False):
+    """An arc from `p` heading `t` through `turn` rad on radius `r`, turning LEFT (counter-clockwise, record frame) or
+    `right`: its stations after `p` [(x, y, tangent)], frozen on the arc, one every <= ARC_STEP_DEG -- but the span
+    next to a mouth is at least MOUTH_CLEAR long (the kit holds a mouth short of its setback otherwise, S14 dry layout
+    2), the rest shared equally."""
+    sg = -1.0 if right else 1.0
+    L = r * turn
+    first = MOUTH_CLEAR if start_is_mouth else 0.0
+    last = MOUTH_CLEAR if end_is_mouth else 0.0
+    n = max(1, int(math.ceil(math.degrees(turn) / ARC_STEP_DEG)))
+    if first or last:
+        rest = L - first - last
+        m = max(0, int(math.ceil(rest / (r * math.radians(ARC_STEP_DEG))))) if rest > 1.0 else 0
+        cuts = ([first] if first else []) + [first + rest * k / m for k in range(1, m)] if m else ([first] if first else [])
+        cuts += [L - last] if last and rest > 1.0 else []
+        hs = sorted(set(round(c / r, 9) for c in cuts if 0.0 < c < L)) + [turn]
+    else:
+        hs = [turn * k / n for k in range(1, n + 1)]
+    c = (p[0] - sg * t[1] * r, p[1] + sg * t[0] * r)                   # the centre: to the left of t (right: to its right)
+    rx, ry = p[0] - c[0], p[1] - c[1]
+    out = []
+    for h in hs:
+        ch, sh = math.cos(sg * h), math.sin(sg * h)
+        out.append((c[0] + rx * ch - ry * sh, c[1] + rx * sh + ry * ch, (t[0] * ch - t[1] * sh, t[0] * sh + t[1] * ch)))
+    return out
+
+
 def _ramp_geometry(ground):
     """The market ramp's plan, record frame: its authored stations [(x, y, z, tangent or None)] mouth first, and the
-    yard junction's centre (x, y) it ends on. Three stations on the level bend (start, middle, end -- none nearer the
-    mouth than `tidy`'s 10 m MIN_MOUTH_CLEAR), then the fall along the skewed line: a 20 m parabola, ICHIBA_GRADE, a
-    20 m parabola onto the yard's ground, ICHIBA_FOOT_RUN of level to the yard junction's mouth."""
+    yard junction J's centre (x, y) it ends on. Three stations on the level top bend (start, middle, end -- none nearer
+    the mouth than `tidy`'s 10 m MIN_MOUTH_CLEAR), then the fall along the skewed line: a 20 m parabola, ICHIBA_GRADE,
+    a 20 m parabola onto the yard's ground, ICHIBA_FOOT_RUN of level, and the level foot bend south to J's mouth."""
     import island_dike as ID
     yj = -672.0
     top = ID.crest_at(ICHIBA_X, yj) - rg.NET_Y
@@ -227,23 +306,13 @@ def _ramp_geometry(ground):
     out += [on_line(d) + (z_at(d), None) for d in ds]
     foot = on_line(D + ICHIBA_FOOT_RUN)
     out.append(foot + (foot_z, w))
-    # the U, level: turning LEFT (south, then east) from w until the road heads due east along the quay
+    # the bend, level: turning LEFT (south) from w until the road heads due south, its end J's north mouth
     lf = (-w[1], w[0])                                                 # w's left: south, a little east
-    c = (foot[0] + lf[0] * ICHIBA_U_R, foot[1] + lf[1] * ICHIBA_U_R)
-    turn = math.pi - a                                                 # 173.1 deg: w + turn = due east
-    n = int(math.ceil(math.degrees(turn) / 15.0))
-    rx, ry = foot[0] - c[0], foot[1] - c[1]
-    for k in range(1, n + 1):
-        h = turn * k / n                                               # counter-clockwise in the record frame
-        ch, sh = math.cos(h), math.sin(h)
-        out.append((c[0] + rx * ch - ry * sh, c[1] + rx * sh + ry * ch, foot_z,
-                    (w[0] * ch - w[1] * sh, w[0] * sh + w[1] * ch)))
-    # the yard's street, east along the quay to the T's mouth
-    x0, y0 = out[-1][0], out[-1][1]
-    J = (YARD_LOOP["j_x"], y0)
-    xe = J[0] - YARD_LOOP["mouth"]
-    m = max(1, int(math.ceil((xe - x0) / 30.0)))
-    out += [(x0 + (xe - x0) * k_ / m, y0, foot_z, (1.0, 0.0) if k_ == m else None) for k_ in range(1, m + 1)]
+    c = (foot[0] + lf[0] * ICHIBA_BEND_R, foot[1] + lf[1] * ICHIBA_BEND_R)
+    # its last station IS J's north mouth (no straight: the depth goes to the yard); `_arc` keeps the others clear of it
+    turn = math.pi / 2.0 - a                                           # 83.1 deg: w + turn = due south
+    out += [q[:2] + (foot_z, q[2]) for q in _arc(foot, w, turn, ICHIBA_BEND_R, end_is_mouth=True)]
+    J = (out[-1][0], out[-1][1] - YARD_EXIT_MOUTH)
     return out, J
 
 
@@ -262,36 +331,160 @@ def _bearing(deg):
     return (math.sin(a), math.cos(a))
 
 
+def _straights(rows, x1, y1, t, step=35.0):
+    """Stations from the last row to (x1, y1) every <= step m along tangent t."""
+    x0, y0 = rows[-1][:2]
+    L = math.hypot(x1 - x0, y1 - y0)
+    n = max(1, int(math.ceil(L / step)))
+    return [(x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n, t) for k in range(1, n + 1)]
+
+
+def yard_frame(J):
+    """(rl, ysl, K): the south-west corner's line radius, the south leg's line y and K's centre, record frame."""
+    rl = YARD_LOOP["r_in"] - YARD_SHIFT
+    ysl = J[1] - YARD_MOUTH - rl
+    return rl, ysl, (YARD_K_X, ysl)
+
+
+def yard_ring_in(J):
+    """The ring's NORTH half by its STATION LINE [(x, y, tangent)], AUTHORED from J's east mouth east along the north leg
+    and round the north-east corner (clockwise) to K's north mouth -- driven the other way (YARD_SHIFT)."""
+    E, S_ = (1.0, 0.0), (0.0, -1.0)
+    rl, ysl, K = yard_frame(J)
+    r = J[1] - (K[1] + YARD_MOUTH)                                      # the corner's arc ENDS on K's north mouth
+    rows = [(J[0] + YARD_EXIT_MOUTH, J[1], E)]
+    rows += _straights(rows, K[0] - r, J[1], E)
+    rows += _arc(rows[-1][:2], E, math.pi / 2.0, r, right=True, end_is_mouth=True)
+    return [(x, y, S_ if i == len(rows) - 1 else t) for i, (x, y, t) in enumerate(rows)]
+
+
+def yard_ring_out(J):
+    """The ring's SOUTH half: AUTHORED from K's west mouth west along the south leg and round the south-west corner
+    (clockwise) to J's south mouth -- driven J -> K."""
+    W, N = (-1.0, 0.0), (0.0, 1.0)
+    rl, ysl, K = yard_frame(J)
+    rows = [(K[0] - YARD_MOUTH, ysl, W)]
+    rows += _straights(rows, J[0] + rl, ysl, W)
+    rows += _arc(rows[-1][:2], W, math.pi / 2.0, rl, right=True, end_is_mouth=True)
+    return [(x, y, N if i == len(rows) - 1 else t) for i, (x, y, t) in enumerate(rows)]
+
+
 def yard_loop(J):
-    """The yard rectangle's centreline [(x, y)] record frame, from its OUT mouth (north of the T) round to its IN
-    mouth (east of it), for the T centred on J (record). Godot z = -y."""
-    L = YARD_LOOP
-    mo = (J[0], J[1] + L["mouth"])                  # north of the T (record +y)
-    mi = (J[0] + L["mouth"], J[1])                  # east of it
-    yN, E = -L["north_z"], L["east_x"]
-    corners = [mo, (J[0], yN), (E, yN), (E, J[1]), mi]
-    return rg.rounded_polygon(corners, [0.0, L["radius"], L["radius"], L["radius"], 0.0], closed=False,
-                              full_ends=True)
+    """The ring's CARRIAGEWAY centre [(x, y)] record frame (its lanes lie YARD_SHIFT to the line's left as authored:
+    the outside), one point per station, in the order it is DRIVEN: J's south mouth -> K -> J's east mouth."""
+    def car(rows):
+        return [(x - t[1] * YARD_SHIFT, y + t[0] * YARD_SHIFT) for x, y, t in rows]
+    return car(yard_ring_out(J))[::-1] + car(yard_ring_in(J))[::-1]
+
+
+def link_rows(J):
+    """The through link's stations [(x, y, z, tangent)] record frame, authored from the joint with kanransha_michi's
+    end to K's east mouth: the corner off the joint, west along the strip, the climb down to the yard, level to K."""
+    rl, ysl, K = yard_frame(J)
+    jx, jz = LINK["joint"]
+    r = LINK["corner_r"]
+    N_, W = (0.0, 1.0), (-1.0, 0.0)
+    # off the joint heading NORTH (kanransha_michi's own direction), turning LEFT (west) onto the strip's line
+    rows = [(jx, -jz, N_)]
+    # the arc's inner stations are NOT frozen (tangent None): between frozen stations the kit's curve is tightest at
+    # each one (docs/roads.md, the market ring's traps) -- frozen every 30 deg this R 28 solved R 8.6 (dry layout mk2)
+    arc = _arc(rows[-1][:2], N_, math.pi / 2.0, r)
+    rows += [(x, y, None) for x, y, _t in arc[:-1]] + [arc[-1]]
+    # (no station at x 560: 5.5 m from the next one it kinked the bend down to K, R 6.3 -- dry layout mk5)
+    pts = [(x, -z) for x, z in LINK["plan"]] + [(K[0] + LINK_K_MOUTH + 12.0, ysl), (K[0] + LINK_K_MOUTH, ysl)]
+    for i, (x, y) in enumerate(pts):
+        nx_, ny_ = (pts[i + 1] if i + 1 < len(pts) else (x - 1.0, y))
+        px_, py_ = (pts[i - 1] if i else rows[-1][:2])
+        tx, ty = nx_ - px_, ny_ - py_
+        L = math.hypot(tx, ty)
+        rows.append((x, y, (tx / L, ty / L) if i else W))
+    rows[-1] = rows[-1][:2] + (W,)
+    return [(x, y, link_z(x), t) for x, y, t in rows]
+
+
+def link_z(x):
+    """The through link's height (record z) at Godot x: the yard's level west of LINK_CLIMB, the strip's (the network's
+    zero, 5.6 m) east of it, between them a parabola LINK_VCURVE long at each end and a straight grade (the climb runs
+    nearly east-west, so x is its run). ONE owner: island_reshape lays the ground under it from here (LINK_CORRIDOR)."""
+    yard = RS_yard_z() - rg.NET_Y
+    strip = 0.0
+    xa, xb = LINK_CLIMB
+    if x >= xb:
+        return strip
+    if x <= xa:
+        return yard
+    L, V = xb - xa, LINK_VCURVE
+    g = (strip - yard) / (L - V)
+    d = x - xa
+    return (yard + g * d * d / (2.0 * V) if d <= V else
+            strip - g * (L - d) ** 2 / (2.0 * V) if d >= L - V else yard + g * (d - V / 2.0))
+
+
+#: the link's climb in plan, Godot (x, z), for the LAND stage (island_reshape lays its ramp through the strip's retaining
+#: wall): LINK["plan"] west of LINK_CLIMB's end plus the yard end on the south leg's line (z 794.45, measured on the S15
+#: dry layouts: J z 769.5 + YARD_MOUTH + r_in - YARD_SHIFT)
+LINK_YARD_LINE_Z = 794.45
+
+
+def link_corridor():
+    """[(x, z)] Godot: the link's centreline across its climb, yard end first."""
+    pts = [(560.0, LINK_YARD_LINE_Z)] + sorted((p for p in LINK["plan"] if p[0] <= LINK_CLIMB[1] + 10.0))
+    return pts
 
 
 def ichiba_loop(net, ramp, ground):
-    """The yard's T at the east end of the quay street and the one-way rectangle off it (YARD_LOOP)."""
+    """J at the ramp's foot (a plain 3-arm T), the one-way ring as two roads J -> K (YARD_LOOP: the south half by its
+    name, the north half + "_in"; authored clockwise, driven counter-clockwise), K at the ring's east end, and the
+    through link east from K (LINK), which `main` joins end to end with kanransha_michi once that exists."""
     _rows, J = _ramp_geometry(ground)
     z = RS_yard_z() - rg.NET_Y
-    pts = yard_loop(J)
-    r = chain_road(net, YARD_LOOP["name"], [(x, y, z) for x, y in pts], preset=None)
-    r.road_class = "street"
-    r.ped_access = True
-    r.median_style = pm.MED_NONE
-    for f, v in YARD_SECTION.items():
-        setattr(r.base, f, v)
-    for u in r.points:
-        net.points[u].lanes_fwd, net.points[u].lanes_bwd = 2, 0
-    make_junction(net, [ramp.points[-1], r.points[0], r.points[-1]], signal=False)
-    for u in r.points:
+    halves = []
+    for name, part in ((YARD_LOOP["name"] + "_in", yard_ring_in(J)), (YARD_LOOP["name"], yard_ring_out(J))):
+        r = chain_road(net, name, [(x, y, z) for x, y, _t in part], preset=None)
+        r.road_class = "street"
+        r.ped_access = True
+        r.median_style = pm.MED_NONE
+        for f, v in YARD_SECTION.items():
+            setattr(r.base, f, v)
+        for u, q in zip(r.points, part):
+            net.points[u].lanes_fwd, net.points[u].lanes_bwd = 2, 0
+            rg.freeze(net, u, q[2])
+        halves.append(r)
+    ring_in, ring_out = halves
+    rows = link_rows(J)
+    link = chain_road(net, LINK["name"], [q[:3] for q in rows], preset="block")
+    link.road_class = "street"
+    for f, v in LINK_SECTION.items():
+        setattr(link.base, f, v)
+    for u, q in zip(link.points, rows):
+        net.points[u].lanes_fwd, net.points[u].lanes_bwd = 1, 1
+        if q[3] is not None:
+            rg.freeze(net, u, q[3])
+    for u in (ramp.points[-1], ring_in.points[0]):                      # the exit's two mouths (YARD_EXIT_MOUTH)
+        net.points[u].setback_locked = True
+    for u in (ring_in.points[-1], link.points[-1]):                     # K: the link's right turn in (LINK_K_MOUTH)
+        net.points[u].setback_locked = True
+    make_junction(net, [ramp.points[-1], ring_in.points[0], ring_out.points[-1]], signal=False)          # J
+    make_junction(net, [ring_out.points[0], ring_in.points[-1], link.points[-1]], signal=False)         # K
+    for u in ring_in.points + ring_out.points:
         q = net.points[u]
         q.ground_z, q.has_ground_z = z, True
-    return r
+    for u, q in zip(link.points, rows):
+        p = net.points[u]
+        p.ground_z, p.has_ground_z = q[2], True
+    return ring_out
+
+
+def ichiba_joint(net):
+    """kanransha_michi's end hands over to the through link's start (a joint: two stations, one place)."""
+    a = net.roads.get("kanransha_michi")
+    b = next((r for n, r in net.roads.items() if n == LINK["name"] or n.startswith(LINK["name"] + "__")
+              if math.hypot(net.points[r.points[0]].pos[0] - LINK["joint"][0],
+                            net.points[r.points[0]].pos[1] + LINK["joint"][1]) < 0.5), None)
+    if a is None or b is None:
+        raise SystemExit("island_site_access: the fish market's link and kanransha_michi do not meet")
+    if not net.points[a.points[-1]].has_link(b.points[0]):
+        net.link(a.points[-1], b.points[0])
 
 
 STATIONS = {"ichiba": ichiba_stations}
@@ -303,7 +496,8 @@ def authored_roads():
     """The access roads whose stations AND heights are authored (`stations`): `island_dike.ramps` sets only their mouth
     on the pad and `island_grades smooth` holds every station (an 80 m moving average flattens a level bend and a 20 m
     vertical curve alike)."""
-    return {a["name"] for a in ACCESS if a.get("stations")} | {YARD_LOOP["name"]}
+    return ({a["name"] for a in ACCESS if a.get("stations")} | {YARD_LOOP["name"], YARD_LOOP["name"] + "_in"}
+            | {LINK["name"], LINK["name"] + "__x1"})                    # the link, cut by its visitor lot's T
 
 
 REUSE_M = 15.0                  # a junction whose centre is this close to `at` is joined, not cut beside
@@ -553,6 +747,9 @@ def main(argv):
         return 0
     ground = rg.Ground()
     for a in missing:
+        if a.get("from_road") is None:                                  # off the fish market's link (see ACCESS)
+            ichiba_joint(net)
+            a = dict(a, from_road=LINK["name"])
         road, members = add(net, a, ground)
         p0, p1 = net.points[road.points[0]].pos, net.points[road.points[-1]].pos
         print("island_site_access: %s -> %s: %d stations from (%.0f, %.0f) to (%.0f, %.0f), a %d-arm junction"

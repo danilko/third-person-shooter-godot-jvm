@@ -380,7 +380,10 @@ RESERVES = (
     # their own (island_site_access), and library_civic.fish_market lays the piece out round them.
     # (S13, 2026-10-13: the quay moved south to z 808 for the yard's lane loop, island_reshape.MARKET_QUAY; the west
     # edge to x 290, the coast road's embankment, where the public car park and the 物揚場 are)
-    ("fish_market", (290.0, 712.0, 610.0, 808.0)),
+    # (S15, 2026-10-14: the quay to z 842 / 848, island_reshape.MARKET_QUAY_S, the moved Wangan south of it; the
+    # VISITORS' strip east of the yard -- 直売所 + 食堂 and their lot north of the through link -- held too)
+    ("fish_market", (290.0, 712.0, 610.0, 848.0)),
+    ("fish_market_visitors", (725.0, 715.0, 890.0, 766.0)),
     # the airport's AIRSIDE (user, 2026-09-29: the runway "on a different side from the bridge"): behind the terminal,
     # the apron against its airside face (boarding bridges to z 1811.6), then the taxiway and the 540 x 45 m runway
     # along the island's SOUTH edge (the island reaches z 2040 for it, island_reshape AIRPORT_SOUTH). It stood between
