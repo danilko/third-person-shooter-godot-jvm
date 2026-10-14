@@ -22,7 +22,7 @@ This project is based on:
 * **Input-Driven Character Architecture:** `Character` (base) → `Player` / `AICharacter`. Each body delegates its "brain" to a `Controller` (`PlayerController` for keyboard/mouse, `AIController` for the FSM) via the `Controllable` interface. All state transitions go through a `UserCommand` snapshot, making human input, AI, and network input (`NetworkController`) interchangeable.
 * **Movement Mechanics:**
 	* **Run by default**; hold (or toggle) **Shift** to *walk* — slower and quieter ("walk to stay quiet"), scaffolding for a future stealth/awareness system (the WALK state carries a low `noiseLevel`).
-	* Single **ground jump** plus CS/Source-style **air strafe** (mid-air acceleration / speed cap) — replicates cleanly under ownership-based network authority.
+	* Single **ground jump** plus **air strafe** (mid-air acceleration / speed cap) — replicates cleanly under ownership-based network authority.
 	* **Crouch / Crawl** stances, each with its own speed, camera height, and accuracy modifier; **Crawl-to-Shoot** supported (experimental animation).
 * **Combat & Ballistics:**
 	* Arcade-style shooting: recoil-only challenge by default; optional bloom accumulation and movement/stance spread modifiers for each weapon.
@@ -67,7 +67,7 @@ This project is based on:
 	* `GameManager` AutoLoad singleton (PLAYING / PAUSED / GAME_OVER).
 	* `AmmoRefill` station that replenishes all weapons on contact.
 * **Front End & Settings:** a title screen (Continue / New game / Host co-op / Join co-op / Settings), a full-screen pause menu (status, missions, controls, display, game), graphics presets with fairness floors, key and controller rebinding, and a loading screen that warms up the world before play.
-* **Gamepad:** one binding table for Xbox / Steam Deck layouts, analog walk, a look rate with turn boost, pad-only aim assist, triggers as analog pedals in a car, and button glyphs in prompts.
+* **Gamepad:** one binding table for standard twin-stick controllers, analog walk, a look rate with turn boost, pad-only aim assist, triggers as analog pedals in a car, and button glyphs in prompts.
 * **Missions & Campaign:** typed Java missions (`game.activity`) on a campaign graph of flags, requirements and effects (checked by a lint), offered in the world and started with `E`; story beats via `MissionDirector`; street races via `RaceDirector`.
 * **Wanted Level & Enforcement:** crimes raise a wanted level; police and gangs are dispatched to you, search when they lose you, and an arrest, hospital stay or abduction each has its own outcome and fee.
 * **Profile, Economy & Save:** money, purchases at konbini (every konbini sells weapons), a garage at the safe house, and a versioned save with migrations.
@@ -463,9 +463,9 @@ not legal advice.
 The generated models are sized from **Japanese practice and measurements**, as numbers written into the tools.
 Nothing is copied from another model or scraped from a website. Examples:
 
-- **Trains**: the published envelope of a 20 m, four-door, 1067 mm-gauge commuter car (the JR E231/E233 class sizes:
-  body width, floor and platform heights, door pitch). No line's livery, logo or name is used.
-- **Roads**: keep-left driving, lane widths and grades in the spirit of the Japanese Road Structure Ordinance
+- **Trains**: the published envelope of a typical 20 m, four-door, 1067 mm-gauge Japanese commuter car
+  (body width, floor and platform heights, door pitch). No line's livery, logo or name is used.
+- **Roads**: lane widths and grades in the spirit of the Japanese Road Structure Ordinance
   (道路構造令), signal and sign placement, and expressway ramp design speeds.
 - **Buildings and blocks**: real-world proportions measured locally from **Project PLATEAU** open city data
   (MLIT, CC BY 4.0). Only the resulting numbers enter the repository, such as typical konbini, station and house
@@ -498,6 +498,15 @@ also records what was REMOVED because its provenance could not be confirmed.
 - **`CLAUDE.md`** is the running technical record Claude keeps for itself and for future sessions: every design
   decision, measurement and trap, with the reason for it.
 
+### Originality
+
+This is **not** a clean-room implementation: it began from two openly licensed projects (see Credits), and its
+design was discussed with reference to well-known games in the genre. What it does guarantee: no code, art, audio,
+names or data were copied, decompiled or extracted from any commercial game; gameplay follows common genre
+conventions, implemented from scratch; every third-party file is listed with its licence in
+[CREDITS.md](CREDITS.md) and audited in `assets/LICENCE_AUDIT.md`. AI-generated code can, rarely, resemble public
+code it was trained on; contributions are reviewed, and a suspected match should be reported as an issue.
+
 ---
 
 ## 📚 Credits & Assets
@@ -517,6 +526,10 @@ Captured 2026-10-14 from the current build (Godot 4.7.2, 1920×1080, software re
 |:---:|:---:|
 | ![Aiming a rifle on foot](images/play_aim.jpg) | ![A city street beside the expressway](images/city_street.jpg) |
 | On foot, aiming a rifle (ASR-1) | A street with lane markings and speed limits beside the expressway |
+| ![A gunfight with a gang](images/fight_gang.jpg) | ![Police response at five stars](images/fight_police.jpg) |
+| A gunfight with a gang: gang stars on the HUD, the red edge marks hits taken | Five wanted stars: police officers on foot and a helicopter overhead |
+| ![The elevated expressway](images/expressway.jpg) | ![An expressway curve beside the rail](images/expressway_curve.jpg) |
+| The elevated expressway with traffic and guide signs | An expressway curve beside the rail line, over the city |
 | ![The island from the air](images/island_overview.jpg) | ![The hospital and its block](images/hospital.jpg) |
 | The island from the air: city, rail, expressway and the mountain | The hospital block, its car park and an elevated road |
 | ![A street at night](images/night.jpg) | ![A shopping arcade](images/shopping_arcade.jpg) |
