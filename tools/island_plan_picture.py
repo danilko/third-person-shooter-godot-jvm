@@ -74,10 +74,12 @@ def main(argv):
     ap.add_argument("--record", default=os.path.join(ROOT, "assets/world_source/pieces/IslandRoads.roads.json"),
                     help="the road record to draw (a scratch derive, say)")
     ap.add_argument("--no-rail", action="store_true", help="leave the rail reserve off")
+    ap.add_argument("--grid", default=os.path.join(ROOT, "assets/world_source/terrain/island_natural.f32"),
+                    help="the land height grid to draw (a dry run's scratch grid)")
     ap.add_argument("--crop", default=None, help="x0,y0,x1,y1 record-frame window to cut the picture to")
     ap.add_argument("--title", default="ISLAND PLAN (derived) -- tools/island_plan_picture.py")
     a = ap.parse_args(argv)
-    H = np.fromfile(os.path.join(ROOT, "assets/world_source/terrain/island_natural.f32"), "<f4").reshape(N, N)
+    H = np.fromfile(a.grid, "<f4").reshape(N, N)
     W, Hh = int((X1 - X0) * S), int((Y1 - Y0) * S)
     xs = X0 + (np.arange(W) + 0.5) / S
     ys = Y1 - (np.arange(Hh) + 0.5) / S

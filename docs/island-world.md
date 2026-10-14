@@ -16,6 +16,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - The rebuild review batch: port entrance, signal controllers, the waterfront re-plan, services coverage (2026-10-03)
 - The fish market: a straight quay, a car park at the dike's height, the crest carried across junction pads (PLAN S11 P12, 2026-10-13)
 - The fish market rebuilt for cars: quay 1.5 m and z 808, a 物揚場, the yard's street and rectangle, real stairs (PLAN S13, 2026-10-13)
+- No beach is a trap: the coast-walk gate, the suburb's one outline, the Wangan terminal's beach (S15, 2026-10-14)
 
 ---
 
@@ -1541,3 +1542,42 @@ on its viaduct (deck y 14.3) with one pier 2.7 m inside the plot, on the lawn, 2
 Pictures: `docs/previews/market_s13_plan.png` (the derived record, `tools/scratch/market_p12/built_s13.py`) and
 `market_s13_{overview,stairs,ramp,ferris}.jpg`. NOT DONE: nobody has driven, walked or swum it by hand (PLAY IT);
 the nightly sweep and `perf_gate.sh`.
+
+## No beach is a trap: the coast-walk gate, the suburb's one outline, the Wangan terminal's beach (S15, 2026-10-14)
+
+User (verbatim): "some of land outside of dike (beside harbor area, once in beach, cannot climb more out, and result need
+to go all due to steep clif like surbub, but should be slope beach out side of dike)", and on the suburb fill east of the
+fish market: "square is okay, but probably just not uniform square shape ... for some portion beside dike have more
+slope so user can walk out like real beach"; on the Wangan's west terminal: "similar thing to [the] sw exway loop so the
+island shape is more island like".
+
+**The gate, `tools/island_coast_walk.py` (13 s, run by `island_world.sh`'s natural stage with `--max 0`).** It floods
+walkable ground -- under 40 deg across a 2 m cell (the body's floor_max_angle is 45) -- from the city plain and the
+airport island over `island_natural.f32`, with every road of the record that stands within 4 m of the ground laid in at
+its own height (the stamp puts it there; without roads, ~800 m of beach under `kaigan_dori`'s cliff read as trapped). An
+EXIT is land <= 1.0 m beside water, where a swimmer stands up. An exit the flood does not reach is a TRAP. Pockets in the
+massif's `cliff` coast zone are listed as stair sites, not failed: a 45 deg natural cliff cannot take a bank. `--walls N`
+lists shore with no exit at all (quays, fills' vertical faces) by coast zone; `--picture` draws both.
+Measured on HEAD's land (2026-10-14): 3 trap pockets -- the east coast beside the bridge (450 m: the RESORT_WALL trim left
+the old shore at 0.4 m in front of a plain the raise lifted to 5.6, a vertical step), the airport's north beach (sand,
+a 5.4 m bench, the 13.6 m platform: two steps) and the suburb's SE corner (the beach's 1:1 end) -- plus 4 cliff coves
+(5-13, 5-6, 5-12 x2).
+
+**The fixes, all in `island_reshape.py` (the land stage):**
+* `walk_banks`: a fill-only 1:SHORE_BANK bank on the LOW side of every non-walkable step, inside `WALK_BANK_BOXES` only,
+  each box with the highest ground it may raise (the airport's climbs its bench). An island-wide pass was tried first:
+  it raised low cells on the massif's natural 45 deg coast above the land between them (dips; the mountain-coast gate
+  read 1.09) and laid sand past the airport's quay end. A new trap gets its own box.
+* The suburb fill is ONE outline: `SUBURB_FILL` x0 880 -> 740 (the waterfront park's plain stood west of it as a stub with
+  the beach bending under it) and `SUBURB_SHELF` x1 1180 -> 1228 (the south beach runs to the bridge's corridor, which
+  is measured along x 1250 +- 15 and stays clear); the beach's east end falls 1:2 above the water (walkable) and 1:1
+  below; the beach laps the new west edge `SUBURB_WEST_REACH` (140 m) into the inlet.
+* The Wangan's west terminal platform: its seaward (SW) corner rounded R 30 and a 1:3 bank + 1:12 beach to -2 m on its
+  west and south sides (`TERMINAL_*`; 1:12, not the suburb's 1:25: 75 m of water to the military pier's berth). Its east
+  side stays the military channel's quay.
+Result on a scratch build (land gate PASS, max land step 7.5 m): 0 trap pockets, the 4 cliff coves unchanged.
+
+Traps: `island_reshape.py build` rewrites `assets/world_source/island_dike.json` even with `--out`, and so does
+`island_dike.py sculpt`: `git checkout` it after a scratch build, and never build land while a dry layout runs (the
+layout cache keys on that file). The committed `island_natural.f32` of 2026-10-13 was built from an older road record
+than the committed one: compare a scratch grid with a scratch grid built from the committed land, not with it.

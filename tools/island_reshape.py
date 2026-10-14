@@ -77,8 +77,16 @@ GULF_FILL = (300.0, 280.0, 900.0, 760.0)          # x0, z0, x1, z1: the gulf HEA
 #: sea in front laid as a shelving shore from the new coast (the old seabed there is 25 m deep and would leave a
 #: vertical face instead of a beach). Its east face stays a revetment (DIKE_NOT_BOXES): the bridge's crossing is
 #: measured along x 1250 on this grid and must not move.
-SUBURB_FILL = (880.0, 760.0, 1230.0, 1170.0)
-SUBURB_SHELF = (860.0, 1170.0, 1180.0, 1700.0)
+#: S15 (user, 2026-10-14: "square is okay, but probably just not uniform square shape ... for some portion beside dike
+#: have more slope so user can walk out like real beach", with a drawing): ONE uniform outline. The fill's west edge
+#: runs straight down at x 740 (it was 880: the waterfront park's plain stood out west of it as a stub, with the beach
+#: bending round under it), and the south beach runs east to the bridge's corridor (SUBURB_SHELF x1 1180 -> 1228;
+#: the bridge measures its crossing along x 1250 +- 15 m, which the 1:1 fall past x1 keeps clear). The beach also laps
+#: the new west edge into the inlet, as far as SUBURB_WEST_REACH.
+SUBURB_FILL = (740.0, 760.0, 1230.0, 1170.0)
+SUBURB_SHELF = (720.0, 1170.0, 1228.0, 1700.0)     # x1: the 1:2 end reaches the water ~6 m further east (x ~1234)
+SUBURB_WEST_REACH = 140.0                          # m of beach west of the fill into the inlet (the fish market's basin
+                                                   # stays deep west of x ~600)
 HARBOUR_TRIM = (-820.0, 300.0)                    # x range of the harbour peninsula...
 HARBOUR_TRIM_Z = 1492.0                           # ...trimmed south of this (1540 until 2026-09-29 night: the
                                                   # military area and the container terminal now share ONE straight
@@ -315,8 +323,11 @@ def reshape(base):
     plain = FLOOR_Z + RAISE
     bank = (plain - BEACH_TOP) * SHORE_BANK
     p = np.where(d < bank, plain - d / SHORE_BANK, BEACH_TOP - (d - bank) / BEACH)
-    p = p - np.maximum(xx - SUBURB_SHELF[2], 0.0)        # the beach's east end falls 1:1 to the seabed (the revetment)
-    zone = (d > 0.0) & (xx <= SUBURB_SHELF[2] + 40.0) & (zz >= z0) & (xx >= x0 - 400.0) & (zz <= z1 + 500.0)
+    # the beach's east end falls to the seabed (the revetment): 1:2 while it is still above the water (a walkable 26 deg:
+    # at 1:1 its last metres were a strip no swimmer could walk off -- island_coast_walk's pocket at 19-19), 1:1 below
+    e = np.maximum(xx - SUBURB_SHELF[2], 0.0)
+    p = np.where(p - 0.5 * e > 0.0, p - 0.5 * e, np.minimum(p - e, 0.0))
+    zone = (d > 0.0) & (xx <= SUBURB_SHELF[2] + 40.0) & (zz >= z0) & (xx >= x0 - SUBURB_WEST_REACH) & (zz <= z1 + 500.0)
     out = np.where(zone, np.maximum(out, p), out)
     land = land | (zone & (out > LAND_Z))
     # THE MILITARY BASE's two finger piers and its air base strip (PLAN.md 3.30 L3, user 2026-09-26), at the
@@ -326,8 +337,26 @@ def reshape(base):
     # THE WANGAN'S WEST TERMINAL (NEXT PASS step 2, 2026-10-02): a reclaimed platform at the plain's height under its
     # junction and turnaround loop, quay edges into the bay; land already higher (the dike) is left as it is
     x0, x1, z0, z1 = WANGAN_TERMINAL_FILL
-    tbox = (xx >= x0) & (xx <= x1) & (zz >= z0) & (zz <= z1)
+    # S15 (user, 2026-10-14: "similar thing to [the] sw exway loop so the island shape is more island like ... slope
+    # (outside of dike) so can work as beach"): the platform's SEAWARD corner is rounded (TERMINAL_ROUND) and its west and
+    # south sides are a beach -- a 1:SHORE_BANK bank to BEACH_TOP, then 1:TERMINAL_BEACH sand to the water and on to
+    # TERMINAL_SHELF -- not a quay face into 24 m of water. Its east side stays a quay (the military harbour's channel).
+    r = TERMINAL_ROUND
+    corner = (xx < x0 + r) & (zz > z1 - r)                              # the rounded quadrant
+    sdf = np.where(corner, np.hypot(xx - (x0 + r), zz - (z1 - r)) - r,
+                   np.hypot(np.maximum(x0 - xx, 0.0) + np.maximum(xx - x1, 0.0),
+                            np.maximum(z0 - zz, 0.0) + np.maximum(zz - z1, 0.0)))
+    sdf = np.where(~corner & (xx >= x0) & (xx <= x1) & (zz >= z0) & (zz <= z1), -1.0, sdf)
+    tbox = sdf <= 0.0
     out = np.where(tbox, np.maximum(out, FLOOR_Z + RAISE), out)
+    plain = FLOOR_Z + RAISE
+    bank = (plain - BEACH_TOP) * SHORE_BANK
+    sand = bank + (BEACH_TOP - TERMINAL_SHELF) * TERMINAL_BEACH        # where the sand meets TERMINAL_SHELF
+    tb = np.where(sdf < bank, plain - sdf / SHORE_BANK,
+                  np.where(sdf < sand, BEACH_TOP - (sdf - bank) / TERMINAL_BEACH, TERMINAL_SHELF - (sdf - sand)))
+    tzone = (sdf > 0.0) & (xx <= x1) & (zz >= z0) & (sdf < TERMINAL_REACH)
+    out = np.where(tzone, np.maximum(out, tb), out)
+    land = land | tbox | (tzone & (out > LAND_Z))
     # THE FISH MARKET: its quay line, the west inlet slot, and the low yard (MARKET_QUAY / MARKET_WEDGE / MARKET_YARD)
     sea_was = open_sea(~(out > LAND_Z))
     for x0, x1, z0, z1 in (MARKET_QUAY, MARKET_WEDGE):
@@ -374,8 +403,82 @@ def reshape(base):
             if out[ref, c] > LAND_Z:
                 out[srows, c] = v
                 land[srows, c] = True
-    edits = {"fill": fill, "trim": trim | mcut, "dike": dike, "works": works, "market": reclaimed}
+    out, banks = walk_banks(out, xx, zz)
+    land = land | (banks & (out > LAND_Z))
+    edits = {"fill": fill, "trim": trim | mcut, "dike": dike, "works": works, "market": reclaimed, "banks": banks}
     return out.astype(np.float32), land, edits
+
+
+#: NO BEACH IS A TRAP (S15, user 2026-10-14, verbatim: "some of land outside of dike (beside harbor area, once in beach,
+#: cannot climb more out, and result need to go all due to steep clif like surbub, but should be slope beach out side of
+#: dike"). Measured by tools/island_coast_walk.py: where the raise lifted a coast to the plain and left the old shore in
+#: front at its own height (the east coast beside the bridge: 5.6 m straight down to sand at 0.4, 450 m long; the airport's
+#: north beach; the suburb's corner), the sand is reachable from the sea and nothing else. Every such STEP -- land
+#: standing more than a walkable slope over a low cell beside it -- gets a 1:SHORE_BANK bank laid on the LOW side (fill
+#: only: the plain, its roads and lots never move), within COAST_BAND of the sea, on cells no higher than BEACH_TOP +
+#: 0.5 and no deeper than BANK_FLOOR. A working edge keeps its wall: the port zones (WALK_BANK_KEEP), the fish market's
+#: boxes, and the massif's natural cliff coast.
+WALK_STEP = 2.0 * math.tan(math.radians(40.0))     # a step steeper than 40 deg over one 2 m cell (island_coast_walk)
+BANK_FLOOR = -3.0
+WALK_BANK_KEEP = ("industrial_harbour", "military_harbour", "gulf", "fishing_port", "cliff")
+#: ...laid only inside these boxes (Godot x0, x1, z0, z1), each a trap island_coast_walk measured on 2026-10-14: an
+#: island-wide pass also raised low cells on the massif's natural 45 deg coast above the land between (a dip, and the
+#: mountain coast's slope gate at 1.09), and laid sand past the airport's quay end. A new trap gets its box here.
+#: The last number is the highest ground the bank may raise there: the airport's north shore is a TERRACE (sand 0.4, a
+#: 10 m bench at 5.4, the platform at 13.6), so its bank climbs over the bench too.
+WALK_BANK_BOXES = (
+    (1240.0, 1460.0, 380.0, 900.0, 3.5),                # the east coast beside the bridge: plain 5.6 m down to sand 0.4
+    (700.0, 1500.0, 1330.0, 1460.0, 6.0),               # the airport island's north beach and its bench
+)
+
+
+def walk_banks(out, xx, zz):
+    zones = json.load(open(os.path.join(ROOT, "assets", "world_source", "island_coast.json")))["zones"]
+    keep = np.zeros(out.shape, bool)
+    for kind in WALK_BANK_KEEP:
+        for x0, x1, z0, z1 in zones.get(kind, ()):
+            keep |= (xx >= x0) & (xx <= x1) & (zz >= z0) & (zz <= z1)
+    for x0, x1, z0, z1 in (MARKET_QUAY, MARKET_WEDGE, MARKET_YARD, MARKET_LANDING):
+        keep |= (xx >= x0 - 20.0) & (xx <= x1 + 20.0) & (zz >= z0 - 20.0) & (zz <= z1 + 20.0)
+    # the Wangan terminal sits inside the military harbour's box but is no harbour: its west and south beach are its own
+    x0, x1, z0, z1 = WANGAN_TERMINAL_FILL
+    keep &= ~((xx >= x0 - TERMINAL_REACH) & (xx <= x1) & (zz >= z0) & (zz <= z1 + TERMINAL_REACH))
+    sea = ~(out > LAND_Z)
+    near = distance_from(open_sea(sea), COAST_BAND + 4.0) <= COAST_BAND
+    inbox = np.zeros(out.shape, bool)
+    top = np.full(out.shape, -np.inf)
+    for x0, x1, z0, z1, hi in WALK_BANK_BOXES:
+        b = (xx >= x0) & (xx <= x1) & (zz >= z0) & (zz <= z1)
+        inbox |= b
+        top = np.where(b, np.maximum(top, hi), top)
+    keep |= ~inbox
+    keep |= xx > AIRPORT_END_X - 2.0                                   # the airport's quay end stays a quay
+    low = (out <= top) & (out > BANK_FLOOR) & near & ~keep
+    # the seeds: high cells standing a non-walkable step over a low neighbour
+    p = np.pad(out, 1, mode="edge")
+    nb_min = np.minimum.reduce([p[:-2, 1:-1], p[2:, 1:-1], p[1:-1, :-2], p[1:-1, 2:]])
+    seed = (out - nb_min > WALK_STEP) & near & ~keep
+    if not seed.any():
+        return out, np.zeros(out.shape, bool)
+    env = np.where(seed, out, -np.inf)
+    reach = (out.max() - BANK_FLOOR) * SHORE_BANK
+    j, i = np.nonzero(seed)
+    j0, j1 = max(0, j.min() - int(reach / STEP)), min(N, j.max() + int(reach / STEP) + 1)
+    i0, i1 = max(0, i.min() - int(reach / STEP)), min(N, i.max() + int(reach / STEP) + 1)
+    sub = env[j0:j1, i0:i1]
+    w = low[j0:j1, i0:i1]
+    c1, c2 = STEP / SHORE_BANK, STEP * math.sqrt(2.0) / SHORE_BANK
+    for _ in range(int(reach / STEP) + 2):
+        q = np.pad(sub, 1, mode="constant", constant_values=-np.inf)
+        m = np.maximum.reduce([q[:-2, 1:-1] - c1, q[2:, 1:-1] - c1, q[1:-1, :-2] - c1, q[1:-1, 2:] - c1,
+                               q[:-2, :-2] - c2, q[:-2, 2:] - c2, q[2:, :-2] - c2, q[2:, 2:] - c2])
+        new = np.where(w, np.maximum(sub, m), sub)
+        if np.array_equal(new, sub):
+            break
+        sub = new
+    env[j0:j1, i0:i1] = sub
+    raised = low & np.isfinite(env) & (env > out)
+    return np.where(raised, env, out), raised
 
 
 #: The base's finger piers (Godot x0, x1, z0, z1): 50 m wide, reaching 260 m WEST of the platform's west edge
@@ -399,6 +502,11 @@ MILITARY_PIER_Z = 4.6
 #: (out to x -985, z 1210, island_plan.WG_LOOP_*) + a 15 m verge, north to the old shore so no water pocket is left
 #: between it and the dike; 75 m of water stays between it and the military pier (z 1300)
 WANGAN_TERMINAL_FILL = (-1000.0, -820.0, 1040.0, 1225.0)
+TERMINAL_ROUND = 30.0          # the platform's south-west corner (the loop's own corner, R 38, stands ~14 m inside it)
+TERMINAL_BEACH = 12.0          # the sand, horizontal per vertical: steeper than the suburb's 1:25 -- 75 m of water to
+                               # the military pier's berth (z 1300) is all the room there is
+TERMINAL_SHELF = -2.0          # the sand runs to this depth, then 1:1 down to the seabed
+TERMINAL_REACH = 70.0          # m from the platform the beach may lay fill (the pier's berth stays deep)
 #: THE FISH MARKET's QUAY IS ONE STRAIGHT SHORE (PLAN S11 P12-9 / P12-11, user 2026-10-13: "extend the land south ... so
 #: the entire fish portion aligns"; the planner: an 埋立法線 is drawn straight corner to corner). Godot x0, x1, z0, z1:
 #: the plain's height from the old shore (z ~762) out to z 780, from the west wedge (a -24 m inlet at x 285..302 beside

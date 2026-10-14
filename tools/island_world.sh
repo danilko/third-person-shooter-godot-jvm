@@ -101,6 +101,9 @@ if want natural; then
     # with the raise); island_coast.py shelf judged "beach land under 3 m", which the raised plain no longer has
     # the ring road's dike embankment and the ramps onto it (island_dike.py); writes its cells into island_dike.json
     python3 tools/island_dike.py sculpt "$TMP/sculpted.f32" "$P/IslandRoads.roads.json" "$T/island_natural.f32"
+    # NO BEACH IS A TRAP (S15): every shore a swimmer can wade onto walks back to town (roads included); the massif's
+    # cliff coves are listed as stair sites, not failed
+    python3 tools/island_coast_walk.py --max 0 | grep -E "^island_coast_walk|pocket|cove"
 fi
 if want terrain; then
     stage terrain
