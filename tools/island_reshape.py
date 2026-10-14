@@ -328,6 +328,19 @@ def reshape(base):
     x0, x1, z0, z1 = WANGAN_TERMINAL_FILL
     tbox = (xx >= x0) & (xx <= x1) & (zz >= z0) & (zz <= z1)
     out = np.where(tbox, np.maximum(out, FLOOR_Z + RAISE), out)
+    # THE FISH MARKET: its quay line, the west inlet slot, and the low yard (MARKET_QUAY / MARKET_WEDGE / MARKET_YARD)
+    sea_was = open_sea(~(out > LAND_Z))
+    for x0, x1, z0, z1 in (MARKET_QUAY, MARKET_WEDGE):
+        mbox = (xx >= x0) & (xx <= x1) & (zz >= z0) & (zz <= z1)
+        out = np.where(mbox, np.maximum(out, FLOOR_Z + RAISE), out)
+        land = land | mbox
+    # every cell that WAS open sea and is not now: the filled ones, and the slot's blind end north of the wedge (under
+    # and behind the dike's crest), which the fill cut off from the bay
+    reclaimed = sea_was & ~open_sea(~(out > LAND_Z)) & (xx >= 200.0) & (xx <= 760.0) & (zz >= 560.0) & (zz <= 820.0)
+    # ...and the yard itself stands LOW, a fishing port's quay height (MARKET_YARD): set, not filled
+    x0, x1, z0, z1 = MARKET_YARD
+    mbox = (xx >= x0) & (xx <= x1) & (zz >= z0) & (zz <= z1)
+    out = np.where(mbox, MARKET_YARD_Z, out)
     # THE AIRPORT ISLAND REACHES 60 m FURTHER SOUTH (user, 2026-09-29: "the airport's runway/island may need to extend,
     # or change side -- the runway may hit the bridge"): the runway moved to the island's SOUTH edge, behind the terminal,
     # away from the bridge, and at the old coast (z 1980) its paved strip stood 4 m from the water. A reclaimed strip at
@@ -358,7 +371,7 @@ def reshape(base):
             if out[ref, c] > LAND_Z:
                 out[srows, c] = v
                 land[srows, c] = True
-    edits = {"fill": fill, "trim": trim | mcut, "dike": dike, "works": works}
+    edits = {"fill": fill, "trim": trim | mcut, "dike": dike, "works": works, "market": reclaimed}
     return out.astype(np.float32), land, edits
 
 
@@ -383,6 +396,28 @@ MILITARY_PIER_Z = 4.6
 #: (out to x -985, z 1210, island_plan.WG_LOOP_*) + a 15 m verge, north to the old shore so no water pocket is left
 #: between it and the dike; 75 m of water stays between it and the military pier (z 1300)
 WANGAN_TERMINAL_FILL = (-1000.0, -820.0, 1040.0, 1225.0)
+#: THE FISH MARKET's QUAY IS ONE STRAIGHT SHORE (PLAN S11 P12-9 / P12-11, user 2026-10-13: "extend the land south ... so
+#: the entire fish portion aligns"; the planner: an 埋立法線 is drawn straight corner to corner). Godot x0, x1, z0, z1:
+#: the plain's height from the old shore (z ~762) out to z 780, from the west wedge (a -24 m inlet at x 285..302 beside
+#: the coast road's corner) to the east bank (land again at x ~720). x 262..610 is the market's quay; x 610..720 a plain
+#: vertical sea wall under the Wangan's viaduct (no buildings; its piers stand on this land). Fill, over a seabed of
+#: -4 (east) to -24 m (west): the edge is a quay wall into deep water, like the harbour's.
+MARKET_QUAY = (262.0, 720.0, 730.0, 780.0)
+#: the WEST WEDGE: a slot of water along x 280..300 (a leftover of GULF_FILL's x0 = 300): -24 m and 20 m wide at the
+#: shore, narrowing north to a 2 m ditch that ran on UNDER the dike road to z 590 behind it. The quay box takes it from
+#: z 730; this takes all the rest. (Filled only to the crest's edge at first: the corner's new arc then left the slot's
+#: far end outside the crest strip, and `island_dike.sculpt` fills no sea cell beside the crest -- a 17 m hole at the
+#: dike's land-side toe, (298, 652..660).)
+MARKET_WEDGE = (276.0, 303.0, 584.0, 730.0)
+#: THE YARD IS A FISHING PORT'S HEIGHT: 2 m OVER THE WATER (user, 2026-10-13 late: "the boat quay should be same level as
+#: the pontoon in most images ... go down, about 2 m above the water"). It stood on the island's raised plain, 5.6 m up,
+#: which no boat lands a catch at. Godot x0, x1, z0, z1: from the dike's sea face (the dike's own sculpt lays its 1:2
+#: face down to this ground, toe at z ~718) to the quay, x 262..610. The strip under the viaduct east of x 610 keeps the
+#: plain's height behind a retaining wall (library_civic.fish_market). 2.0 is land (LAND_Z 0.35) and above the one
+#: world water box (y 0). The crest-level car-park terrace of the first build is gone: the truck ramp now falls 10 m
+#: and needs its ground.
+MARKET_YARD = (262.0, 608.0, 700.0, 780.0)    # x1 = 608: the 2 m cell slope up to the strip lies UNDER the wall (607.8..610)
+MARKET_YARD_Z = 2.0
 #: the airport island's south extension (Godot x0, x1, z0, z1): the strip south of the old coast (z ~1980) to z1, over
 #: the island's own width there (x0..x1 only bound the search). See `reshape`.
 AIRPORT_SOUTH = (700.0, AIRPORT_END_X, 1980.0, 2040.0)
@@ -438,6 +473,20 @@ DIKE_NOT_BOXES = ((230.0, 300.0, 380.0, 820.0), (1185.0, 1400.0, 880.0, 1500.0))
 DIKE_JSON = os.path.join(ROOT, "assets", "world_source", "island_dike.json")
 DIKE_SHELF_Z = -3.0      # open sea shallower than this beside the land is a shelving shore (a quay drops to -24 m)
 DIKE_NOT_ZONES = ("industrial_harbour", "gulf", "military_harbour", "airport_island", "fishing_port", "seawall")
+
+
+MARKET_RECLAIMED = os.path.join(TERRAIN_DIR, "island_market_reclaimed.json")
+
+
+def market_reclaimed():
+    """The cells the fish market's quay and wedge fills took from the bay (bool grid), as `build` recorded them.
+    `island_dike` still counts them as sea: the dike behind was designed against the bay, and both its crest height
+    (`exposure`) and the 側道's town-side test read the open sea."""
+    m = np.zeros((N, N), bool)
+    if os.path.exists(MARKET_RECLAIMED):
+        for j, a, b in json.load(open(MARKET_RECLAIMED))["runs"]:
+            m[j, a:b + 1] = True
+    return m
 
 
 def open_sea(sea):
@@ -761,6 +810,10 @@ def main(argv):
         out, _land, edits = reshape(base)
         os.makedirs(os.path.dirname(a.out), exist_ok=True)
         out.tofile(a.out)
+        if a.out == LAND:
+            json.dump({"x0": X0, "z0": Z0, "step": STEP, "runs": _runs(edits["market"]),
+                       "what": "tools/island_reshape.py build: the bay cells MARKET_QUAY / MARKET_WEDGE filled"},
+                      open(MARKET_RECLAIMED, "w"), separators=(",", ":"))
         if a.preview:
             preview(out, a.preview, edits, base)
         rep, ok = report(base, out)

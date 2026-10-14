@@ -146,6 +146,7 @@ def _parallel_run(segs, kind, v, lo, hi):
 
 RAMP_AT_GRADE = 0.6    # m: an expressway ramp this low is at grade -- a street may meet it in a junction
 RAMP_UNDER = 5.5       # m: ...and this high a street passes under it; in between, neither (roadkit_interchange 5.5)
+END_REACH = 2.0        # m: a raised ramp this far past a line's end crossing is still in its way (see _raised_ramp)
 
 
 def _raised_ramp(net, a, b):
@@ -166,7 +167,12 @@ def _raised_ramp(net, a, b):
                 continue
             t = ((p[0] - a[0]) * sy - (p[1] - a[1]) * sx) / den
             u = ((p[0] - a[0]) * ry - (p[1] - a[1]) * rx) / den
-            if 0.0 <= t <= 1.0 and 0.0 <= u <= 1.0:
+            # `a`..`b` is the run between the line's two END crossings, and the ramp may BE one of them: t is then 0
+            # or 1 give or take the last bit, and an exact test let it through (2026-10-13: cho_sw_345__2 ended ON
+            # shuto_c_sb_off 3.4 m up, the very junction this rule was written against). END_REACH m past either end
+            # still counts.
+            e = END_REACH / max(1e-9, math.hypot(rx, ry))
+            if -e <= t <= 1.0 + e and 0.0 <= u <= 1.0:
                 return name
     return None
 
@@ -427,11 +433,21 @@ def _line_split(net, obst, kind, v, box, segs=None):
     a, b = ((v, y0), (v, y1)) if kind == "x" else ((x0, v), (x1, v))
     cr = _crossings(net, a, b)
     ax = 1 if kind == "x" else 0
-    nodes = [(c[2], c[1]) for c in cr
-             if min((math.hypot(c[2][0] - o[0], c[2][1] - o[1]) for o in obst), default=1e9) >= JUNCTION_CLEAR]
+
+    def raised(c):
+        # A RAMP STILL OFF THE GROUND IS A WALL, NEVER A JUNCTION (2026-10-13). `_line_ok` refuses a whole line that
+        # crosses one (`_raised_ramp`); a line cut by a site came through HERE instead, where nothing asked, and its
+        # piece ended ON shuto_c_sb_off 3.4 m up (cho_sw_345__2 -- probe_road_clear: the pad's connector blocked by
+        # the ramp's own deck; the same junction the 2026-10-04 rule was written against)
+        q = c[2]
+        d = (0.0, 1.0) if kind == "x" else (1.0, 0.0)
+        return _raised_ramp(net, (q[0] - d[0], q[1] - d[1]), (q[0] + d[0], q[1] + d[1])) is not None
+
+    def crowded(c):
+        return min((math.hypot(c[2][0] - o[0], c[2][1] - o[1]) for o in obst), default=1e9) < JUNCTION_CLEAR
+    nodes = [(c[2], c[1]) for c in cr if not crowded(c) and not raised(c)]
     # a crowded crossing is a wall too (`_line_ok`): no piece runs through one
-    walls = sorted(c[2][ax] for c in cr
-                   if min((math.hypot(c[2][0] - o[0], c[2][1] - o[1]) for o in obst), default=1e9) < JUNCTION_CLEAR)
+    walls = sorted(c[2][ax] for c in cr if crowded(c) or raised(c))
     lo, hi = (y0, y1) if kind == "x" else (x0, x1)
     gaps = []
     for g0, g1 in _site_gaps(kind, v, lo, hi):
@@ -448,6 +464,10 @@ def _line_split(net, obst, kind, v, box, segs=None):
             continue
         along = [p[ax] for p, _r in mine]
         if segs is not None and _parallel_run(segs, kind, v, min(along), max(along)) > PARALLEL_RUN:
+            continue
+        # ...and no piece passes UNDER a ramp too low to pass under (3 - 5.5 m up: `_crossings` does not list it)
+        if _raised_ramp(net, (v, min(along)) if kind == "x" else (min(along), v),
+                        (v, max(along)) if kind == "x" else (max(along), v)):
             continue
         out.append((mine, (g0, g1)))
     return out

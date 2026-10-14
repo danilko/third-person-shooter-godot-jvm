@@ -245,6 +245,33 @@ def _nearest_pt(poly, x, y):
 GORE_VERTICAL = 2.0    # m: a ramp this far above or below its mainline's surface is on its own level, not in a gore
 
 
+def _on_curve(pa, pb, t):
+    """((x, y), tangent) at parameter `t` of the cubic Hermite between two stations that both carry a MANUAL tangent
+    (handles = the chord's length, the kit's own spans to within centimetres on a designed arc), or None when either
+    is chord-faced. The tangents are taken in the direction a -> b whatever the chain's order."""
+    if pa.tangent_mode != pm.MANUAL or pb.tangent_mode != pm.MANUAL or pa.tangent is None or pb.tangent is None:
+        return None
+    dx, dy = pb.pos[0] - pa.pos[0], pb.pos[1] - pa.pos[1]
+    L = math.hypot(dx, dy)
+    if L < 1e-6:
+        return None
+    out = []
+    for tg in (pa.tangent, pb.tangent):
+        m = math.hypot(tg[0], tg[1])
+        if m < 1e-9:
+            return None
+        sgn = 1.0 if tg[0] * dx + tg[1] * dy >= 0.0 else -1.0
+        out.append((sgn * tg[0] / m * L, sgn * tg[1] / m * L))
+    (ax, ay), (bx, by) = out
+    h00, h10, h01, h11 = 2 * t ** 3 - 3 * t ** 2 + 1, t ** 3 - 2 * t ** 2 + t, -2 * t ** 3 + 3 * t ** 2, t ** 3 - t ** 2
+    d00, d10, d01, d11 = 6 * t ** 2 - 6 * t, 3 * t ** 2 - 4 * t + 1, -6 * t ** 2 + 6 * t, 3 * t ** 2 - 2 * t
+    x = h00 * pa.pos[0] + h10 * ax + h01 * pb.pos[0] + h11 * bx
+    y = h00 * pa.pos[1] + h10 * ay + h01 * pb.pos[1] + h11 * by
+    tx = d00 * pa.pos[0] + d10 * ax + d01 * pb.pos[0] + d11 * bx
+    ty = d00 * pa.pos[1] + d10 * ay + d01 * pb.pos[1] + d11 * by
+    return (x, y), (tx, ty)
+
+
 def level_gores(net):
     """A RAMP IS LEVEL WITH ITS MAINLINE UNTIL THE TWO PAVED BANDS HAVE PARTED (PLAN.md 0.10(b)).
 
@@ -363,7 +390,15 @@ def level_gores(net):
         if 0.05 < t < 0.95 and not near_a and math.dist((x, y), net.points[b].pos[:2]) > GORE_MIN_SPAN:
             # insert where the bands part, in the ramp's CHAIN order (insert_after follows road.points)
             first, second = (a, b) if ramp.points.index(a) < ramp.points.index(b) else (b, a)
+            # ON THE CURVE, when both neighbours carry a design tangent (island_expressway.face_on_plan): the chord
+            # point of a 15.8 m span of an R 96 arc stands 0.33 m inside it, and the station put there bent the Suburb
+            # exit's lane +-2 deg in 10 m -- a wiggle inside a one-arc ramp (2026-10-13)
+            on = _on_curve(net.points[a], net.points[b], t)
+            if on is not None:
+                x, y = on[0]
             nu = rg.insert_after(net, ramp, first, (x, y, main_at(x, y)[1]))
+            if on is not None:
+                rg.freeze(net, nu, on[1] if first == a else (-on[1][0], -on[1][1]))
             road_of[nu] = ramp.name
             stop = nu
         else:
@@ -429,7 +464,9 @@ RAMP_K_GROUND = 6.5   # ...for a ramp to the ground, whose grade is the tighter 
 RAMP_K_SOLVE = 9.0    # what `ramp_curves` aims for, so the exported Hermite between stations still clears RAMP_K
 #: a ramp whose descent overlaps its own plan turn reads ~30 % lower K on the exported Hermite than on the solve's 2 m
 #: samples: solve it to the JCT target (port_on: solved 6.7, exported 4.6 at the ground target)
-RAMP_K_OVERRIDE = {"shuto_port_on": 9.0}
+#: (port_off, 2026-10-13: its gore stands ON the Wangan's arc since island_expressway.station_by_x places a station on
+#: the plan, 3.8 m from the chord it stood on; solved to the ground target its exported curve read K 6.00, the limit)
+RAMP_K_OVERRIDE = {"shuto_port_on": 9.0, "shuto_port_off": 7.5}
 RAMP_GROUND_GRADE = 0.07   # a ramp to or from the ground at 40 km/h (道路構造令: 7 %)
 RAMP_JCT_GRADE = 0.06      # an expressway-to-expressway ramp
 #: the lane split's EB halves (island_expressway.t_split), which climb together 6 m apart; the WB pair (T2 + T4) is held by
@@ -950,6 +987,12 @@ def cmd_smooth(argv):
     print("island_grades: %d station(s) held beside a parallel expressway road at one height" % pair_held(net))
     for line in ramp_curves(net):
         print("island_grades: ramp " + line)
+    # a road whose profile is AUTHORED station by station (island_site_access.authored_roads: the fish market's ramp --
+    # a level bend, then a fall between two 20 m vertical curves) is held whole: the 80 m average knows neither
+    import island_site_access as isa
+    for name in isa.authored_roads():
+        if name in net.roads:
+            _GORE_HELD.update(net.roads[name].points)
     runs = corridors(net)
     total, worst_move, rough = 0, ("", 0.0), []
     for name, nodes in runs:

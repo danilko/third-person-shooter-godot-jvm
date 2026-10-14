@@ -4,10 +4,10 @@
 [ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/FishMarket_collision.res" id="2_02faf"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/world/ParkedVehicle.java" id="3_4fenj"]
 
-[node name="FishMarket" type="Node3D" unique_id=1708775102]
+[node name="FishMarket" type="Node3D" unique_id=368424571]
 metadata/building = {
-"aabb": [Vector3(-82.5, -5.7780056, -35), Vector3(165, 17.178005, 80)],
-"base_m": -5.778,
+"aabb": [Vector3(-193, -6, -47.74721), Vector3(458.04, 24, 89.84721)],
+"base_m": -6.0,
 "collision": "trimesh",
 "door_style": "swing",
 "doors": [],
@@ -16,30 +16,54 @@ metadata/building = {
 "doors_shop": false,
 "example": true,
 "facade_surfaces": {},
-"footprint_m": [165.0, 80.0],
-"height_m": 17.178,
+"footprint_m": [458.04, 89.8472],
+"height_m": 24.0,
 "id": "FishMarket",
 "kit": "library",
 "landmark": false,
 "marks": [{
-"name": "MARK_vehicle_FIB1_0",
-"pos": [-60.0, -5.6, 49.0],
+"name": "MARK_vehicle_WOB1_0",
+"pos": [-130.0, -2.0, 40.0],
 "props": {
 "kind": "vehicle",
-"vehicle": "FIB1"
+"vehicle": "WOB1"
 },
 "yaw": 90.0
 }, {
 "name": "MARK_vehicle_FIB1_1",
-"pos": [-35.0, -5.6, 49.0],
+"pos": [-55.0, -2.0, 40.0],
 "props": {
 "kind": "vehicle",
 "vehicle": "FIB1"
 },
 "yaw": 90.0
 }, {
-"name": "MARK_vehicle_WOB1_2",
-"pos": [-10.0, -5.6, 49.0],
+"name": "MARK_vehicle_FIB1_2",
+"pos": [-30.0, -2.0, 40.0],
+"props": {
+"kind": "vehicle",
+"vehicle": "FIB1"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_vehicle_FIB1_3",
+"pos": [-5.0, -2.0, 40.0],
+"props": {
+"kind": "vehicle",
+"vehicle": "FIB1"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_vehicle_FIB1_4",
+"pos": [40.0, -2.0, 40.0],
+"props": {
+"kind": "vehicle",
+"vehicle": "FIB1"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_vehicle_WOB1_5",
+"pos": [100.0, -2.0, 40.0],
 "props": {
 "kind": "vehicle",
 "vehicle": "WOB1"
@@ -47,29 +71,38 @@ metadata/building = {
 "yaw": 90.0
 }],
 "piece_count": 1,
-"probe_xz": [0.0, 10.0],
+"probe_xz": [54.0, 21.0],
 "solid_probes": [],
 "trimesh_pieces": 1.0,
-"use": "fish market: sawtooth auction hall open to the quay, ice plant, office, truck bays, a pontoon (浮桟橋) parallel to the quay with a gangway and two fishing boats and a workboat moored at it; PLACEHOLDER massing (blender/tools/library_civic.py), shut",
-"wall_top_m": 17.178
+"use": "fish market on a quay 2 m over the water: the public car park and office / 直売所 (roof = 津波避難 deck) at the ramp's foot, a 90 x 20 m sawtooth auction hall open to the quay with 13 truck berths, cold store + ice plant + 給氷塔, the trucks' turning ground, a slipway and three landing stairs on the quay, three 避難階段 up the dike; four fishing boats and two workboats moored alongside; PLACEHOLDER massing (blender/tools/library_civic.py), shut",
+"wall_top_m": 24.0
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=366283147]
-visibility_range_end = 441.6856
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1978009101]
+visibility_range_end = 583.3844
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_arpke")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=394718895]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1663716112]
 collision_mask = 0
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=81623867]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=482229073]
 shape = ExtResource("2_02faf")
 
-[node name="Markers" type="Node3D" parent="." unique_id=551184861]
+[node name="Markers" type="Node3D" parent="." unique_id=737069876]
 
-[node name="MARK_vehicle_FIB1_0" type="Node3D" parent="Markers" unique_id=1279755452 groups=["mission_marker"]]
-transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -60, -5.6, 49)
+[node name="MARK_vehicle_WOB1_0" type="Node3D" parent="Markers" unique_id=37626129 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -130, -2, 40)
+script = ExtResource("3_4fenj")
+vehicle_id = "WOB1"
+faction = "neutral"
+drop_height = 0.3
+metadata/kind = "vehicle"
+metadata/vehicle = "WOB1"
+
+[node name="MARK_vehicle_FIB1_1" type="Node3D" parent="Markers" unique_id=1311094274 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -55, -2, 40)
 script = ExtResource("3_4fenj")
 vehicle_id = "FIB1"
 faction = "neutral"
@@ -77,8 +110,8 @@ drop_height = 0.3
 metadata/kind = "vehicle"
 metadata/vehicle = "FIB1"
 
-[node name="MARK_vehicle_FIB1_1" type="Node3D" parent="Markers" unique_id=1723552868 groups=["mission_marker"]]
-transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -35, -5.6, 49)
+[node name="MARK_vehicle_FIB1_2" type="Node3D" parent="Markers" unique_id=42319958 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -30, -2, 40)
 script = ExtResource("3_4fenj")
 vehicle_id = "FIB1"
 faction = "neutral"
@@ -86,8 +119,26 @@ drop_height = 0.3
 metadata/kind = "vehicle"
 metadata/vehicle = "FIB1"
 
-[node name="MARK_vehicle_WOB1_2" type="Node3D" parent="Markers" unique_id=1174294418 groups=["mission_marker"]]
-transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -10, -5.6, 49)
+[node name="MARK_vehicle_FIB1_3" type="Node3D" parent="Markers" unique_id=1531473518 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -5, -2, 40)
+script = ExtResource("3_4fenj")
+vehicle_id = "FIB1"
+faction = "neutral"
+drop_height = 0.3
+metadata/kind = "vehicle"
+metadata/vehicle = "FIB1"
+
+[node name="MARK_vehicle_FIB1_4" type="Node3D" parent="Markers" unique_id=602396872 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 40, -2, 40)
+script = ExtResource("3_4fenj")
+vehicle_id = "FIB1"
+faction = "neutral"
+drop_height = 0.3
+metadata/kind = "vehicle"
+metadata/vehicle = "FIB1"
+
+[node name="MARK_vehicle_WOB1_5" type="Node3D" parent="Markers" unique_id=1872026986 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 100, -2, 40)
 script = ExtResource("3_4fenj")
 vehicle_id = "WOB1"
 faction = "neutral"

@@ -923,6 +923,7 @@ def export_network(net):
 
 #: An edge's kind seen from the other end: a lane that handed over to a ramp is, reversed, a ramp joining a lane.
 REVERSED_KIND = {"chain": "chain", "ramp": "merge", "merge": "ramp"}
+SAME_END_TOL = 6.0     # m: two side-by-side lanes that end within this of each other end at one point (reverse_traffic)
 REVERSED_TURN = {lm.TURN_L: lm.TURN_R, lm.TURN_R: lm.TURN_L}
 
 
@@ -947,6 +948,36 @@ def reverse_traffic(doc):
         kinds = l.get("next_kinds") or []
         for i, n in enumerate(l.get("next", ())):
             preds.setdefault(n, []).append((l["id"], kinds[i] if i < len(kinds) else "chain"))
+    # A LANE THAT CLOSED INTO THE ONE BESIDE IT AT THEIR COMMON END (2026-10-13). A widened ramp's second lane, an
+    # entrance's added lane: keep-left it ends where its neighbour ends, kind `merge`, and the car carries on along the
+    # neighbour's successors. Reversed, that lane OPENS beside its neighbour at their common HEAD -- so whatever feeds
+    # the neighbour feeds it too. Reversing the `merge` edge itself instead made a `ramp` edge neighbour -> lane read
+    # at the neighbour's TAIL, the far end of the run: a successor whose head stood 240-510 m behind the car
+    # (shuto_t1 / t3 / e_fwd_on / w_bwd_on, flow "misjoined" 5; a car taking it drove for a point half a kilometre
+    # back). So: the closing lane INHERITS its neighbour's successors (through a chain of such lanes), and its own
+    # `merge` edge is not reversed at all -- the lane beside is reached by a lane change, as it always was.
+    old_next = {l["id"]: [(n, (l.get("next_kinds") or [])[i] if i < len(l.get("next_kinds") or []) else "chain")
+                          for i, n in enumerate(l.get("next", ()))] for l in lanes}
+    closing = {}
+    for l in lanes:
+        for n, kind in old_next[l["id"]]:
+            o = by_id.get(n)
+            if (kind == "merge" and o is not None and l.get("points") and o.get("points")
+                    and n in (l.get("inner_lane"), l.get("outer_lane"))
+                    and _dist3(l["points"][-1], o["points"][-1]) < SAME_END_TOL):
+                closing[l["id"]] = n
+
+    def inherited(lid, depth=0):
+        nb = closing[lid]
+        out = [(n, k) for n, k in old_next[nb] if not (k == "merge" and closing.get(nb) == n)]
+        if nb in closing and depth < 8:
+            out += inherited(nb, depth + 1)
+        return out
+    for lid, nb in closing.items():
+        preds[nb] = [e for e in preds.get(nb, ()) if e != (lid, "merge")]
+        for n, kind in inherited(lid):
+            if (lid, kind) not in preds.setdefault(n, []):
+                preds[n].append((lid, kind))
     # a connector belongs to the arm it LEAVES: after the reversal that is the lane it used to feed
     heads = {}
     for l in lanes:

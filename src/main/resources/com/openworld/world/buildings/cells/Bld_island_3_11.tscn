@@ -1,8 +1,9 @@
 [gd_scene format=3]
 
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ParkingLot28.tscn" id="1"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ParkingLot56.tscn" id="2"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/WarehouseYard_Open.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ParkingLot14.tscn" id="1"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ParkingLot28.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ParkingLot56.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/WarehouseYard_Open.tscn" id="4"]
 [ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_3_11.res" id="hlod"]
 
@@ -27,26 +28,26 @@ visibility_range_begin = 450.0
 visibility_range_begin_margin = 40.0
 visibility_range_fade_mode = 1
 
-[node name="ParkingLot56_000" parent="." instance=ExtResource("2")]
+[node name="ParkingLot56_000" parent="." instance=ExtResource("3")]
 transform = Transform3D(-0.164187, 0, 0.986429, 0, 1, 0, -0.986429, 0, -0.164187, -1223.500, 5.588, 906.500)
 
 [node name="Mesh" parent="./ParkingLot56_000" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ParkingLot28_001" parent="." instance=ExtResource("1")]
+[node name="ParkingLot28_001" parent="." instance=ExtResource("2")]
 transform = Transform3D(-0.645604, 0, 0.763672, 0, 1, 0, -0.763672, 0, -0.645604, -1193.500, 5.588, 954.500)
 
 [node name="Mesh" parent="./ParkingLot28_001" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ParkingLot56_002" parent="." instance=ExtResource("2")]
+[node name="ParkingLot14_002" parent="." instance=ExtResource("1")]
 transform = Transform3D(0.156900, 0, -0.987615, 0, 1, 0, 0.987615, 0, 0.156900, -1079.500, 5.588, 804.500)
 
-[node name="Mesh" parent="./ParkingLot56_002" index="0"]
+[node name="Mesh" parent="./ParkingLot14_002" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="WarehouseYard_Open_003" parent="." instance=ExtResource("3")]
-transform = Transform3D(-0.588844, 0, 0.808247, 0, 1, 0, -0.808247, 0, -0.588844, -1043.500, 5.588, 846.500)
+[node name="WarehouseYard_Open_003" parent="." instance=ExtResource("4")]
+transform = Transform3D(-0.589337, 0, 0.807887, 0, 1, 0, -0.807887, 0, -0.589337, -1043.500, 5.588, 840.500)
 
 [node name="Mesh" parent="./WarehouseYard_Open_003" index="0"]
 visibility_parent = NodePath("../../HLOD")

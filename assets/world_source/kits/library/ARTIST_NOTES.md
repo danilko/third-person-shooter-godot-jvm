@@ -61,7 +61,7 @@ buildings (`tools/plateau2json/measure_named_buildings.py`, p50 over 7 central w
 | Park | 公園 | 60 x 60 plot, trees from the nature kit | playground, toilet, benches |
 | WaterResort | 温浴・プールリゾート | 150 x 120 plot | spa / pool hall, wave pool, lazy river, slide tower |
 | ResortHotel | リゾートホテル | a 70 x 60 reserve, balconies to -Y (the sea) | an Okinawa resort slab: balconies, pool deck, porte-cochère |
-| FishMarket | 魚市場 | the 416 x 99 quay reserve, quay at -Y | sawtooth auction hall, ice plant, office, boats |
+| FishMarket | 魚市場 | the 310 x 68 m yard between the dike and the straight quay (z 780), quay at -Y; laid out in WORLD numbers (see `library_civic.fish_market`): the terrace walls, the footbridge's height and the quay wall must keep matching `island_reshape.MARKET_*` | terrace walls + stair + footbridge, office with the 津波避難 roof deck, sawtooth auction hall, cold store + ice tower, fenced strip, pontoon, boats |
 | Mil_HQ / Mil_Barracks / Mil_Hangar / Mil_ControlTower / Mil_Gate / Mil_Fence | 航空自衛隊 基地 | composite MilitaryBase (320 x 300), gate on the north | plain concrete blocks, arched hangars, tower cab, perimeter fence |
 | Mil_FighterJet | F-15J class | nose -Y; collider = boxes in building_types.json | a real fighter model (19.4 m, 13 m span) |
 | Airport_Hangar / Airport_Airliner | maintenance hangar + 737 class | composite AirportAirside | a real hangar and narrow-body; the hangar doorway stays >= 32 x 16.5 m |

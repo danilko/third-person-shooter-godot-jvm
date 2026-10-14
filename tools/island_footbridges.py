@@ -196,6 +196,30 @@ def own_lanes(j, lanes):
     return own | {lid for lid in lanes if lid.startswith("c" + j["id"])}
 
 
+REBIND_M = 60.0             # a frozen row's arm is looked for this near the row when its junction id is gone
+
+
+def junction_of(r, byid, junctions, lanes):
+    """The junction a FROZEN row stands at. Its recorded id first; when that id is gone, the junction with an arm of
+    the row's road whose pad edge is within REBIND_M of the bridge. A junction's id is `j` + one of its mouths' uids
+    (the smallest), and a GENERATED street's stations get new uids at every layout run: when such a mouth's new uid
+    sorts first the junction is renamed and nothing else about it has changed (2026-10-13: `j4bf395de`, four mouths in
+    the same places, read "its junction arm is gone" after a rebuild that touched nothing near it)."""
+    j = byid.get(r["junction"])
+    if j is not None:
+        return j
+    best = None
+    for q in junctions:
+        arm = next((a for a in q["arms"] if a["road"] == r["road"]), None)
+        f = arm_frame(arm, lanes) if arm else None
+        if f is None:
+            continue
+        d = math.hypot(f[0][0] - r["x"], f[0][2] - r["z"])
+        if d < REBIND_M and (best is None or d < best[0]):
+            best = (d, q)
+    return best[1] if best else None
+
+
 def verify(rows):
     """Every FROZEN bridge against TODAY's records: [(id, why)] for the ones that no longer fit (the road moved, a
     lamp or a tree now stands in a stair, something was built overhead). Run by --check."""
@@ -205,7 +229,7 @@ def verify(rows):
     byid = {j["id"]: j for j in junctions}
     bad = []
     for r in rows:
-        j = byid.get(r["junction"])
+        j = junction_of(r, byid, junctions, lanes)
         arm = next((a for a in (j["arms"] if j else ()) if a["road"] == r["road"]), None)
         f = arm_frame(arm, lanes) if arm else None
         if f is None:
@@ -239,7 +263,7 @@ def write_keepout(rows):
     byid = {j["id"]: j for j in junctions}
     boxes = []
     for r in rows:
-        j = byid.get(r["junction"])
+        j = junction_of(r, byid, junctions, lanes)
         arm = next((a for a in (j["arms"] if j else ()) if a["road"] == r["road"]), None)
         f = arm_frame(arm, lanes) if arm else None
         if f is None:

@@ -316,6 +316,64 @@ def two_arc(m, t0, e, te, avoid=None, step=8.0, reach=400.0):
     return [at_s(pl, cum, cum[-1] * k / n, False) for k in range(n + 1)], best[1]
 
 
+def one_arc(m, t0, e, te, rmax=200.0, keep0=20.0, keep1=15.0, step=8.0):
+    """A ramp that turns ONE WAY (PLAN S11 P12-6; user, 2026-10-13: "remove s wiggle"): a straight along `t0` from `m`,
+    ONE constant arc, a straight along `te` into `e` -- the fillet of the two tangent lines' corner, with the largest
+    radius <= `rmax` that leaves `keep0` m of straight after the gore and `keep1` m before the end. `two_arc` maximises
+    its radius with no same-sense rule, so from a gore whose tangent passes the far side of the target it returns an S
+    (the Suburb entrance: ~20 deg one way, 55 m straight, ~98 deg the other). Raises ValueError when the two tangent
+    lines do not meet ahead of the gore and behind the end (then no one-way curve exists: move the gore or the end).
+    Returns (plan path, radius)."""
+    den = t0[0] * te[1] - t0[1] * te[0]
+    if abs(den) < 1e-6:
+        raise ValueError("one_arc: the two tangents are parallel")
+    a = ((e[0] - m[0]) * te[1] - (e[1] - m[1]) * te[0]) / den
+    c = (t0[0] * (e[1] - m[1]) - t0[1] * (e[0] - m[0])) / den      # the corner = m + t0 * a = e - te * c
+    if a <= keep0 or c <= keep1:
+        raise ValueError("one_arc: the tangent lines meet %.0f m ahead of the gore and %.0f m before the end" % (a, c))
+    k = math.tan(math.acos(max(-1.0, min(1.0, t0[0] * te[0] + t0[1] * te[1]))) / 2.0)
+    R = min(rmax, (a - keep0) / k, (c - keep1) / k)
+    X = (m[0] + t0[0] * a, m[1] + t0[1] * a)
+    pl = rounded_polygon([m[:2], X, e[:2]], [0.0, R, 0.0], closed=False, full_ends=True, arc_step=1.0)
+    cum = arclen(pl, False)
+    n = max(2, int(math.ceil(cum[-1] / step)))
+    path = _Path(at_s(pl, cum, cum[-1] * k_ / n, False) for k_ in range(n + 1))
+    path.plan = pl
+    return path, R
+
+
+class _Path(list):
+    """A ramp's plan path that carries its own DESIGN line (`plan`, 1 m arc steps) for `face_on_plan`."""
+    plan = None
+
+
+def face_on_plan(net, road_name, plan):
+    """Every station of the ramp faced on its design line's tangent (`plan_face`), mouth excepted (it is its
+    mainline's). `thin` keeps a span up to 60 m that turns up to 8 deg, so the END of an arc ends up inside a long span,
+    and the chord (AUTO) facing of the station before it then leans toward the straight: the Suburb exit's last arc
+    station was faced 5.5 deg too far round, and when the grade pass put a station 6.8 m before it the lane bent
+    R 20 one way and R 46 back (2026-10-13, found on the exported lane after a rebuild)."""
+    cum = arclen(plan, False)
+    for u in net.roads[road_name].points[1:]:
+        plan_face(net, u, plan, cum, False)
+
+
+def gore_axis(net, road, uid):
+    """The mainline's direction at its station `uid` (unit, along the chain): the design alignment's own tangent when
+    the station was faced on it (`plan_face`), else the chord of its neighbours."""
+    f = PLAN_FACED.get(uid)
+    if f and f[0] in PLANS:
+        plan, cum, closed = PLANS[f[0]]
+        a, b = at_s(plan, cum, f[1] - 0.5, closed), at_s(plan, cum, f[1] + 0.5, closed)
+    else:
+        k = road.points.index(uid)
+        a = net.points[road.points[max(0, k - 1)]].pos
+        b = net.points[road.points[min(len(road.points) - 1, k + 1)]].pos
+    d = (b[0] - a[0], b[1] - a[1])
+    L = math.hypot(*d)
+    return (d[0] / L, d[1] / L)
+
+
 def reverse_curve(p0, p1, step=12.0, rmax=400.0):
     """A path from p0 to p1, both legs running along y, shifted sideways by p1.x - p0.x: straight, ONE arc, a
     straight diagonal, ONE equal arc back, straight -- with the LARGEST radius the space allows (user, 2026-09-30:
@@ -1040,7 +1098,7 @@ def part_distance(net, main_road, ramp_lanes):
 
 
 def ground_ramp(net, at_uid, name, cw, ent, end_xy, end_dir, mouths, lanes=1, grade=GROUND_GRADE, landing=15.0,
-                avoid=None, reach=400.0, side=None, path=None, hold_extra=0.0):
+                avoid=None, reach=400.0, side=None, path=None, hold_extra=0.0, one_way=None):
     """A ramp between the expressway station `at_uid` and a GROUND junction (P2-5, P2-6, P3-8): `branch_ramp` opens
     the aux slot and places the mouth level with the mainline; then two equal arcs and a straight (`two_arc`) to
     `end_xy`, the ramp's last station, arriving along `end_dir` (its chain's direction there); level until its band has
@@ -1054,12 +1112,7 @@ def ground_ramp(net, at_uid, name, cw, ent, end_xy, end_dir, mouths, lanes=1, gr
     fp = net.points[info["far"]].pos
     # the ramp leaves along the MAINLINE's own axis at the gore (the side it lies on is branch_ramp's far station's):
     # it meets the mainline tangentially and parts from it on its first arc
-    k = road.points.index(at_uid)
-    qa = net.points[road.points[max(0, k - 1)]].pos
-    qb = net.points[road.points[min(len(road.points) - 1, k + 1)]].pos
-    t0 = (qb[0] - qa[0], qb[1] - qa[1])
-    tl = math.hypot(*t0)
-    t0 = (t0[0] / tl, t0[1] / tl)
+    t0 = gore_axis(net, road, at_uid)
     if t0[0] * (fp[0] - m[0]) + t0[1] * (fp[1] - m[1]) < 0.0:
         t0 = (-t0[0], -t0[1])
     el = math.hypot(*end_dir)
@@ -1067,6 +1120,9 @@ def ground_ramp(net, at_uid, name, cw, ent, end_xy, end_dir, mouths, lanes=1, gr
     if path is not None:
         p, R = path(m, t0), None
         R = _min_radius(p)
+    elif one_way is not None:
+        # `one_way` = the largest radius wanted: straight, one arc, straight (no S); it must fit, or the gore is wrong
+        p, R = one_arc(m, t0, end_xy, te, rmax=one_way, keep1=landing)
     elif side is None:
         p, R = two_arc(m, t0, end_xy, te, avoid=avoid, reach=reach)
     else:
@@ -1090,6 +1146,8 @@ def ground_ramp(net, at_uid, name, cw, ent, end_xy, end_dir, mouths, lanes=1, gr
     end = net.roads[PREFIX + name].points[-1]
     net.points[end].pos = (end_xy[0], end_xy[1], zj)
     make_junction(net, list(mouths) + [end])
+    if getattr(p, "plan", None):
+        face_on_plan(net, PREFIX + name, p.plan)
     if g > grade + 1e-6:
         print("island_expressway: WARN %s descends %.1f %% (limit %.1f %%)" % (name, g * 100.0, grade * 100.0))
     return L, g, R
@@ -1140,13 +1198,35 @@ def station_by_x(net, road, x):
         pa, pb = net.points[a].pos, net.points[b].pos
         if min(pa[0], pb[0]) < x < max(pa[0], pb[0]):
             t = (x - pa[0]) / (pb[0] - pa[0])
-            u = insert_after(net, road, a, tuple(pa[k] + (pb[k] - pa[k]) * t for k in range(3)))
+            pos = tuple(pa[k] + (pb[k] - pa[k]) * t for k in range(3))
             fa, fb = PLAN_FACED.get(a), PLAN_FACED.get(b)
-            if fa and fb and fa[0] == fb[0] and fa[0] in PLANS:
+            on_plan = fa and fb and fa[0] == fb[0] and fa[0] in PLANS
+            if on_plan:
+                # ON THE DESIGN ALIGNMENT, not on the chord between its neighbours (PLAN S11 P12-6: across a thinned
+                # span of a curve the chord stood the Suburb entrance's gore 10.3 m inside the Wangan's arc and the port
+                # exit's 3.8 m -- "3 dots" off the line, and a ramp whose axis was the chord's)
                 plan, cum, closed = PLANS[fa[0]]
+                lo, hi = sorted((fa[1], fb[1]))
+                if not closed and hi - lo < 400.0:
+                    n = max(2, int(math.ceil((hi - lo) / 0.5)))
+                    q0 = at_s(plan, cum, lo, closed)
+                    for k in range(1, n + 1):
+                        q1 = at_s(plan, cum, lo + (hi - lo) * k / n, closed)
+                        if (q0[0] - x) * (q1[0] - x) <= 0.0 and q1[0] != q0[0]:
+                            f = (x - q0[0]) / (q1[0] - q0[0])
+                            sx = lo + (hi - lo) * (k - 1 + f) / n
+                            g = (sx - fa[1]) / (fb[1] - fa[1])
+                            pos = (x, q0[1] + (q1[1] - q0[1]) * f, pa[2] + (pb[2] - pa[2]) * g)
+                            break
+                        q0 = q1
+            u = insert_after(net, road, a, pos)
+            if on_plan:
                 plan_face(net, u, plan, cum, closed)
             return u
     return min(ch, key=lambda u: abs(net.points[u].pos[0] - x))
+
+
+SB_ON_R = 100.0   # the Suburb entrance's one arc (a 40 km/h ramp wants R >= 60; 100 is what the T's place leaves)
 
 
 def suburb_entrance(net):
@@ -1159,7 +1239,7 @@ def suburb_entrance(net):
     _thin_near(net, road, [st])
     a, b = cut_road(net, PL.SB_ON_T, "ring_kita", MOUTH)
     end, te = _t_arm(net, a, b, (PL.SB_ON_T[0], PL.SB_ON_T[1] - 100.0))
-    L, g, R = ground_ramp(net, st, "sb_on", "BWD", True, end, te, [a, b], lanes=ENTRY_LANES)
+    L, g, R = ground_ramp(net, st, "sb_on", "BWD", True, end, te, [a, b], lanes=ENTRY_LANES, one_way=SB_ON_R)
     print("island_expressway: Suburb WB entrance %.0f m %.1f %% R %.0f" % (L, g * 100.0, R))
 
 
@@ -1880,6 +1960,7 @@ def t_split(net, wg, spur, spur2):
 SB_GRADE = 0.06   # the Suburb exit's steepest descent (P2-7: <= 6 %)
 SB_LANDING = 0.0  # a level landing before the stop line: 0 -- a level foot sits inside the dike pass's clearance
                   # zone and island_dike lifted the whole exit 5 m off its junction (layout 2026-10-01: a 74 % pad)
+SB_ONE_MARGIN = 0.002   # see suburb_exit
 SB_CLEAR = 5.6    # over the dike road, held across the whole overlap (island_dike.PLANNED_OVER accepts it)
 
 
@@ -1891,10 +1972,7 @@ def suburb_exit(net, off, ground=None):
     m = mouth_of(net, PREFIX + "sb_off")
     road = next(r for r in net.roads.values() if off in r.points)
     k = road.points.index(off)
-    q1 = net.points[road.points[k + 1]].pos
-    t0 = (q1[0] - m[0], q1[1] - m[1])
-    tl = math.hypot(*t0)
-    t0 = (t0[0] / tl, t0[1] / tl)
+    t0 = gore_axis(net, road, off)        # the mainline's own tangent (it was the chord mouth -> next station: skewed)
     cx, cy = PL.SB_JUNCTION
     # the junction is the pad nearest SB_JUNCTION of a road in SB_JUNCTION_ROADS: its mouth and the clique linked to it
     # (2026-10-03 night: wangan_dori's own junction opposite eki_ginza_suburb, island_suburb_kogai.py -- it was the side
@@ -1935,21 +2013,53 @@ def suburb_exit(net, off, ground=None):
         if ground:
             zr = max([zr] + [ground.z(*at_s(p, cum, s_, False)) or 0.0 for s_, _z in hit])
         return hit[0][0], hit[-1][0], zr
+    # the mainline's DESIGN line near the exit (its stations are 45 m apart and thinned later: a chord, not the arc)
+    f_ = PLAN_FACED.get(off)
+    if f_ and f_[0] in PLANS:
+        plan_, cum_, _c = PLANS[f_[0]]
+        dline = [at_s(plan_, cum_, f_[1] + v * 4.0, False) for v in range(0, 150)]
+    else:
+        dline = _densify(mline, 4.0)
+    side0 = min(math.dist(m[:2], q) for q in dline)
+
+    def keeps_off(p):
+        # it leaves on the INSIDE of the mainline's left curve: it may never close on the mainline again
+        cum = arclen(p, False)
+        return all(min(math.dist(q, c_) for c_ in dline) >= side0 - 1.0 for c_s, q in zip(cum, p) if c_s > 30.0)
     best = None
-    for dh in range(-30, 50, 5):
+    # ONE ARC FIRST (PLAN S11 P12, user 2026-10-13: "have curve as much as possible, and remove s wiggle"): a straight
+    # off the gore, one left arc, a straight into the junction, for each arrival heading; the S of two arcs (which is
+    # what this was: 62 deg left, 27 deg back right) only if no one-way curve fits
+    cands = []
+    for dh in range(40, 105, 1):
         a = math.radians(dh)
         te = (t0[0] * math.cos(a) - t0[1] * math.sin(a), t0[0] * math.sin(a) + t0[1] * math.cos(a))
         e = (cx - te[0] * MOUTH, cy - te[1] * MOUTH)
+        for rmax in (260.0, 220.0, 180.0, 145.0, 120.0, 100.0, 80.0, 60.0):
+            try:
+                p, r = one_arc(m, t0, e, te, rmax=rmax, keep0=5.0, keep1=10.0)
+            except ValueError:
+                break
+            if r >= 60.0 and keeps_off(p):
+                cands.append((te, e, p, r))
+                break
+    one = bool(cands)
+    if not cands:
+        for dh in range(-30, 50, 5):
+            a = math.radians(dh)
+            te = (t0[0] * math.cos(a) - t0[1] * math.sin(a), t0[0] * math.sin(a) + t0[1] * math.cos(a))
+            e = (cx - te[0] * MOUTH, cy - te[1] * MOUTH)
+            try:
+                p, r = two_arc(m, t0, e, te, reach=300.0)
+            except ValueError:
+                continue
+            if r >= 60.0:
+                cands.append((te, e, p, r))
+    for te, e, p, r in cands:
         # a fourth arm, not beside another: at least 30 deg from every arm already at the junction
         arms = [(cx - net.points[u].pos[0], cy - net.points[u].pos[1]) for u in members]
         if any(math.degrees(math.acos(max(-1.0, min(1.0, (te[0] * a_[0] + te[1] * a_[1]) / max(1e-9, math.hypot(*a_))))))
                < 30.0 for a_ in arms):
-            continue
-        try:
-            p, r = two_arc(m, t0, e, te, reach=300.0)
-        except ValueError:
-            continue
-        if r < 60.0:
             continue
         cum = arclen(p, False)
         win = dike_window(p)
@@ -1958,8 +2068,10 @@ def suburb_exit(net, off, ground=None):
             sr, s0 = win[0], win[1]
             zc = max(m[2], win[2] + SB_CLEAR)
         gr = (zc - zj) / max(1.0, cum[-1] - s0 - SB_LANDING)
-        # the largest radius whose descent is legal (7 %, a 40 km/h ramp), else the gentlest descent
-        key = (0, -r) if gr <= SB_GRADE else (1, gr)
+        # the largest radius whose descent is legal (7 %, a 40 km/h ramp), else the gentlest descent. A ONE-ARC exit
+        # is planned SB_ONE_MARGIN under the limit: its fall starts right after the dike road, and the vertical curves
+        # the grade pass then rounds into both ends shorten it (planned 5.9 %, exported 7.0 % -- over the ramp rule)
+        key = (0, -r) if gr <= SB_GRADE - (SB_ONE_MARGIN if one else 0.0) else (1, gr)
         if best is None or key < best[0]:
             best = (key, p, r, e, s0, zc, sr)
     _gr, p, r, e, s_ring, z_cross, s_x = best
@@ -1979,12 +2091,15 @@ def suburb_exit(net, off, ground=None):
     s_sep = max(s_sep, s_ring)
     knots += [(cum[-1] - SB_LANDING, zj), (cum[-1], zj)]
     grade = (knots[-3][1] - zj) / max(1.0, cum[-1] - SB_LANDING - knots[-3][0])
-    print("island_expressway: Suburb exit R %.0f m, %.0f m long, over the dike at %.1f m, level/held %.0f m then "
-          "%.1f %%, into %s" % (r, cum[-1], z_cross, knots[-3][0], grade * 100.0, members))
+    print("island_expressway: Suburb exit %s R %.0f m, %.0f m long, over the dike at %.1f m, level/held %.0f m then "
+          "%.1f %%, into %s" % ("ONE ARC" if one else "an S of two arcs", r, cum[-1], z_cross, knots[-3][0],
+                                grade * 100.0, members))
     run_on(net, PREFIX + "sb_off", on_curve(net, PREFIX + "sb_off", heights_by(p, knots)))
     end = net.roads[PREFIX + "sb_off"].points[-1]
     net.points[end].pos = (e[0], e[1], zj)
     make_junction(net, members + [end])
+    if getattr(p, "plan", None):
+        face_on_plan(net, PREFIX + "sb_off", p.plan)
 
 
 def _straight(a, b, step=40.0):

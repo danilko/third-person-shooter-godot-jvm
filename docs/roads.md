@@ -19,6 +19,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - 横断歩道橋: footbridges over the widest junction arms, measured in Blender, placed from the lane records (2026-10-10, user-asked)
 - 電柱 + wires, lamps up the mountain road, white ガードレール (PLAN.md T1 + part of T3, 2026-10-11, user-asked)
 - Right-hand traffic is the keep-left lane graph run backwards (2026-10-12, user: "drive on the right")
+- The fish market's two gates, the Wangan's bay jog as two arcs, both Suburb ramps one-way (PLAN S11 P12, 2026-10-13)
 
 ---
 
@@ -2004,3 +2005,146 @@ the line, facing up; the first character furthest ahead; "50" left to right; an 
 six numerals on the fixture; control: both off paint nothing). Island road stage rebuilt (41 road pieces + the 15
 rail pieces, gate 0 errors, 2 624 lanes as before). Pictures: 止まれ at j056aaf1a (-850, 659) and "30" in both
 lanes of the street it meets, each the right way up for its own direction.
+
+## The fish market's two gates, the Wangan's bay jog as two arcs, both Suburb ramps one-way (PLAN S11 P12, 2026-10-13)
+
+User: the Japanese layout decides ("as long as it aligns more to the Japanese setup"); "roads straight + clean curves, no
+wiggle"; and during the build: "for the wangan expressway / ramp redrawn, please ensure to have curve as much as
+possible, and remove s wiggle". The picture of what was derived is `docs/previews/market_built_plan.png`
+(`tools/scratch/market_p12/built.py`: the record's own centrelines on the land grid, not a sketch); the proposal it
+came from is `market_p12.png`. Land and buildings: `docs/island-world.md` "The fish market".
+
+**The Wangan over the bay (`island_plan.WG_MAIN`).** The line up the waterfront and the line into J0 are PARALLEL
+(both 45 deg, 159 m apart), so the mainline must turn right and then left between them: a reverse curve is the least
+it can be, and "one arc" does not exist. It was three corners (R 200 / 150 / 150: two right turns and a left, a kink
+at x 470). It is two corners, `WG_BAY_W` (378.9, -831.1) and `WG_BAY_E` (620, -815), each on one of the two lines:
+**R 200 right, 91 m straight (x 454..545), R 200 left.** R 250 leaves no straight between the two curves; R 200 keeps
+91 m and both Suburb gores on it. The straight lies 16-20 m further south over x 450..580 than the old line: the deck's
+edge is 29 m from the z 780 quay where it stood 9 m from it.
+
+**A station asked for by x stands ON the design alignment** (`island_expressway.station_by_x`). It interpolated on
+the chord between its neighbours: across a thinned span of a curve the Suburb entrance's gore stood 10.3 m inside the
+Wangan's arc and the port exit's 3.8 m (the "three dots" off the line). The port exit's profile moved with its gore
+and its exported curve read K 6.00: `island_grades.RAMP_K_OVERRIDE["shuto_port_off"] = 7.5`.
+
+**A ramp that turns one way: `island_expressway.one_arc`** -- a straight off the gore, ONE constant arc, a straight
+into the end: the fillet of the two tangent lines' corner, the largest radius that leaves `keep0` m after the gore and
+`keep1` before the end. `two_arc` maximises its radius with no same-sense rule, so from a gore whose tangent passes
+the far side of its target it returns an S. `gore_axis` gives the ramp the mainline's DESIGN tangent at the gore (it
+was the chord of the neighbouring stations). `ground_ramp(one_way=<R>)` asks for it and fails loudly when the two
+tangents do not meet ahead (then the gore is in the wrong place).
+- **The Suburb entrance `shuto_sb_on`** (the ramp the user marked): 273 m with ~20 deg one way, 55 m straight, ~98 deg
+  the other, because from its gore at x 640 (on the mainline's left arc) the tangent pointed almost at the T's mouth.
+  Gore to **x 520** (`SB_ON_X`), on the bay straight, where the tangent passes 113 m south of the mouth: **417 m,
+  one arc R 100 (87 deg), 1.7 %, no reversal.** P12 said x 585; on the two-arc mainline that is on the left arc
+  (heading 15 deg, R <= 50). The T on the dike road (850, 672) did not move.
+- **The Suburb exit `shuto_sb_off`** was "an S by design": 62 deg left, 27 deg back right. `suburb_exit` now tries one
+  arc for every arrival heading (1 deg steps) and keeps the largest radius whose planned fall is <= 5.8 % and which
+  never closes on the mainline again (it leaves on the INSIDE of the mainline's left curve: most arrival headings
+  cross it); the S only if none fits. **437 m, one arc R 96 (50 deg), 6.7 % exported** (limit 7.0; planned 5.7 -- the
+  two vertical curves take the rest). It arrives heading 65 deg N of E where it arrived at 55.
+- **A one-arc ramp's stations are faced on its design line** (`face_on_plan`, the ramp's own 1 m plan through
+  `plan_face`). `thin` keeps a span up to 60 m that turns up to 8 deg, so an arc's END lands inside a long span and the
+  chord (AUTO) facing of the station before it leans toward the straight: the exit's last arc station was faced 5.5 deg
+  too far round, and when the grade pass put a station 6.8 m before it the exported lane bent R 20 one way and R 46
+  back -- a wiggle INSIDE the new arc, found only by reading the lane points after the first rebuild (the record's
+  station turns read clean). Every other ramp is still chord-faced: the scan below is how to look.
+- **`island_grades.level_gores` puts its parting station ON THE CURVE** (`_on_curve`: the cubic Hermite between two
+  stations that both carry a design tangent; 0.5 mm off an R 96 arc over a 15.8 m span). It interpolated on the
+  CHORD, 0.33 m inside that arc, and the station put there still bent the faced exit +-2 deg in 10 m. Exported
+  lanes now: exit tightest R 81 (its inner lane), entrance R 88, no reversal over 0.8 deg on either.
+- NOT in this job: **13 other ramps still reverse** by more than 1 deg on their station turns -- c_nb_on, c_sb_off,
+  e_bwd_off, e_fwd_on, port_off, port_on, t2, t3, t4, w_bwd_on, w_fwd_off, y3, y4 (`tools/scratch/market_p12/sbon.py`
+  prints each reversal). `one_arc` / `ground_ramp(one_way=)` + `face_on_plan` are the tools; each needs its gore or
+  its end looked at the way these two were. And judge the result on the EXPORTED lane (`point_export.write`, then
+  the heading change per sample of `lanes[].points`): on this record 61 expressway lanes read under R 35 somewhere --
+  most are a second lane's taper at a gore, but the base lanes of s/d_bwd_off, spur__3, t4 and c_nb_on are in the list.
+
+**The market's two gates (`island_site_access.ACCESS`).**
+- `ichiba_michi`, the ONE truck ramp (坂路), from the existing signal at x 567 (its 4th arm). Stations AUTHORED
+  (`stations="ichiba"`, `ichiba_stations`), laid verbatim: the arm, a level R 15 bend as arc stations faced on the
+  arc, then **6 % down 124 m** with a 20 m vertical curve at each end, 13 stations, foot at x 419. Three owners used
+  to fight over such a profile (R4-3): `_resample_square` squared the bend, `island_dike.ramps` clamped the fall to
+  5 % from the pad's edge, and the 80 m grade smoothing averaged a level hold away. `authored_roads()` is read by the
+  last two: the dike sets only the mouth, the smoothing holds every station.
+  - **It is skewed 5.76 deg seaward.** The dike's face is a 1:2.2 slope, so the contour at the ramp's own height moves
+    14 m seaward over its fall: a ramp PARALLEL to the dike that starts on the face ends cut 4.7 m into it. Skewed, its
+    land-side edge follows the face down -- seaward fill only, the crest never notched.
+  - **Its arm leaves the pad 20 deg west of south** (`ICHIBA_ARM`). Due south it stands opposite the 3+3 north arm
+    (8 deg off north) and the kit's turn search for a 3-lane-to-1-lane "straight on" runs away: the pad solved
+    57.9 m (75 at 0 deg, 215 at +5) where any arm 15 deg or more off the line solves 20.8. MEASURED with
+    `point_solve.solved_setback` on the record; the search's non-monotony is known (W17). The first dry layout had
+    the ring's mouths 58 m from the centre and the north arm's ramp shortened to a 9.6 % pad.
+  - 6 %, not the plan's 5 %: 5 % needs 145 m and puts the foot 10 m from the car-park terrace's wall. The public's
+    step-free way is the terrace, not this ramp. It keeps the `block` preset (13 m: 1+1 lanes, both footways), not
+    the plan's 10 m strip with one footway.
+- `ichiba_chushajo`, the PUBLIC gate: a 26 m stub off a new T at x 375 to a ParkingLot56 on a terrace at the crest's
+  height. `signal=False`, `allow_cross=False` (new ACCESS keys, set on all three mouths in `_join`): no lights,
+  right-in / right-out -- the first use of `allow_cross` on the island. The pad solves 12.0 m.
+- **The coast road's corner** (`tools/island_market_corner.py`, a one-shot on the arterials input; refuses to run
+  twice): `ring_kita__9` turned 17, 26 and 45 deg at three chord stations. One arc **R 60, 88.2 deg**, five stations
+  faced on it, both legs unshifted; it lies INSIDE the old chords, on the crest already there. Its end (x 299) leaves
+  76 m to the car-park T. **The 側道 keeps its old line**: `teibo_sokudo` is the ring's line offset ~158 m to the town
+  side, and offset from the arc it moved up to 40 m (a core street lost its T, 58 m away), so `island_dike.sokudo`
+  offsets the arc as the chords it replaced (`island_market_corner.side_line`).
+
+**Right-hand traffic: a lane that CLOSED into its neighbour now OPENS beside it** (`point_export.reverse_traffic`).
+`island_layout.py` had not been run since the island went right-hand (2026-10-12): its flow assert failed with 5
+"misjoined" lanes (shuto_t1, t3, e_fwd_on, w_bwd_on) on the committed record. A widened ramp's second lane ends,
+keep-left, where its neighbour ends, kind `merge`. Reversed edge by edge that became a `ramp` edge neighbour -> lane
+read at the neighbour's TAIL, the far end of the run: a successor whose head stood 240-510 m BEHIND the car, taken
+with RAMP_WEIGHT. Now such a lane (a `merge` to its own inner / outer lane, their ends within `SAME_END_TOL` 6 m)
+INHERITS its neighbour's successors before the reversal -- so, reversed, whatever feeds the neighbour feeds it too --
+and its own merge edge is not reversed (the lane beside is reached by a lane change, as before). Flow: 2 566 lanes,
+0 broken / misjoined / unreached / orphans. TRAP for the next dry layout: a copy of the record WITHOUT
+`IslandRoads.network.json` beside it is a keep-left network, and its flow check passes what the island's fails.
+
+**Three things the layout re-run itself turned up** (it had not been run since 2026-10-04's street fixes, the s10 civic
+re-siting and the right-hand switch; the committed record was older than the code):
+- **A street T'd into an exit ramp 3.4 m up**: `cho_sw_345__2` ended ON `shuto_c_sb_off` at (69, 328), the very
+  junction `island_streets._raised_ramp` was written against on 2026-10-04. Its crossing test was exact (0 <= t <= 1)
+  on the run between a line's two END crossings, and the ramp WAS one of them: t = 1 give or take a bit. It reaches
+  `END_REACH` 2 m past either end now -- and that was NOT the path this street took: a line CUT BY A SITE goes through
+  `_line_split`, which asked nothing about ramps. There a raised-ramp crossing is a wall (never a node) and a piece
+  whose run crosses a ramp 0.6-5.5 m up is dropped. Found by `probe_road_clear` (the pad's connector blocked by the ramp's own
+  deck). The committed code alone reproduces it (a dry layout before any change of this job).
+- **Two koba block streets are gone**: `koba_cho_719` and `koba_machi_850`'s north half. The s10 re-siting put
+  `civic:hospital_west` / `civic:danchi` across the line y -719 ("cut by a site ... meets one road and no other
+  street"); frozen sites win over generated streets, so this layout drops them and `koba_waku_w__x2` is one road
+  round both corners. Their buildings were re-derived with everything else.
+- **A frozen footbridge lost its junction**: a junction's id is `j` + the smallest of its mouths' uids, and a
+  GENERATED street's stations get new uids at every layout run -- `j4bf395de` was renamed with nothing about it
+  changed, and its bridge read "its junction arm is gone". `island_footbridges.junction_of` falls back to the
+  junction with an arm of the row's road within 60 m of the bridge. (19 bridges, check clean.) The same id is the
+  prefix of every connector lane's name: anything else frozen against a junction id has this problem.
+
+**Checked (two passes; the first found the street-into-ramp, the stale footbridge and the exit's wiggle).** The
+layout: 0 errors; flow 2 551 lanes, 0 broken / misjoined / unreached / orphans / open ends; 60 grade separations,
+tightest 5.9 m (sb_off over the dike road); 27 ramps, steepest 6.7 % (sb_off), flattest curve K 6.2; 183 lane
+hand-overs within 0.003 m; again after the fillets (16 fixed -- the s9 set -- and 4 left at road ends; none on the
+market's roads). Road names against the committed record: + `ichiba_chushajo`, - the three koba pieces. The island
+from the bridge stage on (64 min): road gate 0 errors, 2 619 lanes in 41 pieces + 15 rail pieces, 13 stations PASS,
+2 027 buildings, door access PASS. `check_roads.sh` 45 PASS + the old sample street-tree FAIL;
+`island_downstream.sh --check` PASS; `probe_buildings` 18 163 / 18 163. In the engine: `probe_road_clear` 0 failures
+(the first pass: 1, the street on the ramp); `probe_road_launch` on World.tscn -- the truck ramp both lanes at
+12 m/s with the traffic rules (0 launches, worst rise 0.3 m/s), the Suburb entrance and exit at 22 m/s (twice their
+limit; 0 launches, worst rise 0.5 / 0.8 m/s); `probe_gps_route --world=island` 33 / 33; `probe_craft` PASS (boats
+float and make way). Piers against the quay wall (read from the baked meshes): the nearest in the water stands
+5.1 m out (596, 785), the nearest on land 7.8 m behind it (661, 772) -- none straddles the wall.
+Then the road stage once more (`tools/island_roads_stage.sh`, 21 min, 23 pieces dirty): the roads stage reads the
+footbridges' keep-out file the PREVIOUS sites stage wrote, so the pass in which a bridge had lost its junction built
+a guardrail into its stair one pass later; after it `island_footbridges --check` is clean (19), `probe_road_clear`
+0 failures, `island_downstream --check` PASS, `check_roads.sh` 45 + the old sample FAIL, World.tscn boots (exit 0;
+its 19 "scene unique ID" errors are the footbridge sub-resources' ids, which carry a `+` -- older than this job).
+NOT DONE: nobody drove or walked it; the nightly sweep and `perf_gate.sh` were not run; `probe_road_launch` counted
+"3 poles knocked down" three times -- past the truck ramp's dead end (402, 721), at the exit's gore with the car 3 m
+off its lane (566, 807), and on the Wangan's aux lane at (264, 936) driving the lane centre (first pass): three
+breakables each time reads like one ガードレール module, and the last of them is a rail IN an aux lane's path at a
+gore after the right-hand reversal -- not identified, not fixed.
+
+**The same evening the yard was lowered to y 2.0** (docs/island-world.md "The yard came DOWN ..."): `ichiba_michi`
+falls 10 m, not 6.3 -- `ICHIBA_GRADE` 0.07 (163 m; at 6 % it is 187 m and ends in the west corner), `ICHIBA_SKEW`
+6.9 deg, foot at (383, 728), record heights down to -3.6 (the first road authored below the network's zero; the
+whole layout passes it). `ichiba_chushajo` and its T at x 375 are REMOVED (the terrace stood where the ramp's foot
+now lands); `signal` / `allow_cross` stay as ACCESS keys with no user. The coast road's corner keeps its R 60 arc.
+

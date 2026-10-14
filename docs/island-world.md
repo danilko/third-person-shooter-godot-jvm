@@ -14,6 +14,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - The airport behind the bridge: one divided spur, the rail under it, the station against the terminal, the runway south; every hub station has its street (2026-09-29, user-asked)
 - Rail order at Central, one divided spur, runways on their aprons, a Ferris wheel (2026-09-29, later; user-asked)
 - The rebuild review batch: port entrance, signal controllers, the waterfront re-plan, services coverage (2026-10-03)
+- The fish market: a straight quay, a car park at the dike's height, the crest carried across junction pads (PLAN S11 P12, 2026-10-13)
 
 ---
 
@@ -1363,3 +1364,117 @@ seawall works and fields blocked. Fixes, each measured against the scan:
   scenes; a mission then places it at a plot (`island_civic_sites.PLOTS`) or an anchor
   (`island_buildings.OPEN_BUILDINGS` / `PUBLIC_BUILDINGS`). Replacing only the LOOK is a hand edit of the piece in
   library.blend (build_library.py keeps a hand-edited piece) and `build_buildings.sh`.
+
+## The fish market: a straight quay, a car park at the dike's height, the crest carried across junction pads (PLAN S11 P12, 2026-10-13)
+
+The Japanese layout the user approved on `docs/previews/market_p12.png` after six review rounds ("as long as it aligns
+more to the Japanese setup"): the market stays LOW outside the dike (yard 5.6 m, crest 12.0), ONE truck ramp from the
+existing signal, the public parked up at crest height, one straight shore. Roads: `docs/roads.md` "The fish market's
+two gates". What was derived: `docs/previews/market_built_plan.png`.
+
+**Land (`island_reshape.py`, three boxes applied last, like the Wangan terminal's platform).**
+- `MARKET_QUAY` (262, 720, 730, 780): the plain's height out to **z 780** from the west wedge to the east bank -- one
+  straight shore 458 m long where the yard's edge stood at z 762 and stopped at the wedge. x 262..610 is the market's
+  quay; x 610..720 a plain vertical sea wall under the Wangan's viaduct (no buildings). Fill over a seabed of -4 (east)
+  to -24 m (west): a quay wall into deep water.
+- `MARKET_WEDGE` (276, 303, 584, 730): the west wedge was a SLOT of water along x 280..300 (a leftover of
+  `GULF_FILL`'s x0 = 300): -24 m and 20 m wide at the shore, narrowing north to a 2 m ditch that ran on under the dike
+  road to z 590 behind it. The quay box alone left a pond between z 700 and 730; filled only to the crest's edge it
+  left a 17 m hole at the dike's land-side toe (298, 652..660) -- the corner's new arc no longer covered the slot's far
+  end, and `island_dike.sculpt` fills no sea cell beside the crest. All of it is filled.
+- `MARKET_TERRACE` (352, 398, 696, 753) at 11.9: the car park's terrace against the crest's sea face.
+- **The fill does not lower the dike.** `island_dike.exposure` (the open-sea fraction within 1 km that picks a 12.0 or
+  14.7 m crest) and `sokudo`'s "which side is the town" test both read the open sea from the land grid; with the wedge
+  filled the corner's reading changed and the 側道 moved 20-40 m. `reshape` records every cell that WAS open sea and is
+  not after the fills (`terrain/island_market_reclaimed.json`: the filled cells and the slot's cut-off blind end), and
+  both readers count them as the bay they were (`RS.market_reclaimed()`). Measured: the pre-expressway record with
+  the fills differs from the one without by 0.1 m at most on `teibo_sokudo` (it was 66 m).
+- **`island_land.f32` was STALE before this job**: `coastal_works` reads the road record (`_road_near`), and the
+  record had gained the north-coast beach lane since the grid was last built. A rebuild with the committed code
+  changed 24 189 cells off the north coast (x 500..950, z -2200..-1700; <= 2.8 m, mostly < 0.5) before any market
+  change. They are in this rebuild.
+
+**The crest runs on across a junction pad (`island_dike.sculpt`).** A dike road ends at its mouth and the next one
+starts at the pad's far mouth, so no segment spanned the pad and the embankment stopped either side of it: under the
+x 567 junction the ground stood at the plain, 6.3 m under the road, over z 666..684 (and so under every crest
+junction on the ring). One crest segment per pair of dike mouths of a pad, the wider road's width. Measured at the
+market junction: 11.9 from z 664 to 696 where it read 5.6.
+
+**The piece (`blender/tools/library_civic.py fish_market`, PLACEHOLDER massing; `FishMarket.tscn`, its mesh is its
+collider).** Laid out in WORLD numbers through one helper, because every part answers to something a generator owns.
+West to east: the small-boat corner under the terrace with the 浮桟橋 (two FIB1 and a WOB1, off the hall's landing
+face); the terrace's retaining walls (2.2 m thick: the land grid's own edge is a 2 m slope) with a stair down the
+south face and a 16 m footbridge off the east face to a gallery on the office; the 3-storey office whose roof is the
+津波避難 deck (a flight up from the gallery, one down to the yard); the 90 x 29 m sawtooth hall open to the quay with
+17 truck berths on its land side; the cold store, ice plant and 給氷塔 with its chute; a fence and gate at x 610; the
+strip's coping and pipe railing. The quay face is a wall from -8 m to the yard along the whole 458 m.
+- Reserve `fish_market` = (300, 712)-(610, 780) (it was (405, 705)-(570, 775)).
+- **Differences from the approved picture** (drawn as notes on `market_built_plan.png`): the office is at the hall's
+  WEST end beside the terrace (a footbridge to an office at the east end would be 110 m long over the hall); the car
+  park is the ParkingLot56 composite (56 spaces, not ~40) with its T at x 375; no stairs up the dike face (the 1:2.2
+  slope is walkable); no ramp wall (the ramp's sides are fill slopes); the ferris wheel park did NOT move -- sliding
+  it south puts its south end on the beach, 3-5 m lower -- so the Suburb entrance passes 8 m over its north-west lawn
+  (x 760..805, z 798..817).
+
+### The yard came DOWN to a fishing port's height the same day (user, 2026-10-13 late; three fresh reviews)
+
+The user, looking at the first build: "the boat quay should be same level as the pontoon in most images" -- at 5.6 m
+over the water (the island's raised plain) no boat lands a catch, and the pontoon far below read wrong. Decision: the
+yard at **y 2.0**, "a more reasonable arrangement to a Japanese fish market with quay"; then, at the user's request,
+the plan went to three session-less reviewers (Japanese port planner, level designer, developer) BEFORE the rebuild.
+Everything above about the terrace, the crest-level car park, the footbridge, the pontoon and "5.6" is the first
+build's record; this is what stands.
+
+**Land.** `MARKET_YARD` (262, 608, 700, 780) is SET to `MARKET_YARD_Z` 2.0 after the quay and wedge fills (not a
+fill: `np.where`). The dike's own sculpt lays its 1:2 face down to it (toe z 718); the strip under the viaduct east
+of x 610 keeps 5.6 behind the piece's 3.6 m retaining wall. `MARKET_TERRACE` is gone.
+- `island_dike.sculpt`: a ramp segment was skipped when below `plain + 0.3` -- the ramp's lower half would have hung
+  over the yard. It is compared with the ground under the segment now; and a dike segment's REACH is measured from
+  the lowest land within 60 m (the developer measured the face's reach with not one cell to spare).
+- x1 = 608, not 610: the grid's 2 m slope up to the strip must lie UNDER the wall (607.8..610), or a 3.6 m wedge is
+  left behind it and the stair's head ends over a 1.8 m notch (developer, measured on the grid).
+
+**The piece (`library_civic.fish_market`), west to east -- the PLANNER's order:** the public car park (two double
+rows, 6 m aisles) and the office over a 直売所 / 食堂 floor (roof = 津波避難 deck, a solid stair) AT THE RAMP'S FOOT,
+fenced from the working yard with one gate; the auction hall **90 x 20 m** open to the quay under a 4.5 m eave, its
+east gable open, 13 truck berths 13-18 m deep on its land side; the cold store, ice plant and an 18 m 給氷塔 on the
+quay (the 準備岸壁); the trucks' turning ground with a net store and container rows; the retaining wall and its stair.
+On the quay a 船揚場 slipway (1:11, outside the wall) and three landing stairs; three 避難階段 up the dike's face. Six
+boats moored ALONGSIDE (four FIB1, two WOB1), no pontoon.
+
+**What each review changed** (the planner sourced nothing: every figure of theirs is RECALLED or judgement):
+- PLANNER: public cars must not drive through the truck berths -> the ends were swapped (my layout, and the user's
+  "push the parking east", had the public at the far end past 13 berths); hall 27 -> 20 m deep (a 荷さばき所 is
+  15-25 m; backing a 4 t truck wants ~18 m); the dike crest is the refuge, so stairs to it; 乗り越し by ramp, no 陸閘;
+  eave over the apron; do NOT move the quay south (29 m of water is a channel, not a basin).
+- LEVEL DESIGNER (read in code): my car park had no aisles (2 m between rows); the quay was a one-way door -- the
+  swim jump clears ~1 m and the quay is 2 m, the nearest way out 348 m off -> slipway + landing stairs; a chain-link
+  box is a see-through bullet stop -> a low wall; cover lines (fish-box rows in the hall, containers).
+- DEVELOPER (measured, scripts in the session's scratchpad): safe to rebuild; the x 608 edge; the ramp's fill toe
+  reaches z 736..738 after the stamp's 6 m verge -> paving from z 738; the coast road's embankment covers x 262..288
+  -> the slipway and car park start at x 290+; record heights below zero pass the whole layout (14 other roads
+  already carry them); the site stands at 2.0 (`ground="centre"`); boats clear the fenders by 0.9 m.
+
+**NOT TAKEN, for the user** (each needs a decision or a second job):
+- the planner's quay at y 1.5 with a y 1.0 物揚場 for small craft -- the user said "about 2 m"; the slipway and stairs
+  are the low landings for now;
+- a ramp section of 3.5 m lanes and one footway (10.5 m) and a retaining wall instead of its seaward fill -- the ramp
+  keeps the kit's `block` section (13 m) and its fill slope;
+- LANES IN THE YARD (designer): AI cars stop at the ramp's foot, and police dispatch discards a car whose route is
+  over 2.5x the straight line (a unit on the dike above a player in the yard) -- a teardrop at the foot and a spine
+  east along z ~740 are roads, i.e. another layout + road rebuild, and the kit's street section has kerbs and
+  footways a paved yard should not;
+- a second, unlaned service ramp through the east wall; ladders on the quay wall; boats moored bow-in (縦付け);
+  the seabed raised from -24 m to a port's -4 m; the buildings split into separate meshes for occlusion.
+
+**Checked (the lowered yard, 2026-10-13 night).** A dry layout first (0 errors), then land -> layout -> the 16
+fillets -> the island from the bridge stage (68 min): layout 0 errors, flow 2 539 lanes clean, 27 ramps (steepest
+6.7 %, K >= 6.2), again on the filleted record; road gate 0 errors, 2 607 lanes; 2 027 buildings; footbridges 19
+clean; `probe_buildings` 18 163 / 18 163; `probe_road_clear` 0 failures; `probe_road_launch` on the 7 % ramp both
+lanes at 12 m/s with the traffic rules (0 launches, worst rise 0.6 m/s) and on both Suburb ramps at 22 m/s (0);
+`probe_gps_route --world=island` 33 / 33; `probe_craft` PASS; `island_downstream --check` PASS; `check_roads.sh` 45 +
+the old sample FAIL; World.tscn boots. Pictures: `docs/previews/market_built_plan.png` (the derived record) and
+`market_built_{overview,quay,water,dike,ramp,yard,gate}.jpg`. NOT DONE: nobody has driven, walked or sailed it;
+whether a swimmer really walks out by the landing stairs and the slipway was not tried in play; the nightly sweep
+and `perf_gate.sh` were not run.
+

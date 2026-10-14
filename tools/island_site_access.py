@@ -89,13 +89,20 @@ ACCESS = [
     # the terminal, south to the locked gate in the airside fence (site_airport_fence.py GATE_GX)
     dict(name="kuko_service", site="airport_airfield", from_road="kuko_rotary", at=(1130.0, -1710.0),
          end=(1130.0, -1777.0), parking=None),
-    # the FISH MARKET's lane (PLAN.md 1b, 2026-10-08): the market stands outside the dike between its toe and the quay
-    # with no road. The dike road ring_kita has a T at x 567 where eki_minami_dori climbs onto it from the land side;
-    # this lane is that T's 4th arm, straight on toward the sea and then WEST along the dike's sea toe (z ~703, the
-    # reserve's north edge), where `island_dike.py raise` ramps it down off the crest -- 6.4 m, ~90 m at 7 % -- so it
-    # reaches the market's ground before its end. No car park: the market's own forecourt is the end.
+    # THE FISH MARKET (PLAN S11 P12, 2026-10-13; the Japanese layout the user approved on docs/previews/market_p12.png).
+    # The market stands outside the dike on a quay 2 m over the water, 10 m below the crest, with ONE way in off the
+    # dike road ring_kita:
+    #  * `ichiba_michi`, the ONE truck ramp (坂路), from the existing signal at x 567 ("市場前", where eki_minami_dori
+    #    climbs onto the dike from the land side: its 4th arm). South off the pad, a level R 15 bend, then WEST down the
+    #    dike's sea face at ICHIBA_GRADE to the yard, skewed 5.8 deg seaward so it never cuts into the face. Its stations are AUTHORED (`stations`, see ichiba_stations): the
+    #    bend as real arc stations faced on the arc, the fall with a 20 m vertical curve at each end -- so
+    #    `_resample_square`, the dike's 5 % ramp pass and the grade smoothing all leave it alone (authored_roads()).
+    #    It replaces the 2026-10-08 lane on z 703 (69 deg in one station, 5 % from the pad's edge).
+    #  (The first build had a second gate, `ichiba_chushajo`: a T at x 375 to a car park on a terrace at the crest's
+    #  height. With the yard lowered to a quay's height the ramp falls 10 m and its foot lands where the terrace stood;
+    #  the public and the buyers park on the yard's east end instead. `signal` / `allow_cross` stay as ACCESS keys.)
     dict(name="ichiba_michi", site="fish_market", from_road="ring_kita", at=(567.0, -672.0),
-         via=[(560.0, -703.0)], end=(440.0, -703.0), parking=None),
+         stations="ichiba", end=(379.0, -729.0), parking=None),
     # BEACH ACCESS over the dike (PLAN.md item 4, user 2026-10-08: "connect to the car parking just like the north east
     # top"). The dike IS the raised ring road, so cars already cross it on top and nothing needs an opening or a 陸閘;
     # what was missing is a way DOWN its sea face to the sand. Each lane is a T off the dike road, turns along the
@@ -118,6 +125,88 @@ ACCESS = [
     dict(name="butsuryu_michi", site="logistics_yard", from_road="kichi_dori", at=(-280.0, -1230.0),
          end=(-280.0, -1440.0), parking="ParkingLot14"),     # its car park short of the runway band (z 1480)
 ]
+
+
+ICHIBA_X = 567.0                # the market ramp: its arm's line off the x 567 junction (record x)
+ICHIBA_MOUTH = 20.5             # its mouth from the junction's centre (the pad's solved setback: 20.4-20.6)
+ICHIBA_ARM = 20.0               # deg: the arm leaves the pad this far WEST of due south. Due south it stands opposite
+#                                 the 3+3 north arm (eki_minami_dori, 8 deg off north), and the kit's turn search for a
+#                                 3-lane-to-1-lane "straight on" runs away: the pad solved 57.9 m (75 at 0 deg, 215 at
+#                                 +5) where every arm 15 deg or more off the line solves 20.8 -- measured, 2026-10-13
+ICHIBA_R = 15.0                 # the level bend onto the dike's face (a truck's walking-pace turn; the pad is its room)
+ICHIBA_PI_Z = 706.1             # Godot z of the bend's corner on the arm's line: R 15 then starts at the mouth
+ICHIBA_SKEW = 6.9               # deg: the ramp runs this far SEAWARD of the dike's own line as it falls. The face is a
+#                                 1:2 slope (crest edge z 698 at 11.9, toe z ~718 at the yard's 2.0), so the contour at
+#                                 the ramp's own height moves 20 m seaward over its fall: a ramp PARALLEL to the dike
+#                                 that starts on the face ends cut metres into it (the 2026-10-08 lane on z 703 did).
+#                                 Skewed, its land-side edge follows the face down: seaward fill only, never a notch
+ICHIBA_GRADE = 0.07             # its fall: 10 m in 163 m (a ramp's limit at 40 km/h; trucks take it at 20). At 6 % it is
+#                                 187 m and ends in the west corner with no room to turn
+ICHIBA_VCURVE = 20.0            # a vertical curve this long at the top and at the foot (MLIT: >= 20 m at 20 km/h)
+ICHIBA_FOOT_RUN = 4.0           # m of level road past the foot (the yard is flat beyond it; the terrace wall is 15 m on)
+
+
+def ichiba_stations(ground):
+    """The market ramp's AUTHORED stations [(x, y, z, tangent or None)], record frame, mouth first: three on the level
+    bend (start, middle, end -- none nearer the mouth than `tidy`'s 10 m MIN_MOUTH_CLEAR), then the fall along the
+    skewed line: a 20 m parabola, ICHIBA_GRADE, a 20 m parabola onto the yard's ground, and ICHIBA_FOOT_RUN of level."""
+    import island_dike as ID
+    yj = -672.0
+    top = ID.crest_at(ICHIBA_X, yj) - rg.NET_Y
+    a = math.radians(ICHIBA_SKEW)
+    w = (-math.cos(a), -math.sin(a))                                   # down the ramp: west, a little south
+    k = math.radians(ICHIBA_ARM)
+    t0 = (-math.sin(k), -math.cos(k))                                  # the arm: south-south-west off the pad
+    m = (ICHIBA_X + t0[0] * ICHIBA_MOUTH, yj + t0[1] * ICHIBA_MOUTH)   # its mouth, on a ray from the pad's centre
+    # the bend's corner: where the arm's line meets the ramp's line (through (ICHIBA_X, ICHIBA_PI_Z) along w)
+    den = t0[0] * w[1] - t0[1] * w[0]
+    sa = ((ICHIBA_X - m[0]) * w[1] - (-ICHIBA_PI_Z - m[1]) * w[0]) / den
+    pi = (m[0] + t0[0] * sa, m[1] + t0[1] * sa)
+    phi = math.acos(t0[0] * w[0] + t0[1] * w[1])
+    T = ICHIBA_R * math.tan(phi / 2.0)
+    s0 = (pi[0] - t0[0] * T, pi[1] - t0[1] * T)                        # the arc's start, on the arm
+    e0 = (pi[0] + w[0] * T, pi[1] + w[1] * T)                          # its end, on the ramp's line
+    c = (s0[0] + t0[1] * ICHIBA_R, s0[1] - t0[0] * ICHIBA_R)           # its centre: to the arm's right (the west)
+    out = [(m[0], m[1], top, t0)]
+    if sa - T > 10.0:                                                  # the arc's start, when it clears the mouth
+        out.append((s0[0], s0[1], top, t0))
+    h = -phi / 2.0                                                     # the arc's middle: s0 turned phi/2 clockwise
+    rx, ry = s0[0] - c[0], s0[1] - c[1]
+    out.append((c[0] + rx * math.cos(h) - ry * math.sin(h), c[1] + rx * math.sin(h) + ry * math.cos(h), top,
+                (t0[0] * math.cos(h) - t0[1] * math.sin(h), t0[0] * math.sin(h) + t0[1] * math.cos(h))))
+    out.append((e0[0], e0[1], top, w))
+
+    def on_line(d):
+        return (e0[0] + w[0] * d, e0[1] + w[1] * d)
+    # the yard's own level at the foot, read clear of the dike's toe (8 m seaward of the ramp's line there)
+    q = on_line(150.0)
+    foot_z = ground.z(q[0], q[1] - 12.0) or 0.0     # (below the network's zero: the yard is under the plain)
+    D = (top - foot_z) / ICHIBA_GRADE + ICHIBA_VCURVE
+
+    def z_at(d):
+        if d <= ICHIBA_VCURVE:
+            return top - ICHIBA_GRADE * d * d / (2.0 * ICHIBA_VCURVE)
+        if d >= D - ICHIBA_VCURVE:
+            return foot_z + ICHIBA_GRADE * (D - d) ** 2 / (2.0 * ICHIBA_VCURVE)
+        return top - ICHIBA_GRADE * (d - ICHIBA_VCURVE / 2.0)
+    ds = [ICHIBA_VCURVE * k_ / 3.0 for k_ in (1, 2, 3)]
+    run = D - 2.0 * ICHIBA_VCURVE
+    n = max(1, int(math.ceil(run / 30.0)))
+    ds += [ICHIBA_VCURVE + run * k_ / n for k_ in range(1, n + 1)]
+    ds += [D - ICHIBA_VCURVE + ICHIBA_VCURVE * k_ / 3.0 for k_ in (1, 2, 3)]
+    out += [on_line(d) + (z_at(d), None) for d in ds]
+    out.append(on_line(D + ICHIBA_FOOT_RUN) + (foot_z, None))
+    return out
+
+
+STATIONS = {"ichiba": ichiba_stations}
+
+
+def authored_roads():
+    """The access roads whose stations AND heights are authored (`stations`): `island_dike.ramps` sets only their mouth
+    on the pad and `island_grades smooth` holds every station (an 80 m moving average flattens a level bend and a 20 m
+    vertical curve alike)."""
+    return {a["name"] for a in ACCESS if a.get("stations")}
 
 
 REUSE_M = 15.0                  # a junction whose centre is this close to `at` is joined, not cut beside
@@ -257,6 +346,15 @@ def add(net, a, ground):
     members = _junction_of(net, a["from_road"], a["at"])
     cx = sum(net.points[u].pos[0] for u in members) / len(members)
     cy = sum(net.points[u].pos[1] for u in members) / len(members)
+    if a.get("stations"):
+        # AUTHORED stations, laid verbatim (the market ramp): no resampling, no squared corner, its own heights
+        rows = STATIONS[a["stations"]](ground)
+        road = chain_road(net, a["name"], [q[:3] for q in rows], preset="block")
+        for u, q in zip(road.points, rows):
+            if q[3] is not None:
+                rg.freeze(net, u, q[3])
+        _join(net, a, members, road)
+        return road, members
     via = list(a.get("via", ()))
     first = via[0] if via else a["end"]
     dx, dy = first[0] - cx, first[1] - cy
@@ -319,11 +417,21 @@ def add(net, a, ground):
         # no car park at the end: the road drapes (a station's street crosses its track level with it)
         pts3 = [(x, y, max(0.0, ground.z(x, y) or 0.0)) for x, y in pts]
     road = chain_road(net, a["name"], pts3, preset="block")
-    make_junction(net, members + [road.points[0]])
+    _join(net, a, members, road)
+    return road, members
+
+
+def _join(net, a, members, road):
+    """The access road's mouth joins its junction. `signal` False = no lights (a minor T); `allow_cross` False = no turn
+    across the oncoming lanes at any of its mouths (right-in / right-out: point_export drops the cross movement)."""
+    make_junction(net, members + [road.points[0]], signal=a.get("signal", True))
+    if not a.get("allow_cross", True):
+        for u in members + [road.points[0]]:
+            net.points[u].allow_cross = False
+    ground = rg.Ground()
     for u in road.points:
         q = net.points[u]
         q.ground_z, q.has_ground_z = ground.z(q.pos[0], q.pos[1]) or 0.0, True
-    return road, members
 
 
 def main(argv):

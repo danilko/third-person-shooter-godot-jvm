@@ -371,11 +371,12 @@ RESERVES = (
     # both, and Fish Market station's 駅前 row already lines it with shop-houses -- the market's types replace them there.)
     # (2026-10-02 night, the waterfront review: the Wangan's deck and both Suburb ramps crossed the old box's east part,
     # x 585..716 -- FishMarket stood under the viaduct; the market keeps the west part, clear of all three)
-    ("fish_market", (405.0, 705.0, 570.0, 775.0)),   # and only z 705..775: the dike's slope ends
-    #                                                    at ~705 and the shore is at 762 (the quay deck runs on to 775)             # (x 300 -> 420, 2026-09-29: the Wangan's leg and
-                                                               # the W JCT's flyovers pass over x 350..420)             # the 魚市場 + small-boat quay outside the dike, reached
-                                                               # from the ring / dike side road (hatoba_dori is gone)
-                                                               # (3.18(h), the Tsukiji/Toyosu pattern)
+    # (PLAN S11 P12, 2026-10-13: the Japanese layout) the whole yard between the dike's sea toe (z 712) and the new
+    # straight quay (z 780, island_reshape.MARKET_QUAY), from the filled west wedge (x 300) to the yard's east end
+    # (x 610, where the Wangan's viaduct takes over). It was (405, 705)-(570, 775). The truck ramp ichiba_michi comes
+    # down inside its north edge and the car-park terrace stands in its north-west corner: both are roads / sites of
+    # their own (island_site_access), and library_civic.fish_market lays the piece out round them.
+    ("fish_market", (300.0, 712.0, 610.0, 780.0)),
     # the airport's AIRSIDE (user, 2026-09-29: the runway "on a different side from the bridge"): behind the terminal,
     # the apron against its airside face (boarding bridges to z 1811.6), then the taxiway and the 540 x 45 m runway
     # along the island's SOUTH edge (the island reaches z 2040 for it, island_reshape AIRPORT_SOUTH). It stood between
@@ -501,6 +502,7 @@ E2_FLY_Z = 17.5
 #: completely outside C1"): its WEST END (a terminal loop since 2026-10-02, WG_LOOP_*), then the coast east to a quarter-turn north (WG_TURN_*) onto chuo_dori's median, over it
 #: to C1's west side (the W JCT). WG_CENTRE's vertices east of the turn are phase 2's line (PHASE2_CORRIDOR below
 #: holds that ground); the build takes only those west of the turn. Record frame.
+#: (WG_CENTRE / WG_RADII are phase 1's line, read by nothing since the complete Wangan: WG_MAIN below is the alignment.)
 WG_CENTRE = [(-1030.0, -1030.0), (-940.0, -1113.0), (-700.0, -1128.0), (-350.0, -1126.0), (-60.0, -1112.0),
              (150.0, -1060.0), (370.0, -840.0), (470.0, -805.0), (640.0, -795.0), (780.0, -655.0),
              (930.0, -505.0), (1060.0, -500.0)]
@@ -517,8 +519,18 @@ WG_TURN_R = 100.0           # the quarter-turn north onto chuo_dori's line (a 50
 #: J0 (2026-10-01, the lane-split T): the mainline ENDS on the straight waterfront diagonal and each carriageway splits
 #: lane by lane into four one-lane ramps (分岐 / 合流), NW -> SE: T3 | T1 | median | T4 | T2 (see t_split)
 WG_J0 = (880.0, -530.0)
+#: THE BAY JOG IS TWO ARCS AND ONE STRAIGHT (PLAN S11 P12-5, user 2026-10-13: "can move the wangan further south", "have
+#: curve as much as possible, and remove s wiggle"). The line up the waterfront (45 deg through (150, -1060)) and the line
+#: into J0 (45 deg through (780, -655)) are PARALLEL, 159 m apart, so the mainline must turn right and then left between
+#: them: a reverse curve is the least it can be. It was three corners ((370, -840) (470, -805) (640, -795), R 200 / 150 /
+#: 150: two right turns and a left, a kink at x 470); it is two corners now, WG_BAY_W on the first line and WG_BAY_E on the
+#: second, joined by one tangent heading 3.8 deg north of east: R 200 right, 91 m straight (x 454..545), R 200 left. That
+#: tangent lies 16-20 m further SOUTH over x 450..580 than the old line: the water in front of the fish market's quay
+#: (z 780) is 29 m to the deck's edge where it was 9, and the two Suburb gores stand on a straight.
+WG_BAY_W = (378.9, -831.1)
+WG_BAY_E = (620.0, -815.0)
 WG_MAIN = [(-850.0, -1128.0), (-700.0, -1128.0), (-350.0, -1130.0), (-60.0, -1133.0),
-           (150.0, -1060.0), (370.0, -840.0), (470.0, -805.0), (640.0, -795.0), (780.0, -655.0), WG_J0]
+           (150.0, -1060.0), WG_BAY_W, WG_BAY_E, (780.0, -655.0), WG_J0]
 #: THE WEST END IS A TERMINAL LOOP (NEXT PASS step 2, 2026-10-02, user: "ground terminal loop"; the second independent
 #: review: a west-end TURNAROUND joins the two one-way systems in BOTH directions, where a port-side PA would join only
 #: one). The mainline comes down to the ground on its straight coast line and ends at WG_LOOP_J, a signalised 4-arm
@@ -535,7 +547,7 @@ WG_LOOP_R = 38.0
 WG_LOOP_Z = 5.75                   # the platform (the plain, 5.6) + the stamp's clearance
 WG_WEST_RISE = 230.0               # the mainline climbs from the junction to WG_Z over this far (2.7 %), level by Y1's gore
 WG_APPROACH = 85.0                 # the approach's last stretch, posted 50 (its own road `shuto_wangan`)
-WG_MAIN_R = [90.0, 600.0, 1500.0, 1500.0, 250.0, 200.0, 150.0, 150.0, 120.0, 0.0]
+WG_MAIN_R = [90.0, 600.0, 1500.0, 1500.0, 250.0, 200.0, 200.0, 120.0, 0.0]
 #: THE LANE-SPLIT T at the spur (2026-10-01, island_expressway.t_split): T1 (Wangan EB -> spur SB) runs along J0's
 #: line, turns right OVER T4, and makes ONE clockwise circle of T1_R over the spur (centre (T1_LEG_X - T1_R, T1_LOOP_Y)),
 #: then straight down the spur's east side at T1_LEG_X to its merge
@@ -591,7 +603,10 @@ SB_OFF_X = 540.0
 #: P2-6: the Suburb's WB entrance -- from a new T on the dike road (ring_kita) east of the Wangan's crossing, where the
 #: road is already on the sea side, merging onto the WB carriageway's left here
 SB_ON_T = (850.0, -672.0)
-SB_ON_X = 640.0
+#: (P12-6, 2026-10-13) its gore stood at x 640 ON the mainline's left arc, where the tangent points almost at the T's
+#: mouth: no one-way curve reaches the T from there, and the ramp was an S. On the bay straight (x 454..545) the tangent
+#: passes 113 m south of the mouth: a straight, ONE arc of R 100 and a straight (island_expressway.one_arc)
+SB_ON_X = 520.0
 #: P3-8: the port's WB exit -- off the WB's left under Y2's flyover, landing at a new T on the port loop's west leg
 #: (kichi_dori__2) from inside the loop; a mainline joint at WG_CUT4_X keeps it off Y3's run
 PORT_OFF_X = -170.0          # -200 -> -170 (2026-10-04): a two-lane exit holds ~30 m longer at the deck height

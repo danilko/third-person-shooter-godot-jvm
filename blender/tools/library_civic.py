@@ -531,47 +531,165 @@ def resort_hotel(material, Builder):
     return "ResortHotel", "civic", b.mesh()
 
 
+FM_C = (455.0, 746.0)     # the fish market reserve's centre, GODOT (x, z): island_plan RESERVES "fish_market"
+FM_QUAY_Z = 780.0         # island_reshape.MARKET_QUAY's sea edge
+FM_YARD_X = (262.0, 610.0)   # island_reshape.MARKET_YARD: the low yard's west and east ends
+FM_WATER = -2.0           # the water under the yard (island_reshape.MARKET_YARD_Z = 2.0 over the sea)
+FM_STRIP_H = 3.6          # the strip under the viaduct east of the yard: the plain, 5.6 - 2.0 over the yard
+
+
 def fish_market(material, Builder):
-    """魚市場 for the 165 x 70 m quay reserve (2026-10-02 night: the reserve's west part -- the Wangan's deck and the
-    Suburb ramps cross its old east end -- and only as deep as the flat land between the dike's slope and the shore,
-    57 m, plus a 13 m quay deck out over the water): a 90 x 36 m auction hall (a low sawtooth-roofed shed, open to the
-    quay at -Y on columns, 11 m), an ice plant, a 3-storey office, the truck bays along the land side (+Y); on the quay
-    (-Y, the water) bollards and fenders, and a floating pontoon (浮桟橋) for the small boats PARALLEL to the quay,
-    reached by a gangway -- parallel because the Wangan's viaduct runs 15-25 m off this quay, so finger piers would
-    stand under its deck. The plot's ground is the land, 5.6 m above the water: the pontoon floats at -5.0."""
+    """魚市場 on a fishing port's quay, 2 m over the water (user, 2026-10-13 late: "the boat quay should be same level as
+    the pontoon in most images ... go down, about 2 m above the water ... a more reasonable arrangement to a Japanese
+    fish market with quay"), as three fresh reviewers (Japanese port planner, level designer, developer) then changed
+    it. The first build of the day stood on the island's raised plain, 5.6 m up, with a pontoon far below it.
+
+    Laid out in WORLD (Godot x, z) numbers through `B`, because every part answers to something the generators own:
+    the low yard (island_reshape.MARKET_YARD), the quay line z 780, the truck ramp `ichiba_michi` coming down the
+    dike's face to its foot at (383, 728) (island_site_access), the Wangan's viaduct east of x 610. Origin = the
+    reserve's centre on the yard's ground; the quay at -Y.
+
+    West to east (the planner's order: the PUBLIC at the ramp's foot and fenced off, so no visitor's car passes the
+    truck berths; trucks run foot -> berths -> the turning ground at the east end and back):
+      * the public car park and, by the quay, the 3-storey office over a 直売所 / 食堂 floor -- its roof is the
+        津波避難 deck, a solid stair up its land side; a fence with one gate between it and the working yard;
+      * the 90 x 20 m auction hall (a 荷さばき所 is 15-25 m deep; at 27 m the trucks had 7 m to back in), sawtooth
+        roof, open to the quay under a 4.5 m eave, a wall to the land, 13 truck berths 15-18 m deep on its land side;
+      * the cold store and ice plant, the 給氷塔 on the quay with its chute (the 準備岸壁: ice straight into the boats);
+      * the trucks' turning and waiting ground, net / float store; a 3.6 m retaining wall up to the strip under the
+        viaduct with a stair through it.
+    THE QUAY: a wall down past the water (the terrain's own edge is a 2 m slope), 車止め kerb, bollards, tyre fenders;
+    at the west end a 船揚場 slipway down into the water, and three landing stairs along the wall -- the only ways OUT
+    of the water for a swimmer (the swim jump clears ~1 m, the quay is 2 m). Three 避難階段 climb the dike's face to
+    the crest (the dike IS the refuge: 10 m up, a minute away)."""
     b = Builder("FishMarket", material)
-    ground(b, -82.5, 82.5, -35.0, 35.0, "MI_AsphaltLot")
-    x0, x1, y0, y1 = -45.0, 45.0, -28.0, 8.0
-    b.box((x0, y1 - 1.0, 0.0), (x1, y1, 8.0), "MI_Corrugated")                     # the land-side wall
-    for x in range(int(x0), int(x1) + 1, 10):                                          # columns on the open side
-        b.box((x - 0.4, y0 - 0.4, 0.0), (x + 0.4, y0 + 0.4, 8.0), "MI_PaintedMetal")
-    b.box((x0, y0, 8.0), (x1, y1, 8.6), "MI_PaintedMetal")
-    x = x0
-    while x < x1 - 1e-6:                                                               # sawtooth roof
-        b.wedge_x(x, x + 10.0, y0, y1, 11.0, 8.6, "MI_Corrugated")
-        b.box((x, y0, 8.6), (x + 0.3, y1, 11.0), "MI_GlassClear")
+    cx, cz = FM_C
+
+    def B(x0, x1, z0, z1, h0, h1, mat):
+        """A box over Godot x0..x1, z0..z1, from height h0 to h1 above the yard."""
+        b.box((x0 - cx, cz - z1, h0), (x1 - cx, cz - z0, h1), mat)
+
+    def ramp_x(x0, x1, z0, z1, h_at_x0, h_at_x1, mat, base=None):
+        """A solid stair / ramp whose top slopes along Godot x (from the yard's ground, or a box under it to `base`)."""
+        b.wedge_x(x0 - cx, x1 - cx, cz - z1, cz - z0, h_at_x0, h_at_x1, mat)
+        if base is not None:
+            B(x0, x1, z0, z1, base, 0.0, mat)
+    q = FM_QUAY_Z
+    yx0, yx1 = FM_YARD_X
+    sh = FM_STRIP_H
+    # ── the yard's paving: all of it south of the ramp's fill (the ramp comes down inside the north edge from x 545
+    # to its foot at x 383; its seaward slope ends by z ~736), and the public forecourt west of the foot
+    # (measured by the developer review: the coast road's own embankment covers x 262..288, and the terrain stamp's
+    # verge carries the ramp's fill toe to z 736..738 over x 394..480)
+    wx = 290.0
+    B(wx, 376.0, 722.0, q, -0.02, 0.02, "MI_AsphaltLot")
+    B(376.0, yx1, 738.0, q, -0.02, 0.02, "MI_AsphaltLot")
+    B(wx, yx1, q - 8.0, q, 0.02, 0.03, "MI_ConcreteSmooth")                  # the quay apron
+    # ── the quay: a wall down past the water along the yard, a 車止め kerb (open at the slipway and the stairs),
+    # bollards and tyre fenders; east of the yard the strip's higher sea wall, its coping and a 1.1 m pipe railing
+    B(yx0, yx1, q - 0.4, q + 1.6, -6.0, 0.0, "MI_ConcreteSmooth")
+    B(yx1, 720.0, q - 0.4, q + 1.6, -6.0, sh, "MI_ConcreteSmooth")
+    slip = (294.0, 324.0)                     # the 船揚場: its head at x 300, falling west into the water
+    stairs = (352.0, 468.0, 598.0)            # landing stairs: each head at this x, falling west
+    gaps = [(slip[1] - 7.0, slip[1] + 0.5)] + [(x - 0.5, x + 2.5) for x in stairs]
+    x = wx
+    for g0, g1 in sorted(gaps) + [(yx1, yx1)]:
+        if g0 > x:
+            B(x, g0, q - 0.5, q - 0.2, 0.0, 0.25, "MI_PaintYellow")
+        x = max(x, g1)
+    for x in range(340, 606, 15):
+        if any(g0 - 2.0 < x < g1 + 2.0 for g0, g1 in gaps):
+            continue
+        B(x - 0.3, x + 0.3, q - 1.6, q - 1.0, 0.0, 0.6, "MI_PaintedMetalDark")
+        B(x + 6.9, x + 8.1, q + 1.6, q + 2.0, -1.9, -0.3, "MI_PaintedMetalDark")
+    B(yx1, 720.0, q - 0.5, q, sh, sh + 0.4, "MI_ConcreteSmooth")
+    for h in (0.7, 1.04):
+        B(yx1, 720.0, q - 0.3, q - 0.24, sh + h, sh + h + 0.06, "MI_PaintedMetal")
+    for x in range(int(yx1), 721, 5):
+        B(x - 0.04, x + 0.04, q - 0.31, q - 0.23, sh + 0.4, sh + 1.1, "MI_PaintedMetal")
+    # the slipway (1:11, 6.5 m wide, outside the wall: a car or a trailer can reach the water, a swimmer the yard)
+    # and the landing stairs (1:2, 2 m wide), each from the quay's level to 0.6 m under the water
+    wz0 = q + 1.6
+    ramp_x(slip[0], slip[1], wz0, wz0 + 6.5, FM_WATER - 0.7, 0.0, "MI_ConcreteSmooth", base=-6.0)
+    B(slip[1], slip[1] + 0.5, wz0, wz0 + 6.5, -6.0, 0.0, "MI_ConcreteSmooth")
+    B(slip[1] - 7.0, slip[1] + 0.5, q - 0.4, wz0, 0.0, 0.02, "MI_ConcreteSmooth")
+    for sx in stairs:
+        drop = -FM_WATER + 0.6
+        ramp_x(sx - 2.0 * drop, sx, wz0, wz0 + 2.0, -drop, 0.0, "MI_ConcreteSmooth", base=-6.0)
+        B(sx, sx + 2.0, wz0, wz0 + 2.0, -6.0, 0.0, "MI_ConcreteSmooth")             # its head landing
+    # ── the retaining wall up to the strip (the land grid's own edge is a 2 m slope: the wall stands over it), a
+    # low wall on top (a chain-link panel would be a see-through bullet stop), and a stair through it
+    w = 2.2
+    for z0, z1 in ((712.0, 742.0), (745.0, q + 1.6)):
+        B(yx1 - w, yx1, z0, z1, -0.5, sh, "MI_ConcreteSmooth")
+        B(yx1 - 0.3, yx1, z0, z1, sh, sh + 1.1, "MI_ConcreteSmooth")
+    B(yx1 - w, yx1 + 1.0, 742.0, 745.0, -0.5, sh, "MI_ConcreteSmooth")              # the stair's head, at the strip
+    ramp_x(yx1 - w - 2.0 * sh, yx1 - w, 742.0, 745.0, 0.0, sh, "MI_ConcreteSmooth")
+    # ── the PUBLIC end, at the ramp's foot: a car park (two double rows, a 6 m aisle between and either side) and
+    # the office over a 直売所 / 食堂; a fence with one gate keeps the public off the 荷さばき floor
+    for z in (735.0, 757.0):
+        B(293.0, 338.0, z - 0.06, z + 0.06, 0.02, 0.03, "MI_PaintWhite")
+        for k in range(19):
+            xx = 293.0 + k * 2.5
+            B(xx - 0.05, xx + 0.05, z - 5.0, z + 5.0, 0.02, 0.03, "MI_PaintWhite")
+    ox0, ox1, oz0, oz1 = 345.0, 368.5, 746.0, 770.0
+    top = ribbon_block(b, ox0 - cx, ox1 - cx, cz - oz1, cz - oz0, 0.0, 3, ST, wall="MI_TileBeige",
+                       ground="MI_GlassClear")
+    t = 0.25
+    B(ox0, ox1, oz1 - t, oz1, top, top + 1.1, "MI_ConcreteSmooth")                  # the deck's parapet: south,
+    B(ox0, ox0 + t, oz0, oz1, top, top + 1.1, "MI_ConcreteSmooth")                  # west,
+    B(ox1 - t, ox1, oz0, oz1, top, top + 1.1, "MI_ConcreteSmooth")                  # east,
+    B(ox0, ox1 - 2.6, oz0, oz0 + t, top, top + 1.1, "MI_ConcreteSmooth")            # north, open at the stair's head
+    B(350.0, 354.0, 762.0, 766.0, top, top + 3.0, "MI_ConcreteSmooth")              # the 塔屋
+    B(ox0 + 2.0, ox1 - 2.0, oz1, oz1 + 0.15, top - 2.4, top - 0.6, "MI_Sign")       # 魚市場, on the quay face
+    B(ox0 + 2.0, ox1 - 2.0, oz0 - 2.75, oz0 - 2.6, top - 2.4, top - 0.6, "MI_Sign")  # ...and to the ramp
+    sz0, sz1 = oz0 - 2.6, oz0                                                        # the stair: 1:2, 2.6 m wide
+    ramp_x(ox1 - 2.0 * top, ox1 - 0.6, sz0, sz1, 0.0, top, "MI_ConcreteSmooth")
+    B(ox1 - 0.6, ox1, sz0, sz1, 0.0, top, "MI_ConcreteSmooth")
+    B(ox1 - 2.0 * top, ox1, sz0 - 0.1, sz0, 0.0, top + 1.1, "MI_PaintedMetal")
+    for z0, z1 in ((736.0, oz0 - 2.7), (oz1, q - 8.5)):                               # the fence at x 371
+        B(370.9, 371.1, z0, z1, 0.0, 1.2, "MI_ConcreteSmooth")
+    # ── the auction hall: 90 x 20 m, a sawtooth-roofed shed open to the quay on columns, an eave over the apron
+    hx0, hx1, hz0, hz1 = 374.0, 464.0, 751.0, 771.0
+    B(hx0, hx1, hz0, hz0 + 1.0, 0.0, 8.0, "MI_Corrugated")
+    B(hx0, hx0 + 0.6, hz0, hz1 - 6.0, 0.0, 8.0, "MI_Corrugated")                    # the west gable; the east is open
+    for x in range(int(hx0), int(hx1) + 1, 10):
+        B(x - 0.4, x + 0.4, hz1 - 0.4, hz1 + 0.4, 0.0, 8.0, "MI_PaintedMetal")
+        B(x - 0.4, x + 0.4, hz0 + 9.6, hz0 + 10.4, 0.0, 8.0, "MI_PaintedMetal")     # the mid row
+    B(hx0, hx1, hz0, hz1 + 4.5, 8.0, 8.6, "MI_PaintedMetal")                        # the roof slab and its 庇
+    x = hx0
+    while x < hx1 - 1e-6:
+        b.wedge_x(x - cx, x + 10.0 - cx, cz - hz1, cz - hz0, 11.0, 8.6, "MI_Corrugated")
+        B(x, x + 0.3, hz0, hz1, 8.6, 11.0, "MI_GlassClear")
         x += 10.0
-    b.box((x0, y0, 0.0), (x1, y1, 0.05), "MI_TileWhite")                              # the washable floor
-    b.box((55.0, -15.0, 0.0), (78.0, 8.0, 10.0), "MI_Corrugated")                    # ice plant
-    b.box((-78.0, -8.0, 0.0), (-55.0, 8.0, 11.4), "MI_TileBeige")                    # office
-    ribbon_block(b, -78.0, -55.0, -8.0, 8.0, 0.0, 3, 3.8, wall="MI_TileBeige")
-    sign(b, -20.0, 20.0, y0, 8.6, 10.0, "MI_Sign")
-    for k in range(17):                                                                 # the quay's bollards
-        xx = -80.0 + k * 10.0
-        b.box((xx - 0.3, -34.0, 0.0), (xx + 0.3, -33.4, 0.6), "MI_PaintedMetalDark")
-    for k in range(16):                                                                 # fenders on the quay face
-        xx = -75.0 + k * 10.0
-        b.box((xx - 0.6, -35.4, -3.5), (xx + 0.6, -35.0, -1.0), "MI_PaintedMetalDark")
-    # the pontoon: 4 m wide, 6 m off the quay, along the west part (the Wangan's deck is furthest off there)
-    b.box((-75.0, -45.0, -5.6), (15.0, -41.0, -5.0), "MI_Wood")
-    for xx in range(-74, 16, 8):                                                       # its cleats
-        b.box((xx - 0.2, -44.9, -5.0), (xx + 0.2, -44.5, -4.7), "MI_PaintedMetalDark")
-    b.beam((-10.0, -35.6, 0.0), (-30.0, -41.6, -5.0), 1.6, "MI_Steel")             # the gangway, along the quay
-    for side in (-0.8, 0.8):                                                            # its handrails
-        b.beam((-10.0, -35.6 + side, 1.0), (-30.0, -41.6 + side, -4.0), 0.06, "MI_PaintedMetal")
-    for k in range(20):                                                                 # truck bays, land side
-        xx = -48.0 + k * 4.8
-        b.box((xx, 14.0, 0.0), (xx + 0.12, 30.0, 0.01), "MI_PaintWhite")
+    B(hx0, hx1, hz0, hz1, 0.0, 0.05, "MI_TileWhite")                                # the washable floor
+    B(hx0 + 25.0, hx1 - 25.0, hz0 - 0.15, hz0, 5.4, 7.4, "MI_Sign")                 # the name, to the ramp and the dike
+    for k in range(13):                                                              # the truck berths, land side
+        xx = 398.0 + k * 5.0
+        B(xx, xx + 0.12, hz0 - 11.0, hz0 - 1.0, 0.02, 0.03, "MI_PaintWhite")
+    for k in range(8):                                                               # fish-box rows: cover in the hall
+        xx = 380.0 + k * 10.0
+        B(xx, xx + 6.0, 756.0, 757.2, 0.05, 1.25, "MI_PlasticWhite")
+        B(xx + 3.0, xx + 9.0, 763.0, 764.2, 0.05, 1.25, "MI_PlasticWhite")
+    # ── the cold store and ice plant east of the hall, the 給氷塔 on the quay with its chute to the boats
+    B(470.0, 504.0, 747.0, 771.0, 0.0, 9.0, "MI_Corrugated")
+    B(470.0, 504.0, 747.0, 771.0, 9.0, 9.4, "MI_PaintedMetal")
+    B(474.0, 478.0, 746.85, 747.0, 0.0, 4.2, "MI_PaintedMetalDark")                 # its two dock doors, land side
+    B(486.0, 490.0, 746.85, 747.0, 0.0, 4.2, "MI_PaintedMetalDark")
+    B(506.0, 512.0, 764.0, 770.0, 0.0, 18.0, "MI_PaintedMetal")                     # the ice tower: the tall mark
+    B(506.0, 512.0, 763.85, 764.0, 14.0, 17.0, "MI_Sign")
+    b.beam((509.0 - cx, cz - 770.0, 9.0), (509.0 - cx, cz - (q + 3.0), 1.5), 0.8, "MI_Steel")
+    # ── the trucks' turning and waiting ground at the east end: a net / float store, stacked reefer boxes as cover
+    B(576.0, 600.0, 760.0, 771.0, 0.0, 5.0, "MI_Corrugated")                        # 漁具倉庫
+    for x0 in (520.0, 548.0):
+        B(x0, x0 + 12.2, 737.0, 739.5, 0.0, 5.2, "MI_PaintedMetal")                 # two-high container rows
+    # ── 避難階段 up the dike's sea face to the crest (1:2, 2 m wide, lying on the slope), clear of the ramp
+    rise = 9.9
+    for x in (300.0, 350.0, 590.0):
+        b.beam((x - cx, cz - 718.5, -0.9), (x - cx, cz - (718.5 - 2.0 * rise), rise - 0.9), 2.0, "MI_ConcreteSmooth")
+        for dx in (-1.0, 1.0):
+            b.beam((x + dx - cx, cz - 718.5, 1.0), (x + dx - cx, cz - (718.5 - 2.0 * rise), rise + 1.0), 0.06,
+                   "MI_PaintedMetal")
     return "FishMarket", "civic", b.mesh()
 
 
@@ -1037,8 +1155,10 @@ CIVIC_NOTES = {
     "Park": "Placeholder 公園 on a 60 x 60 plot, openings on all four sides; trees come from the nature kit (composite).",
     "WaterResort": "Placeholder 温浴・プールリゾート on a 150 x 120 plot, entrance on the street at -Y.",
     "ResortHotel": "Placeholder resort hotel for a 70 x 60 reserve, the balconies and pool deck to -Y (the sea).",
-    "FishMarket": "Placeholder 魚市場 for the 165 x 70 m quay reserve; the quay (water) at -Y, trucks at +Y; the "
-                  "pontoon (浮桟橋) at z -5 runs parallel to the quay (the Wangan's deck stands 12-25 m off it).",
+    "FishMarket": "Placeholder 魚市場 on a quay 2 m over the water (the 310 x 68 m reserve), laid out in WORLD numbers: "
+                  "the quay wall matches island_reshape.MARKET_QUAY's z 780 edge, the east retaining wall MARKET_YARD's "
+                  "x 610 and the strip's 3.6 m. Origin = the reserve's centre on the yard; the quay at -Y. The whole "
+                  "mesh is the collider (the stairs are solid ramps): keep every stair a slope a character can walk.",
     "Mil_FighterJet": "Placeholder F-15J-class fighter, nose -Y. Static prop; its collider is the boxes in "
                       "building_types.json (MilitaryBase props), not its mesh.",
     "Airport_Airliner": "Placeholder narrow-body airliner (737-800 class), nose -Y. Static prop; collider = boxes in "

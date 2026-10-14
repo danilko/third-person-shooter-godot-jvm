@@ -73,6 +73,10 @@ def exposure(x, y):
     if _EXPO is None:
         h = RS.load(RS.LAND)
         ocean = RS.open_sea(~(h > RS.LAND_Z))
+        # the fish market's quay strip is RECLAIMED in front of a dike that already stands: it does not lower the
+        # crest behind it (counted as land it took the corner's crest down, and the 側道 -- offset by crest / grade --
+        # moved 20 m with it). Its cells count as the bay they were (PLAN S11 P12)
+        ocean = ocean | RS.market_reclaimed()
         k = 16
         n = RS.N // k
         oc = ocean[:n * k, :n * k].reshape(n, k, n, k).mean(axis=(1, 3))
@@ -228,6 +232,8 @@ def ramps(net, dike):
     """Every road meeting a dike station -- at a junction pad or a joint -- ramped from the dike's height."""
     road_of = {u: n for n, r in net.roads.items() for u in r.points}
     P = net.points
+    import island_site_access as isa
+    authored = isa.authored_roads()
     done, out = set(), []
     for u in sorted(dike):
         p = P[u]
@@ -246,6 +252,11 @@ def ramps(net, dike):
                 continue
             done.add(v)
             name = road_of[v]
+            if name in authored:
+                # an AUTHORED profile (the fish market's ramp): only its mouth is this pass's -- the pad's height
+                P[v].pos = (P[v].pos[0], P[v].pos[1], round(jz, 3))
+                out.append((name, 0.0))
+                continue
             L = _ramp_road(net, name, v, round(jz, 3))
             out.append((name, L))
     return out
@@ -692,10 +703,13 @@ def sokudo(net, ground):
     ring end on it instead. Built only over dry, low land (not the massif, not a site); each piece runs between two
     at-grade crossings and junctions them (a T on the arterial, cut with `cut_road`). Returns (pieces, junctions)."""
     from shapely.geometry import LineString, Point
+    import island_market_corner as IMC
     road_of = {u: n for n, r in net.roads.items() for u in r.points}
     ocean_d = None
     H = RS.load(RS.LAND)
-    ocean = RS.open_sea(~(H > RS.LAND_Z))
+    # (the fish market's reclaimed quay counts as the bay it was, as in `exposure`: with the west wedge filled the
+    # corner's "which side is the town" reading changed and the line moved 20-40 m)
+    ocean = RS.open_sea(~(H > RS.LAND_Z)) | RS.market_reclaimed()
     ocean_d = RS.distance_from(ocean, 800.0)
     ocean_d[~np.isfinite(ocean_d)] = 800.0
 
@@ -726,7 +740,8 @@ def sokudo(net, ground):
             if ps and not is_dike_road(n_):
                 continue
             if len(run) >= 2:
-                runs.append([(q[0], q[1], q[2]) for q in run])
+                # (the fish market corner's arc is offset as the chords it replaced: island_market_corner.side_line)
+                runs.append(IMC.side_line([(q[0], q[1], q[2]) for q in run]))
             run = []
     lines_ = []
     while runs:
@@ -926,14 +941,39 @@ def sculpt(H, net):
             if a.pillar_skip:
                 continue
             segs.append((a.pos, b.pos, half, dk))
+    # THE CREST RUNS ON ACROSS A JUNCTION PAD (PLAN S11 P12, the "hole under every crest junction"): a dike road ends
+    # at its mouth and the next one starts at the pad's far mouth, so no segment spanned the pad and the embankment
+    # stopped either side of it -- the ground under the x 567 junction stood at the plain, 6.3 m under the road, over
+    # z 666..684. One crest segment per pair of dike mouths of a pad, the wider road's width
+    seen = set()
+    for u in sorted(dike):
+        for v in net.points[u].targets(pm.LINK_JUNCTION):
+            if v in dike and road_of[v] != road_of[u] and (v, u) not in seen:
+                seen.add((u, v))
+                segs.append((net.points[u].pos, net.points[v].pos,
+                             max(_half(net.roads[road_of[u]]), _half(net.roads[road_of[v]])), True))
     plain = RS.FLOOR_Z + RS.RAISE
     rails = rail_crossings(net)
     for a, b, half, dk in segs:
         za, zb = a[2] + rg.NET_Y - 0.10, b[2] + rg.NET_Y - 0.10
-        if not dk and max(za, zb) < plain + 0.3:
-            continue
         ax, az, bx, bz = a[0], -a[1], b[0], -b[1]
-        top = max(za, zb) - plain
+        # the ground a ramp stands on is the plain almost everywhere -- and 3.6 m under it in the fish market's yard,
+        # where a ramp "below the plain" still needs its embankment (the test was against `plain`: the ramp's lower
+        # half would have hung over the yard)
+        mi = min(max(int(round(((ax + bx) / 2.0 - RS.X0) / RS.STEP)), 0), RS.N - 1)
+        mj = min(max(int(round(((az + bz) / 2.0 - RS.Z0) / RS.STEP)), 0), RS.N - 1)
+        low = min(plain, max(float(H[mj, mi]), RS.LAND_Z))
+        if dk:
+            # ...and a dike segment's midpoint is on the crest line, where the land is the plain: its FACE comes
+            # down onto whatever lies beside it, so the reach is measured from the lowest land within 60 m (with the
+            # market's yard 3.6 m under the plain the reach had not one cell to spare -- developer review, measured)
+            w0 = H[max(mj - 30, 0):mj + 31, max(mi - 30, 0):mi + 31]
+            land_ = w0[w0 > RS.LAND_Z]
+            if land_.size:
+                low = min(low, float(land_.min()))
+        if not dk and max(za, zb) < low + 0.3:
+            continue
+        top = max(za, zb) - low
         if dk:
             wl, ws = half + SHOULDER, half + RAIL_W + PARAPET
             reach = max(wl + top * LAND_SLOPE, ws + top * SEA_SLOPE) + 4.0
