@@ -67,7 +67,11 @@ def g2r(pts):
 #: through the blocks now), the port road on the trimmed harbour tip, the old coast roads the coastal RING replaces
 #: (on trimmed land after v6/v9), the airport road on the bridge's lower deck (R7: that deck is RAIL; cars take the
 #: spur) and the east arterial on the trimmed east coast.
-DROPPED = ("shrine_touge", "kaigan_dori", "port_road", "futo_dori", "kitahama_dori", "nishihama_dori", "kuko_dori",
+#: THE MOUNTAIN ROADS, by name prefix (S15: one owner -- ~15 tools keyed off the literal `shrine_touge`). Every tool
+#: that treats the touge specially (no wiggle / fillet / align pass, no building or civic frontage, no block-split end,
+#: its own picture colour, the touge sculpt) reads this; a new mountain road joins the tuple when it is derived.
+MOUNTAIN_ROADS = ("shrine_touge",)
+DROPPED = MOUNTAIN_ROADS + ("kaigan_dori", "port_road", "futo_dori", "kitahama_dori", "nishihama_dori", "kuko_dori",
            "hama_dori")
 
 #: the plan's NEW at-grade roads, GODOT (x, z) as the plan drew them (v16.py `NEWR`, `RING_NEW`, `MILR`), and the

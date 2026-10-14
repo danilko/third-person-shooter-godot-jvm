@@ -38,7 +38,8 @@ JOG_TOL = 1.0           # m: a through pair offset under this (and under JOG_DEG
 JOG_DEG = 3.0
 CORNER_DEG = 20.0       # an arm whose own heading turns more than this has a corner: its line stops there
 ROUNDS = 15              # straightening one pair moves the far station of the next: repeat until nothing moves
-SKIP = ("shuto_", "rail_", "shrine_touge", "kaigan_dori", "teibo_sokudo", "ring_kita")
+from island_plan import MOUNTAIN_ROADS  # noqa: E402
+SKIP = ("shuto_", "rail_", "kaigan_dori", "teibo_sokudo", "ring_kita") + MOUNTAIN_ROADS
 SKIP_IN = ("rotary", "_loop")
 
 

@@ -413,7 +413,7 @@ SITE_PLACES = {       # a SiteZones / Landmarks child -> its label (a landmark: 
 }
 ANCHOR_REACH = 250.0   # ... and the furthest a WANTED TYPE may be found from the wish
 SPACING = {"TowerMansion": 500.0, "LuxuryLowRise": 250.0, "CarDealer": 300.0, "GasStation": 450.0, "KonbiniL": 250.0, "FamilyRestaurant": 350.0, "KonbiniS": 120.0}
-SKIP_ROADS = ("shuto_", "shrine_touge", "kaigan_dori", "airport_", "kuko_")
+SKIP_ROADS = ("shuto_", "kaigan_dori", "airport_", "kuko_") + __import__("island_plan").MOUNTAIN_ROADS
 def _variants():
     """{base type: [its footprint variants]} (PLAN.md 3.19(c)), from the type table via the layout (one owner)."""
     sys.path.insert(0, os.path.join(HERE, "building_kit"))

@@ -51,7 +51,7 @@ RELIEF = 1.5           # m of ground relief the whole footprint may have
 AT_GRADE = 1.5         # m: the frontage road's surface within this of the ground under it
 PLOT_GAP = 6.0         # m between two plots
 STEP = 10.0            # m between candidates along a road
-NO_FRONT = ("shuto_", "shrine_touge", "kaigan_dori", "rail")
+NO_FRONT = ("shuto_", "kaigan_dori", "rail") + PL.MOUNTAIN_ROADS
 
 # (id, kind, 日本語, frontage m, depth m, min lanes a side, target) -- target is a RECORD (x, y) or "station:<Name>".
 # Sizes are ordinary Japanese sites: a 警察署 / 消防署 本署 ~1 800-2 500 m2, a 消防出張所 ~500 m2, a 交番 ~80 m2, a

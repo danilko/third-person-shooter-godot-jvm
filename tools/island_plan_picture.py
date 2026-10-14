@@ -58,7 +58,7 @@ def road_class(name, rd):
         return "wangan"
     if name.startswith("shuto_"):
         return "shuto"
-    if name.startswith("shrine_touge"):
+    if name.startswith(__import__("island_plan").MOUNTAIN_ROADS):
         return "touge"
     if name.startswith(("kaigan", "ring_")):
         return "coast"

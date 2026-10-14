@@ -367,7 +367,7 @@ def cmd_sculpt(land_path, record, out):
     net = pm.load_network(record)
     segs = []
     for name, r in net.roads.items():
-        if name == NAME or name.startswith(NAME + "__"):
+        if any(name == m or name.startswith(m + "__") for m in PL.MOUNTAIN_ROADS):      # every mountain road
             pts = [net.points[u].pos for u in r.points]
             segs += list(zip(pts, pts[1:]))
     H = RS.load(land_path)

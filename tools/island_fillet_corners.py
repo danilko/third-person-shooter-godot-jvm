@@ -36,7 +36,8 @@ import point_model as pm          # noqa: E402
 import point_profile as pp        # noqa: E402
 
 RECORD = os.path.join(ROOT, "assets/world_source/pieces/IslandRoads.roads.json")
-SKIP = ("shuto", "shrine_touge")       # ramps; the mountain road's hairpins
+from island_plan import MOUNTAIN_ROADS  # noqa: E402
+SKIP = ("shuto",) + MOUNTAIN_ROADS        # ramps; the mountain roads' hairpins
 SKIP_HAS = ("rotary",)                 # a roundabout is meant to be a small circle
 
 

@@ -8,7 +8,8 @@ bends at joints. Report only.
 import json, math, sys, collections
 rec = sys.argv[1]
 d = json.load(open(rec)); P = {p["uid"]: p for p in d["points"]}
-SKIP = ("shuto_", "rail_", "shrine_touge", "kaigan_dori", "teibo")
+from island_plan import MOUNTAIN_ROADS  # noqa: E402
+SKIP = ("shuto_", "rail_", "kaigan_dori", "teibo") + MOUNTAIN_ROADS
 def hd(a, b): return math.degrees(math.atan2(b[1]-a[1], b[0]-a[0]))
 def turn(h0, h1): return (h1 - h0 + 180) % 360 - 180
 out = collections.Counter(); ex = collections.defaultdict(list)

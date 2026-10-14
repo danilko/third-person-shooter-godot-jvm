@@ -42,7 +42,8 @@ MIN_HALF = 45.0          # m: each half at least this deep, measured square to t
 MIN_GAIN = 2500.0        # m2 of empty ground the cut must serve
 REACH = 48.0             # m: a cell is "served" within this of a street (the deep-vacancy measure)
 DEPTH = 2                # a block is cut, and each half once more
-NO_END = ("shuto_", "ring_kita", "kaigan_", "shrine_touge", "rail", "JCT", "GORE")   # the dike's side road (teibo_) is an ordinary street
+from island_plan import MOUNTAIN_ROADS  # noqa: E402
+NO_END = ("shuto_", "ring_kita", "kaigan_", "rail", "JCT", "GORE") + MOUNTAIN_ROADS   # the dike's side road (teibo_) is an ordinary street
 SKIP_REGIONS = (None, "farm", "airport")
 
 
