@@ -531,108 +531,207 @@ def resort_hotel(material, Builder):
     return "ResortHotel", "civic", b.mesh()
 
 
-FM_C = (455.0, 746.0)     # the fish market reserve's centre, GODOT (x, z): island_plan RESERVES "fish_market"
-FM_QUAY_Z = 780.0         # island_reshape.MARKET_QUAY's sea edge
+FM_C = (450.0, 760.0)     # the fish market reserve's centre, GODOT (x, z): island_plan RESERVES "fish_market"
+FM_QUAY_Z = 808.0         # island_reshape.MARKET_QUAY's sea edge (S13: 780 -> 808, room for the yard's lane loop)
 FM_YARD_X = (262.0, 610.0)   # island_reshape.MARKET_YARD: the low yard's west and east ends
-FM_WATER = -2.0           # the water under the yard (island_reshape.MARKET_YARD_Z = 2.0 over the sea)
-FM_STRIP_H = 3.6          # the strip under the viaduct east of the yard: the plain, 5.6 - 2.0 over the yard
+FM_WATER = -1.5           # the water under the yard (island_reshape.MARKET_YARD_Z = 1.5 over the sea, S13 D1)
+FM_STRIP_H = 4.1          # the strip under the viaduct east of the yard: the plain, 5.6 - 1.5 over the yard
+FM_LANDING = (290.0, 332.0, 790.0, 808.0, -0.5)   # island_reshape.MARKET_LANDING: the 物揚場, 1.0 over the sea
+FM_RISER = 0.17           # a stair's riser (m); its tread is the run / the risers
+
+
+def _fm_roads():
+    """The yard's road lines in GODOT (x, z): the truck ramp's stations [(x, z, h over the yard)], the yard junction's
+    centre and the lane loop -- from their ONE owner, tools/island_site_access.py (the piece is laid out round them)."""
+    import os
+    import sys
+    tools = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "tools")
+    if tools not in sys.path:
+        sys.path.insert(0, tools)
+    import island_site_access as SA
+    import island_roadgen as rg
+    rows, J = SA._ramp_geometry(None)
+    yard = SA.RS_yard_z()
+    ramp = [(q[0], -q[1], q[2] + rg.NET_Y - yard) for q in rows]
+    return ramp, (J[0], -J[1]), [(x, -y) for x, y in SA.yard_loop(J)], SA
+
+
+def _seg_dist(p, a, b):
+    dx, dz = b[0] - a[0], b[1] - a[1]
+    L2 = dx * dx + dz * dz
+    t = 0.0 if L2 < 1e-12 else max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / L2))
+    return math.hypot(p[0] - a[0] - dx * t, p[1] - a[1] - dz * t), t
 
 
 def fish_market(material, Builder):
-    """魚市場 on a fishing port's quay, 2 m over the water (user, 2026-10-13 late: "the boat quay should be same level as
-    the pontoon in most images ... go down, about 2 m above the water ... a more reasonable arrangement to a Japanese
-    fish market with quay"), as three fresh reviewers (Japanese port planner, level designer, developer) then changed
-    it. The first build of the day stood on the island's raised plain, 5.6 m up, with a pontoon far below it.
+    """魚市場 on a fishing port's quay, 1.5 m over the water (S13 D1, user 2026-10-13: "the planner main quay at 1.5m
+    ... please do it as planner suggest"; it was 2.0, and 5.6 on the island's plain before that), with a 1.0 m 物揚場
+    for the small craft at its west end.
 
     Laid out in WORLD (Godot x, z) numbers through `B`, because every part answers to something the generators own:
-    the low yard (island_reshape.MARKET_YARD), the quay line z 780, the truck ramp `ichiba_michi` coming down the
-    dike's face to its foot at (383, 728) (island_site_access), the Wangan's viaduct east of x 610. Origin = the
-    reserve's centre on the yard's ground; the quay at -Y.
+    the low yard (island_reshape.MARKET_YARD / MARKET_LANDING), the quay line z 808, and the ROADS -- the 2 + 2 truck
+    ramp `ichiba_michi` down the dike's face, on through a U at its foot and east along the quay as the yard's street,
+    to a T and the one-way RECTANGLE round the cold store (island_site_access.YARD_LOOP, S13 D2: a car follows lanes;
+    with the ramp a dead end every AI car stopped at its foot). The piece reads those lines from island_site_access itself (`_fm_roads`), and keeps its paving, walls and
+    buildings off them. Origin = the reserve's centre on the yard's ground; the quay at -Y.
 
-    West to east (the planner's order: the PUBLIC at the ramp's foot and fenced off, so no visitor's car passes the
-    truck berths; trucks run foot -> berths -> the turning ground at the east end and back):
-      * the public car park and, by the quay, the 3-storey office over a 直売所 / 食堂 floor -- its roof is the
-        津波避難 deck, a solid stair up its land side; a fence with one gate between it and the working yard;
-      * the 90 x 20 m auction hall (a 荷さばき所 is 15-25 m deep; at 27 m the trucks had 7 m to back in), sawtooth
-        roof, open to the quay under a 4.5 m eave, a wall to the land, 13 truck berths 15-18 m deep on its land side;
-      * the cold store and ice plant, the 給氷塔 on the quay with its chute (the 準備岸壁: ice straight into the boats);
-      * the trucks' turning and waiting ground, net / float store; a 3.6 m retaining wall up to the strip under the
-        viaduct with a stair through it.
-    THE QUAY: a wall down past the water (the terrain's own edge is a 2 m slope), 車止め kerb, bollards, tyre fenders;
-    at the west end a 船揚場 slipway down into the water, and three landing stairs along the wall -- the only ways OUT
-    of the water for a swimmer (the swim jump clears ~1 m, the quay is 2 m). Three 避難階段 climb the dike's face to
-    the crest (the dike IS the refuge: 10 m up, a minute away)."""
+    West to east (the planner's order: the PUBLIC at the ramp's foot, no visitor's car past the truck berths):
+      * the public end WEST of the U: the car park, the office over a 直売所 / 食堂 floor (its roof the 津波避難 deck, a
+        flight of real steps up its land side) and, at the quay, the 物揚場 half a metre lower with the 船揚場 slipway;
+      * inside the U, the trucks' waiting ground; between the ramp's fill and the quay street the 90 x 19 m auction
+        hall, open to the street and the quay under a 4.5 m eave, its 13 truck berths on its land side;
+      * INSIDE THE RECTANGLE: the cold store and ice plant, the 給氷塔 with its chute over the street to the boats, a
+        net store; container rows (cover) by the berths;
+      * the retaining wall up to the strip under the viaduct (east of x 608), a stair through it.
+    THE QUAY: a wall down past the water, 車止め kerb, bollards, tyre fenders; landing stairs down the wall into the
+    water and the slipway: the ways OUT of the water for a swimmer (the swim jump clears ~1 m; the yard is 1.5 m up,
+    the 物揚場 1.0). Two 避難階段 climb the dike's face to the crest (the dike IS the refuge).
+    EVERY STAIR IS REAL STEPS with an invisible slide collider over its nosings (Builder.stair_ramp, S13 D2c, user:
+    "please use actual stair mesh, but above with the collision mesh of slide for character movement (just like in
+    station)")."""
     b = Builder("FishMarket", material)
     cx, cz = FM_C
+    ramp, J, loop, SA = _fm_roads()
 
     def B(x0, x1, z0, z1, h0, h1, mat):
         """A box over Godot x0..x1, z0..z1, from height h0 to h1 above the yard."""
         b.box((x0 - cx, cz - z1, h0), (x1 - cx, cz - z0, h1), mat)
 
-    def ramp_x(x0, x1, z0, z1, h_at_x0, h_at_x1, mat, base=None):
-        """A solid stair / ramp whose top slopes along Godot x (from the yard's ground, or a box under it to `base`)."""
-        b.wedge_x(x0 - cx, x1 - cx, cz - z1, cz - z0, h_at_x0, h_at_x1, mat)
-        if base is not None:
-            B(x0, x1, z0, z1, base, 0.0, mat)
+    def P(x, z, h):
+        return (x - cx, cz - z, h)
+
+    def flight(axis, s0, s1, c0, c1, h0, h1, mat="MI_ConcreteSmooth", base=None):
+        """A flight of REAL STEPS along Godot `axis` ("x" or "z") from s0 (at height h0) to s1 (at h1), across c0..c1
+        on the other axis, each step a solid down to `base` (default: the lower end's height), and its slide collider
+        over the nosings."""
+        n = max(1, int(math.ceil(abs(h1 - h0) / FM_RISER)))
+        lo = min(h0, h1) if base is None else base
+        for k in range(n):
+            # step k covers the k-th tread from the s0 end; its top is the riser above it
+            a = s0 + (s1 - s0) * k / n
+            e = s0 + (s1 - s0) * (k + 1) / n
+            top = h0 + (h1 - h0) * (k + 1) / n if h1 > h0 else h0 + (h1 - h0) * k / n
+            if axis == "x":
+                B(min(a, e), max(a, e), c0, c1, lo, top, mat)
+            else:
+                B(c0, c1, min(a, e), max(a, e), lo, top, mat)
+        # the slide: ALONG THE NOSINGS, both ends one tread toward the low side (from one tread before the first riser at
+        # the lower floor to the top nosing at the upper). Run from the first riser's foot to the top floor's edge it
+        # stood one riser under every nosing, and the noses stuck up through it: a swimmer could not get onto a landing
+        # stair at all (2026-10-14, a probe of this exact flight; walking it hid the fault)
+        d = (s1 - s0) / n
+        if h1 > h0:
+            lo_s, hi_s, lo_h, hi_h = s0 - d, s1 - d, h0, h1
+        else:
+            lo_s, hi_s, lo_h, hi_h = s1 + d, s0 + d, h1, h0
+        if axis == "x":
+            b.stair_ramp(P(lo_s, c0, lo_h), P(hi_s, c0, hi_h), P(lo_s, c1, lo_h), P(hi_s, c1, hi_h))
+        else:
+            b.stair_ramp(P(c0, lo_s, lo_h), P(c0, hi_s, hi_h), P(c1, lo_s, lo_h), P(c1, hi_s, hi_h))
+
     q = FM_QUAY_Z
     yx0, yx1 = FM_YARD_X
     sh = FM_STRIP_H
-    # ── the yard's paving: all of it south of the ramp's fill (the ramp comes down inside the north edge from x 545
-    # to its foot at x 383; its seaward slope ends by z ~736), and the public forecourt west of the foot
-    # (measured by the developer review: the coast road's own embankment covers x 262..288, and the terrain stamp's
-    # verge carries the ramp's fill toe to z 736..738 over x 394..480)
-    wx = 290.0
-    B(wx, 376.0, 722.0, q, -0.02, 0.02, "MI_AsphaltLot")
-    B(376.0, yx1, 738.0, q, -0.02, 0.02, "MI_AsphaltLot")
-    B(wx, yx1, q - 8.0, q, 0.02, 0.03, "MI_ConcreteSmooth")                  # the quay apron
-    # ── the quay: a wall down past the water along the yard, a 車止め kerb (open at the slipway and the stairs),
-    # bollards and tyre fenders; east of the yard the strip's higher sea wall, its coping and a 1.1 m pipe railing
-    B(yx0, yx1, q - 0.4, q + 1.6, -6.0, 0.0, "MI_ConcreteSmooth")
-    B(yx1, 720.0, q - 0.4, q + 1.6, -6.0, sh, "MI_ConcreteSmooth")
-    slip = (294.0, 324.0)                     # the 船揚場: its head at x 300, falling west into the water
-    stairs = (352.0, 468.0, 598.0)            # landing stairs: each head at this x, falling west
+    lx0, lx1, lz0, lz1, lh = FM_LANDING
+    # ── the yard's PAVING, kept off the roads: the loop's lanes (+ a 0.5 m edge), the junction's pad, the ramp and its
+    # fill (south to its toe: its seaward edge + the stamp's 6 m verge + its height over the yard), the 物揚場
+    LOOP_CLEAR = 4.0 + 0.5
+    PAD_CLEAR = 22.0
+
+    def on_road(x, z):
+        if math.hypot(x - J[0], z - J[1]) < PAD_CLEAR:
+            return True
+        if any(_seg_dist((x, z), a, c)[0] < LOOP_CLEAR for a, c in zip(loop, loop[1:])):
+            return True
+        for a, c in zip(ramp, ramp[1:]):
+            d, t = _seg_dist((x, z), a[:2], c[:2])
+            h = a[2] + (c[2] - a[2]) * t
+            raised = h > 0.3
+            # its paved half (9.75 m on the footway side) + 0.5; where it stands above the yard, the stamp's 6 m verge
+            # and its fill slope too, and everything on its land side (the dike's face)
+            if d < 9.75 + 0.5 + ((6.0 + h + 1.0) if raised else 0.0):
+                return True
+            if raised and z < a[1] and min(a[0], c[0]) - 2.0 <= x <= max(a[0], c[0]) + 2.0:
+                return True
+        return z < 721.0                              # the dike's face west of the ramp
+    step = 2.0
+    zz = 712.0
+    while zz < q - 3.0:
+        xx, run0 = yx0 + 28.0, None                   # from x 290: the coast road's embankment covers 262..288
+        while xx <= yx1 - 2.0:
+            c = (xx + step / 2.0, zz + step / 2.0)
+            ok = not on_road(*c) and not (lx0 <= c[0] <= lx1 + 1.0 and c[1] >= lz0 - 1.5)
+            if ok and run0 is None:
+                run0 = xx
+            if (not ok or xx + step > yx1 - 2.0) and run0 is not None:
+                B(run0, xx if not ok else xx + step, zz, zz + step, -0.02, 0.02, "MI_AsphaltLot")
+                run0 = None
+            xx += step
+        zz += step
+    B(lx1 + 1.0, yx1, q - 3.0, q, 0.0, 0.03, "MI_ConcreteSmooth")                  # the quay coping, past the street
+    B(lx0, lx1, lz0, q, lh - 0.02, lh + 0.02, "MI_ConcreteSmooth")                  # the 物揚場's floor
+    # ── the quay: a wall down past the water along the yard (lower along the 物揚場), a 車止め kerb (open at the
+    # slipway and the stairs), bollards and tyre fenders; east of the yard the strip's higher sea wall and railing
+    B(yx0, lx0, q - 0.4, q + 1.6, -6.5, 0.0, "MI_ConcreteSmooth")
+    B(lx0, lx1, q - 0.4, q + 1.6, -6.5, lh, "MI_ConcreteSmooth")
+    B(lx1, yx1, q - 0.4, q + 1.6, -6.5, 0.0, "MI_ConcreteSmooth")
+    B(yx1, 720.0, q - 0.4, q + 1.6, -6.5, sh, "MI_ConcreteSmooth")
+    slip = (294.0, 324.0)                     # the 船揚場: from the 物揚場 at x 324, falling west into the water
+    stairs = (400.0, 500.0)                   # landing stairs: each head at this x, falling west
     gaps = [(slip[1] - 7.0, slip[1] + 0.5)] + [(x - 0.5, x + 2.5) for x in stairs]
-    x = wx
+    x = lx0
     for g0, g1 in sorted(gaps) + [(yx1, yx1)]:
         if g0 > x:
-            B(x, g0, q - 0.5, q - 0.2, 0.0, 0.25, "MI_PaintYellow")
+            hk = lh if x < lx1 else 0.0
+            if g0 > lx1 > x:
+                B(x, lx1, q - 0.5, q - 0.2, lh, lh + 0.25, "MI_PaintYellow")
+                x = lx1 + 2.0
+                hk = 0.0
+            B(x, g0, q - 0.5, q - 0.2, hk, hk + 0.25, "MI_PaintYellow")
         x = max(x, g1)
-    for x in range(340, 606, 15):
+    for x in range(296, 606, 15):
         if any(g0 - 2.0 < x < g1 + 2.0 for g0, g1 in gaps):
             continue
-        B(x - 0.3, x + 0.3, q - 1.6, q - 1.0, 0.0, 0.6, "MI_PaintedMetalDark")
-        B(x + 6.9, x + 8.1, q + 1.6, q + 2.0, -1.9, -0.3, "MI_PaintedMetalDark")
+        hk = lh if x < lx1 else 0.0
+        B(x - 0.3, x + 0.3, q - 1.6, q - 1.0, hk, hk + 0.6, "MI_PaintedMetalDark")
+        B(x + 6.9, x + 8.1, q + 1.6, q + 2.0, hk - 1.7, hk - 0.3, "MI_PaintedMetalDark")
     B(yx1, 720.0, q - 0.5, q, sh, sh + 0.4, "MI_ConcreteSmooth")
     for h in (0.7, 1.04):
         B(yx1, 720.0, q - 0.3, q - 0.24, sh + h, sh + h + 0.06, "MI_PaintedMetal")
     for x in range(int(yx1), 721, 5):
         B(x - 0.04, x + 0.04, q - 0.31, q - 0.23, sh + 0.4, sh + 1.1, "MI_PaintedMetal")
-    # the slipway (1:11, 6.5 m wide, outside the wall: a car or a trailer can reach the water, a swimmer the yard)
-    # and the landing stairs (1:2, 2 m wide), each from the quay's level to 0.6 m under the water
+    # the slipway (1:11, 6.5 m wide, outside the wall: a trailer reaches the water, a swimmer the 物揚場) and the
+    # landing stairs (2 m wide, real steps), each from the quay's level to 1.5 m under the water: a swimmer floats
+    # with its body ~0.45 m under its origin, so a flight that stopped 0.6 m down met it with a riser (measured: 0.6
+    # stuck, 1.2 and 1.8 walk out)
     wz0 = q + 1.6
-    ramp_x(slip[0], slip[1], wz0, wz0 + 6.5, FM_WATER - 0.7, 0.0, "MI_ConcreteSmooth", base=-6.0)
-    B(slip[1], slip[1] + 0.5, wz0, wz0 + 6.5, -6.0, 0.0, "MI_ConcreteSmooth")
-    B(slip[1] - 7.0, slip[1] + 0.5, q - 0.4, wz0, 0.0, 0.02, "MI_ConcreteSmooth")
+    b.wedge_x(slip[0] - cx, slip[1] - cx, cz - (wz0 + 6.5), cz - wz0, FM_WATER - 0.7, lh, "MI_ConcreteSmooth")
+    B(slip[0], slip[1], wz0, wz0 + 6.5, -6.5, FM_WATER - 0.7, "MI_ConcreteSmooth")
+    B(slip[1], slip[1] + 0.5, wz0, wz0 + 6.5, -6.5, lh, "MI_ConcreteSmooth")
+    B(slip[1] - 7.0, slip[1] + 0.5, q - 0.4, wz0, lh, lh + 0.02, "MI_ConcreteSmooth")
     for sx in stairs:
-        drop = -FM_WATER + 0.6
-        ramp_x(sx - 2.0 * drop, sx, wz0, wz0 + 2.0, -drop, 0.0, "MI_ConcreteSmooth", base=-6.0)
-        B(sx, sx + 2.0, wz0, wz0 + 2.0, -6.0, 0.0, "MI_ConcreteSmooth")             # its head landing
+        drop = -FM_WATER + 1.5
+        flight("x", sx - 2.0 * drop, sx, wz0, wz0 + 2.0, -drop, 0.0, base=-6.5)
+        B(sx, sx + 2.0, wz0, wz0 + 2.0, -6.5, 0.0, "MI_ConcreteSmooth")              # its head landing
+    # the 物揚場's step up to the yard (three risers along its north edge) and the yard's edge along its east side
+    flight("z", lz0, lz0 - 1.2, lx0 + 2.0, lx1 - 2.0, lh, 0.0, base=lh - 0.1)
+    B(lx1, lx1 + 1.0, lz0 - 1.2, q - 0.4, lh - 0.1, 0.0, "MI_ConcreteSmooth")
     # ── the retaining wall up to the strip (the land grid's own edge is a 2 m slope: the wall stands over it), a
     # low wall on top (a chain-link panel would be a see-through bullet stop), and a stair through it
     w = 2.2
-    for z0, z1 in ((712.0, 742.0), (745.0, q + 1.6)):
+    for z0, z1 in ((725.0, 742.0), (745.0, q + 1.6)):
         B(yx1 - w, yx1, z0, z1, -0.5, sh, "MI_ConcreteSmooth")
         B(yx1 - 0.3, yx1, z0, z1, sh, sh + 1.1, "MI_ConcreteSmooth")
     B(yx1 - w, yx1 + 1.0, 742.0, 745.0, -0.5, sh, "MI_ConcreteSmooth")              # the stair's head, at the strip
-    ramp_x(yx1 - w - 2.0 * sh, yx1 - w, 742.0, 745.0, 0.0, sh, "MI_ConcreteSmooth")
-    # ── the PUBLIC end, at the ramp's foot: a car park (two double rows, a 6 m aisle between and either side) and
-    # the office over a 直売所 / 食堂; a fence with one gate keeps the public off the 荷さばき floor
-    for z in (735.0, 757.0):
-        B(293.0, 338.0, z - 0.06, z + 0.06, 0.02, 0.03, "MI_PaintWhite")
-        for k in range(19):
-            xx = 293.0 + k * 2.5
+    flight("x", yx1 - w - 2.0 * sh, yx1 - w, 742.0, 745.0, 0.0, sh)
+    # ── the PUBLIC end, west of the U: the car park (four rows of 2.5 x 5 m stalls, 6 m aisles) and the office over a
+    # 直売所 / 食堂 by the 物揚場
+    for z in (729.0, 745.0):
+        B(294.0, 332.0, z - 0.06, z + 0.06, 0.02, 0.03, "MI_PaintWhite")
+        for k in range(16):
+            xx = 294.0 + k * 2.5
             B(xx - 0.05, xx + 0.05, z - 5.0, z + 5.0, 0.02, 0.03, "MI_PaintWhite")
-    ox0, ox1, oz0, oz1 = 345.0, 368.5, 746.0, 770.0
+    ox0, ox1, oz0, oz1 = 296.0, 332.0, 762.0, 786.0
     top = ribbon_block(b, ox0 - cx, ox1 - cx, cz - oz1, cz - oz0, 0.0, 3, ST, wall="MI_TileBeige",
                        ground="MI_GlassClear")
     t = 0.25
@@ -640,22 +739,21 @@ def fish_market(material, Builder):
     B(ox0, ox0 + t, oz0, oz1, top, top + 1.1, "MI_ConcreteSmooth")                  # west,
     B(ox1 - t, ox1, oz0, oz1, top, top + 1.1, "MI_ConcreteSmooth")                  # east,
     B(ox0, ox1 - 2.6, oz0, oz0 + t, top, top + 1.1, "MI_ConcreteSmooth")            # north, open at the stair's head
-    B(350.0, 354.0, 762.0, 766.0, top, top + 3.0, "MI_ConcreteSmooth")              # the 塔屋
-    B(ox0 + 2.0, ox1 - 2.0, oz1, oz1 + 0.15, top - 2.4, top - 0.6, "MI_Sign")       # 魚市場, on the quay face
-    B(ox0 + 2.0, ox1 - 2.0, oz0 - 2.75, oz0 - 2.6, top - 2.4, top - 0.6, "MI_Sign")  # ...and to the ramp
-    sz0, sz1 = oz0 - 2.6, oz0                                                        # the stair: 1:2, 2.6 m wide
-    ramp_x(ox1 - 2.0 * top, ox1 - 0.6, sz0, sz1, 0.0, top, "MI_ConcreteSmooth")
+    B(301.0, 305.0, 776.0, 780.0, top, top + 3.0, "MI_ConcreteSmooth")              # the 塔屋
+    B(ox0 + 2.0, ox1 - 2.0, oz1, oz1 + 0.15, top - 2.4, top - 0.6, "MI_Sign")       # 魚市場, to the quay
+    B(ox0 + 2.0, ox1 - 2.0, oz0 - 2.75, oz0 - 2.6, top - 2.4, top - 0.6, "MI_Sign")  # ...and to the car park
+    sz0, sz1 = oz0 - 2.6, oz0                                                        # the stair: 2.6 m wide
+    flight("x", ox1 - 2.0 * top, ox1 - 0.6, sz0, sz1, 0.0, top, base=0.0)
     B(ox1 - 0.6, ox1, sz0, sz1, 0.0, top, "MI_ConcreteSmooth")
     B(ox1 - 2.0 * top, ox1, sz0 - 0.1, sz0, 0.0, top + 1.1, "MI_PaintedMetal")
-    for z0, z1 in ((736.0, oz0 - 2.7), (oz1, q - 8.5)):                               # the fence at x 371
-        B(370.9, 371.1, z0, z1, 0.0, 1.2, "MI_ConcreteSmooth")
-    # ── the auction hall: 90 x 20 m, a sawtooth-roofed shed open to the quay on columns, an eave over the apron
-    hx0, hx1, hz0, hz1 = 374.0, 464.0, 751.0, 771.0
+    # ── the auction hall: 90 x 19 m between the ramp's fill and the quay street, a sawtooth-roofed shed open to the
+    # street and the boats under a 4.5 m eave, its berths on the land side
+    hx0, hx1, hz0, hz1 = 400.0, 490.0, 765.0, 784.0
     B(hx0, hx1, hz0, hz0 + 1.0, 0.0, 8.0, "MI_Corrugated")
     B(hx0, hx0 + 0.6, hz0, hz1 - 6.0, 0.0, 8.0, "MI_Corrugated")                    # the west gable; the east is open
     for x in range(int(hx0), int(hx1) + 1, 10):
         B(x - 0.4, x + 0.4, hz1 - 0.4, hz1 + 0.4, 0.0, 8.0, "MI_PaintedMetal")
-        B(x - 0.4, x + 0.4, hz0 + 9.6, hz0 + 10.4, 0.0, 8.0, "MI_PaintedMetal")     # the mid row
+        B(x - 0.4, x + 0.4, hz0 + 9.1, hz0 + 9.9, 0.0, 8.0, "MI_PaintedMetal")      # the mid row
     B(hx0, hx1, hz0, hz1 + 4.5, 8.0, 8.6, "MI_PaintedMetal")                        # the roof slab and its 庇
     x = hx0
     while x < hx1 - 1e-6:
@@ -664,32 +762,32 @@ def fish_market(material, Builder):
         x += 10.0
     B(hx0, hx1, hz0, hz1, 0.0, 0.05, "MI_TileWhite")                                # the washable floor
     B(hx0 + 25.0, hx1 - 25.0, hz0 - 0.15, hz0, 5.4, 7.4, "MI_Sign")                 # the name, to the ramp and the dike
-    for k in range(13):                                                              # the truck berths, land side
-        xx = 398.0 + k * 5.0
+    for k in range(14):                                                              # the truck berths, land side
+        xx = 422.0 + k * 5.0
         B(xx, xx + 0.12, hz0 - 11.0, hz0 - 1.0, 0.02, 0.03, "MI_PaintWhite")
     for k in range(8):                                                               # fish-box rows: cover in the hall
-        xx = 380.0 + k * 10.0
-        B(xx, xx + 6.0, 756.0, 757.2, 0.05, 1.25, "MI_PlasticWhite")
-        B(xx + 3.0, xx + 9.0, 763.0, 764.2, 0.05, 1.25, "MI_PlasticWhite")
-    # ── the cold store and ice plant east of the hall, the 給氷塔 on the quay with its chute to the boats
-    B(470.0, 504.0, 747.0, 771.0, 0.0, 9.0, "MI_Corrugated")
-    B(470.0, 504.0, 747.0, 771.0, 9.0, 9.4, "MI_PaintedMetal")
-    B(474.0, 478.0, 746.85, 747.0, 0.0, 4.2, "MI_PaintedMetalDark")                 # its two dock doors, land side
-    B(486.0, 490.0, 746.85, 747.0, 0.0, 4.2, "MI_PaintedMetalDark")
-    B(506.0, 512.0, 764.0, 770.0, 0.0, 18.0, "MI_PaintedMetal")                     # the ice tower: the tall mark
-    B(506.0, 512.0, 763.85, 764.0, 14.0, 17.0, "MI_Sign")
-    b.beam((509.0 - cx, cz - 770.0, 9.0), (509.0 - cx, cz - (q + 3.0), 1.5), 0.8, "MI_Steel")
-    # ── the trucks' turning and waiting ground at the east end: a net / float store, stacked reefer boxes as cover
-    B(576.0, 600.0, 760.0, 771.0, 0.0, 5.0, "MI_Corrugated")                        # 漁具倉庫
-    for x0 in (520.0, 548.0):
-        B(x0, x0 + 12.2, 737.0, 739.5, 0.0, 5.2, "MI_PaintedMetal")                 # two-high container rows
-    # ── 避難階段 up the dike's sea face to the crest (1:2, 2 m wide, lying on the slope), clear of the ramp
-    rise = 9.9
-    for x in (300.0, 350.0, 590.0):
-        b.beam((x - cx, cz - 718.5, -0.9), (x - cx, cz - (718.5 - 2.0 * rise), rise - 0.9), 2.0, "MI_ConcreteSmooth")
+        xx = 406.0 + k * 10.0
+        B(xx, xx + 6.0, 770.0, 771.2, 0.05, 1.25, "MI_PlasticWhite")
+        B(xx + 3.0, xx + 9.0, 777.0, 778.2, 0.05, 1.25, "MI_PlasticWhite")
+    for x0 in (362.0, 377.0):                                                        # inside the U: reefer boxes
+        B(x0, x0 + 12.2, 760.0, 762.5, 0.0, 5.2, "MI_PaintedMetal")
+    # ── INSIDE THE RECTANGLE: the cold store and ice plant, the 給氷塔 by the street with its chute over it to the
+    # boats, the net / float store
+    B(530.0, 564.0, 764.0, 786.0, 0.0, 9.0, "MI_Corrugated")
+    B(530.0, 564.0, 764.0, 786.0, 9.0, 9.4, "MI_PaintedMetal")
+    B(534.0, 538.0, 763.85, 764.0, 0.0, 4.2, "MI_PaintedMetalDark")                 # its two dock doors, north side
+    B(546.0, 550.0, 763.85, 764.0, 0.0, 4.2, "MI_PaintedMetalDark")
+    B(570.0, 576.0, 780.0, 786.0, 0.0, 18.0, "MI_PaintedMetal")                     # the ice tower: the tall mark
+    B(570.0, 576.0, 779.85, 780.0, 14.0, 17.0, "MI_Sign")
+    b.beam(P(573.0, 786.0, 9.0), P(573.0, q + 3.0, 1.5), 0.8, "MI_Steel")
+    B(568.0, 586.0, 763.0, 775.0, 0.0, 5.0, "MI_Corrugated")                        # 漁具倉庫
+    # ── 避難階段 up the dike's sea face to the crest (real steps lying on the 1:2 slope, 2 m wide), clear of the ramp,
+    # its junction and the car park: one behind the car park, one east of the ramp's top bend
+    rise = 10.4
+    for x in (304.0, 598.0):
+        flight("z", 720.0, 720.0 - 2.0 * rise, x - 1.0, x + 1.0, 0.0, rise, base=None)
         for dx in (-1.0, 1.0):
-            b.beam((x + dx - cx, cz - 718.5, 1.0), (x + dx - cx, cz - (718.5 - 2.0 * rise), rise + 1.0), 0.06,
-                   "MI_PaintedMetal")
+            b.beam(P(x + dx, 720.0, 1.0), P(x + dx, 720.0 - 2.0 * rise, rise + 1.0), 0.06, "MI_PaintedMetal")
     return "FishMarket", "civic", b.mesh()
 
 
@@ -1155,10 +1253,12 @@ CIVIC_NOTES = {
     "Park": "Placeholder 公園 on a 60 x 60 plot, openings on all four sides; trees come from the nature kit (composite).",
     "WaterResort": "Placeholder 温浴・プールリゾート on a 150 x 120 plot, entrance on the street at -Y.",
     "ResortHotel": "Placeholder resort hotel for a 70 x 60 reserve, the balconies and pool deck to -Y (the sea).",
-    "FishMarket": "Placeholder 魚市場 on a quay 2 m over the water (the 310 x 68 m reserve), laid out in WORLD numbers: "
-                  "the quay wall matches island_reshape.MARKET_QUAY's z 780 edge, the east retaining wall MARKET_YARD's "
-                  "x 610 and the strip's 3.6 m. Origin = the reserve's centre on the yard; the quay at -Y. The whole "
-                  "mesh is the collider (the stairs are solid ramps): keep every stair a slope a character can walk.",
+    "FishMarket": "Placeholder 魚市場 on a quay 1.5 m over the water (the 320 x 96 m reserve), laid out in WORLD numbers "
+                  "round the ROADS island_site_access owns (the 2 + 2 truck ramp, its foot junction, the yard's one-way "
+                  "lane loop -- read at build time): keep paving, walls and props off their bands. The quay wall matches "
+                  "island_reshape.MARKET_QUAY's z 808 edge, the 物揚場 MARKET_LANDING (0.5 m lower), the east retaining "
+                  "wall MARKET_YARD's x 608 and the strip's 4.1 m. Origin = the reserve's centre on the yard; the quay at "
+                  "-Y. The mesh is the collider; every stair is real steps with a HULL_stair_ slide over its nosings.",
     "Mil_FighterJet": "Placeholder F-15J-class fighter, nose -Y. Static prop; its collider is the boxes in "
                       "building_types.json (MilitaryBase props), not its mesh.",
     "Airport_Airliner": "Placeholder narrow-body airliner (737-800 class), nose -Y. Static prop; collider = boxes in "
@@ -1769,23 +1869,27 @@ def build_all(material, Builder):
 # across on a 60 m hub (110 m to the top), on the gulf's east shore beside the resort hotels.
 
 def ferris_wheel_park(material, Builder):
-    """観覧車のある臨海公園 on a 110 x 160 plot (2026-10-02 night: moved south of the Suburb WB entrance onto the plain
+    """観覧車のある臨海公園 on a 110 x 140 plot (160 until S13: its north 20 m went to the Suburb entrance ramp) (2026-10-02 night: moved south of the Suburb WB entrance onto the plain
     by the beach). X across (the gulf at -X), Y along (the beach and the open sea at -Y, the scene's front; the suburb
     loop's corner at +X +Y): grass, a 6 m promenade along the two waterfront edges (-X, -Y), an entrance plaza at the
     +X +Y corner with a path to the wheel, and the wheel in the water corner (-X -Y) -- a 100 m rim (two rings 6 m
     apart, spokes, 32 gondolas) turning in the X-Z plane, so its full circle faces the open sea (-Y) (item 4: "the full
     circle faces open water"), on two A-frame legs, with a boarding hall under its low point."""
     b = Builder("Park_FerrisWheel", material)
-    hx, hy = 55.0, 80.0
+    # (S13 D3, user 2026-10-13: the plot loses 20 m off its NORTH (+Y) edge, 160 -> 140, so the Suburb entrance ramp
+    # passes clear of it; the wheel, the promenades and the beach edge stay where they stood in the world: the plot's
+    # centre moved 10 m south (-Y), so everything placed from the old centre is `sy` further +Y in the new frame)
+    hx, hy = 55.0, 70.0
+    sy = 10.0
     ground(b, -hx, hx, -hy, hy, "MI_Grass")
     b.box((-hx, -hy, 0.0), (-hx + 6.0, hy, 0.05), "MI_ConcreteSmooth")         # promenade, gulf side (-X)
     b.box((-hx, -hy, 0.0), (hx, -hy + 6.0, 0.05), "MI_ConcreteSmooth")         # promenade, sea side (-Y)
     b.box((-hx, -hy, 0.05), (-hx + 0.1, hy, 1.1), "MI_PaintedMetal")             # the waterfront railing
     b.box((-hx, -hy, 0.05), (hx, -hy + 0.1, 1.1), "MI_PaintedMetal")
     b.box((hx - 30.0, hy - 22.0, 0.0), (hx, hy, 0.06), "MI_ConcreteSmooth")    # entrance plaza (+X +Y corner)
-    b.box((-3.0, -28.0, 0.0), (3.0, hy - 22.0, 0.05), "MI_ConcreteSmooth")     # path south to the wheel
+    b.box((-3.0, -28.0 + sy, 0.0), (3.0, hy - 22.0, 0.05), "MI_ConcreteSmooth")  # path south to the wheel
     b.box((3.0, hy - 28.0, 0.0), (hx - 30.0, hy - 22.0, 0.05), "MI_ConcreteSmooth")
-    cx, cy, hub, R = 0.0, -40.0, 60.0, 50.0                                   # the wheel: centre (x, y), hub z, radius
+    cx, cy, hub, R = 0.0, -40.0 + sy, 60.0, 50.0                              # the wheel: centre (x, y), hub z, radius
     n = 48
     for side in (-3.0, 3.0):                                                  # two rims, 6 m apart across Y
         y = cy + side
@@ -1817,8 +1921,8 @@ def ferris_wheel_park(material, Builder):
     b.box((cx - 9.5, cy - 12.5, lo - 0.5), (cx + 9.5, cy + 12.5, lo - 0.2), "MI_PaintedMetal")
     b.box((cx - 9.0, cy + 12.0, 0.3), (cx + 9.0, cy + 12.2, lo - 0.5), "MI_TileWhite")
     b.box((cx - 4.0, cy + 12.1, 2.2), (cx + 4.0, cy + 12.3, 3.6), "MI_SignPink")   # the ticket-hall sign
-    for (x, y) in ((-40.0, -10.0), (-40.0, 20.0), (-40.0, 50.0), (-25.0, -70.0), (10.0, -70.0), (35.0, -70.0),
-                   (20.0, 0.0), (20.0, 30.0), (-20.0, 60.0), (10.0, 60.0)):
+    for (x, y) in ((-40.0, -10.0 + sy), (-40.0, 20.0 + sy), (-40.0, 50.0 + sy), (-25.0, -70.0 + sy), (10.0, -70.0 + sy),
+                   (35.0, -70.0 + sy), (20.0, 0.0 + sy), (20.0, 30.0 + sy), (-20.0, 50.0), (10.0, 50.0)):
         b.box((x - 0.9, y - 0.25, 0.4), (x + 0.9, y + 0.25, 0.5), "MI_Wood")       # benches
         b.box((x - 0.8, y - 0.2, 0.0), (x - 0.6, y + 0.2, 0.4), "MI_PaintedMetal")
         b.box((x + 0.6, y - 0.2, 0.0), (x + 0.8, y + 0.2, 0.4), "MI_PaintedMetal")
@@ -1826,7 +1930,7 @@ def ferris_wheel_park(material, Builder):
 
 
 CIVIC_NOTES["Park_FerrisWheel"] = (
-    "Placeholder 観覧車 waterfront park, 110 x 160 plot (the sea -Y, the gulf -X, the entrance at +X +Y): a 100 m "
+    "Placeholder 観覧車 waterfront park, 110 x 140 plot (the sea -Y, the gulf -X, the entrance at +X +Y): a 100 m "
     "wheel on a 60 m hub (two white rims, 32 gondolas, A-frame legs) in the water corner, a boarding hall under its low "
     "point, a promenade along both waterfront edges. The game assumes: the wheel's plane is X-Z (its circle faces "
     "+-Y, the open sea), the wheel does not "

@@ -24,6 +24,7 @@ class Builder:
         self.material = material
         self.bm = bmesh.new()
         self.mats = []
+        self.stair_hulls = []   # [[(x, y, z) x 8]]: stair RAMPS, characters only (HULL_stair_: layer stair_ramp)
 
     def _mi(self, mat):
         if mat not in self.mats:
@@ -138,6 +139,18 @@ class Builder:
         if rest:
             bmesh.ops.delete(self.bm, geom=rest, context="VERTS")
 
+    def stair_ramp(self, a_lo, a_hi, b_lo, b_hi, thick=0.3):
+        """An invisible RAMP collider over a flight of real steps (the stations' answer to characters stuck on stairs,
+        docs/buildings.md): a convex slab whose top runs along the NOSINGS from a_lo / b_lo (the two bottom corners, at
+        the lower floor one tread before the first riser) to a_hi / b_hi (the top corners, at the upper floor), `thick`
+        deep. Characters walk its slope; bullets, blasts and cars meet the steps. `build_library.install_piece` writes
+        each as a HULL_stair_ Empty (export_building_kit: collision layer stair_ramp)."""
+        pts = []
+        for q in (a_lo, a_hi, b_lo, b_hi):
+            pts.append(tuple(q))
+            pts.append((q[0], q[1], q[2] - thick))
+        self.stair_hulls.append(pts)
+
     def mesh(self):
         bmesh.ops.remove_doubles(self.bm, verts=self.bm.verts, dist=1e-5)
         me = bpy.data.meshes.new(self.name)
@@ -146,6 +159,9 @@ class Builder:
         self.bm.free()
         for m in self.mats:
             me.materials.append(self.material(m))
+        if self.stair_hulls:
+            # carried on the mesh to build_library.install_piece, which makes the Empties (a library piece is a mesh)
+            me["stair_hulls"] = [c for h in self.stair_hulls for q in h for c in q]
         me.update()
         return me
 

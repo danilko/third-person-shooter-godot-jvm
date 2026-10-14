@@ -349,7 +349,9 @@ RESERVES = (
     # the park moved SOUTH of it, onto the plain that runs on to the beach at z ~960 -- its wheel faces the open sea)
     # (2026-10-03: the dike's suburb stretch now runs down x 945 beside it, so the park is OUTSIDE the dike, beach
     # leisure, reached on foot over the dike; no road reaches it)
-    ("waterfront_park", (760.0, 798.0, 870.0, 958.0)),
+    # (S13 D3, user 2026-10-13: "yes, the current decision is good"): 20 m off the NORTH edge (z 798 -> 818) -- the
+    # Suburb entrance shuto_sb_on passed over x 760..805, z 798..817, the plot's north-west lawn
+    ("waterfront_park", (760.0, 818.0, 870.0, 958.0)),
     # the resort hotels (history: inside the old suburb loop, then 2026-10-02 night on the beach front OUTSIDE the dike).
     # 2026-10-03 (user: "homes behind the dike, only beach leisure outside"): the ring swings south round the suburb
     # (tools/island_suburb_dike.py), so the hotels stand INSIDE it, in the 68 m band between the suburb loop's bottom leg
@@ -376,7 +378,9 @@ RESERVES = (
     # (x 610, where the Wangan's viaduct takes over). It was (405, 705)-(570, 775). The truck ramp ichiba_michi comes
     # down inside its north edge and the car-park terrace stands in its north-west corner: both are roads / sites of
     # their own (island_site_access), and library_civic.fish_market lays the piece out round them.
-    ("fish_market", (300.0, 712.0, 610.0, 780.0)),
+    # (S13, 2026-10-13: the quay moved south to z 808 for the yard's lane loop, island_reshape.MARKET_QUAY; the west
+    # edge to x 290, the coast road's embankment, where the public car park and the 物揚場 are)
+    ("fish_market", (290.0, 712.0, 610.0, 808.0)),
     # the airport's AIRSIDE (user, 2026-09-29: the runway "on a different side from the bridge"): behind the terminal,
     # the apron against its airside face (boarding bridges to z 1811.6), then the taxiway and the 540 x 45 m runway
     # along the island's SOUTH edge (the island reaches z 2040 for it, island_reshape AIRPORT_SOUTH). It stood between

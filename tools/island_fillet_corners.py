@@ -101,6 +101,19 @@ def slide(net, uid, toward_uid, limit_uid, factor, corner):
     p.pos = (p.pos[0] + u[0] / ul * extra, p.pos[1] + u[1] / ul * extra, p.pos[2])
 
 
+def face_legs(net, a0, a, b, b0):
+    """The corner's two remaining points faced down their OWN legs (MANUAL): `a` along a0 -> a, `b` along b -> b0
+    (PLAN S13 D4). Left AUTO, each was faced on the chord of its neighbours, which leans into the corner, and the kit's
+    curve then bent 3-8 deg the WRONG way on each leg before turning the corner (an S at every rounded corner)."""
+    for u, p0, p1 in ((a, a0, a), (b, b, b0)):
+        q0, q1 = net.points[p0].pos, net.points[p1].pos
+        d = (q1[0] - q0[0], q1[1] - q0[1])
+        L = math.hypot(*d)
+        if L > 1e-6:
+            net.points[u].tangent_mode = pm.MANUAL
+            net.points[u].tangent = (d[0] / L, d[1] / L, 0.0)
+
+
 def fix(net, road, corner_uid, target):
     """Tries the fixes on a copy; returns (network to keep, radius reached, what was done) or None."""
     uids = road.points
@@ -117,6 +130,7 @@ def fix(net, road, corner_uid, target):
         if factor > 1.0:
             slide(trial, a, corner_uid, uids[i - 2], factor, corner)
             slide(trial, b, corner_uid, uids[i + 2], factor, corner)
+        face_legs(trial, uids[i - 2], a, b, uids[i + 2])
         r = worst_near(trial, road.name, corner)
         what = "corner point removed" + ("" if factor == 1.0 else ", neighbours slid back x%.1f" % factor)
         if best is None or r > best[1]:

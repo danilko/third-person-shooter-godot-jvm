@@ -20,6 +20,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - 電柱 + wires, lamps up the mountain road, white ガードレール (PLAN.md T1 + part of T3, 2026-10-11, user-asked)
 - Right-hand traffic is the keep-left lane graph run backwards (2026-10-12, user: "drive on the right")
 - The fish market's two gates, the Wangan's bay jog as two arcs, both Suburb ramps one-way (PLAN S11 P12, 2026-10-13)
+- The yard's street and rectangle: why the fish market has no junction at the ramp's foot (PLAN S13, 2026-10-13)
 
 ---
 
@@ -2147,4 +2148,28 @@ falls 10 m, not 6.3 -- `ICHIBA_GRADE` 0.07 (163 m; at 6 % it is 187 m and ends i
 6.9 deg, foot at (383, 728), record heights down to -3.6 (the first road authored below the network's zero; the
 whole layout passes it). `ichiba_chushajo` and its T at x 375 are REMOVED (the terrace stood where the ramp's foot
 now lands); `signal` / `allow_cross` stay as ACCESS keys with no user. The coast road's corner keeps its R 60 arc.
+
+
+
+## The yard's street and rectangle: why the fish market has no junction at the ramp's foot (PLAN S13, 2026-10-13)
+
+User: cars must reach the yard ("rectangle counter map will be better?"), the truck ramp 2 + 2 "for the truck and other
+larger vehicles", the T "slightly more straight". Owner: `tools/island_site_access.py` (ICHIBA_*, YARD_LOOP).
+
+* **`ichiba_michi` is 2 + 2** (`ICHIBA_SECTION`: 3.5 m lanes -- the 第3種 width at 20 km/h, not the city's 4.5 --
+  a painted centre, one 2 m footway on its right). Its arm leaves the x 567 pad **10 deg** west of south (was 20; the
+  eastbound right turn in is 100 deg); the pad still solves ~21 m (it ran away at 0..+5 deg with a 1 + 1 arm). The
+  top bend is R 20 (the inside lane's inner edge on R 12.75), then 7 % down the dike's face, skewed 6.9 deg so its
+  land edge follows the face -- now on fill all the way (it is 4.5 m wider on the land side).
+* **A JUNCTION AT THE RAMP'S FOOT DOES NOT WORK, MEASURED.** The ramp comes down PARALLEL to every lane the yard can
+  hold, so any pad there has two arms from the east. Dry layout 1 (stem, a loop's in-arm from the south-east, its
+  out-arm south-south-west, ~50 deg apart): `setback` threw the loop's mouths 38 m out round their first bends and
+  slid the ramp's end 40 m back up the ramp. Dry layout 2, the three mouths `setback_locked`: `check_mouth_sides
+  --fix` then moved the ramp's end "out of the road it meets" onto the dike's face. Every perpendicular T (the stem
+  turned to meet the loop square) costs ~15 m of yard depth: the north lane lands at z ~775.
+* **What is built: no junction at the foot.** The ramp goes on, LEVEL, through a U (`ICHIBA_U_R` 30, 173 deg, so it
+  leaves heading due east; inside lane on R ~23) and east along the quay as the yard's street (z 793.8, its footway
+  on the quay side), to ONE plain T at x 522 (`YARD_LOOP`): `ichiba_michi_loop`, a one-way rounded rectangle (2 x 3.5 m,
+  kerbless, corners R 16 -- inner edge R 12) out north and back from the east, every turn a right turn. Dry layout 3:
+  the T solves 12 m with no slide; flow clean. It is in `authored_roads()` (the grade smoothing holds it).
 

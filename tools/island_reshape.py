@@ -341,6 +341,9 @@ def reshape(base):
     x0, x1, z0, z1 = MARKET_YARD
     mbox = (xx >= x0) & (xx <= x1) & (zz >= z0) & (zz <= z1)
     out = np.where(mbox, MARKET_YARD_Z, out)
+    # ...with its 物揚場 (MARKET_LANDING) half a metre lower again at the quay's west end, for the small craft
+    x0, x1, z0, z1 = MARKET_LANDING
+    out = np.where((xx >= x0) & (xx <= x1) & (zz >= z0) & (zz <= z1), MARKET_LANDING_Z, out)
     # THE AIRPORT ISLAND REACHES 60 m FURTHER SOUTH (user, 2026-09-29: "the airport's runway/island may need to extend,
     # or change side -- the runway may hit the bridge"): the runway moved to the island's SOUTH edge, behind the terminal,
     # away from the bridge, and at the old coast (z 1980) its paved strip stood 4 m from the water. A reclaimed strip at
@@ -402,7 +405,11 @@ WANGAN_TERMINAL_FILL = (-1000.0, -820.0, 1040.0, 1225.0)
 #: the coast road's corner) to the east bank (land again at x ~720). x 262..610 is the market's quay; x 610..720 a plain
 #: vertical sea wall under the Wangan's viaduct (no buildings; its piers stand on this land). Fill, over a seabed of
 #: -4 (east) to -24 m (west): the edge is a quay wall into deep water, like the harbour's.
-MARKET_QUAY = (262.0, 720.0, 730.0, 780.0)
+MARKET_QUAY = (262.0, 720.0, 730.0, 808.0)
+#: (S13 D2, 2026-10-13: the quay moved SOUTH 28 m, z 780 -> 808, user: "can push overall quay further south if it
+#: helps to make room". The yard now carries a one-way lane loop round the hall for cars -- the north lane under the
+#: truck ramp's fill, 13 m berths, the 20 m hall, the quay lane -- and the truck ramp is 2 + 2 (D2b). The Wangan's
+#: piers over x 553..720 stand on the quay land or in the water; a pier on the loop's lanes is dropped by the kit.)
 #: the WEST WEDGE: a slot of water along x 280..300 (a leftover of GULF_FILL's x0 = 300): -24 m and 20 m wide at the
 #: shore, narrowing north to a 2 m ditch that ran on UNDER the dike road to z 590 behind it. The quay box takes it from
 #: z 730; this takes all the rest. (Filled only to the crest's edge at first: the corner's new arc then left the slot's
@@ -416,8 +423,17 @@ MARKET_WEDGE = (276.0, 303.0, 584.0, 730.0)
 #: plain's height behind a retaining wall (library_civic.fish_market). 2.0 is land (LAND_Z 0.35) and above the one
 #: world water box (y 0). The crest-level car-park terrace of the first build is gone: the truck ramp now falls 10 m
 #: and needs its ground.
-MARKET_YARD = (262.0, 608.0, 700.0, 780.0)    # x1 = 608: the 2 m cell slope up to the strip lies UNDER the wall (607.8..610)
-MARKET_YARD_Z = 2.0
+MARKET_YARD = (262.0, 608.0, 700.0, 808.0)    # x1 = 608: the 2 m cell slope up to the strip lies UNDER the wall (607.8..610)
+#: (S13 D1, user 2026-10-13: "the planner main quay at 1.5m ... please do it as planner suggest".) Japanese fishing-port
+#: practice sets the crown at H.W.L. plus a margin that grows with the boats; Tokyo Bay's H.W.L. is ~1 m over the mean
+#: and the game's sea (y 0) IS the mean, so 1.5 is a small / medium fishing quay. RECALLED (the planner's and mine),
+#: not sourced: the JFA design guide's pages found define H.W.L. but not the crown formula.
+MARKET_YARD_Z = 1.5
+#: THE 物揚場 (landing quay for small craft) at the quay's WEST end, half a metre under the yard (the planner: a low
+#: strip 15-20 m deep beside the slipway, short steps up to the yard). Godot x0, x1, z0, z1: from the coast road's
+#: embankment (x 290) to the yard street's U at the ramp's foot (its outer kerb x ~336), the last 18 m before the wall.
+MARKET_LANDING = (290.0, 332.0, 790.0, 808.0)
+MARKET_LANDING_Z = 1.0
 #: the airport island's south extension (Godot x0, x1, z0, z1): the strip south of the old coast (z ~1980) to z1, over
 #: the island's own width there (x0..x1 only bound the search). See `reshape`.
 AIRPORT_SOUTH = (700.0, AIRPORT_END_X, 1980.0, 2040.0)

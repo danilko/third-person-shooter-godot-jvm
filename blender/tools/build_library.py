@@ -106,6 +106,20 @@ def install_piece(name, cat, mesh, origin_note, procedural):
     scene.collection.children.link(col)
     obj = bpy.data.objects.new(name, mesh)
     col.objects.link(obj)
+    # the piece's stair RAMP colliders (Builder.stair_ramp): one HULL_stair_ Empty each, at the piece's origin like the
+    # mesh (relayout moves both), its 8 points relative to it -- export_building_kit reads them into `stair_ramps`
+    flat = list(mesh.get("stair_hulls", []))
+    for i in range(len(flat) // 24):
+        pts = [tuple(flat[i * 24 + 3 * k: i * 24 + 3 * k + 3]) for k in range(8)]
+        e = bpy.data.objects.new("HULL_stair_%s_%d" % (name, i), None)
+        e.empty_display_type = "SPHERE"
+        e.empty_display_size = 0.2
+        e.location = pts[0]
+        e["pts"] = [c - pts[0][k % 3] for q in pts for k, c in enumerate(q)]
+        e.hide_render = True
+        col.objects.link(e)
+    if "stair_hulls" in mesh:
+        del mesh["stair_hulls"]
     col["bk_piece_path"] = "pieces/%s/%s.gltf" % (cat, name)
     col["bk_category"] = cat
     col["lib_procedural"] = bool(procedural)

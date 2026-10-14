@@ -172,13 +172,45 @@ def path_z(pts, anchors):
     return _profile(pts, anchors)
 
 
-def fillet(corners, radii, step=15.0):
+REVERSE_GAP = 20.0   # m of straight between two arcs that turn OPPOSITE ways (PLAN S13 D4: a reverse curve forced by two
+#                      parallel lines is drawn arc / straight / arc, as the Wangan's bay jog -- never an inflection)
+
+
+def _gapped(corners, radii, gap):
+    """`radii` shrunk where two neighbouring corners turn opposite ways, so their arcs leave `gap` m of straight
+    between them (each takes at most half of what is left of the span)."""
+    if gap <= 0.0:
+        return list(radii)
+    out = list(radii)
+    n = len(corners)
+
+    def turn(i):
+        a, b, c = corners[i - 1], corners[i], corners[i + 1]
+        u = (b[0] - a[0], b[1] - a[1])
+        v = (c[0] - b[0], c[1] - b[1])
+        cr = u[0] * v[1] - u[1] * v[0]
+        ang = math.acos(max(-1.0, min(1.0, (u[0] * v[0] + u[1] * v[1]) / max(1e-9, math.hypot(*u) * math.hypot(*v)))))
+        return (1.0 if cr > 0 else -1.0), ang
+    for i in range(1, n - 2):
+        if out[i] <= 0.0 or out[i + 1] <= 0.0:
+            continue
+        (s0, a0), (s1, a1) = turn(i), turn(i + 1)
+        if s0 * s1 > 0 or a0 < 1e-3 or a1 < 1e-3:
+            continue
+        room = max(0.0, (math.dist(corners[i][:2], corners[i + 1][:2]) - gap) / 2.0)
+        out[i] = min(out[i], room / math.tan(a0 / 2.0))
+        out[i + 1] = min(out[i + 1], room / math.tan(a1 / 2.0))
+    return out
+
+
+def fillet(corners, radii, step=15.0, gap=0.0):
     """A plan polyline through `corners` with each interior corner filleted (radius per corner), densified every
-    `step` m -- a ramp's path. Returns [(x, y)] including both ends."""
-    pl = rounded_polygon(corners, radii, closed=False, full_ends=True, arc_step=4.0)
+    `step` m -- a ramp's path; two opposite arcs keep `gap` m of straight between them (`_gapped`). Returns [(x, y)]
+    including both ends, carrying its design line (`plan`)."""
+    pl = rounded_polygon(corners, _gapped(corners, radii, gap), closed=False, full_ends=True, arc_step=1.0)
     cum = arclen(pl, False)
     n = max(2, int(math.ceil(cum[-1] / step)))
-    return [at_s(pl, cum, cum[-1] * k / n, False) for k in range(n + 1)]
+    return _Path((at_s(pl, cum, cum[-1] * k / n, False) for k in range(n + 1)), pl)
 
 
 def mouth_of(net, name):
@@ -190,6 +222,8 @@ def on_curve(net, name, path3, lead=40.0):
     """Put the ramp's FAR station (the second, placed by branch_ramp) ON its curve `path3` [(x, y, z)], which starts
     at the mouth, and return the rest of the curve after it: the curve then starts at the gore itself, with no kink
     where branch_ramp's offset station met it (user, 2026-09-30: smooth curves, no jumps)."""
+    if getattr(path3, "plan", None):
+        RAMP_PLANS[name] = path3.plan
     cum = arclen([q[:2] for q in path3], False)
     k = next((i for i, c in enumerate(cum) if c >= min(lead, cum[-1] / 4.0)), 1)
     fu = net.roads[name].points[1]
@@ -253,7 +287,7 @@ def designed_ramp(m, t0, e, te, side, crosses=(), along=None, sep=11.0, z0=0.0, 
                         turns.append(math.degrees(math.acos(max(-1.0, min(1.0, cosv)))))
                     if not ok or max(turns) > maxturn:
                         continue
-                    path = fillet(pts, [0.0] + [2000.0] * (len(pts) - 2) + [0.0], step=step)
+                    path = fillet(pts, [0.0] + [2000.0] * (len(pts) - 2) + [0.0], step=step, gap=REVERSE_GAP)
                     if avoid is not None and any(avoid(q) for q in path):
                         continue
                     r = _min_radius(path)
@@ -300,11 +334,13 @@ def two_arc(m, t0, e, te, avoid=None, step=8.0, reach=400.0):
             if f1 < 1e-3 or f2 < 1e-3 or f1 > math.radians(100) or f2 > math.radians(100):
                 continue
             k1, k2 = math.tan(f1 / 2.0), math.tan(f2 / 2.0)
-            R = min(a / k1, c / k2, L / (k1 + k2))
+            # an S (the two arcs turn opposite ways) keeps REVERSE_GAP m of straight between them
+            s_ = (t0[0] * xc[1] - t0[1] * xc[0]) * (xc[0] * te[1] - xc[1] * te[0]) < 0.0
+            R = min(a / k1, c / k2, max(0.0, L - (REVERSE_GAP if s_ else 0.0)) / (k1 + k2))
             if best is not None and R <= best[1]:
                 continue
             pl = rounded_polygon([m[:2], X, C, e[:2]], [0.0, R * 0.999, R * 0.999, 0.0], closed=False,
-                                 full_ends=True, arc_step=4.0)
+                                 full_ends=True, arc_step=1.0)
             if avoid is not None and any(avoid(q) for q in pl):
                 continue
             best = (pl, R)
@@ -313,7 +349,7 @@ def two_arc(m, t0, e, te, avoid=None, step=8.0, reach=400.0):
     pl = best[0]
     cum = arclen(pl, False)
     n = max(2, int(math.ceil(cum[-1] / step)))
-    return [at_s(pl, cum, cum[-1] * k / n, False) for k in range(n + 1)], best[1]
+    return _Path((at_s(pl, cum, cum[-1] * k / n, False) for k in range(n + 1)), pl), best[1]
 
 
 def one_arc(m, t0, e, te, rmax=200.0, keep0=20.0, keep1=15.0, step=8.0):
@@ -337,14 +373,48 @@ def one_arc(m, t0, e, te, rmax=200.0, keep0=20.0, keep1=15.0, step=8.0):
     pl = rounded_polygon([m[:2], X, e[:2]], [0.0, R, 0.0], closed=False, full_ends=True, arc_step=1.0)
     cum = arclen(pl, False)
     n = max(2, int(math.ceil(cum[-1] / step)))
-    path = _Path(at_s(pl, cum, cum[-1] * k_ / n, False) for k_ in range(n + 1))
-    path.plan = pl
-    return path, R
+    return _Path((at_s(pl, cum, cum[-1] * k_ / n, False) for k_ in range(n + 1)), pl), R
 
 
 class _Path(list):
     """A ramp's plan path that carries its own DESIGN line (`plan`, 1 m arc steps) for `face_on_plan`."""
     plan = None
+
+    def __init__(self, items=(), plan=None):
+        super().__init__(items)
+        self.plan = plan
+
+
+#: ramp name -> its design line (record x, y, 1 m arc steps), registered as each ramp is run on (`on_curve`) or by its
+#: generator; `face_ramps` faces every station of the ramp on it before `thin` (PLAN S13 D4: chord-faced stations
+#: between thinned spans swept wiggles and kinks into otherwise designed arcs -- R 16 on c_nb_on's lanes)
+RAMP_PLANS = {}
+
+
+def face_ramps(net):
+    """Every registered ramp's stations faced on its design line (`face_on_plan`): the plan is turned to run the way
+    the road's chain does, and a ramp split at a joint (`<name>__2`) is faced piece by piece. Returns the count."""
+    n = 0
+    for name, plan in RAMP_PLANS.items():
+        for rn in [r for r in net.roads if r == name or r.startswith(name + "__")]:
+            ch = net.roads[rn].points
+            if len(ch) < 2 or not plan:
+                continue
+            a, b = net.points[ch[0]].pos[:2], net.points[ch[-1]].pos[:2]
+            cum = arclen(plan, False)
+            pl = plan if _s_open(plan, cum, a) <= _s_open(plan, cum, b) else plan[::-1]
+            cum = arclen(pl, False)
+            for u in ch:
+                p = net.points[u]
+                if p.tangent_mode == pm.MANUAL or any(l.type != pm.LINK_SEGMENT for l in p.links):
+                    continue
+                # off its line (a mouth, a moved joint station): leave it chord-faced
+                s_ = _s_open(pl, cum, p.pos[:2])
+                if math.dist(at_s(pl, cum, s_, False), p.pos[:2]) > 1.0:
+                    continue
+                plan_face(net, u, pl, cum, False)
+                n += 1
+    return n
 
 
 def face_on_plan(net, road_name, plan):
@@ -396,7 +466,7 @@ def reverse_curve(p0, p1, step=12.0, rmax=400.0):
     a = (H - h) / 2.0
     A = (p0[0], p0[1] + sy * a)
     B = (p1[0], p1[1] - sy * a)
-    return fillet([p0[:2], A, B, p1[:2]], [0.0, R, R, 0.0], step=step)
+    return fillet([p0[:2], A, B, p1[:2]], [0.0, R, R, 0.0], step=step, gap=REVERSE_GAP)
 
 
 def best_corner(p0, p1, corner_of, lo, hi, step=12.0, rmax=400.0):
@@ -464,7 +534,7 @@ def fly_heights(path, z0, z1, fly, spans, grade=0.055):
             d = 0.0 if a <= c <= b else min(abs(c - a), abs(c - b))
             z = max(z, fly - grade * d)
         out.append(z)
-    return [(q[0], q[1], round(z, 2)) for q, z in zip(path, out)]
+    return _Path(((q[0], q[1], round(z, 2)) for q, z in zip(path, out)), getattr(path, "plan", None))
 
 
 def joint_ramp(net, ramp_name, head, face, side, against):
@@ -522,7 +592,7 @@ def heights_by(path, pieces):
         else:
             z = pieces[-1][1]
         out.append((p[0], p[1], z))
-    return out
+    return _Path(out, getattr(path, "plan", None))
 
 
 def s_first(path, pred):
@@ -565,25 +635,34 @@ def diamond_ramp(net, at_uid, name, cw, ent, mouth, side, length=50.0, spread=18
     dx, dy = fp[0] - m[0], fp[1] - m[1]
     dl = math.hypot(dx, dy)
     ux, uy = dx / dl, dy / dl
-    t = (mouth[1] - m[1]) / uy                                     # the diagonal meets the arm's line here
-    corner = (m[0] + ux * t, mouth[1])
-    ax = 1.0 if mouth[0] > corner[0] else -1.0
-    th = math.acos(max(-1.0, min(1.0, ux * ax)))
-    tl = radius * math.tan(th / 2.0)
-    back = max(tl + 8.0, 0.0)
-    if t - back < dl * 0.6:                                        # keep the far station clear of the gore
-        back = t - dl * 0.6
-    far.pos = (corner[0] - ux * back, corner[1] - uy * back, fp[2])
-    fp = far.pos
-    path = fillet([fp[:2], corner, mouth], [0.0, min(radius, back / max(1e-6, math.tan(th / 2.0)) - 1.0), 0.0],
-                  step=20.0)[1:]
+    # PLAN S13 D4 ("every S out"): the diagonal used to start AT the gore, whose station is faced down C1 -- a 28 deg
+    # kink there, swept as an R 18-23 bend on the lanes, then the arc back onto the arm. The arm's line is parallel to
+    # C1, so out-and-back is unavoidable (a reverse curve between parallel lines); it is drawn as one: straight off the
+    # gore along C1's axis, an arc of `radius` out onto the diagonal, the diagonal, an arc of `radius` back onto the arm's
+    # line, straight into the mouth
+    ax = gore_axis(net, next(r for r in net.roads.values() if at_uid in r.points), at_uid)
+    if ax[0] * ux + ax[1] * uy < 0.0:
+        ax = (-ax[0], -ax[1])
+    th0 = math.acos(max(-1.0, min(1.0, ax[0] * ux + ax[1] * uy)))
+    X = (m[0] + ax[0] * (radius * math.tan(th0 / 2.0) + 2.0), m[1] + ax[1] * (radius * math.tan(th0 / 2.0) + 2.0))
+    t = (mouth[1] - X[1]) / uy                                     # the diagonal meets the arm's line here
+    corner = (X[0] + ux * t, mouth[1])
+    ax2 = 1.0 if mouth[0] > corner[0] else -1.0
+    th = math.acos(max(-1.0, min(1.0, ux * ax2)))
+    r_in = min(radius, 0.98 * min(t - radius * math.tan(th0 / 2.0), abs(mouth[0] - corner[0])) / max(1e-6, math.tan(th / 2.0)))
+    plan = fillet([m[:2], X, corner, mouth], [0.0, radius, r_in, 0.0], step=20.0, gap=REVERSE_GAP)
+    RAMP_PLANS[PREFIX + name] = plan.plan
+    cumw = arclen(plan, False)
+    k = next((i for i, c in enumerate(cumw) if c >= min(40.0, cumw[-1] / 4.0)), 1)
+    far.pos = (plan[k][0], plan[k][1], fp[2])
+    whole = [m[:2]] + list(plan[k:])
+    path = list(plan[k + 1:])
     # the climb (or descent) starts where the ramp's paved band has PARTED from C1's (island_grades.level_gores holds
     # it level until then anyway), not at its last corner: the same drop over ~40 m more (2026-10-01 review: 7.3 %)
-    whole = [m[:2], fp[:2]] + path
     cumw = arclen(whole, False)
     part = next((c for c, q in zip(cumw, whole) if abs(q[1] - m[1]) >= DIAMOND_PART), cumw[1])
     zs = ramp_heights(whole, m[2], 0.0, hold0=part, hold1=20.0)     # a level foot: queue room at the signal
-    far.pos = (fp[0], fp[1], round(zs[1], 2))
+    far.pos = (far.pos[0], far.pos[1], round(zs[1], 2))
     extend(net, PREFIX + name, [(x, y, round(z, 2)) for (x, y), z in zip(path, zs[2:])])
     return net.roads[PREFIX + name].points[-1]
 
@@ -718,7 +797,7 @@ def build(net, ground):
     far = open_ramp(net, at["w_bwd_on"], PREFIX + "w_bwd_on", "BWD", True, length=45.0)
     m = mouth_of(net, PREFIX + "w_bwd_on")
     p1, r1 = designed_ramp(m, down, (hn[0] - 0.5, hn[1]), down, 0, z0=m[2], zend=PL.CONN_Z)
-    p1 = [q[:2] for q in p1]
+    p1 = _Path((q[:2] for q in p1), p1.plan)
     run_on(net, PREFIX + "w_bwd_on", on_curve(net, PREFIX + "w_bwd_on",
                                                  heights_by(p1, [(0.0, m[2]), (arclen(p1, False)[-1], PL.CONN_Z)])))
     joint_ramp(net, PREFIX + "w_bwd_on", head_n, fn, 1, against=True)
@@ -794,7 +873,7 @@ def build(net, ground):
     far = open_ramp(net, at["e_bwd_off"], PREFIX + "e_bwd_off", "BWD", False, length=45.0)
     m = mouth_of(net, PREFIX + "e_bwd_off")
     pe1, r1 = designed_ramp(m, south, (bx + 0.5, ey), south, 0, z0=m[2], zend=zj)
-    pe1 = [q[:2] for q in pe1]
+    pe1 = _Path((q[:2] for q in pe1), pe1.plan)
     run_on(net, PREFIX + "e_bwd_off", on_curve(net, PREFIX + "e_bwd_off",
                                                  heights_by(pe1, [(0.0, m[2]), (arclen(pe1, False)[-1], zj)])))
     joint_ramp(net, PREFIX + "e_bwd_off", head_e, south, 1, against=False)
@@ -1129,7 +1208,7 @@ def ground_ramp(net, at_uid, name, cw, ent, end_xy, end_dir, mouths, lanes=1, gr
         # a gentle diverge to `side` first (designed_ramp): in a narrow corridor two_arc's corner sits on the
         # mainline's own line, so the ramp would never part from it before its last turn (R1: 8 m off for 240 m)
         p3, R = designed_ramp(m, t0, end_xy, te, side, avoid=avoid)
-        p = [q[:2] for q in p3]
+        p = _Path((q[:2] for q in p3), p3.plan)
     zj = sum(net.points[u].pos[2] for u in mouths) / len(mouths)
     mline = [net.points[u].pos[:2] for u in road.points]
     need = part_distance(net, road, lanes)
@@ -1300,6 +1379,9 @@ def port_entrance(net):
                              arc_step=4.0)
         cum = arclen(pl, False)
         n = max(2, int(math.ceil(cum[-1] / 8.0)))
+        # NOT faced on this line (PLAN S13 D4): its arc into the T is rr ~19 m, and drawn faithfully its lanes turned
+        # 42 deg at R 12; chord-faced, the setback's mouth cuts it to R 36. The ramp is pinned between the Wangan and the
+        # dike road (PORT_ON_T is 35 m from the mainline): its S and that turn need the plan's T moved, not this path
         return [at_s(pl, cum, cum[-1] * k / n, False) for k in range(n + 1)]
     L, g, R = ground_ramp(net, st, "port_on", "FWD", True, end, te, [a, b], lanes=ENTRY_LANES, path=path,
                           hold_extra=PORT_ON_HOLD, landing=PORT_ON_LANDING)
@@ -1565,22 +1647,51 @@ def y_ramps(net, wat, conn):
     # move whenever the mainline's length changes the 45 m station grid (NEXT PASS step 2 moved Y4 11 m that way)
     ux, uy = pm.station_axis(net, on)
     nx, ny = -uy, ux                                                # the mainline's left (north) side
-    g = (op[0] + nx * 22.0 - ux * 40.0, op[1] + ny * 22.0 - uy * 40.0)
-    corner_of = lambda v: (far[0], g[1] + (far[0] - g[0]) * uy / ux if abs(ux) > 1e-6 else v)
-    C = corner_of(0.0)
-    a, b = math.dist(far[:2], C), math.dist(C, g)
-    th = math.acos(max(-1.0, min(1.0, ((C[0] - far[0]) * (g[0] - C[0]) + (C[1] - far[1]) * (g[1] - C[1])) / (a * b))))
-    R = min(250.0, 0.97 * min(a, b) / math.tan(th / 2.0))
+    # ONE ARC (PLAN S13 D4, user: "every S out"): straight off the connector along ITS axis, one arc, a straight
+    # Y4_MERGE_RUN long ON the merge's gore line into the gore. It aimed at a point 22 m off the mainline 40 m short of
+    # the merge and was then dragged onto the gore line by make_ramp (a 12.5 m jog in its last span), and it left the
+    # connector 7 deg off the connector's own axis (a kink at the diverge): an S at each end
     m = mouth_of(net, PREFIX + "y4")
-    C = (m[0] + 6.0, C[1])
-    p = fillet([m[:2], C, g], [0.0, R, 0.0], step=12.0)
+    t0 = gore_axis(net, conn, off)
+    if t0[0] * (far[0] - m[0]) + t0[1] * (far[1] - m[1]) < 0.0:
+        t0 = (-t0[0], -t0[1])
+    g = _gore_line(net, on, (nx, ny))
+    p, R = one_arc(m, t0, g, (ux, uy), rmax=250.0, keep0=20.0, keep1=Y4_MERGE_RUN)
+    print("island_expressway: Y4 one arc R %.0f m" % R)
     L = arclen(p, False)[-1]
     run_on(net, PREFIX + "y4", on_curve(net, PREFIX + "y4", heights_by(p, [(0.0, m[2]), (L, op[2])])))
     ro.make_ramp(net, on, net.roads[PREFIX + "y4"].points[-1], lanes=ENTRY_LANES)
+    _check_gore(net, PREFIX + "y4", g)
     y3_ramp(net, wat["y3"], conn)
 
 
-Y3_MERGE_DEG = 8.0   # Y3's last straight converges onto the connector at this angle
+Y4_MERGE_RUN = 40.0  # m: Y4's last straight, on its merge's gore line (the parallel run before the taper)
+
+
+def _gore_line(net, on, side):
+    """Where a ramp MERGING at mainline station `on` from `side` (a unit plan vector, the mainline's left or right)
+    has its last station once `make_ramp` aligns it: on the station's cross-section, the through carriageway's half
+    width (half the median + its lanes) out -- `point_solve.ramp_target`'s gore line, which a ramp's own mouth station
+    (OVERRIDE, no shoulder) starts on. A path aimed anywhere else is dragged there in its last span (an S)."""
+    res = net.resolved(on)
+    ax = pm.station_axis(net, on)
+    left = side[0] * -ax[1] + side[1] * ax[0] > 0.0
+    lanes = res.lanes_fwd if left else res.lanes_bwd
+    off = res.median_width / 2.0 + lanes * res.lane_width
+    p = net.points[on].pos
+    return (p[0] + side[0] * off, p[1] + side[1] * off)
+
+
+def _check_gore(net, name, g):
+    """Report how far `make_ramp` moved a ramp's last station off the point its design line ends at (`_gore_line`)."""
+    q = net.points[net.roads[name].points[-1]].pos
+    d = math.dist(q[:2], g[:2])
+    if d > 0.3:
+        print("island_expressway: WARN %s's end moved %.2f m off its design line by make_ramp" % (name, d))
+
+
+Y3_MERGE_DEG = 8.0   # Y3's last straight converges onto the connector at this angle (PLAN S13 D4: parallel on the gore
+#                      line, its band touched the connector's the whole straight and level_gores held it: 12.3 %)
 Y3_GORE_HOLD = 85.0  # m: about how long island_grades.level_gores holds it level with the connector at its merge
 
 
@@ -1602,6 +1713,9 @@ def y3_ramp(net, off, conn):
     far = open_ramp(net, off, PREFIX + "y3", "BWD", False, length=45.0, lanes=ENTRY_LANES)
     m = mouth_of(net, PREFIX + "y3")
     road = next(r for r in net.roads.values() if off in r.points)
+    # it leaves along the CHORD to the mainline's next station, a few degrees outward of the mainline's design tangent
+    # on its curve: a taper-type diverge before it turns back over the mainline. (PLAN S13 D4 tried the design tangent:
+    # Y3 then hugged the curving mainline longer, crossed it 1.3 m higher and came down at 7.2 %.)
     k = road.points.index(off)
     q0 = net.points[road.points[k + 1]].pos                        # WB runs toward the chain's start
     t0 = (m[0] - q0[0], m[1] - q0[1])
@@ -1619,9 +1733,11 @@ def y3_ramp(net, off, conn):
     left = (-te[1], te[0])
     # it arrives on a straight converging onto the merge at MERGE_DEG (no corner where the curve meets the taper),
     # ending where the ramp's own mouth will sit (its lanes beside the connector's, half a carriageway off)
+    # (PLAN S13 D4) it ends ON the gore line (it aimed 0.5 m short of it, and make_ramp stepped it there); the 8 deg
+    # turn onto the connector's axis at the merge is the taper-type entrance's nose
     a = math.radians(Y3_MERGE_DEG)
     tm = (te[0] * math.cos(a) + te[1] * math.sin(a), -te[0] * math.sin(a) + te[1] * math.cos(a))
-    g = (op[0] + left[0] * 9.0, op[1] + left[1] * 9.0)
+    g = _gore_line(net, on, left)
     # the MAINLINE's runs only, in their chain order: a loop or connector in this list adds a fake segment from one
     # road's end to the next one's start (the west terminal's loop put one diagonally across the bay, right where Y3
     # turns, and Y3 came out lying on top of Y4 for 230 m)
@@ -1683,8 +1799,10 @@ def y3_ramp(net, off, conn):
             z = max(z, lw[2] + (op[2] - lw[2]) * f)
         prof.append((x, y, round(z, 2)))
     knots = [(round(a0), round(zw, 1)) for a0, _a1, zw in win]
+    RAMP_PLANS[PREFIX + "y3"] = p.plan
     run_on(net, PREFIX + "y3", on_curve(net, PREFIX + "y3", prof))
     ro.make_ramp(net, on, net.roads[PREFIX + "y3"].points[-1], lanes=ENTRY_LANES)
+    _check_gore(net, PREFIX + "y3", g)
 
 def _arc(c, r, a0, a1, step=10.0):
     """Points on the circle (c, r) from angle a0 to a1 (radians, either way), every ~step m, excluding a0."""
@@ -1713,6 +1831,11 @@ T_GORE_LANES = 1      # ...and so is its SPUR gore, for now: two lanes there wan
 T_HALF = 4.0          # a one-lane ramp's paved half width (lane 4.5 + shoulders), for overlap spans
 T_FLY = 5.8           # surface-over-surface target where one T ramp passes over another road (gate: 5.5)
 T_GRADE = 0.05        # the steepest a T ramp climbs or falls
+T_EASE = 60.0         # m: the last span into a T ramp's spur gore, over which make_ramp's step onto the gore line is
+#                       swept (PLAN S13 D4: it was the last 12 m span, an R 24-44 S)
+T4_EASE = 0.0         # ...but NOT T4's (a 5.5 m step, its last 12 m span as before): spread over 60 m its band overlapped
+#                       the spur's that much longer, level_gores held it level there and its descent off the flyover came
+#                       out 8.0 % (7.0 % at 30 m; the rule is 6). Its S at the gore stays until its profile has the room
 T_PAIR = 6.0          # two T ramps closer than this (station to centreline) are one carriageway: one height
 
 
@@ -1778,7 +1901,7 @@ def _heights(path, z0, z1, over, grade=T_GRADE, hold=0.0):
             d = 0.0 if a <= c <= b else min(abs(c - a), abs(c - b))
             z = max(z, zm - grade * d)
         out.append((q[0], q[1], round(z, 2)))
-    return out
+    return _Path(out, getattr(path, "plan", None))
 
 
 def _side(q, path):
@@ -1797,6 +1920,12 @@ def _wrong_side(q, path, want, clear):
     """True if `q` is within `clear` of `path` or on the other side of it from `want` (+1 left, -1 right)."""
     sd, d = _side(q, path)
     return d < clear or sd * want < 0
+
+
+def _ease_end(path, ease):
+    """`path` without its interior points within `ease` m (arclength) of its END: the span into the end is that long."""
+    cum = arclen([q[:2] for q in path], False)
+    return [q for q, c in zip(path[:-1], cum[:-1]) if c <= cum[-1] - ease] + [path[-1]]
 
 
 def _one_lane_road(net, name, pts3):
@@ -1836,9 +1965,16 @@ def t_split(net, wg, spur, spur2):
     # T3 (EB outer -> spur NB): straight on along the diagonal, then the S onto the spur's west side (two_arc)
     on3 = min(spur.points, key=lambda k: abs(net.points[k].pos[1] - PL.T3_ON_Y))
     o3 = net.points[on3].pos
+    # each T ramp runs beside the spur with its band PARTED from the spur's (22 / 15 / 13 m off: it climbs there, and
+    # island_grades.level_gores holds a ramp whose band touches its mainline's level with it -- on the gore line all the
+    # way, T1 read 10.8 %, T4 11.4 %, PLAN S13 D4), and make_ramp drags its last station onto the gore line (~9.5 m).
+    # That lateral step was taken in the last 12 m span (an R 24-44 S at every spur gore); it is spread over T_EASE m
+    # now (`_ease_end`: no station in between), a taper of a few degrees
     g3 = (o3[0] - 22.0, o3[1] - 40.0)
     st3 = (s3[0] + u[0] * PL.T3_STRAIGHT, s3[1] + u[1] * PL.T3_STRAIGHT)
     p3, r3 = two_arc(st3, u, g3, (0.0, 1.0), avoid=lambda q: q[0] > 1040.0 and q[1] < -365.0)
+    p3 = _Path(_ease_end(p3, T_EASE - 40.0), p3.plan)
+    RAMP_PLANS[PREFIX + "t3"] = [s3] + list(p3.plan)
     p3 = _densify([s3, st3], 12.0) + p3[1:]
     t3 = _heights(p3, z0, o3[2], [])
 
@@ -1848,11 +1984,13 @@ def t_split(net, wg, spur, spur2):
     on1 = min(spur2.points, key=lambda k: abs(net.points[k].pos[1] - PL.T1_ON_Y))
     mp = net.points[on1].pos
     r = PL.T1_R
-    c = (PL.T1_LEG_X - r, PL.T1_LOOP_Y)
+    leg_x = PL.T1_LEG_X
+    c = (leg_x - r, PL.T1_LOOP_Y)
     P = (s1[0] + u[0] * PL.T1_SWAP, s1[1] + u[1] * PL.T1_SWAP)
     T, aT = _tangent_cw(P, c, r)
     lead = fillet([s1, P, T], [0.0, PL.T1_SWAP_R, 0.0], step=12.0)
-    p1 = lead + _arc(c, r, aT, 0.0) + [(PL.T1_LEG_X, y) for y in _ys(c[1] - 20.0, mp[1] + 45.0)]
+    p1 = lead + _arc(c, r, aT, 0.0) + [(leg_x, y) for y in _ys(c[1] - 20.0, mp[1] + 45.0)]
+    RAMP_PLANS[PREFIX + "t1"] = list(lead.plan) + _arc(c, r, aT, 0.0, step=1.0) + [(leg_x, mp[1])]
     p1x = [q[:2] for q in p1]
     p3x = [q[:2] for q in p3]
 
@@ -1870,7 +2008,9 @@ def t_split(net, wg, spur, spur2):
     C = (PL.T4_NORTH_X, PL.T_EAST_Y)
     F = (o4[0] + 16.0, PL.T4_TURN_Y)
     G = (o4[0] + 15.0, o4[1])
-    p4 = fillet([e4, A, C, F, G], [0.0, rA, PL.T4_RC, PL.T4_RF, 0.0], step=12.0)[::-1]
+    p4 = fillet([e4, A, C, F, G], [0.0, rA, PL.T4_RC, PL.T4_RF, 0.0], step=12.0, gap=REVERSE_GAP)
+    RAMP_PLANS[PREFIX + "t4"] = p4.plan
+    p4 = _ease_end(p4, T4_EASE)[::-1]
     r4 = min(rA, PL.T4_RC, PL.T4_RF)
     cum4 = arclen(p4, False)
     over4 = [(a, b_, max(_spur_z(net, spurs, at_s(p4, cum4, a, False)[1]),
@@ -1921,9 +2061,12 @@ def t_split(net, wg, spur, spur2):
     tA2 = (yE2 - e2[1]) / u[1]
     A2 = (e2[0] + u[0] * tA2, e2[1] + u[1] * tA2)
     rA2 = 0.95 * tA2 / math.tan(hA / 2.0)
-    C2 = (o2[0] - 13.0, yE2)
-    rC2 = 0.95 * min(math.dist(A2, C2) - rA2 * math.tan(hA / 2.0), math.dist(C2, (o2[0] - 13.0, o2[1])))
-    p2 = fillet([e2, A2, C2, (o2[0] - 13.0, o2[1])], [0.0, rA2, min(PL.T2_RC, rC2), 0.0], step=12.0)[::-1]
+    G2 = (o2[0] - 13.0, o2[1])
+    C2 = (G2[0], yE2)
+    rC2 = 0.95 * min(math.dist(A2, C2) - rA2 * math.tan(hA / 2.0), math.dist(C2, G2))
+    p2 = fillet([e2, A2, C2, G2], [0.0, rA2, min(PL.T2_RC, rC2), 0.0], step=12.0, gap=REVERSE_GAP)
+    RAMP_PLANS[PREFIX + "t2"] = p2.plan
+    p2 = _ease_end(p2, T_EASE)[::-1]
     r2 = min(rA2, PL.T2_RC, rC2)
     t2 = _heights(p2, o2[2], z0, [])
     # T2 rides LEVEL with T4 (one carriageway) where the two are side by side by J0: within T_PAIR of T4's line
@@ -1950,6 +2093,7 @@ def t_split(net, wg, spur, spur2):
     ro.make_ramp(net, on1, net.roads[PREFIX + "t1"].points[-1], lanes=T_GORE_LANES)
     ro.make_ramp(net, of4, net.roads[PREFIX + "t4"].points[0], lanes=T_GORE_LANES)
     ro.make_ramp(net, of2, net.roads[PREFIX + "t2"].points[0], lanes=T_GORE_LANES)
+
     # no pier on the first span off J0 (four columns would stand together)
     for name in ("t3", "t1"):
         net.points[net.roads[PREFIX + name].points[0]].pillar_skip = True
@@ -2302,6 +2446,38 @@ THIN_TURN = 8.0      # ...the most the ORIGINAL alignment may turn within one ke
 THIN_DZ = 0.08        # ...and the most any removed station may stand off the straight-line height between the kept ones
 
 
+THIN_DEV = 0.10   # m: a span whose two stations are faced on one design line is kept only if the kit's curve between
+#                   them stays this close to that line (PLAN S13 D4: a diamond's arc end thinned into a 57 m span bulged
+#                   0.85 m off its straight and bent its lanes 2 deg the wrong way)
+
+
+def _off_plan(pa, pb):
+    """How far the cubic Hermite between two stations (the kit's span: handles = the chord's length) strays from the
+    design line both are faced on (`plan_face`); 0 when they are not faced on the same one."""
+    fa, fb = PLAN_FACED.get(pa.uid), PLAN_FACED.get(pb.uid)
+    if not fa or not fb or fa[0] != fb[0] or fa[0] not in PLANS or pa.tangent is None or pb.tangent is None:
+        return 0.0
+    plan, cum, closed = PLANS[fa[0]]
+    dx, dy = pb.pos[0] - pa.pos[0], pb.pos[1] - pa.pos[1]
+    L = math.hypot(dx, dy)
+    if L < 1e-6:
+        return 0.0
+    hs = []
+    for tg in (pa.tangent, pb.tangent):
+        m = math.hypot(tg[0], tg[1]) or 1.0
+        sg = 1.0 if tg[0] * dx + tg[1] * dy >= 0.0 else -1.0
+        hs.append((sg * tg[0] / m * L, sg * tg[1] / m * L))
+    worst = 0.0
+    for k in range(1, 8):
+        t = k / 8.0
+        h00, h10, h01, h11 = 2 * t ** 3 - 3 * t ** 2 + 1, t ** 3 - 2 * t ** 2 + t, -2 * t ** 3 + 3 * t ** 2, t ** 3 - t ** 2
+        q = (h00 * pa.pos[0] + h10 * hs[0][0] + h01 * pb.pos[0] + h11 * hs[1][0],
+             h00 * pa.pos[1] + h10 * hs[0][1] + h01 * pb.pos[1] + h11 * hs[1][1])
+        sq = s_on(plan, cum, q) if closed else _s_open(plan, cum, q)
+        worst = max(worst, math.dist(q, at_s(plan, cum, sq, closed)))
+    return worst
+
+
 def thin(net):
     """Drop expressway stations the SHAPE does not need. The generators sample every curve every 8-12 m for the
     alignment solve, which the Road Kit does not need: it faces each station along its neighbours' chord and sweeps a
@@ -2353,6 +2529,8 @@ def thin(net):
                     turn += abs(d)
                 if math.degrees(turn) > THIN_TURN:
                     break
+                if _off_plan(ch[a], ch[c]) > THIN_DEV:
+                    break
                 za, zc = ch[a].pos[2], ch[c].pos[2]
                 if any(abs(ch[k].pos[2] - (za + (zc - za) * (s[k] - s[a]) / max(1e-9, s[c] - s[a]))) > THIN_DZ
                        for k in range(a + 1, c)):
@@ -2395,6 +2573,7 @@ def main(argv):
         print("island_expressway: widen " + line)
     speeds = post_speeds(net)
     n0 = sum(len(r.points) for n_, r in net.roads.items() if n_.startswith(PREFIX))
+    print("island_expressway: %d ramp stations faced on their design lines" % face_ramps(net))
     k = 0 if "--no-thin" in argv else thin(net)
     print("island_expressway: thinned %d of %d expressway stations" % (k, n0))
     for name, r in net.roads.items():

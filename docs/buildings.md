@@ -42,6 +42,13 @@ deal with stairs like stairs"). A navmesh bake parses every layer, so a path wal
   defects that fail with steps only too: the police station's roof-level flight has 1.64 m of headroom at its foot
   (the roof slab is not cut over it), and the large city safe house's top flight has a slab edge at head height.
 - Not covered: stairs inside `library.blend` pieces (landmarks, civic placeholders, apartment external stairs).
+  Since S13 (2026-10-13) a library piece CAN carry them (`library_procedural.Builder.stair_ramp`; the FishMarket's
+  7 flights); see `docs/island-world.md` "The fish market rebuilt for cars".
+- **A hull must lie ON the nosings, not one riser under them** (2026-10-14): from one tread before the first riser at
+  the lower floor to the top nosing, i.e. both ends one tread toward the low side of the flight. The FishMarket's
+  first `flight()` ran it from the first riser's foot to the top floor's edge: `probe_stairs` still passed (a walker
+  hops the 0.16 m noses), but a SWIMMER stalled at the first riser. A flight down into the sea must also reach ~1.2 m+
+  under the surface (a floating body reaches ~0.45 m under its origin).
 
 ## `assets/` is organised by domain; every modular kit is under `world_source/kits/` (PLAN.md 3.9, 2026-09-17)
 

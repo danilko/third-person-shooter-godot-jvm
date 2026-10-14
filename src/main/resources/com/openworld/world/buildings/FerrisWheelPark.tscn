@@ -3,9 +3,9 @@
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/FerrisWheelPark_mesh.res" id="1_2qoji"]
 [ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/FerrisWheelPark_collision.res" id="2_ugyit"]
 
-[node name="FerrisWheelPark" type="Node3D" unique_id=1019366585]
+[node name="FerrisWheelPark" type="Node3D" unique_id=1903131382]
 metadata/building = {
-"aabb": [Vector3(-55, -0.24277201, -80), Vector3(110, 111.10977, 160)],
+"aabb": [Vector3(-55, -0.24277201, -70), Vector3(110, 111.10977, 140)],
 "base_m": 0.0,
 "collision": "trimesh",
 "door_style": "swing",
@@ -15,13 +15,13 @@ metadata/building = {
 "doors_shop": false,
 "example": true,
 "facade_surfaces": {},
-"footprint_m": [110.0, 160.0],
+"footprint_m": [110.0, 140.0],
 "height_m": 111.11,
 "id": "FerrisWheelPark",
 "kit": "library",
 "landmark": true,
 "piece_count": 20,
-"probe_xz": [0.0, 40.0],
+"probe_xz": [0.0, 30.0],
 "props_top_m": 9.1824,
 "solid_probes": [],
 "trimesh_pieces": 1.0,
@@ -29,11 +29,11 @@ metadata/building = {
 "wall_top_m": 110.867
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=90479258]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=582513781]
 mesh = ExtResource("1_2qoji")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=1978996442]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1257352048]
 collision_mask = 0
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1289244070]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=800576059]
 shape = ExtResource("2_ugyit")

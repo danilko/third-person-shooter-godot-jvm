@@ -15,6 +15,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - Rail order at Central, one divided spur, runways on their aprons, a Ferris wheel (2026-09-29, later; user-asked)
 - The rebuild review batch: port entrance, signal controllers, the waterfront re-plan, services coverage (2026-10-03)
 - The fish market: a straight quay, a car park at the dike's height, the crest carried across junction pads (PLAN S11 P12, 2026-10-13)
+- The fish market rebuilt for cars: quay 1.5 m and z 808, a 物揚場, the yard's street and rectangle, real stairs (PLAN S13, 2026-10-13)
 
 ---
 
@@ -1478,3 +1479,65 @@ the old sample FAIL; World.tscn boots. Pictures: `docs/previews/market_built_pla
 whether a swimmer really walks out by the landing stairs and the slipway was not tried in play; the nightly sweep
 and `perf_gate.sh` were not run.
 
+## The fish market rebuilt for cars: quay 1.5 m and z 808, a 物揚場, the yard's street and rectangle, real stairs (PLAN S13, 2026-10-13)
+
+The user's decisions after S12 (PLAN.md "▶ S13 REBUILD"): the planner's quay height, cars able to reach the yard,
+the truck ramp 2 + 2 with a straighter T, the ferris wheel park clear of the Suburb ramp, real stairs. Roads:
+`docs/roads.md` "The yard's street and rectangle".
+
+**Land (`island_reshape`).** `MARKET_YARD_Z` 2.0 -> **1.5** (the planner's crown: H.W.L. ~1 m over the mean in Tokyo
+Bay plus a small-craft margin; RECALLED, not sourced -- see the constant). `MARKET_LANDING` (290, 332, 790, 808) at
+**1.0**: the 物揚場 for small craft at the quay's west end, three risers up to the yard. The quay line z 780 ->
+**808** (`MARKET_QUAY`, `MARKET_YARD`; the reserve `fish_market` (290, 712, 610, 808)): the yard's roads need ~30 m
+more depth than the hall, the berths and a quay apron took. The Wangan's piers over x 553..610 now stand on the
+quay land; a pier on a lane is dropped by the kit (`point_mesh.pier_on_road`) -- re-measure piers against the wall
+after the build (`tools/scratch/market_p12/piers.py`).
+
+**The ferris wheel park lost 20 m off its north edge** (reserve z 798 -> 818; `Park_FerrisWheel` 110 x 140, everything
+in the piece moved 10 m in its frame so the wheel, the promenades and the beach edge stay where they stood; the
+composite's tree props and probe moved with it). The Suburb entrance crossed its north-west lawn.
+
+**The piece (`library_civic.fish_market`) READS THE ROADS** from their one owner (`_fm_roads` imports
+`island_site_access` inside Blender) and keeps its paving (2 m raster spans), walls and buildings off their bands:
+the public end west of the ramp's U (car park, office + 直売所 with the roof-deck refuge, the 物揚場 + slipway), the
+trucks' waiting ground inside the U, the 90 x 19 m hall between the ramp's fill and the quay street (berths on its
+land side), the cold store / ice tower / net store inside the rectangle, two landing stairs, two 避難階段 up the dike.
+
+**Every stair is real steps with a slide over its nosings (D2c, user: "please use actual stair mesh, but above with
+the collision mesh of slide ... just like in station").** The library path had no way to carry one: a library piece
+is a mesh. `library_procedural.Builder.stair_ramp` records the hull and `Builder.mesh` carries it on the mesh as a
+custom property; `build_library.install_piece` turns each into a `HULL_stair_<piece>_<i>` Empty, which the existing
+export (`export_building_kit.markers`) and layout (`layout_buildings`, the example/custom path) already take to the
+scene's StairRamps body (layer 7, characters only). FishMarket: 7 flights, 7 hulls in `pieces.json`. Any library piece
+can now use it. The fingerprint (hand-edit guard) counts meshes only, so the Empties do not mark a piece edited.
+
+**A swimmer gets out by the landing stairs and the slipway, not by jumping (measured 2026-10-14).** The swim jump
+(`MovementController.swimJump`) lifts the body ~0.9 m (origin -0.65 -> 0.25 in a test pool): it clears no lip at all,
+not even 0.5 m, so the 1.0 m 物揚場 is NOT a way out by itself. A flight is, but only when it goes deep enough and its
+hull lies on the nosings. Two faults found by a probe of the exact flight (scratch: a bare pool, the steps, the hull):
+(1) `fish_market.flight` laid the hull from the first riser's foot to the top floor's edge -- one riser UNDER every
+nosing, so the noses stuck through it (walking hid it: `probe_stairs` passed; a swimmer stalls against the first
+riser); now both ends move one tread toward the low side, through the nosings, as `interior_kit`'s hulls are.
+(2) The landing stairs stopped 0.6 m under the sea; a floating body reaches ~0.45 m under its origin, so it met a
+riser: 0.6 stuck, 1.2 and 1.8 walked out. They now end **1.5 m** under (3.0 m high, 6 m run). The slipway (1:17 to
+0.7 m under) works as it was: a 1:12 slope to 0.7 under walks out. The built scene, turned so its stair faces the
+probe (`tools/godot/probe_swim_exit.gd -- --x=400|500`): the swimmer reaches the yard (y 1.51 / 1.52) at both stairs.
+
+**The S13 gates (2026-10-14, after `--from bridge`):** layout 0 errors, flow 2 483 lanes clean, 27 ramps (steepest
+6.7 %, K >= 6.4); the road gate 0 errors (2 551 lanes, 41 + 15 pieces); `island_footbridges --check` 19 clean (one row
+re-pointed: `ekimae_dori__4__x1` is `ekimae_dori__4` after the zone splits re-ran); `probe_road_clear` 0 / 2 551;
+`island_downstream --check` PASS (super_sento_city's lost frontage and the two buildings under C1 -- both were so at
+HEAD; SuperSento's roof, y 19.8, stands above C1's deck, y 18.6, at (-158, 338): not this job's, listed in PLAN);
+`check_roads.sh` 44 + the old sample street-tree FAIL; World.tscn boots (the 19 footbridge-id errors as before);
+`probe_gps_route --world=island` 33 / 33; `probe_craft` PASS; `probe_buildings` 18 163 / 18 163; `probe_stairs
+--scenes=FishMarket` 6 / 6 (the 7th hull, the 物揚場's 0.5 m step, is under the probe's 1 m threshold);
+`probe_road_launch` with the 26 t LTK1 at 8 m/s by the traffic rules on all four ramp lanes (down, and up from rest)
+and both rectangle lanes: 0 launches, lateral <= 0.5 m; with SPC1 at 22 m/s by the traffic rules on all 50 lanes of
+the 25 redrawn expressway ramps: 0 launches, worst rise 1.46 m/s, worst lateral 0.9 m; `probe_breach --at` on the
+yard street at 1 star: 7 units within 3 m, the first at 6.7 s. Measured: a Wangan pier at (539, 806) on the quay apron
+4.7 m outside the rectangle's outer lane; the rectangle runs under the Wangan and sb_off decks at y 17.6; the ice
+tower is 5.3 m from the sb_off deck in plan; the Suburb entrance (sb_on) still crosses the park's north-west corner
+on its viaduct (deck y 14.3) with one pier 2.7 m inside the plot, on the lawn, 2.5 m+ from the park's fence.
+Pictures: `docs/previews/market_s13_plan.png` (the derived record, `tools/scratch/market_p12/built_s13.py`) and
+`market_s13_{overview,stairs,ramp,ferris}.jpg`. NOT DONE: nobody has driven, walked or swum it by hand (PLAY IT);
+the nightly sweep and `perf_gate.sh`.
