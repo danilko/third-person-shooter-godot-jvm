@@ -29,6 +29,8 @@ import math
 import os
 import sys
 
+import numpy as np
+
 HERE = os.path.dirname(os.path.realpath(__file__))
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
@@ -46,6 +48,36 @@ SAMPLE = 25.0
 #: Road sampling pitch when a polyline is turned into points, metres. Well under `RADIUS` so a
 #: long straight leg cannot read as two endpoints with a gap between them.
 ROAD_SAMPLE = 40.0
+
+#: LAND IS THE BUILT GROUND, not the plan outline (S15 [I0], 2026-10-14). `G.on_land` is the OLD plan polygon: on it
+#: three of the five "unserved patches" were sea (y -24) and the reach read 87.3 % where the built island is 96.0 %.
+#: A sample is land where the land stage's height grid (`island_reshape.LAND`, Godot Y) stands above `LAND_Y`, the
+#: same rule the plan picture draws (`island_plan_picture.py`). `--grid` takes another grid (island_natural.f32).
+LAND_Y = 0.35
+
+#: The gate: the record's reach may not fall below this (`--min`). Set from the measured value on 2026-10-14
+#: (96.0 % on island_natural.f32, the record at 4c1deaba) less 0.5 pt -- a correction of the old gate, not a loosening.
+MIN_REACH = 95.5
+
+
+class LandGrid(object):
+    """`on_land(x, y)` in the RECORD frame (x east, y north = -Godot z) from a 2 m Godot height grid."""
+
+    def __init__(self, path=None):
+        import island_reshape as RS
+        self.RS = RS
+        self.h = RS.load(path or RS.LAND)
+
+    def __call__(self, x, y):
+        RS = self.RS
+        i, j = int(round((x - RS.X0) / RS.STEP)), int(round((-y - RS.Z0) / RS.STEP))
+        if not (0 <= i < RS.N and 0 <= j < RS.N):
+            return False
+        return bool(self.h[j, i] > LAND_Y)
+
+
+#: what `reach` samples as land; `main` swaps in a `LandGrid` (the self-test keeps the plan outline: it is pure)
+ON_LAND = G.on_land
 
 
 def densify(pts, step):
@@ -94,7 +126,7 @@ def reach(roads, radius=RADIUS, sample=SAMPLE):
         x = -G.ORIGIN + i * sample
         for j in range(n + 1):
             y = -G.ORIGIN + j * sample
-            if not G.on_land(x, y):
+            if not ON_LAND(x, y):
                 continue
             total += 1
             ci, cj = int(math.floor(x / radius)), int(math.floor(y / radius))
@@ -202,7 +234,17 @@ if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--record", default="", help="score a Road Kit .roads.json instead of the plan's network")
+    ap.add_argument("--grid", default="", help="the height grid that says what is land (default: the land stage's "
+                                              "island_land.f32)")
+    ap.add_argument("--plan-outline", action="store_true", help="the OLD land test (the plan polygon), for comparison")
+    ap.add_argument("--min", type=float, default=None, help="exit 1 below this reach in percent (the gate: --min %.1f)"
+                    % MIN_REACH)
     a = ap.parse_args()
     _selftest()
     print()
-    report(record_roads(a.record) if a.record else None)
+    if not a.plan_outline:
+        ON_LAND = LandGrid(a.grid or None)
+    got = report(record_roads(a.record) if a.record else None)
+    if a.min is not None and got < a.min:
+        print("island_v3_reach: FAIL reach %.1f %% < %.1f %%" % (got, a.min))
+        sys.exit(1)

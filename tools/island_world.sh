@@ -72,6 +72,9 @@ if want layout; then
     # planner and the building derive both read it -- so it is written here, after land and before anything else
     python3 tools/island_rail_layout.py --layout tokyo_straight --reserve | tail -1
     python3 tools/island_layout.py | grep -E "^island_layout|^island_grades|^island_dike|^island_streets" | tail -40
+    # REACH (S15 [I0]): land within 250 m of a road, scored on the land stage's grid -- a layout that strands land fails
+    python3 tools/island_v3_reach.py --record assets/world_source/pieces/IslandRoads.roads.json --min 95.5 \
+        | grep -E "^reach|FAIL"
     # the rail record (PLAN.md 3.25 R2): its level crossings take the ROADS' heights, so it follows the layout
     python3 tools/island_rail_record.py | tail -3
     # the civic plots (user, 2026-09-28) must still front a road and have no road through them on the new layout
