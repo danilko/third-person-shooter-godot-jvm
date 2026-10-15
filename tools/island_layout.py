@@ -858,11 +858,26 @@ def main(argv):
     print("island_layout: %d level crossing(s), %d break a 踏切 rule%s%s" % (len(lx), len(lxbad),
           "" if LX_ASSERT else " (reported; asserted after step (c))", "" if not lxbad else ": " + "; ".join(
               "%s x %s at %s: %s" % (r[0], r[1], r[2], ", ".join(r[5])) for r in lxbad)))
+    # S16 A1: two roads that do not meet keep their decks >= 3 m apart unless one is on a structure over the other
+    # (kita_touge ran 10-30 m beside kaigan_dori and 14-47 m up its cut; nothing gated it). New / worse pairs only:
+    # HEAD's own are listed in tools/island_road_gap.baseline.json
+    t0 = time.monotonic()
+    import island_road_gap as RG
+    gap_rows = RG.measure(pm.load_network(OUTPUT), RG.land_fn())
+    gap_known = {(r["a"], r["b"]): r for r in json.load(open(RG.BASELINE))["pairs"]}
+    gap_bad = [r for r in gap_rows if (r["a"], r["b"]) not in gap_known
+               or r["slack"] < gap_known[(r["a"], r["b"])]["slack"] - 0.5
+               or r["length"] > gap_known[(r["a"], r["b"])]["length"] + 20.0]
+    TIMES["check: road gap"] = time.monotonic() - t0
+    print("island_layout: %d road pair(s) closer than %.0f m deck to deck (%d known)%s" % (
+        len(gap_rows), RG.GAP, len(gap_rows) - len(gap_bad), "" if not gap_bad else "; %d NEW OR WORSE: %s" % (
+            len(gap_bad), ", ".join("%s x %s %.1f m over %.0f m at (%.0f, %.0f)" % (
+                r["a"], r["b"], r["slack"], r["length"], r["x"], r["y"]) for r in gap_bad[:8]))))
     print("island_layout: time " + ", ".join("%s %.0f s" % kv for kv in sorted(TIMES.items(), key=lambda kv: -kv[1])))
     print("island_layout: %d step(s) replayed from the cache%s" % (len(HITS), "" if not HITS else " (%s)" % ", ".join(HITS)))
     if LX_ASSERT and lxbad:
         sys.exit(1)
-    if rep["errors"] or any(bad.values()) or low or steep or folds or p2 or rbad or ungapped:
+    if rep["errors"] or any(bad.values()) or low or steep or folds or p2 or rbad or ungapped or gap_bad:
         sys.exit(1)
 
 

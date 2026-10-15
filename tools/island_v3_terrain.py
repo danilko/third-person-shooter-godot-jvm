@@ -655,7 +655,7 @@ def _hairpin(px, py, heading, uphill, radius, points):
 
 
 def switchback(height, start, target_z, grade, leg=260.0, step=20.0,
-               inside=None, max_length=12000.0, radius=HAIRPIN_RADIUS, heading=None, lookahead=0.0):
+               inside=None, max_length=12000.0, radius=HAIRPIN_RADIUS, heading=None, lookahead=0.0, sense=1.0):
     """A grade-legal alignment from `start` up to `target_z`. Returns the polyline.
 
     This is the answer WORLD_REBUILD_PLAN.md `W2` names -- "the grade limit is on the road, not on
@@ -689,7 +689,8 @@ def switchback(height, start, target_z, grade, leg=260.0, step=20.0,
     x, y = start
     pts = [(x, y)]
     arcs = set()                 # indices of hairpin arc points -- see `simplify(protect=...)`
-    sense = 1.0
+    # `sense` picks which way along the contour the FIRST leg runs (+1 / -1; `climb_direction`): kita_touge's foot on the
+    # cape has the coast road converging on its east side, so its first leg runs west (S16 C)
     run = 0.0
     total = 0.0
     last = heading
@@ -747,7 +748,7 @@ def alignment_grade(height, pts):
 
 
 def hill_road(height, start, target_z, limit, leg=500.0, step=20.0, inside=None,
-              radius=HAIRPIN_RADIUS, tries=10, heading=None, lookahead=0.0):
+              radius=HAIRPIN_RADIUS, tries=10, heading=None, lookahead=0.0, sense=1.0):
     """A switchback alignment whose OVERALL ground grade is inside `limit`, not just its legs.
 
     THE HAIRPINS ARE PART OF THE CLIMB, and forgetting that is what makes a generated mountain road
@@ -776,7 +777,7 @@ def hill_road(height, start, target_z, limit, leg=500.0, step=20.0, inside=None,
     for _ in range(tries):
         g = 0.5 * (lo + hi)
         pts, arcs = switchback(height, start, target_z, g, leg=leg, step=step, inside=inside,
-                               radius=radius, heading=heading, lookahead=lookahead)
+                               radius=radius, heading=heading, lookahead=lookahead, sense=sense)
         climb, length, avg = alignment_grade(height, pts)
         reached = height(*pts[-1]) >= target_z - 1.0
         if reached and avg <= limit:

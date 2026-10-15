@@ -45,6 +45,8 @@ NAME = "shrine_touge"
 LIMIT = 0.10
 MOUTH = 22.0                    # the road's first/last station this far from its junction (setback re-solves)
 LEAD_IN = 40.0                  # level off the junction before climbing (3.2d: a climb at the stop line bent the pad)
+APPROACH = 40.0                 # a derived road's last straight onto its summit T, square to the summit straight
+LEAD_TURN = 15.0                # a SQUARE lead's walk starts this far past its straight: the room its first turn rounds in
 # Phase 1's junction. 3.2d's was (-90, 700), where nishi_dori met nogyo_michi; the east descent now comes down to the
 # farm arterial 60 m north of it, and on the face between the two there was no room for phase 1's switchbacks (it
 # stalled after one hairpin against the east descent's corridor). So phase 1 leaves nishi_dori further south, where
@@ -279,6 +281,27 @@ def derive(land_path):
 
 
 # ------------------------------------------------------------------ add
+#: S16 A3: a derived road's end must sit ON its host road when it is added. The alignment file is frozen, so it is a
+#: hidden input to `--from land`: a host road that moves (the cape shift moves kaigan_dori 40-60 m) would otherwise be
+#: cut up to `cut_road`'s 30 m away and the T built across the gap. `END_OFFSETS` is what the last add measured.
+ENDS_TOL = 0.5
+#: the one end that already broke it at the gate's birth (HEAD a1d8f5a7, measured 2026-10-14 on the host's chords AND
+#: on its solved curve): shrine_touge's east T sits 3.55 m off nishi_dori__6, shipped so. shrine_touge is held
+#: byte-identical by S16 J2, so this is a recorded baseline, not a tolerance: any other end, or this one moving further,
+#: fails.
+ENDS_KNOWN = {("shrine_touge", (132.0, 729.0)): 3.56}
+END_OFFSETS = []
+
+
+def _host(net, c, prefix, who):
+    name, _i, _t, d = nearest_span(net, c, prefix)
+    END_OFFSETS.append((who, tuple(round(v, 1) for v in c), name, round(d, 2)))
+    if d > ENDS_KNOWN.get((who, (round(c[0], 2), round(c[1], 2))), ENDS_TOL):
+        raise SystemExit("island_touges: %s's end %s is %.2f m off its host %s (> %.1f m): the host road moved -- "
+                         "re-derive the alignment" % (who, tuple(round(v, 1) for v in c), d, name, ENDS_TOL))
+    return name
+
+
 def add(net, doc=None):
     doc = doc or json.load(open(ALIGNMENT))
     if NAME in net.roads:
@@ -286,7 +309,7 @@ def add(net, doc=None):
     sts = [tuple(p) for p in doc["stations"]]
     arms = []
     for c in (tuple(doc["junction"]), tuple(sts[-1][:2])):
-        name = nearest_span(net, c, "")[0]
+        name = _host(net, c, "", NAME)
         arms.append(list(cut_road(net, c, name, MOUTH)))
     jn, ej = tuple(doc["junction"]), tuple(sts[-1][:2])
     body = [p for p in sts if math.dist(p[:2], jn) >= MOUTH - 0.5 and math.dist(p[:2], ej) >= MOUTH - 0.5]
@@ -316,10 +339,18 @@ def add(net, doc=None):
 #: PLAN [I3]) up the north face -- measured on the land grid 2026-10-14: a 90 deg wedge from the summit's east end with
 #: 800 m legs gives 4.4 km and 6 hairpins and reaches the summit level (60 deg / 500 m legs: 7.4 km, 13 hairpins, stalled
 #: at 367 m against shrine_touge's west climb) -- then LEVEL onto a T on the summit straight (the 展望 point).
+#: S16 C (2026-10-14): the foot moved onto the CAPE's crossroads (island_coast_road.CAPE: kaigan_dori shifted ~50 m
+#: seaward onto a reclaimed terrace, its top straight at y 2010). The road leaves it SQUARE, inland (`square`: the road's
+#: normal away from the sea, LEAD_IN level), opposite the 道の駅's arm, and keeps `coast_clear` from kaigan_dori's centreline
+#: once past the lead -- the old foot (-292, 1952) left ALONG the coast road (`along` -1) on the slope's toe and ran
+#: 10-30 m beside it, 14-47 m up its cut, for ~560 m (the road-gap gate's first finding). `lock_foot` went with the
+#: shallow T it was for. Swept 2026-10-14 on the cape land (leg 500-1200, grade 8.5-9.5 %, wedge 70-120, either way
+#: first): leg 1000 / 9.5 % / west first is 4.80 km with 6 hairpins and no self-crossing (800 m legs hooked back over
+#: their own leg at (-400, 1530), the walk's ridge, on both senses).
 EXTRA = {
-    "kita_touge": dict(file="IslandTouge_kita_touge.json", foot=(-292.0, 1952.0), foot_road="kaigan_dori",
-                       wedge=90.0, leg=800.0, clear=70.0, along=-1.0, grade=0.095,
-                       lock_foot=True),
+    "kita_touge": dict(file="IslandTouge_kita_touge.json", foot=(-220.0, 2010.0), foot_road="kaigan_dori",
+                       wedge=90.0, leg=1000.0, clear=70.0, square=True, coast_clear=30.0, grade=0.095,
+                       sense=-1.0, lock_foot=True, lock_top=True),
 }
 #: (the 中腹林道 -- from the shrine plateau (-1005, 713) to the east descent (-316, 1009) along the 220 m contour -- was
 #: CUT from S15, measured 2026-10-14: the straight between its ends crosses the summit dome (395 m), and a shortest-path
@@ -396,29 +427,56 @@ def _self_crossings(line):
     return out
 
 
-def derive_north(land_path):
+def derive_north(land_path, record=None):
     spec = EXTRA["kita_touge"]
     raw, walk, dsea, free = Land(land_path), Land(land_path, smooth_m=20.0), sea_distance(land_path), site_free()
     A, B = crest_record()
     plat = RS.PLATEAU_Z + RS.RAISE - NET_Y
     clear, touge = _touge_clear(spec["clear"])
-    rec = pm.load_network(RECORD)
+    rec = pm.load_network(record or RECORD)
     name, i, t, _d = nearest_span(rec, spec["foot"], spec["foot_road"])
+    if _d > ENDS_TOL:
+        raise SystemExit("island_touges: kita_touge's foot %s is %.2f m off %s in %s" % (spec["foot"], _d, name,
+                                                                                    record or RECORD))
     pa, pb = (rec.points[u].pos for u in rec.roads[name].points[i:i + 2])
     foot = tuple(pa[k] + (pb[k] - pa[k]) * t for k in range(3))
-    # THE NORTH COAST IS THE MASSIF'S 45 deg FLANK everywhere (measured: ~1 m of rise per metre inland all along the
-    # coast road): a walk started inland stood 17-29 m over the T and the lead-in climbed 14-19 %. The road leaves the
-    # coast road ALONG it (`along`: -1 = toward the chain's start) and climbs across the slope, as a real 峠 does
     cu = unit(pa[:2], pb[:2])
-    v = (cu[0] * spec["along"], cu[1] * spec["along"])
-    start = (foot[0] + v[0] * LEAD_IN, foot[1] + v[1] * LEAD_IN)
+    if spec.get("square"):
+        # S16 C: SQUARE off the cape's crossroads, inland -- the normal whose side is farther from the sea
+        n = (-cu[1], cu[0])
+        probe = 30.0
+        v = n if dsea(foot[0] + n[0] * probe, foot[1] + n[1] * probe) >= dsea(foot[0] - n[0] * probe,
+                                                                             foot[1] - n[1] * probe) else (-n[0], -n[1])
+    else:
+        # THE NORTH COAST IS THE MASSIF'S 45 deg FLANK everywhere (measured: ~1 m of rise per metre inland all along
+        # the coast road): a walk started inland stood 17-29 m over the T and the lead-in climbed 14-19 %. The road
+        # leaves the coast road ALONG it (`along`: -1 = toward the chain's start) and climbs across the slope
+        v = (cu[0] * spec["along"], cu[1] * spec["along"])
+    # a SQUARE lead stays STRAIGHT for LEAD_IN (the crossroads' mouth needs 80-90 deg, >= 75): the walk starts LEAD_TURN
+    # past it and the fillet rounds that corner, never the lead (S16 C, dry layout c1: the corner at the lead's end took
+    # 20 m of it and the mouth read 27 deg off square)
+    run_in = LEAD_IN + (LEAD_TURN if spec.get("square") else 0.0)
+    start = (foot[0] + v[0] * run_in, foot[1] + v[1] * run_in)
+    # ...and keeps clear of the coast road past the lead (S16 A1: two roads that do not meet keep their decks apart)
+    host = [rec.points[u].pos[:2] for n_, r in rec.roads.items() if n_.startswith(spec["foot_road"]) for u in r.points]
+    hgrid = {}
+    for q in host:
+        hgrid.setdefault((int(q[0] // 50), int(q[1] // 50)), []).append(q)
+    cc = spec.get("coast_clear", 0.0)
+
+    def coast_free(x, y):
+        if cc <= 0.0 or math.dist((x, y), foot[:2]) < LEAD_IN + 10.0:
+            return True
+        gx, gy = int(x // 50), int(y // 50)
+        return not any((q[0] - x) ** 2 + (q[1] - y) ** 2 < cc * cc
+                       for i_ in (-1, 0, 1) for j_ in (-1, 0, 1) for q in hgrid.get((gx + i_, gy + j_), ()))
     wb = wedge(B, (foot[0] - B[0], foot[1] - B[1]), spec["wedge"])
     pts, arcs = IT.hill_road(walk, start, plat - 4.0, spec["grade"], leg=spec["leg"], step=10.0, radius=ST.HAIRPIN_R,
                              inside=lambda x, y: ((dsea(x, y) > 15.0 if math.dist((x, y), foot[:2]) < 350.0
                                                    else dsea(x, y) > 40.0)
                                                   and (wb(x, y) or math.dist((x, y), foot[:2]) < 350.0)
-                                                  and free(x, y) and clear(x, y)),
-                             heading=v, lookahead=ST.HAIRPIN_R + 10.0)
+                                                  and free(x, y) and clear(x, y) and coast_free(x, y)),
+                             heading=v, lookahead=ST.HAIRPIN_R + 10.0, sense=spec.get("sense", 1.0))
     end = pts[-1]
     # the T on the summit straight: the walk's end projected square onto A -> B
     ab = (B[0] - A[0], B[1] - A[1])
@@ -431,15 +489,39 @@ def derive_north(land_path):
     p_, inner = ST._protect_hairpins(arcs)
     simp = IT.simplify(pts, 3.0, protect=p_)
     keep = {pts[i] for i in inner}
-    nodrop = {pts[i] for i in p_} | {foot[:2], top}
     lead = (foot[0] + v[0] * LEAD_IN, foot[1] + v[1] * LEAD_IN)
-    line = [foot[:2], lead] + simp + [top]
+    if spec.get("square"):
+        keep.add(lead)
+    nodrop = {pts[i] for i in p_} | {foot[:2], top}
+    # ...and it ARRIVES square: the last APPROACH m on the summit straight's normal, on the walk's side (S16 C, dry layout
+    # c1: a straight from the walk's end met the T 10-15 deg off shrine_touge's own outgoing hairpin, and the setback
+    # solve threw the mouth 45 m up the leg). The corner onto the normal is the fillet's.
+    nx_, ny_ = -ab[1], ab[0]
+    nl = math.hypot(nx_, ny_)
+    nx_, ny_ = nx_ / nl, ny_ / nl
+    if (end[0] - top[0]) * nx_ + (end[1] - top[1]) * ny_ < 0.0:
+        nx_, ny_ = -nx_, -ny_
+    approach = (top[0] + nx_ * APPROACH, top[1] + ny_ * APPROACH)                       # straight from here (kept)
+    turn_in = (top[0] + nx_ * (APPROACH + LEAD_TURN), top[1] + ny_ * (APPROACH + LEAD_TURN))   # the fillet's corner
+    keep.add(approach)
+    nodrop |= {approach, turn_in}
+    line = [foot[:2], lead] + simp + [turn_in, approach, top]
     rep = {"hairpins": len(arcs) // IT.HAIRPIN_POINTS, "reached": walk(*end) >= plat - 5.0,
            "self_crossings": _self_crossings(line)}
     rep["reached"] = rep["reached"] and not rep["self_crossings"]
     return _finish("kita_touge", line, keep, nodrop, raw,
                    [(foot[:2], foot[2], LEAD_IN + 0.5), (top, plat, 2.0)],
                    [(foot[:2], spec["foot_road"]), (top, NAME)], rep)
+
+
+def _at_distance(sts, end, d):
+    """The point (x, y, z) where the polyline `sts`, walked from its start, first stands `d` from `end` (lerped)."""
+    for a, b in zip(sts, sts[1:]):
+        da, db = math.dist(a[:2], end), math.dist(b[:2], end)
+        if da < d <= db:
+            t = (d - da) / (db - da)
+            return tuple(a[k] + (b[k] - a[k]) * t for k in range(3))
+    raise SystemExit("island_touges: no station %.0f m from %s" % (d, end))
 
 
 def add_extra(net):
@@ -454,10 +536,14 @@ def add_extra(net):
         arms = []
         for e in doc["ends"]:
             c = tuple(e["at"])
-            rn = nearest_span(net, c, e["on"])[0]
+            rn = _host(net, c, e["on"], name)
             arms.append(list(cut_road(net, c, rn, MOUTH)))
         e0, e1 = tuple(doc["ends"][0]["at"]), tuple(doc["ends"][1]["at"])
         body = [p for p in sts if math.dist(p[:2], e0) >= MOUTH - 0.5 and math.dist(p[:2], e1) >= MOUTH - 0.5]
+        # each end's mouth EXACTLY at MOUTH along the alignment: a 20 m station spacing left the first one at 40 m (the
+        # cape crossroads' kita arm, dry layout c3), which pulled the pad's centre 7 m south and its 道の駅 arm's mouth to
+        # 2.7 m past kaigan_dori's edge
+        body = [_at_distance(sts, e0, MOUTH)] + body + [_at_distance(sts[::-1], e1, MOUTH)]
         road = net.add_road(pm.RoadData(name, pm.PointData(uid=""), ()))
         road.road_class = "arterial"
         road.base.lanes_fwd, road.base.lanes_bwd = 1, 1
@@ -470,12 +556,14 @@ def add_extra(net):
             prev = p.uid
         make_junction(net, arms[0] + [road.points[0]], signal=False)
         make_junction(net, arms[1] + [road.points[-1]], signal=False)
+        # MOUTHS HELD AT THEIR LAID SETBACK (MOUTH) where the solve pulls them in too tight to turn (the market's J / K
+        # trick). S16 C, dry layout c2: solved, the cape crossroads' mouths came to 11-13 m and its right turns to R 4.5-8
+        # on exported lanes (the plan asks R >= 12); the summit T's right turn off kita_touge to R 6.5
         if EXTRA[name].get("lock_foot"):
-            # a SHALLOW T: the 45 deg coast leaves the road only one low line, along the slope's toe beside the coast
-            # road, so the arm leaves at a few degrees off it; solved, its mouth was thrown 70 m out and folded
-            # kaigan_dori (dry layout mo3). All three mouths keep their laid places (the market's J / K trick)
             for u in arms[0] + [road.points[0]]:
                 net.points[u].setback_locked = True
+        if EXTRA[name].get("lock_top"):
+            net.points[road.points[-1]].setback_locked = True
         ppr.apply_preset(net, name, "mountain")
         out.append("%s: %d stations, %.0f m" % (name, len(road.points), doc["report"]["length_m"]))
     return "; ".join(out)
@@ -561,16 +649,20 @@ def main(argv):
     ap.add_argument("--land", default=RS.LAND)
     ap.add_argument("--from", dest="src", default="")
     ap.add_argument("--extra", default="", help="derive one of EXTRA (kita_touge) instead")
+    ap.add_argument("--record", default="", help="the record whose host roads the derive reads (a dry layout's)")
     a = ap.parse_args(argv)
     if a.cmd == "derive":
         if a.extra == "kita_touge":
-            return derive_north(a.land)
+            return derive_north(a.land, a.record or None)
         return derive(a.land)
     if a.cmd == "add":
         out = a.args[0]
         net = pm.load_network(a.src or out)
-        print("island_touges: " + add(net))
-        extra = add_extra(net)
+        try:
+            print("island_touges: " + add(net))
+            extra = add_extra(net)
+        finally:
+            print("island_touges: ends on host %s" % END_OFFSETS)
         if extra:
             print("island_touges: " + extra)
         pm.save_network(net, out)

@@ -370,7 +370,12 @@ RESERVES = (
     ("logistics_truck_terminal", (-445.0, 1245.0, -295.0, 1470.0)),
     ("logistics_distribution", (-265.0, 1245.0, -25.0, 1470.0)),
     ("lighthouse", (1350.0, -1320.0, 1430.0, -1260.0)),       # the north-east headland
-    ("michi_no_eki", (385.0, -1720.0, 475.0, -1640.0)),       # the roadside station on the north coast road
+    # the 道の駅 (roadside station) on the north coast road. S16 C (2026-10-14): RE-SITED from the farm coast (385, -1720,
+    # 475, -1640) to the NORTH CAPE's reclaimed terrace (island_reshape.CAPE_TERRACE), seaward of the crossroads where
+    # kita_touge leaves kaigan_dori -- the 峠's foot, a race start / finish, a lookout over the north sea; one 道の駅 on the
+    # north coast, not two 700 m apart (they stand ~10+ km apart in Japan, RECALLED). The kind is kept (user rule: a site
+    # may move if it stays present and fronts a road).
+    ("michi_no_eki", (-295.0, -2092.0, -145.0, -2026.0)),
     # 2026-09-28 (the step 7 rebuild): ground kept for what the batch did not author, so filling it later needs no road
     # rebuild. Each is already reached by a road: the ring / dike side road, the airport's own loop roads, yamate_dori.
     # (The bay MARKET needs no reserve: the gulf head between wangan_dori and the ring's dike is one 84 m block fronting

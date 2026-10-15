@@ -72,10 +72,16 @@ ACCESS = [
     # to a small car park short of the tip; the tower itself is a later model on the reserved site (island_plan)
     dict(name="todai_michi", site="lighthouse", from_road="ring_kita", at=(1250.0, 1297.0),
          end=(1360.0, 1292.0), parking="ParkingLot4"),
-    # the 道の駅 (roadside station) on the north coast road beside the farm: its car park IS the station's core, and
-    # it is entered off the coast road itself (the building is a later model on the reserved site)
-    dict(name="michinoeki_michi", site="michi_no_eki", from_road="kaigan_machi", at=(442.0, 1757.0),
-         end=(430.0, 1690.0), parking="ParkingLot14"),
+    # the 道の駅 (roadside station): its car park IS the station's core (the building is a later model on the reserved
+    # site). S16 C (2026-10-14): on the NORTH CAPE's terrace -- the crossroads' 4th arm, seaward, opposite kita_touge
+    # (`at` is the T kita_touge's add cut: `_junction_of` joins it, REUSE_M), ending at a ParkingLot56 on the terrace.
+    # It was entered off kaigan_machi on the farm coast at (442, 1757) with a ParkingLot14.
+    dict(name="michinoeki_michi", site="michi_no_eki", from_road="kaigan_dori", at=(-220.0, 2010.0),
+         end=(-220.0, 2048.0), parking="ParkingLot56", signal=False, lock=True, mouth=30.0),
+    #    (its mouth 30 m from the 3-arm pad's centre, which stands 7 m south of the crossing: ~23 m from kaigan_dori's
+    #    centreline, the other arms' setback;
+    #    at MOUTH it stood 2.7 m past the coast road's edge and its turns came out R 5.7 -- dry layout c3. The lot
+    #    y 2052..2088, the terrace to 2095)
     # THE PORT (PLAN.md 3.30 L3, 2026-09-26): the platform's interior streets meet no road at their south end (a quay),
     # so the planner cannot make them; these two dead ends leave the port road kichi_dori__2 (a U along the platform's
     # north strip). The MILITARY BASE's gate road enters on the base's north edge; the LOGISTICS road serves the
@@ -662,7 +668,8 @@ def add(net, a, ground):
     first = via[0] if via else a["end"]
     dx, dy = first[0] - cx, first[1] - cy
     L = math.hypot(dx, dy)
-    head = (cx + dx / L * MOUTH, cy + dy / L * MOUTH)
+    mouth = a.get("mouth", MOUTH)
+    head = (cx + dx / L * mouth, cy + dy / L * mouth)
     ex, ey = a["end"]
     if via:
         # a street with corners (a hub station's, `station_access`): rounded, resampled like an authored street
@@ -728,6 +735,10 @@ def _join(net, a, members, road):
     """The access road's mouth joins its junction. `signal` False = no lights (a minor T); `allow_cross` False = no turn
     across the oncoming lanes at any of its mouths (right-in / right-out: point_export drops the cross movement)."""
     make_junction(net, members + [road.points[0]], signal=a.get("signal", True))
+    if a.get("lock"):
+        # its mouth held where it was laid (MOUTH from the junction's centre): solved, the cape crossroads' 道の駅 arm came
+        # in to 12.5 m and its right turn out to R 4.5 (S16 C, dry layout c2)
+        net.points[road.points[0]].setback_locked = True
     if not a.get("allow_cross", True):
         for u in members + [road.points[0]]:
             net.points[u].allow_cross = False

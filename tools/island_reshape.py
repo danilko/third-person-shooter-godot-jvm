@@ -420,10 +420,88 @@ def reshape(base):
             if out[ref, c] > LAND_Z:
                 out[srows, c] = v
                 land[srows, c] = True
+    out, cape_land = cape(out, xx, zz)
+    land = land | cape_land
     out, banks = walk_banks(out, xx, zz)
     land = land | (banks & (out > LAND_Z))
     edits = {"fill": fill, "trim": trim | mcut, "dike": dike, "works": works, "market": reclaimed, "banks": banks}
     return out.astype(np.float32), land, edits
+
+
+#: THE NORTH CAPE (S16 map review C, 2026-10-14): kaigan_dori moves ~50 m seaward over the cape onto a reclaimed platform
+#: (island_coast_road.CAPE owns the line) and a TERRACE for the 道の駅 north of its crossroads. The platform is everything
+#: between the old line and the new one (the old line hugged the slope's toe), the new line's corridor, and the terrace,
+#: all at the coast road's own height (record z 1.0 + NET_Y). Its sea edge: a 1:SHORE_BANK bank to BEACH_TOP, a
+#: 1:CAPE_BEACH beach to CAPE_SHELF (the coast walk: no trap), then 1:1 -- except a quay face on the terrace's north side
+#: (CAPE_QUAY x, the 道の駅's boat landing; ladders are a hand item). Measured on the land grid: the shelf is -0.5..-2.7 m
+#: out to y 2170, so the fill is ~0.3 Mm3 for ~6 ha; the old flank is untouched (no fan: the review's scar).
+CAPE_Z = 1.0 + 5.6                                   # Godot (island_roadgen.NET_Y; not imported: reshape stays light)
+CAPE_CORRIDOR = 16.0                                 # the road's half width 10 + the stamp's 6 m verge
+CAPE_TERRACE = (-305.0, -135.0, -2095.0, -1965.0)    # Godot x0, x1, z0, z1 (record y 1965..2095)
+CAPE_ROUND = 25.0                                    # the terrace's two seaward corners
+CAPE_QUAY = (-195.0, -135.0)                         # x of the terrace's north face kept a quay
+CAPE_BEACH = 12.0
+CAPE_SHELF = -2.0
+CAPE_REACH = 80.0
+CAPE_WIN = (-700.0, 250.0, -2200.0, -1780.0)         # Godot x0, x1, z0, z1: the window the edit touches
+
+
+def _poly_mask(xx, zz, poly):
+    """Even-odd point in polygon over (broadcast) grids, polygon in Godot (x, z)."""
+    inside = np.zeros(np.broadcast(xx, zz).shape, bool)
+    for k in range(len(poly)):
+        (x1, z1), (x2, z2) = poly[k], poly[(k + 1) % len(poly)]
+        dz = z2 - z1 if z2 != z1 else 1e-12
+        inside ^= ((z1 > zz) != (z2 > zz)) & (xx < (x2 - x1) * (zz - z1) / dz + x1)
+    return inside
+
+
+def _polyline_distance(xx, zz, pts):
+    d = np.full(np.broadcast(xx, zz).shape, np.inf)
+    for (ax, az), (bx, bz) in zip(pts, pts[1:]):
+        ex, ez = bx - ax, bz - az
+        t = np.clip(((xx - ax) * ex + (zz - az) * ez) / max(ex * ex + ez * ez, 1e-9), 0.0, 1.0)
+        d = np.minimum(d, np.hypot(xx - (ax + ex * t), zz - (az + ez * t)))
+    return d
+
+
+def cape(out, xx, zz):
+    """THE NORTH CAPE (see CAPE_Z): the platform, its bank and beach, the quay face. Returns (out, platform mask)."""
+    import island_coast_road as CR
+    sts = json.load(open(CR.ALIGNMENT))["stations"]
+    new_rec, _info = CR.cape_line(sts)
+    old_rec = [tuple(p[:2]) for p in sts[CR.CAPE["i1"]:CR.CAPE["i2"] + 1]]
+    x0, x1, z0, z1 = CAPE_WIN
+    j0, j1 = int((z0 - Z0) / STEP), int((z1 - Z0) / STEP) + 1
+    i0, i1 = int((x0 - X0) / STEP), int((x1 - X0) / STEP) + 1
+    XX, ZZ = np.broadcast_arrays(xx, zz)
+    sx, sz = XX[j0:j1, i0:i1], ZZ[j0:j1, i0:i1]
+    o = out[j0:j1, i0:i1].astype(np.float64)
+    new = [(x, -y) for x, y in new_rec]
+    old = [(x, -y) for x, y in old_rec]
+    tx0, tx1, tz0, tz1 = CAPE_TERRACE
+    r = CAPE_ROUND
+    # the terrace with its two SEAWARD (north, low z) corners rounded
+    terr = (sx >= tx0) & (sx <= tx1) & (sz >= tz0) & (sz <= tz1)
+    for cx, outside in ((tx0 + r, sx < tx0 + r), (tx1 - r, sx > tx1 - r)):
+        terr &= ~(outside & (sz < tz0 + r) & (np.hypot(sx - cx, sz - (tz0 + r)) > r))
+    plat = _poly_mask(sx, sz, new + old[::-1]) | (_polyline_distance(sx, sz, new) <= CAPE_CORRIDOR) | terr
+    sdf = distance_from(plat, CAPE_REACH + 10.0)
+    sdf[~np.isfinite(sdf)] = 1e6
+    bank = (CAPE_Z - BEACH_TOP) * SHORE_BANK
+    sand = bank + (BEACH_TOP - CAPE_SHELF) * CAPE_BEACH
+    prof = np.where(sdf < bank, CAPE_Z - sdf / SHORE_BANK,
+                    np.where(sdf < sand, BEACH_TOP - (sdf - bank) / CAPE_BEACH, CAPE_SHELF - (sdf - sand)))
+    quay = (sx >= CAPE_QUAY[0]) & (sx <= CAPE_QUAY[1]) & (sz < tz0)
+    prof = np.where(quay, SEABED, prof)
+    zone = (sdf > 0.0) & (sdf < CAPE_REACH)
+    o = np.where(zone, np.maximum(o, prof), o)
+    o = np.where(plat, np.maximum(o, CAPE_Z), o)
+    res = out.copy()
+    res[j0:j1, i0:i1] = o.astype(out.dtype)
+    full = np.zeros(out.shape, bool)
+    full[j0:j1, i0:i1] = plat | (zone & (o > LAND_Z))
+    return res, full
 
 
 #: NO BEACH IS A TRAP (S15, user 2026-10-14, verbatim: "some of land outside of dike (beside harbor area, once in beach,

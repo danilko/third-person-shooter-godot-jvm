@@ -423,6 +423,99 @@ def cmd_derive(dump_path):
                                                     os.path.relpath(ALIGNMENT, ROOT)))
 
 
+#: THE NORTH CAPE (S16 map review C, 2026-10-14; all three reviewers): kaigan_dori is SHIFTED SEAWARD over the cape onto a
+#: reclaimed platform (island_reshape.cape), freeing the slope's toe for kita_touge's lead (its first ~560 m ran 10-30 m
+#: beside this road and 14-47 m up its cut: two carves on one verge) and giving a SQUARE crossroads on flat ground -- the
+#: coast road through, kita_touge inland, the 道の駅 seaward. NO big fan on the flank (lower-only 1:3.5 to +60 m cut 60-130 m
+#: of the ~1:1 flank, a scar seen from the whole north sea); the shelf is cheap (-0.5..-2.7 m out to y 2170).
+#: The shape (no wiggles, constant arcs): the old line is left at station `i1` on its own tangent, a straight, an arc R1
+#: onto a STRAIGHT at y `top_y` (heading due west -- the crossroads stands on it), an arc R2, and a straight back onto the
+#: old line at station `i2` on ITS tangent. Measured on the frozen alignment: 50 m seaward at the cape top (old y 1960),
+#: 54 m at x 0, up to ~80 m at x -400 where the old line S-bends; the top straight runs x -138..-303 (166 m).
+#: The alignment file stays as derived; `add` applies this (the stations between i1 and i2 replaced, the sheds after it
+#: moved by the length change).
+CAPE = dict(i1=20, i2=44, top_y=2010.0, r1=200.0, r2=200.0, step=15.0, z=1.0,
+            p1=(112.5, 1869.5), p2=(-575.57, 1869.39))
+CAPE_CROSS_X = -220.0        # the crossroads on the top straight (>= 80 m of straight either side)
+
+
+def _chord_heading(sts, i):
+    a, b = sts[i - 1], sts[i + 1]
+    return math.atan2(b[1] - a[1], b[0] - a[0]) % (2.0 * math.pi)
+
+
+def cape_line(sts=None):
+    """The cape's new centreline (record (x, y)), from old station i1 to old station i2 inclusive, and its parts:
+    (pts, {"top": (x_east, x_west), "y": top_y, ...})."""
+    c = CAPE
+    sts = sts or json.load(open(ALIGNMENT))["stations"]
+    P1, P2 = tuple(sts[c["i1"]][:2]), tuple(sts[c["i2"]][:2])
+    if math.dist(P1, c["p1"]) > 0.05 or math.dist(P2, c["p2"]) > 0.05:
+        raise SystemExit("island_coast_road: the alignment's cape stations moved -- re-author CAPE")
+    h1, h2 = _chord_heading(sts, c["i1"]), _chord_heading(sts, c["i2"])
+    u1, u2 = (math.cos(h1), math.sin(h1)), (math.cos(h2), math.sin(h2))
+    Y = c["top_y"]
+    t1 = (Y - P1[1]) / u1[1]
+    t2 = (Y - P2[1]) / -u2[1]
+    I1 = (P1[0] + u1[0] * t1, Y)
+    I2 = (P2[0] - u2[0] * t2, Y)
+    d1, d2 = math.pi - h1, h2 - math.pi              # both LEFT turns (west along the north coast, the sea outside)
+    T1, T2 = c["r1"] * math.tan(d1 / 2), c["r2"] * math.tan(d2 / 2)
+    a1 = (I1[0] - u1[0] * T1, I1[1] - u1[1] * T1)
+    b1, a2 = (I1[0] - T1, Y), (I2[0] + T2, Y)
+    b2 = (I2[0] + u2[0] * T2, I2[1] + u2[1] * T2)
+    if not (t1 > T1 and t2 > T2 and b1[0] > a2[0]):
+        raise SystemExit("island_coast_road: CAPE does not fit (straights %.0f / %.0f / %.0f m)" % (
+            t1 - T1, b1[0] - a2[0], t2 - T2))
+    pts = []
+
+    def line(a, b):
+        n = max(1, int(math.ceil(math.dist(a, b) / c["step"])))
+        pts.extend((a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n) for k in range(n))
+
+    def arc(a, h0, dh, R):
+        cx, cy = a[0] - math.sin(h0) * R, a[1] + math.cos(h0) * R
+        n = max(2, int(math.ceil(R * dh / c["step"])))
+        pts.extend((cx + math.sin(h0 + dh * k / n) * R, cy - math.cos(h0 + dh * k / n) * R) for k in range(n))
+    line(P1, a1)
+    arc(a1, h1, d1, c["r1"])
+    line(b1, a2)
+    arc(a2, math.pi, d2, c["r2"])
+    line(b2, P2)
+    pts.append(P2)
+    return pts, {"top": (b1[0], a2[0]), "y": Y, "straights": (t1 - T1, b1[0] - a2[0], t2 - T2)}
+
+
+def apply_cape(doc):
+    """The alignment doc with the cape's stations replaced (z: CAPE z on the cape, eased to the old z at the far end
+    over the last straight) and every shed after it moved by the length change. A new dict; the file is not touched."""
+    c = CAPE
+    sts = [list(p) for p in doc["stations"]]
+    pts, info = cape_line(sts)
+    old_len = sum(math.dist(sts[k][:2], sts[k + 1][:2]) for k in range(c["i1"], c["i2"]))
+    new_len = sum(math.dist(a, b) for a, b in zip(pts, pts[1:]))
+    s_i2 = sum(math.dist(sts[k][:2], sts[k + 1][:2]) for k in range(c["i2"]))
+    z2 = sts[c["i2"]][2]
+    cum = [0.0]
+    for a, b in zip(pts, pts[1:]):
+        cum.append(cum[-1] + math.dist(a, b))
+    ease = info["straights"][2]
+    mid = []
+    for p, s in zip(pts[1:-1], cum[1:-1]):
+        u = max(0.0, (s - (new_len - ease)) / ease)
+        mid.append([round(p[0], 2), round(p[1], 2), round(c["z"] + (z2 - c["z"]) * u, 3)])
+    s_i1 = s_i2 - old_len
+    if any(a < s_i2 - 0.5 and b > s_i1 + 0.5 for a, b in doc.get("sheds", [])):
+        raise SystemExit("island_coast_road: a shed lies on the cape's replaced stretch")
+    out = dict(doc)
+    out["stations"] = sts[:c["i1"] + 1] + mid + sts[c["i2"]:]
+    delta = new_len - old_len
+    out["sheds"] = [[round(a + delta, 1), round(b + delta, 1)] if a >= s_i2 - 0.5 else [a, b]
+                    for a, b in doc.get("sheds", [])]
+    out["cape"] = {"top": [round(v, 1) for v in info["top"]], "y": info["y"], "length_change": round(delta, 1)}
+    return out
+
+
 def _drop_until(net, road, keep_uid, from_head):
     """Remove the stations of `road` before (from_head) or after `keep_uid`; `keep_uid` becomes the end."""
     chain = list(road.points)
@@ -447,7 +540,7 @@ def add(net, doc=None):
     """`kaigan_dori` into `net` (see the module doc). Returns a one-line summary."""
     if NAME in net.roads:
         raise SystemExit("island_coast_road: %s is already in the record" % NAME)
-    doc = doc or json.load(open(ALIGNMENT))
+    doc = apply_cape(doc or json.load(open(ALIGNMENT)))
     e_uid, _nb = head_end(net)
     sts = doc["stations"]
     if math.dist(sts[0][:2], net.points[e_uid].pos[:2]) > 0.05:
