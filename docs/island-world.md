@@ -17,6 +17,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - The fish market: a straight quay, a car park at the dike's height, the crest carried across junction pads (PLAN S11 P12, 2026-10-13)
 - The fish market rebuilt for cars: quay 1.5 m and z 808, a 物揚場, the yard's street and rectangle, real stairs (PLAN S13, 2026-10-13)
 - No beach is a trap: the coast-walk gate, the suburb's one outline, the Wangan terminal's beach (S15, 2026-10-14)
+- The fish market piece re-laid for the S15 quay: the row on z 842 / 848, a pontoon, every way out of the sea probed (PLAN S16 H, 2026-10-15)
 
 ---
 
@@ -1581,3 +1582,34 @@ Traps: `island_reshape.py build` rewrites `assets/world_source/island_dike.json`
 `island_dike.py sculpt`: `git checkout` it after a scratch build, and never build land while a dry layout runs (the
 layout cache keys on that file). The committed `island_natural.f32` of 2026-10-13 was built from an older road record
 than the committed one: compare a scratch grid with a scratch grid built from the committed land, not with it.
+
+## The fish market piece re-laid for the S15 quay: the row on z 842 / 848, a pontoon, every way out of the sea probed (PLAN S16 H, 2026-10-15)
+
+`library_civic.fish_market` was still laid out for S13/S14 (quay z 808, the reserve centred at z 760). It now READS
+everything it answers to: the land from `island_reshape` (`_fm_land`: MARKET_QUAY_S, MARKET_YARD, MARKET_LANDING,
+FLOOR_Z + RAISE, LINK_CORRIDOR), its ORIGIN from `island_plan.RESERVES` "fish_market" (S15 moved the box's south edge to
+848, so the centre is now **(450, 780)**: island_sites centres the scene on the box), and the roads from
+`island_site_access` (`_fm_roads`: the ramp, J, `yard_loop`, `yard_frame`'s K, `link_rows`, the mouths for J's and K's
+pads as convex hulls). Godot frame below; heights over the yard (y 1.5).
+- **The row** from z 811.5 (the south leg's outer edge z 803.3 + six 20 m lay-by slots to 806.8 + the forklift strip):
+  物揚場 x 288-300 (the coast road's dike face covers x 262..286 on the stamped ground -- measured on
+  IslandRoads.ground.bin, toe ~x 284-286 for z 720-806 -- so only 12 m of MARKET_LANDING is usable), 管理棟 3F x
+  300-342.4 to z 831 (roof deck 11.4, its flight x 342.4-345 from the apron), 荷捌き所 x 345-400 to 831 / 400-445 to
+  827.5 (shutters half up on both faces, sawtooth to 11.0), 製氷 x 445-470 and an enterable 冷蔵庫 x 470-522 to z 823.5
+  (dock doors x 474-478 / 488-492, a staff door to the quay; it stops 3 m short of the x 525 quay corner). West plot:
+  水産加工場 x 292-342 z 752-788 (stack to 16.0, the piece's tallest thing and `probe_xz`) + 漁協 2F x 292-330 z 738-751;
+  漁具倉庫 x 292-318 z 793-805; staff lot paint north of the north leg; cover inside the ring. Roofs <= 12.5.
+- **The quay**: walls on z 842 (x 286-445), z 848 (445-525), z 808 (525-720, the strip's at 4.1), and the two short faces
+  at x 445 / 525; kerb, bollards, fenders; ten yellow ladders, VISUAL ONLY -- `MovementController.ladderValid()` is false
+  while swimming and a library piece cannot carry a `world.Ladder`.
+- **Ways out of the sea** (`tools/godot/probe_swim_exit.gd`, all six + its control PASS 2026-10-15): landing stairs with
+  heads at x 436 (z 842), 512 (z 848), 600 (z 808); the sea-wall stairs (x 645.8 foot, a landing at the yard's level,
+  head x 662 at 4.1); the slipway x 289.5-297.5 south off the 物揚場 at 1:12 to **1.5 m** under (to 0.7 under a swimmer
+  stood at its lip: the floating body's feet are ~0.45 m under its origin, so 0.7 is a riser); the 浮桟橋 x 300-360 z
+  846-850, deck 0.45 over the sea, by its own boarding steps at x 360-363.9 (the swim jump clears no lip) and a gangway
+  at x 328-332 to the coping.
+- **A stair slide must stand a little OVER the nose line, not on it** (`FM_SLIDE_LIFT` 0.03): laid exactly through the
+  noses, the sea-wall flight stopped a swimmer dead at its 4th nose (the trimesh, normal 48 deg, velocity 0) while the
+  identical flight at x 600 walked out -- a float tie. Walking (`probe_stairs`) never showed it.
+- NOT DONE: the island is not rebuilt, so World.tscn still has the S13 terrain and the old site centre (450, 760): the
+  new scene stands 20 m north of where it belongs there until step 5's rebuild; nothing was checked in the world.
