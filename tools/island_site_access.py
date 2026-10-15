@@ -62,7 +62,11 @@ ACCESS = [
          # (2026-10-03, the castle's walk in) it ENDS ON THE OUTER GATE'S AXIS: the castle's 歓会門 / 守礼門 line
          # (library_landmarks SH_GATE_Y, piece x SH_ROAD_X = -88, i.e. 9 m outside the site's footprint), the last
          # 29 m along that axis so a visitor looks straight up it at 守礼門. Move the gates, move these two points.
-         via=[(-609.4, -164.2)], end=(-616.9, -135.2), parking=None),
+         # (S18, 2026-10-15: the 踏切 batch, user "straight across the track") the castle SQUARED (yaw 90) and 30 m
+         # east, so its gate axis is x -610: the street is ONE straight line from the junction to the gate's axis
+         # end (piece x SH_ROAD_X = -88 -> record y -40 - 88). It used to kink 14 deg at the track (">") to reach the
+         # tilted axis.
+         end=(-610.0, -128.0), parking=None),
     # FARM STATION'S STREET (駅前通り, 2026-09-28): the farm row hata_yoko_1220 continued east from its nodo_waku
     # junction, over the Main line (a 踏切 beside the station's end buildings, whose ramps come down to it), ending
     # just past the track; the station's car park stands on it (island_rail_layout STATION_FRONT)

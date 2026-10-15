@@ -691,6 +691,10 @@ _R0["stations"]["Light Industry"] = ("Blue line", BLUE_WEST_X, -975.3) + tuple(_
 # R_MIN, over a throat's 100) the turn begins at x -610, the sando's 踏切.
 _R0["lines"]["Blue line"]["radii"] = dict(_R0["lines"]["Blue line"].get("radii", {}))
 _R0["lines"]["Blue line"]["radii"][4] = 140.0
+# ...and down to a throat's 100 (S18, the 踏切 batch, user 2026-10-15 on castle_proposal.png "D"): at 140 the curve began
+# AT the sando's 踏切 (x -610), so the road crossed where the rail starts to turn; at 100 the rail is straight from x
+# -650 and the 踏切 stands 40 m along the straight, square
+_R0["lines"]["Blue line"]["radii"][4] = R_THROAT
 # Farm moved 2 m south and Residential North 46 m north, onto nishi_dori's crossing: 452 m apart
 _R0["accept_gaps"] = list(_R0["accept_gaps"]) + [("Farm", "Residential North")]
 # THE AIRPORT STATION BEHIND THE BRIDGE (user, 2026-09-29: "let the station at airport combine with the air terminal,
@@ -779,7 +783,7 @@ STATION_FRONT = {
     "City West": dict(end=-1, street=[(-82.5, -226.7), (-64.7, -167.9), (-47.4, -108.9)], half=14.5),
     # the castle's approach jokamachi_sando, straight north from the nishi_dori x jokamachi_dori junction and over the
     # Blue line (island_site_access): the castle is a walk up from the station's north exit
-    "Castle Town": dict(end=1, street=[(-608.4, -239.5), (-608.4, -138.0)], half=6.5),
+    "Castle Town": dict(end=1, street=[(-610.0, -239.5), (-610.0, -128.0)], half=6.5),
     # nishi_cho_413, a block street of the south-west housing grid (island_streets: an open-air station's box keeps no
     # clearance along its axis, so the planner leaves this street where it is)
     "Residential": dict(end=-1, street=[(-900.0, -413.0), (-700.0, -413.0)], half=6.5),
