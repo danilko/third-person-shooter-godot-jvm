@@ -1790,7 +1790,8 @@ strings the wires from it, so the two cannot disagree; moving a wire is one edit
   what it owns), so a zone boundary that falls between two poles leaves one gap.
 - `guardrail_kind(road)`: "kerb" -- both kerbs of a road with >= 2 lanes each way and a footway, 0.25 m behind the
   kerb line, never within `guardrail_end_clear` (9 m) of a run's end (the crossing), a vehicle entry, a keep-out, a
-  level crossing; "edge" -- a road whose new field **`barrier_style` = RAIL** (the `coast` preset, `kaigan_dori`):
+  level crossing (S17, 2026-10-15: the lane test asks the module's two ENDS as well as its centre -- a 4 m module
+  with a clear centre stood its end post in the train's gauge at four 踏切, found by `probe_rail_track`); "edge" -- a road whose new field **`barrier_style` = RAIL** (the `coast` preset, `kaigan_dori`):
   `point_solve` no longer stands the no-pedestrian wall where the road is on the ground and outside a rock shed
   (a deck, a pier, a shed keep wall AND car wall), and the rail goes wherever no wall is; "drop" -- the roads
   `guardrail_drop_roads` names (`shrine_touge*`): EVERY edge except where the hill stands beside it (the ground 4 m

@@ -9,9 +9,9 @@ material = ExtResource("lotmat")
 
 [sub_resource type="MultiMesh" id="Aprons"]
 transform_format = 1
-instance_count = 2
+instance_count = 3
 mesh = SubResource("ApronBox")
-buffer = PackedFloat32Array(-2.0234, 0.0000, 0.5351, -922.9460, 0.0000, 0.4000, 0.0000, 12.2740, -0.5619, 0.0000, -1.9271, 1036.7120, -2.0234, 0.0000, 0.5351, -915.0510, 0.0000, 0.4000, 0.0000, 12.2740, -0.5619, 0.0000, -1.9271, 1008.2890)
+buffer = PackedFloat32Array(-2.0875, 0.0000, 0.2177, -793.8360, 0.0000, 0.4000, 0.0000, 11.9400, -0.2286, 0.0000, -1.9881, 1066.9000, -2.0234, 0.0000, 0.5351, -911.8630, 0.0000, 0.4000, 0.0000, 12.1380, -0.5619, 0.0000, -1.9271, 1039.7910, -1.9986, 0.0000, 0.6140, -988.4190, 0.0000, 0.4000, 0.0000, 12.8490, -0.6448, 0.0000, -1.9034, 1019.2460)
 
 [sub_resource type="BoxShape3D" id="ApronShape"]
 size = Vector3(2.100, 0.400, 2.000)
@@ -26,7 +26,7 @@ visibility_range_begin_margin = 40.0
 visibility_range_fade_mode = 1
 
 [node name="PocketPark_000" parent="." instance=ExtResource("1")]
-transform = Transform3D(-0.971334, 0, 0.237720, 0, 1, 0, -0.237720, 0, -0.971334, -965.500, 5.590, 1074.500)
+transform = Transform3D(-0.968800, 0, 0.247845, 0, 1, 0, -0.247845, 0, -0.968800, -983.500, 5.590, 1074.500)
 
 [node name="Mesh" parent="./PocketPark_000" index="0"]
 visibility_parent = NodePath("../../HLOD")
@@ -39,9 +39,13 @@ cast_shadow = 0
 collision_mask = 0
 
 [node name="Apron0" type="CollisionShape3D" parent="ApronCollision"]
-transform = Transform3D(-0.963537, 0, 0.267575, 0, 1, 0, -0.267575, 0, -0.963537, -922.946, 12.274, 1036.712)
+transform = Transform3D(-0.994056, 0, 0.108867, 0, 1, 0, -0.108867, 0, -0.994056, -793.836, 11.940, 1066.900)
 shape = SubResource("ApronShape")
 
 [node name="Apron1" type="CollisionShape3D" parent="ApronCollision"]
-transform = Transform3D(-0.963537, 0, 0.267575, 0, 1, 0, -0.267575, 0, -0.963537, -915.051, 12.274, 1008.289)
+transform = Transform3D(-0.963537, 0, 0.267575, 0, 1, 0, -0.267575, 0, -0.963537, -911.863, 12.138, 1039.791)
+shape = SubResource("ApronShape")
+
+[node name="Apron2" type="CollisionShape3D" parent="ApronCollision"]
+transform = Transform3D(-0.951702, 0, 0.307024, 0, 1, 0, -0.307024, 0, -0.951702, -988.419, 12.849, 1019.246)
 shape = SubResource("ApronShape")

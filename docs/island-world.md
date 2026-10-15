@@ -1613,3 +1613,28 @@ pads as convex hulls). Godot frame below; heights over the yard (y 1.5).
   identical flight at x 600 walked out -- a float tie. Walking (`probe_stairs`) never showed it.
 - NOT DONE: the island is not rebuilt, so World.tscn still has the S13 terrain and the old site centre (450, 760): the
   new scene stands 20 m north of where it belongs there until step 5's rebuild; nothing was checked in the world.
+
+## The S16 build, rebuilt: three traps the pipeline had, and Castle Town's curve (S17, 2026-10-15)
+
+`tools/island_world.sh --from land` with C (the cape), D (the hamlet), E (the west batch) and H (the fish market piece).
+What the rebuild found that no dry run could:
+- **A zone north of row 0 was pruned the moment it was baked.** The cape made `island_3_-1`; its piece is spelled
+  `Roads_IslandRoads_island_3__1`, and `island_rebuild.sh`'s stale-piece pruner compared the raw id with the file name,
+  so it deleted the piece, the stamp could not load it and `probe_island_zones` died on the missing lanekit. The
+  pruner compares the spellings now. A probe that errors in `_initialize` HANGS (no `quit()`), and `timeout` without
+  `-k` did not kill Godot: give every gate run `timeout -k`.
+- **island_layout's 踏切 line judges the rail record from BEFORE the layout** (`island_rail_record` writes the new one
+  after it): a moved Blue leg was reported at its old x. `island_world.sh` judges the crossings again after the record.
+- **The rail layout's station table was hidden.** It printed 'Castle Town ON A CURVE (bows 1.04 m)' and
+  `island_world.sh` kept only its last line; it now prints every ON A CURVE / IN PLATFORM / foot-off-street line.
+- **Castle Town and the moved leg.** The Blue corner (-750, -160) used the line's default radius 200, so moving the leg
+  50 m east moved the turn's start to x -550, under the station's west building and ramps (its box reaches x -600.4;
+  the station cannot slide -- it fills the 180 m between the jokamachi_sando and nishi_dori 踏切s). `radii[4] = 140`
+  (a station throat, under R_MIN 160, over 100) starts the turn at x -610. `probe_rail_track` PASS.
+- Gates on the rebuilt world: island_zones, road_clear, road_stamp, road_ground, road_zones 12/12, traffic_spawn,
+  gps_route 33/33, station_paid 13, rail_track, swim_exit 6/6 + control, stairs 34/34, road_launch + the new roads
+  (shiokaze_dori, koba x2, the cape's kaigan_dori / kita_touge, gyoko_michi -- the hamlet street at 8 m/s: faster, the
+  probe drives blind into the traffic queued at its T), civic coverage, door_access 0 / 263.
+- NEXT (user, 2026-10-15): a 踏切 must run STRAIGHT ACROSS the track (no > / < kink; curves either side are fine) --
+  PLAN.md's 踏切 batch.
+

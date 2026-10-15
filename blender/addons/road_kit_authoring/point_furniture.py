@@ -1373,7 +1373,12 @@ def _guardrails(fur, table, solves, bands, mine_run, ground, index):
                     if g is not None and g - p[2] >= rise:
                         continue                                 # the hill stands here (the inner side): no rail
                 pos = (p[0] + out[0] * inset, p[1] + out[1] * inset, p[2] + (k if w > 0.0 else 0.0))
-                if index is not None and not index.clear_of(pos, 0.1, asset_height(table, "guardrail")):
+                # the module's ENDS too (its posts): a 4 m module whose centre is clear can still stand its end post
+                # in a lane -- measured S17, probe_rail_track: 4 guardrail posts in the train's gauge at 踏切
+                hh, ends = 0.5 * length, [pos]
+                ends += [(pos[0] + d[0] * e * hh, pos[1] + d[1] * e * hh, pos[2]) for e in (-1.0, 1.0)]
+                if index is not None and not all(index.clear_of(q, 0.1, asset_height(table, "guardrail"))
+                                                 for q in ends):
                     fur.counts["guardrail_in_lane"] = fur.counts.get("guardrail_in_lane", 0) + 1
                     continue
                 # the piece's +X (the beam) toward the road, so its forward runs WITH the edge on the left kerb and

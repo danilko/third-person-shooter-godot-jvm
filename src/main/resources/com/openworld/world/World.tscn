@@ -244,6 +244,16 @@ tonemap_white = 6.0
 
 [sub_resource type="CameraAttributesPractical" id="sky_CameraAttributesPractical_d0ed4"]
 
+[sub_resource type="Resource" id="Zone_road_3_-1"]
+script = ExtResource("3_zone")
+zone_id = "island_3_-1"
+size = Vector3(504, 600, 504)
+load_radius = 1350.0
+unload_radius = 1650.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_3__1.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.6, 0)
+
 [sub_resource type="Resource" id="Zone_road_1_0"]
 script = ExtResource("3_zone")
 zone_id = "island_1_0"
@@ -401,6 +411,16 @@ size = Vector3(504, 600, 504)
 load_radius = 1350.0
 unload_radius = 1650.0
 geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_6_2.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_0_3"]
+script = ExtResource("3_zone")
+zone_id = "island_0_3"
+size = Vector3(504, 600, 504)
+load_radius = 1350.0
+unload_radius = 1650.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_0_3.tscn"
 geometry_world_placed = true
 geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.6, 0)
 
@@ -1000,8 +1020,8 @@ load_radius = 900.0
 unload_radius = 1200.0
 geometry_path = "res://src/main/resources/com/openworld/world/buildings/StationMall.tscn"
 geometry_world_placed = true
-geometry_world_transform = Transform3D(0.000000, 0, -1.000000, 0, 1, 0, 1.000000, 0, 0.000000, -735.000, 5.598, 520.000)
-metadata/site_reserve = PackedFloat64Array(-735.000, 520.000, -1.570796, 23.650, 20.000)
+geometry_world_transform = Transform3D(0.000000, 0, -1.000000, 0, 1, 0, 1.000000, 0, 0.000000, -685.000, 5.598, 520.000)
+metadata/site_reserve = PackedFloat64Array(-685.000, 520.000, -1.570796, 23.650, 20.000)
 
 [sub_resource type="Resource" id="Zone_site_station_airport_parking"]
 script = ExtResource("3_zone")
@@ -1082,9 +1102,9 @@ load_radius = 900.0
 unload_radius = 1200.0
 geometry_path = "res://src/main/resources/com/openworld/world/buildings/ParkingLot14.tscn"
 geometry_world_placed = true
-geometry_world_transform = Transform3D(-0.945318, 0, 0.326149, 0, 1, 0, -0.326149, 0, -0.945318, 135.210, 7.821, 1081.180)
+geometry_world_transform = Transform3D(-0.945318, 0, 0.326149, 0, 1, 0, -0.326149, 0, -0.945318, 135.210, 24.322, 1081.180)
 metadata/site_reserve = PackedFloat64Array(135.210, 1081.180, 2.809365, 10.920, 9.100)
-metadata/site_level = 7.821
+metadata/site_level = 24.322
 
 [sub_resource type="Resource" id="Zone_site_station_industry_parking"]
 script = ExtResource("3_zone")
@@ -1106,8 +1126,8 @@ load_radius = 900.0
 unload_radius = 1200.0
 geometry_path = "res://src/main/resources/com/openworld/world/buildings/ParkingLot8.tscn"
 geometry_world_placed = true
-geometry_world_transform = Transform3D(-1.000000, 0, -0.000000, 0, 1, 0, 0.000000, 0, -1.000000, -824.970, 5.598, 890.670)
-metadata/site_reserve = PackedFloat64Array(-824.970, 890.670, -3.141593, 10.920, 6.370)
+geometry_world_transform = Transform3D(-1.000000, 0, -0.000000, 0, 1, 0, 0.000000, 0, -1.000000, -774.970, 5.598, 890.670)
+metadata/site_reserve = PackedFloat64Array(-774.970, 890.670, -3.141593, 10.920, 6.370)
 
 [sub_resource type="Resource" id="Zone_site_station_residential_parking"]
 script = ExtResource("3_zone")
@@ -1117,8 +1137,9 @@ load_radius = 900.0
 unload_radius = 1200.0
 geometry_path = "res://src/main/resources/com/openworld/world/buildings/ParkingLot8.tscn"
 geometry_world_placed = true
-geometry_world_transform = Transform3D(-1.000000, 0, -0.000000, 0, 1, 0, 0.000000, 0, -1.000000, -824.970, 5.598, 426.170)
-metadata/site_reserve = PackedFloat64Array(-824.970, 426.170, -3.141593, 10.920, 6.370)
+geometry_world_transform = Transform3D(-1.000000, 0, -0.000000, 0, 1, 0, 0.000000, 0, -1.000000, -774.970, 5.750, 426.170)
+metadata/site_reserve = PackedFloat64Array(-774.970, 426.170, -3.141593, 10.920, 6.370)
+metadata/site_level = 5.750
 
 [sub_resource type="Resource" id="Zone_site_station_residential_north_parking"]
 script = ExtResource("3_zone")
@@ -1169,13 +1190,13 @@ metadata/site_reserve = PackedFloat64Array(205.000, 135.000, -1.570796, 45.000, 
 [sub_resource type="Resource" id="Zone_site_station_castle_town"]
 script = ExtResource("3_zone")
 zone_id = "site_station_castle_town"
-size = Vector3(187.56, 120, 187.56)
+size = Vector3(182.6, 120, 182.6)
 load_radius = 900.0
 unload_radius = 1200.0
 geometry_path = "res://src/main/resources/com/openworld/world/buildings/Station_CastleTown_Shop.tscn"
 geometry_world_placed = true
-geometry_world_transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, -508.100, 7.527, 160.000)
-metadata/site_reserve = PackedFloat64Array(-508.100, 160.000, 3.141593, 93.780, 13.050)
+geometry_world_transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, -508.100, 7.506, 160.000)
+metadata/site_reserve = PackedFloat64Array(-508.100, 160.000, 3.141593, 91.300, 13.050)
 
 [sub_resource type="Resource" id="Zone_site_station_central"]
 script = ExtResource("3_zone")
@@ -1251,8 +1272,8 @@ load_radius = 900.0
 unload_radius = 1200.0
 geometry_path = "res://src/main/resources/com/openworld/world/buildings/Station_LightIndustry_Shop.tscn"
 geometry_world_placed = true
-geometry_world_transform = Transform3D(0.000000, 0, -1.000000, 0, 1, 0, 1.000000, 0, 0.000000, -800.000, 5.740, 975.300)
-metadata/site_reserve = PackedFloat64Array(-800.000, 975.300, -1.570796, 91.300, 13.050)
+geometry_world_transform = Transform3D(0.000000, 0, -1.000000, 0, 1, 0, 1.000000, 0, 0.000000, -750.000, 5.740, 975.300)
+metadata/site_reserve = PackedFloat64Array(-750.000, 975.300, -1.570796, 91.300, 13.050)
 
 [sub_resource type="Resource" id="Zone_site_station_residential"]
 script = ExtResource("3_zone")
@@ -1262,8 +1283,8 @@ load_radius = 900.0
 unload_radius = 1200.0
 geometry_path = "res://src/main/resources/com/openworld/world/buildings/Station_Residential_Shop.tscn"
 geometry_world_placed = true
-geometry_world_transform = Transform3D(0.000000, 0, -1.000000, 0, 1, 0, 1.000000, 0, 0.000000, -800.000, 5.740, 510.800)
-metadata/site_reserve = PackedFloat64Array(-800.000, 510.800, -1.570796, 91.300, 13.050)
+geometry_world_transform = Transform3D(0.000000, 0, -1.000000, 0, 1, 0, 1.000000, 0, 0.000000, -750.000, 5.740, 510.800)
+metadata/site_reserve = PackedFloat64Array(-750.000, 510.800, -1.570796, 91.300, 13.050)
 
 [sub_resource type="Resource" id="Zone_site_station_residential_north"]
 script = ExtResource("3_zone")
@@ -1350,7 +1371,7 @@ load_radius = 2500.0
 unload_radius = 2800.0
 geometry_path = "res://src/main/resources/com/openworld/world/buildings/FerrisWheelPark.tscn"
 geometry_world_placed = true
-geometry_world_transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, 815.000, 5.598, 888.000)
+geometry_world_transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, 815.000, 5.600, 888.000)
 metadata/site_reserve = PackedFloat64Array(815.000, 888.000, 0.000000, 55.000, 70.000)
 
 [sub_resource type="Resource" id="Zone_site_resort_hotel_1"]
@@ -1405,8 +1426,8 @@ load_radius = 1200.0
 unload_radius = 1500.0
 geometry_path = "res://src/main/resources/com/openworld/world/buildings/FishMarket.tscn"
 geometry_world_placed = true
-geometry_world_transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, 450.000, 1.500, 760.000)
-metadata/site_reserve = PackedFloat64Array(450.000, 760.000, 0.000000, 160.000, 48.000)
+geometry_world_transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, 450.000, 1.500, 780.000)
+metadata/site_reserve = PackedFloat64Array(450.000, 780.000, 0.000000, 160.000, 68.000)
 
 [sub_resource type="Resource" id="Zone_site_airport_airfield"]
 script = ExtResource("3_zone")
@@ -1443,6 +1464,17 @@ geometry_world_transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000
 metadata/site_reserve = PackedFloat64Array(787.500, -149.500, 0.000000, 168.500, 30.500)
 metadata/site_level = 5.750
 
+[sub_resource type="Resource" id="Zone_site_west_station_forecourt"]
+script = ExtResource("3_zone")
+zone_id = "site_west_station_forecourt"
+size = Vector3(76, 120, 76)
+load_radius = 1200.0
+unload_radius = 1500.0
+geometry_path = "res://src/main/resources/com/openworld/world/buildings/WestForecourt.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, -698.000, 5.598, 459.000)
+metadata/site_reserve = PackedFloat64Array(-698.000, 459.000, 0.000000, 36.000, 38.000)
+
 [sub_resource type="Resource" id="Zone_site_lighthouse_parking"]
 script = ExtResource("3_zone")
 zone_id = "site_lighthouse_parking"
@@ -1458,26 +1490,26 @@ metadata/site_level = 10.142
 [sub_resource type="Resource" id="Zone_site_michi_no_eki_parking"]
 script = ExtResource("3_zone")
 zone_id = "site_michi_no_eki_parking"
-size = Vector3(21.84, 120, 21.84)
+size = Vector3(40.04, 120, 40.04)
 load_radius = 900.0
 unload_radius = 1200.0
-geometry_path = "res://src/main/resources/com/openworld/world/buildings/ParkingLot14.tscn"
+geometry_path = "res://src/main/resources/com/openworld/world/buildings/ParkingLot56.tscn"
 geometry_world_placed = true
-geometry_world_transform = Transform3D(-0.983938, 0, 0.178510, 0, 1, 0, -0.178510, 0, -0.983938, 427.662, 9.864, -1677.110)
-metadata/site_reserve = PackedFloat64Array(427.662, -1677.110, 2.962121, 10.920, 9.100)
-metadata/site_level = 9.864
+geometry_world_transform = Transform3D(1.000000, 0, -0.000000, 0, 1, 0, 0.000000, 0, 1.000000, -220.000, 6.650, -2074.200)
+metadata/site_reserve = PackedFloat64Array(-220.000, -2074.200, -0.000000, 20.020, 18.200)
+metadata/site_level = 6.650
 
-[sub_resource type="Resource" id="Zone_site_waterfront_park_parking"]
+[sub_resource type="Resource" id="Zone_site_west_hamlet_parking"]
 script = ExtResource("3_zone")
-zone_id = "site_waterfront_park_parking"
+zone_id = "site_west_hamlet_parking"
 size = Vector3(21.84, 120, 21.84)
 load_radius = 900.0
 unload_radius = 1200.0
 geometry_path = "res://src/main/resources/com/openworld/world/buildings/ParkingLot14.tscn"
 geometry_world_placed = true
-geometry_world_transform = Transform3D(1.000000, 0, -0.000000, 0, 1, 0, 0.000000, 0, 1.000000, 893.000, 5.650, 776.900)
-metadata/site_reserve = PackedFloat64Array(893.000, 776.900, -0.000000, 10.920, 9.100)
-metadata/site_level = 5.650
+geometry_world_transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1645.100, 3.000, -190.000)
+metadata/site_reserve = PackedFloat64Array(-1645.100, -190.000, 1.570796, 10.920, 9.100)
+metadata/site_level = 3.000
 
 [sub_resource type="Resource" id="Zone_site_north_beach_parking"]
 script = ExtResource("3_zone")
@@ -1499,9 +1531,9 @@ load_radius = 900.0
 unload_radius = 1200.0
 geometry_path = "res://src/main/resources/com/openworld/world/buildings/ParkingLot14.tscn"
 geometry_world_placed = true
-geometry_world_transform = Transform3D(-1.000000, 0, -0.000000, 0, 1, 0, 0.000000, 0, -1.000000, -1235.000, 5.933, 808.100)
+geometry_world_transform = Transform3D(-1.000000, 0, -0.000000, 0, 1, 0, 0.000000, 0, -1.000000, -1235.000, 5.648, 808.100)
 metadata/site_reserve = PackedFloat64Array(-1235.000, 808.100, -3.141593, 10.920, 9.100)
-metadata/site_level = 5.933
+metadata/site_level = 5.648
 
 [sub_resource type="Resource" id="Zone_site_suburb_beach_parking"]
 script = ExtResource("3_zone")
@@ -1526,6 +1558,50 @@ geometry_world_placed = true
 geometry_world_transform = Transform3D(-1.000000, 0, -0.000000, 0, 1, 0, 0.000000, 0, -1.000000, -280.000, 9.656, 1453.100)
 metadata/site_reserve = PackedFloat64Array(-280.000, 1453.100, -3.141593, 10.920, 9.100)
 metadata/site_level = 9.656
+
+[sub_resource type="Resource" id="Zone_site_summit_lookout_parking"]
+script = ExtResource("3_zone")
+zone_id = "site_summit_lookout_parking"
+size = Vector3(21.84, 120, 21.84)
+load_radius = 900.0
+unload_radius = 1200.0
+geometry_path = "res://src/main/resources/com/openworld/world/buildings/ParkingLot14.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(-0.707108, 0, -0.707105, 0, 1, 0, 0.707105, 0, -0.707108, -700.037, 440.050, -1033.437)
+metadata/site_reserve = PackedFloat64Array(-700.037, -1033.437, -2.356196, 10.920, 9.100)
+metadata/site_level = 440.050
+
+[sub_resource type="Resource" id="Zone_site_fish_market_visitors_parking"]
+script = ExtResource("3_zone")
+zone_id = "site_fish_market_visitors_parking"
+size = Vector3(40.04, 120, 40.04)
+load_radius = 900.0
+unload_radius = 1200.0
+geometry_path = "res://src/main/resources/com/openworld/world/buildings/ParkingLot28.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1.000000, 0, -0.000000, 0, 1, 0, 0.000000, 0, 1.000000, 820.000, 5.648, 726.900)
+metadata/site_reserve = PackedFloat64Array(820.000, 726.900, -0.000000, 20.020, 9.100)
+metadata/site_level = 5.648
+
+[sub_resource type="Resource" id="Zone_bld_1_7"]
+script = ExtResource("3_zone")
+zone_id = "bld_island_1_7"
+size = Vector3(252, 120, 252)
+load_radius = 800.0
+unload_radius = 1100.0
+geometry_path = "res://src/main/resources/com/openworld/world/buildings/cells/Bld_island_1_7.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[sub_resource type="Resource" id="Zone_bld_2_7"]
+script = ExtResource("3_zone")
+zone_id = "bld_island_2_7"
+size = Vector3(252, 120, 252)
+load_radius = 800.0
+unload_radius = 1100.0
+geometry_path = "res://src/main/resources/com/openworld/world/buildings/cells/Bld_island_2_7.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 
 [sub_resource type="Resource" id="Zone_bld_2_8"]
 script = ExtResource("3_zone")
@@ -1934,16 +2010,6 @@ size = Vector3(252, 120, 252)
 load_radius = 800.0
 unload_radius = 1100.0
 geometry_path = "res://src/main/resources/com/openworld/world/buildings/cells/Bld_island_8_11.tscn"
-geometry_world_placed = true
-geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
-
-[sub_resource type="Resource" id="Zone_bld_9_0"]
-script = ExtResource("3_zone")
-zone_id = "bld_island_9_0"
-size = Vector3(252, 120, 252)
-load_radius = 800.0
-unload_radius = 1100.0
-geometry_path = "res://src/main/resources/com/openworld/world/buildings/cells/Bld_island_9_0.tscn"
 geometry_world_placed = true
 geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 
@@ -2467,6 +2533,36 @@ geometry_path = "res://src/main/resources/com/openworld/world/buildings/cells/Bl
 geometry_world_placed = true
 geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 
+[sub_resource type="Resource" id="PedSpawn_1_7"]
+script = ExtResource("gen_2")
+faction = "neutral"
+count = 2
+weapon_scene_path = ""
+behavior = "sidewalk"
+
+[sub_resource type="Resource" id="Zone_ped_1_7"]
+script = ExtResource("3_zone")
+zone_id = "ped_island_1_7"
+size = Vector3(252, 20, 252)
+load_radius = 300.0
+unload_radius = 420.0
+spawn_configs = Array[ExtResource("gen_2")]([SubResource("PedSpawn_1_7")])
+
+[sub_resource type="Resource" id="PedSpawn_2_7"]
+script = ExtResource("gen_2")
+faction = "neutral"
+count = 1
+weapon_scene_path = ""
+behavior = "sidewalk"
+
+[sub_resource type="Resource" id="Zone_ped_2_7"]
+script = ExtResource("3_zone")
+zone_id = "ped_island_2_7"
+size = Vector3(252, 20, 252)
+load_radius = 300.0
+unload_radius = 420.0
+spawn_configs = Array[ExtResource("gen_2")]([SubResource("PedSpawn_2_7")])
+
 [sub_resource type="Resource" id="PedSpawn_2_9"]
 script = ExtResource("gen_2")
 faction = "neutral"
@@ -2515,7 +2611,7 @@ spawn_configs = Array[ExtResource("gen_2")]([SubResource("PedSpawn_3_9")])
 [sub_resource type="Resource" id="PedSpawn_3_10"]
 script = ExtResource("gen_2")
 faction = "neutral"
-count = 5
+count = 9
 weapon_scene_path = ""
 behavior = "sidewalk"
 
@@ -2530,7 +2626,7 @@ spawn_configs = Array[ExtResource("gen_2")]([SubResource("PedSpawn_3_10")])
 [sub_resource type="Resource" id="PedSpawn_3_11"]
 script = ExtResource("gen_2")
 faction = "neutral"
-count = 6
+count = 8
 weapon_scene_path = ""
 behavior = "sidewalk"
 
@@ -2560,7 +2656,7 @@ spawn_configs = Array[ExtResource("gen_2")]([SubResource("PedSpawn_4_8")])
 [sub_resource type="Resource" id="PedSpawn_4_9"]
 script = ExtResource("gen_2")
 faction = "neutral"
-count = 11
+count = 20
 weapon_scene_path = ""
 behavior = "sidewalk"
 
@@ -2575,7 +2671,7 @@ spawn_configs = Array[ExtResource("gen_2")]([SubResource("PedSpawn_4_9")])
 [sub_resource type="Resource" id="PedSpawn_4_10"]
 script = ExtResource("gen_2")
 faction = "neutral"
-count = 90
+count = 132
 weapon_scene_path = ""
 behavior = "sidewalk"
 
@@ -2590,7 +2686,7 @@ spawn_configs = Array[ExtResource("gen_2")]([SubResource("PedSpawn_4_10")])
 [sub_resource type="Resource" id="PedSpawn_4_11"]
 script = ExtResource("gen_2")
 faction = "neutral"
-count = 3
+count = 8
 weapon_scene_path = ""
 behavior = "sidewalk"
 
@@ -2605,7 +2701,7 @@ spawn_configs = Array[ExtResource("gen_2")]([SubResource("PedSpawn_4_11")])
 [sub_resource type="Resource" id="PedSpawn_4_12"]
 script = ExtResource("gen_2")
 faction = "neutral"
-count = 7
+count = 8
 weapon_scene_path = ""
 behavior = "sidewalk"
 
@@ -2616,6 +2712,21 @@ size = Vector3(252, 20, 252)
 load_radius = 300.0
 unload_radius = 420.0
 spawn_configs = Array[ExtResource("gen_2")]([SubResource("PedSpawn_4_12")])
+
+[sub_resource type="Resource" id="PedSpawn_5_3"]
+script = ExtResource("gen_2")
+faction = "neutral"
+count = 1
+weapon_scene_path = ""
+behavior = "sidewalk"
+
+[sub_resource type="Resource" id="Zone_ped_5_3"]
+script = ExtResource("3_zone")
+zone_id = "ped_island_5_3"
+size = Vector3(252, 20, 252)
+load_radius = 300.0
+unload_radius = 420.0
+spawn_configs = Array[ExtResource("gen_2")]([SubResource("PedSpawn_5_3")])
 
 [sub_resource type="Resource" id="PedSpawn_5_8"]
 script = ExtResource("gen_2")
@@ -2635,7 +2746,7 @@ spawn_configs = Array[ExtResource("gen_2")]([SubResource("PedSpawn_5_8")])
 [sub_resource type="Resource" id="PedSpawn_5_9"]
 script = ExtResource("gen_2")
 faction = "neutral"
-count = 12
+count = 28
 weapon_scene_path = ""
 behavior = "sidewalk"
 
@@ -2650,7 +2761,7 @@ spawn_configs = Array[ExtResource("gen_2")]([SubResource("PedSpawn_5_9")])
 [sub_resource type="Resource" id="PedSpawn_5_10"]
 script = ExtResource("gen_2")
 faction = "neutral"
-count = 88
+count = 120
 weapon_scene_path = ""
 behavior = "sidewalk"
 
@@ -3202,21 +3313,6 @@ load_radius = 300.0
 unload_radius = 420.0
 spawn_configs = Array[ExtResource("gen_2")]([SubResource("PedSpawn_9_10")])
 
-[sub_resource type="Resource" id="PedSpawn_9_11"]
-script = ExtResource("gen_2")
-faction = "neutral"
-count = 2
-weapon_scene_path = ""
-behavior = "sidewalk"
-
-[sub_resource type="Resource" id="Zone_ped_9_11"]
-script = ExtResource("3_zone")
-zone_id = "ped_island_9_11"
-size = Vector3(252, 20, 252)
-load_radius = 300.0
-unload_radius = 420.0
-spawn_configs = Array[ExtResource("gen_2")]([SubResource("PedSpawn_9_11")])
-
 [sub_resource type="Resource" id="PedSpawn_10_1"]
 script = ExtResource("gen_2")
 faction = "neutral"
@@ -3367,6 +3463,21 @@ load_radius = 300.0
 unload_radius = 420.0
 spawn_configs = Array[ExtResource("gen_2")]([SubResource("PedSpawn_10_10")])
 
+[sub_resource type="Resource" id="PedSpawn_10_11"]
+script = ExtResource("gen_2")
+faction = "neutral"
+count = 2
+weapon_scene_path = ""
+behavior = "sidewalk"
+
+[sub_resource type="Resource" id="Zone_ped_10_11"]
+script = ExtResource("3_zone")
+zone_id = "ped_island_10_11"
+size = Vector3(252, 20, 252)
+load_radius = 300.0
+unload_radius = 420.0
+spawn_configs = Array[ExtResource("gen_2")]([SubResource("PedSpawn_10_11")])
+
 [sub_resource type="Resource" id="PedSpawn_11_1"]
 script = ExtResource("gen_2")
 faction = "neutral"
@@ -3505,7 +3616,7 @@ spawn_configs = Array[ExtResource("gen_2")]([SubResource("PedSpawn_11_10")])
 [sub_resource type="Resource" id="PedSpawn_11_11"]
 script = ExtResource("gen_2")
 faction = "neutral"
-count = 10
+count = 12
 weapon_scene_path = ""
 behavior = "sidewalk"
 
@@ -4220,247 +4331,259 @@ celestials_calculations = 0
 
 [node name="RoadZones" type="Node" parent="." unique_id=910013000]
 
-[node name="Road_1_0" type="Node3D" parent="RoadZones" unique_id=910013001]
+[node name="Road_3_-1" type="Node3D" parent="RoadZones" unique_id=910013001]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252.000, 5.600, -2268.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_3_-1")
+show_debug_volume = false
+
+[node name="Road_1_0" type="Node3D" parent="RoadZones" unique_id=910013002]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1260.000, 5.600, -1764.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_1_0")
 show_debug_volume = false
 
-[node name="Road_2_0" type="Node3D" parent="RoadZones" unique_id=910013002]
+[node name="Road_2_0" type="Node3D" parent="RoadZones" unique_id=910013003]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -756.000, 5.600, -1764.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_2_0")
 show_debug_volume = false
 
-[node name="Road_3_0" type="Node3D" parent="RoadZones" unique_id=910013003]
+[node name="Road_3_0" type="Node3D" parent="RoadZones" unique_id=910013004]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252.000, 5.600, -1764.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_3_0")
 show_debug_volume = false
 
-[node name="Road_4_0" type="Node3D" parent="RoadZones" unique_id=910013004]
+[node name="Road_4_0" type="Node3D" parent="RoadZones" unique_id=910013005]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 252.000, 5.600, -1764.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_4_0")
 show_debug_volume = false
 
-[node name="Road_5_0" type="Node3D" parent="RoadZones" unique_id=910013005]
+[node name="Road_5_0" type="Node3D" parent="RoadZones" unique_id=910013006]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 756.000, 5.600, -1764.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_5_0")
 show_debug_volume = false
 
-[node name="Road_1_1" type="Node3D" parent="RoadZones" unique_id=910013006]
+[node name="Road_1_1" type="Node3D" parent="RoadZones" unique_id=910013007]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1260.000, 5.600, -1260.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_1_1")
 show_debug_volume = false
 
-[node name="Road_2_1" type="Node3D" parent="RoadZones" unique_id=910013007]
+[node name="Road_2_1" type="Node3D" parent="RoadZones" unique_id=910013008]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -756.000, 5.600, -1260.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_2_1")
 show_debug_volume = false
 
-[node name="Road_3_1" type="Node3D" parent="RoadZones" unique_id=910013008]
+[node name="Road_3_1" type="Node3D" parent="RoadZones" unique_id=910013009]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252.000, 5.600, -1260.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_3_1")
 show_debug_volume = false
 
-[node name="Road_5_1" type="Node3D" parent="RoadZones" unique_id=910013009]
+[node name="Road_5_1" type="Node3D" parent="RoadZones" unique_id=910013010]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 756.000, 5.600, -1260.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_5_1")
 show_debug_volume = false
 
-[node name="Road_6_1" type="Node3D" parent="RoadZones" unique_id=910013010]
+[node name="Road_6_1" type="Node3D" parent="RoadZones" unique_id=910013011]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1260.000, 5.600, -1260.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_6_1")
 show_debug_volume = false
 
-[node name="Road_1_2" type="Node3D" parent="RoadZones" unique_id=910013011]
+[node name="Road_1_2" type="Node3D" parent="RoadZones" unique_id=910013012]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1260.000, 5.600, -756.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_1_2")
 show_debug_volume = false
 
-[node name="Road_2_2" type="Node3D" parent="RoadZones" unique_id=910013012]
+[node name="Road_2_2" type="Node3D" parent="RoadZones" unique_id=910013013]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -756.000, 5.600, -756.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_2_2")
 show_debug_volume = false
 
-[node name="Road_3_2" type="Node3D" parent="RoadZones" unique_id=910013013]
+[node name="Road_3_2" type="Node3D" parent="RoadZones" unique_id=910013014]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252.000, 5.600, -756.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_3_2")
 show_debug_volume = false
 
-[node name="Road_4_2" type="Node3D" parent="RoadZones" unique_id=910013014]
+[node name="Road_4_2" type="Node3D" parent="RoadZones" unique_id=910013015]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 252.000, 5.600, -756.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_4_2")
 show_debug_volume = false
 
-[node name="Road_5_2" type="Node3D" parent="RoadZones" unique_id=910013015]
+[node name="Road_5_2" type="Node3D" parent="RoadZones" unique_id=910013016]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 756.000, 5.600, -756.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_5_2")
 show_debug_volume = false
 
-[node name="Road_6_2" type="Node3D" parent="RoadZones" unique_id=910013016]
+[node name="Road_6_2" type="Node3D" parent="RoadZones" unique_id=910013017]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1260.000, 5.600, -756.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_6_2")
 show_debug_volume = false
 
-[node name="Road_1_3" type="Node3D" parent="RoadZones" unique_id=910013017]
+[node name="Road_0_3" type="Node3D" parent="RoadZones" unique_id=910013018]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1764.000, 5.600, -252.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_0_3")
+show_debug_volume = false
+
+[node name="Road_1_3" type="Node3D" parent="RoadZones" unique_id=910013019]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1260.000, 5.600, -252.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_1_3")
 show_debug_volume = false
 
-[node name="Road_2_3" type="Node3D" parent="RoadZones" unique_id=910013018]
+[node name="Road_2_3" type="Node3D" parent="RoadZones" unique_id=910013020]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -756.000, 5.600, -252.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_2_3")
 show_debug_volume = false
 
-[node name="Road_3_3" type="Node3D" parent="RoadZones" unique_id=910013019]
+[node name="Road_3_3" type="Node3D" parent="RoadZones" unique_id=910013021]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252.000, 5.600, -252.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_3_3")
 show_debug_volume = false
 
-[node name="Road_4_3" type="Node3D" parent="RoadZones" unique_id=910013020]
+[node name="Road_4_3" type="Node3D" parent="RoadZones" unique_id=910013022]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 252.000, 5.600, -252.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_4_3")
 show_debug_volume = false
 
-[node name="Road_5_3" type="Node3D" parent="RoadZones" unique_id=910013021]
+[node name="Road_5_3" type="Node3D" parent="RoadZones" unique_id=910013023]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 756.000, 5.600, -252.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_5_3")
 show_debug_volume = false
 
-[node name="Road_6_3" type="Node3D" parent="RoadZones" unique_id=910013022]
+[node name="Road_6_3" type="Node3D" parent="RoadZones" unique_id=910013024]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1260.000, 5.600, -252.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_6_3")
 show_debug_volume = false
 
-[node name="Road_1_4" type="Node3D" parent="RoadZones" unique_id=910013023]
+[node name="Road_1_4" type="Node3D" parent="RoadZones" unique_id=910013025]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1260.000, 5.600, 252.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_1_4")
 show_debug_volume = false
 
-[node name="Road_2_4" type="Node3D" parent="RoadZones" unique_id=910013024]
+[node name="Road_2_4" type="Node3D" parent="RoadZones" unique_id=910013026]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -756.000, 5.600, 252.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_2_4")
 show_debug_volume = false
 
-[node name="Road_3_4" type="Node3D" parent="RoadZones" unique_id=910013025]
+[node name="Road_3_4" type="Node3D" parent="RoadZones" unique_id=910013027]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252.000, 5.600, 252.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_3_4")
 show_debug_volume = false
 
-[node name="Road_4_4" type="Node3D" parent="RoadZones" unique_id=910013026]
+[node name="Road_4_4" type="Node3D" parent="RoadZones" unique_id=910013028]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 252.000, 5.600, 252.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_4_4")
 show_debug_volume = false
 
-[node name="Road_5_4" type="Node3D" parent="RoadZones" unique_id=910013027]
+[node name="Road_5_4" type="Node3D" parent="RoadZones" unique_id=910013029]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 756.000, 5.600, 252.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_5_4")
 show_debug_volume = false
 
-[node name="Road_6_4" type="Node3D" parent="RoadZones" unique_id=910013028]
+[node name="Road_6_4" type="Node3D" parent="RoadZones" unique_id=910013030]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1260.000, 5.600, 252.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_6_4")
 show_debug_volume = false
 
-[node name="Road_1_5" type="Node3D" parent="RoadZones" unique_id=910013029]
+[node name="Road_1_5" type="Node3D" parent="RoadZones" unique_id=910013031]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1260.000, 5.600, 756.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_1_5")
 show_debug_volume = false
 
-[node name="Road_2_5" type="Node3D" parent="RoadZones" unique_id=910013030]
+[node name="Road_2_5" type="Node3D" parent="RoadZones" unique_id=910013032]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -756.000, 5.600, 756.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_2_5")
 show_debug_volume = false
 
-[node name="Road_3_5" type="Node3D" parent="RoadZones" unique_id=910013031]
+[node name="Road_3_5" type="Node3D" parent="RoadZones" unique_id=910013033]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252.000, 5.600, 756.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_3_5")
 show_debug_volume = false
 
-[node name="Road_4_5" type="Node3D" parent="RoadZones" unique_id=910013032]
+[node name="Road_4_5" type="Node3D" parent="RoadZones" unique_id=910013034]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 252.000, 5.600, 756.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_4_5")
 show_debug_volume = false
 
-[node name="Road_5_5" type="Node3D" parent="RoadZones" unique_id=910013033]
+[node name="Road_5_5" type="Node3D" parent="RoadZones" unique_id=910013035]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 756.000, 5.600, 756.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_5_5")
 show_debug_volume = false
 
-[node name="Road_6_5" type="Node3D" parent="RoadZones" unique_id=910013034]
+[node name="Road_6_5" type="Node3D" parent="RoadZones" unique_id=910013036]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1260.000, 5.600, 756.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_6_5")
 show_debug_volume = false
 
-[node name="Road_2_6" type="Node3D" parent="RoadZones" unique_id=910013035]
+[node name="Road_2_6" type="Node3D" parent="RoadZones" unique_id=910013037]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -756.000, 5.600, 1260.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_2_6")
 show_debug_volume = false
 
-[node name="Road_3_6" type="Node3D" parent="RoadZones" unique_id=910013036]
+[node name="Road_3_6" type="Node3D" parent="RoadZones" unique_id=910013038]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252.000, 5.600, 1260.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_3_6")
 show_debug_volume = false
 
-[node name="Road_4_6" type="Node3D" parent="RoadZones" unique_id=910013037]
+[node name="Road_4_6" type="Node3D" parent="RoadZones" unique_id=910013039]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 252.000, 5.600, 1260.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_4_6")
 show_debug_volume = false
 
-[node name="Road_5_6" type="Node3D" parent="RoadZones" unique_id=910013038]
+[node name="Road_5_6" type="Node3D" parent="RoadZones" unique_id=910013040]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 756.000, 5.600, 1260.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_5_6")
 show_debug_volume = false
 
-[node name="Road_6_6" type="Node3D" parent="RoadZones" unique_id=910013039]
+[node name="Road_6_6" type="Node3D" parent="RoadZones" unique_id=910013041]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1260.000, 5.600, 1260.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_6_6")
 show_debug_volume = false
 
-[node name="Road_5_7" type="Node3D" parent="RoadZones" unique_id=910013040]
+[node name="Road_5_7" type="Node3D" parent="RoadZones" unique_id=910013042]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 756.000, 5.600, 1764.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_5_7")
 show_debug_volume = false
 
-[node name="Road_6_7" type="Node3D" parent="RoadZones" unique_id=910013041]
+[node name="Road_6_7" type="Node3D" parent="RoadZones" unique_id=910013043]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1260.000, 5.600, 1764.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_road_6_7")
@@ -4481,13 +4604,13 @@ zone = SubResource("Zone_traffic_01")
 show_debug_volume = false
 
 [node name="Traffic02" type="Node3D" parent="TrafficZones" unique_id=910012003]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 664.719, 5.592, 293.945)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 664.740, 5.592, 293.940)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_02")
 show_debug_volume = false
 
 [node name="Traffic03" type="Node3D" parent="TrafficZones" unique_id=910012004]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 706.280, 5.600, -739.002)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 706.280, 5.600, -739.001)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_03")
 show_debug_volume = false
@@ -4499,181 +4622,181 @@ zone = SubResource("Zone_traffic_04")
 show_debug_volume = false
 
 [node name="Traffic05" type="Node3D" parent="TrafficZones" unique_id=910012006]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -233.519, 5.600, 356.858)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -235.724, 5.600, 356.747)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_05")
 show_debug_volume = false
 
 [node name="Traffic06" type="Node3D" parent="TrafficZones" unique_id=910012007]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -84.879, 5.598, -248.935)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -84.883, 5.598, -248.937)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_06")
 show_debug_volume = false
 
 [node name="Traffic07" type="Node3D" parent="TrafficZones" unique_id=910012008]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -736.068, 5.767, 258.879)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -711.771, 5.712, 298.520)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_07")
 show_debug_volume = false
 
 [node name="Traffic08" type="Node3D" parent="TrafficZones" unique_id=910012009]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -250.956, 5.634, 699.769)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -742.245, 5.593, 715.301)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_08")
 show_debug_volume = false
 
 [node name="Traffic09" type="Node3D" parent="TrafficZones" unique_id=910012010]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 713.816, 8.814, 687.318)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 728.152, 8.740, 689.650)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_09")
 show_debug_volume = false
 
 [node name="Traffic10" type="Node3D" parent="TrafficZones" unique_id=910012011]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 270.043, 5.583, -717.736)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -246.688, 5.633, 693.530)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_10")
 show_debug_volume = false
 
 [node name="Traffic11" type="Node3D" parent="TrafficZones" unique_id=910012012]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -331.604, 11.186, 1139.640)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 270.033, 5.584, -717.744)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_11")
 show_debug_volume = false
 
 [node name="Traffic12" type="Node3D" parent="TrafficZones" unique_id=910012013]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1171.860, 9.969, -217.445)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -331.604, 11.186, 1139.640)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_12")
 show_debug_volume = false
 
 [node name="Traffic13" type="Node3D" parent="TrafficZones" unique_id=910012014]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1109.267, 7.531, -788.771)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1171.858, 9.969, -217.445)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_13")
 show_debug_volume = false
 
 [node name="Traffic14" type="Node3D" parent="TrafficZones" unique_id=910012015]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -648.500, 5.605, 723.578)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1109.311, 7.531, -788.763)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_14")
 show_debug_volume = false
 
 [node name="Traffic15" type="Node3D" parent="TrafficZones" unique_id=910012016]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -764.824, 11.645, 1094.244)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -772.289, 11.600, 1087.095)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_15")
 show_debug_volume = false
 
 [node name="Traffic16" type="Node3D" parent="TrafficZones" unique_id=910012017]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1146.480, 9.174, -1273.382)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 189.264, 4.635, 710.014)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_16")
 show_debug_volume = false
 
 [node name="Traffic17" type="Node3D" parent="TrafficZones" unique_id=910012018]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -45.244, 5.600, -653.573)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1146.480, 9.174, -1273.382)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_17")
 show_debug_volume = false
 
 [node name="Traffic18" type="Node3D" parent="TrafficZones" unique_id=910012019]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 138.228, 5.600, 691.979)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -45.244, 5.600, -653.573)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_18")
 show_debug_volume = false
 
 [node name="Traffic19" type="Node3D" parent="TrafficZones" unique_id=910012020]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 810.000, 5.600, -1341.897)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1186.274, 11.667, 721.332)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_19")
 show_debug_volume = false
 
 [node name="Traffic20" type="Node3D" parent="TrafficZones" unique_id=910012021]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1116.931, 11.021, 620.099)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 810.000, 5.600, -1341.897)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_20")
 show_debug_volume = false
 
 [node name="Traffic21" type="Node3D" parent="TrafficZones" unique_id=910012022]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1058.314, 5.561, 286.589)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1116.931, 10.697, 620.099)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_21")
 show_debug_volume = false
 
 [node name="Traffic22" type="Node3D" parent="TrafficZones" unique_id=910012023]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1092.719, 13.600, 1701.831)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1058.314, 5.561, 286.589)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_22")
 show_debug_volume = false
 
 [node name="Traffic23" type="Node3D" parent="TrafficZones" unique_id=910012024]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1404.615, 12.693, 268.749)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1092.719, 13.600, 1701.831)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_23")
 show_debug_volume = false
 
 [node name="Traffic24" type="Node3D" parent="TrafficZones" unique_id=910012025]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1198.431, 11.174, 700.868)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -686.195, 439.950, -1109.130)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_24")
 show_debug_volume = false
 
 [node name="Traffic25" type="Node3D" parent="TrafficZones" unique_id=910012026]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 61.512, 11.279, 1034.236)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -220.321, 6.655, -2016.095)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_25")
 show_debug_volume = false
 
 [node name="Traffic26" type="Node3D" parent="TrafficZones" unique_id=910012027]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 439.563, 11.644, -1742.712)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1461.730, 5.999, -189.862)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_26")
 show_debug_volume = false
 
 [node name="Traffic27" type="Node3D" parent="TrafficZones" unique_id=910012028]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 513.983, 6.005, -1269.417)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1404.615, 12.304, 268.749)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_27")
 show_debug_volume = false
 
 [node name="Traffic28" type="Node3D" parent="TrafficZones" unique_id=910012029]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 827.099, 12.046, -1557.938)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 61.512, 11.279, 1034.236)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_28")
 show_debug_volume = false
 
 [node name="Traffic29" type="Node3D" parent="TrafficZones" unique_id=910012030]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1208.905, 12.321, 260.050)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 513.983, 6.005, -1269.417)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_29")
 show_debug_volume = false
 
 [node name="Traffic30" type="Node3D" parent="TrafficZones" unique_id=910012031]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1064.550, 13.789, 1087.400)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 827.099, 12.006, -1557.938)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_30")
 show_debug_volume = false
 
 [node name="Traffic31" type="Node3D" parent="TrafficZones" unique_id=910012032]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1382.380, 6.600, -546.007)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1208.905, 12.026, 260.050)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_31")
 show_debug_volume = false
 
 [node name="Traffic32" type="Node3D" parent="TrafficZones" unique_id=910012033]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1257.630, 6.600, -1511.341)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1064.550, 13.320, 1087.400)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_32")
 show_debug_volume = false
 
 [node name="Traffic33" type="Node3D" parent="TrafficZones" unique_id=910012034]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -786.451, 439.100, -1016.731)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1380.832, 6.600, -1051.425)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_33")
 show_debug_volume = false
 
 [node name="Traffic34" type="Node3D" parent="TrafficZones" unique_id=910012035]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -459.568, 6.155, -1889.940)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -955.966, 6.987, -1744.973)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_34")
 show_debug_volume = false
@@ -4711,7 +4834,7 @@ zone = SubResource("Zone_site_airport_terminal")
 show_debug_volume = false
 
 [node name="StationMall" type="Node3D" parent="SiteZones" unique_id=910015005]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -735.000, 5.598, 520.000)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -685.000, 5.598, 520.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_site_west_station_mall")
 show_debug_volume = false
@@ -4753,7 +4876,7 @@ zone = SubResource("Zone_site_station_fish_market_parking")
 show_debug_volume = false
 
 [node name="Parking_station_harbour" type="Node3D" parent="SiteZones" unique_id=910015012]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 135.210, 7.821, 1081.180)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 135.210, 24.322, 1081.180)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_site_station_harbour_parking")
 show_debug_volume = false
@@ -4765,13 +4888,13 @@ zone = SubResource("Zone_site_station_industry_parking")
 show_debug_volume = false
 
 [node name="Parking_station_light_industry" type="Node3D" parent="SiteZones" unique_id=910015014]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -824.970, 5.598, 890.670)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -774.970, 5.598, 890.670)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_site_station_light_industry_parking")
 show_debug_volume = false
 
 [node name="Parking_station_residential" type="Node3D" parent="SiteZones" unique_id=910015015]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -824.970, 5.598, 426.170)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -774.970, 5.750, 426.170)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_site_station_residential_parking")
 show_debug_volume = false
@@ -4801,7 +4924,7 @@ zone = SubResource("Zone_site_station_bay")
 show_debug_volume = false
 
 [node name="Station_castle_town" type="Node3D" parent="SiteZones" unique_id=910015020]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -508.100, 7.527, 160.000)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -508.100, 7.506, 160.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_site_station_castle_town")
 show_debug_volume = false
@@ -4843,13 +4966,13 @@ zone = SubResource("Zone_site_station_industry")
 show_debug_volume = false
 
 [node name="Station_light_industry" type="Node3D" parent="SiteZones" unique_id=910015027]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -800.000, 5.740, 975.300)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -750.000, 5.740, 975.300)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_site_station_light_industry")
 show_debug_volume = false
 
 [node name="Station_residential" type="Node3D" parent="SiteZones" unique_id=910015028]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -800.000, 5.740, 510.800)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -750.000, 5.740, 510.800)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_site_station_residential")
 show_debug_volume = false
@@ -4897,7 +5020,7 @@ zone = SubResource("Zone_site_airport_cargo")
 show_debug_volume = false
 
 [node name="Reserve_waterfront_park" type="Node3D" parent="SiteZones" unique_id=910015036]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 815.000, 5.598, 888.000)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 815.000, 5.600, 888.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_site_waterfront_park")
 show_debug_volume = false
@@ -4927,7 +5050,7 @@ zone = SubResource("Zone_site_logistics_distribution")
 show_debug_volume = false
 
 [node name="Reserve_fish_market" type="Node3D" parent="SiteZones" unique_id=910015041]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 450.000, 1.500, 760.000)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 450.000, 1.500, 780.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_site_fish_market")
 show_debug_volume = false
@@ -4950,609 +5073,633 @@ script = ExtResource("3_zmark")
 zone = SubResource("Zone_site_central_forecourt")
 show_debug_volume = false
 
-[node name="Parking_lighthouse_parking" type="Node3D" parent="SiteZones" unique_id=910015045]
+[node name="Reserve_west_station_forecourt" type="Node3D" parent="SiteZones" unique_id=910015045]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -698.000, 5.598, 459.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_site_west_station_forecourt")
+show_debug_volume = false
+
+[node name="Parking_lighthouse_parking" type="Node3D" parent="SiteZones" unique_id=910015046]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1370.368, 10.142, -1291.815)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_site_lighthouse_parking")
 show_debug_volume = false
 
-[node name="Parking_michi_no_eki_parking" type="Node3D" parent="SiteZones" unique_id=910015046]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 427.662, 9.864, -1677.110)
+[node name="Parking_michi_no_eki_parking" type="Node3D" parent="SiteZones" unique_id=910015047]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -220.000, 6.650, -2074.200)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_site_michi_no_eki_parking")
 show_debug_volume = false
 
-[node name="Parking_waterfront_park_parking" type="Node3D" parent="SiteZones" unique_id=910015047]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 893.000, 5.650, 776.900)
+[node name="Parking_west_hamlet_parking" type="Node3D" parent="SiteZones" unique_id=910015048]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1645.100, 3.000, -190.000)
 script = ExtResource("3_zmark")
-zone = SubResource("Zone_site_waterfront_park_parking")
+zone = SubResource("Zone_site_west_hamlet_parking")
 show_debug_volume = false
 
-[node name="Parking_north_beach_parking" type="Node3D" parent="SiteZones" unique_id=910015048]
+[node name="Parking_north_beach_parking" type="Node3D" parent="SiteZones" unique_id=910015049]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 692.191, 5.650, -1630.745)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_site_north_beach_parking")
 show_debug_volume = false
 
-[node name="Parking_west_beach_parking" type="Node3D" parent="SiteZones" unique_id=910015049]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1235.000, 5.933, 808.100)
+[node name="Parking_west_beach_parking" type="Node3D" parent="SiteZones" unique_id=910015050]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1235.000, 5.648, 808.100)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_site_west_beach_parking")
 show_debug_volume = false
 
-[node name="Parking_suburb_beach_parking" type="Node3D" parent="SiteZones" unique_id=910015050]
+[node name="Parking_suburb_beach_parking" type="Node3D" parent="SiteZones" unique_id=910015051]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 881.900, 5.650, 1145.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_site_suburb_beach_parking")
 show_debug_volume = false
 
-[node name="Parking_logistics_yard_parking" type="Node3D" parent="SiteZones" unique_id=910015051]
+[node name="Parking_logistics_yard_parking" type="Node3D" parent="SiteZones" unique_id=910015052]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -280.000, 9.656, 1453.100)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_site_logistics_yard_parking")
 show_debug_volume = false
 
+[node name="Parking_summit_lookout_parking" type="Node3D" parent="SiteZones" unique_id=910015053]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -700.037, 440.050, -1033.437)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_site_summit_lookout_parking")
+show_debug_volume = false
+
+[node name="Parking_fish_market_visitors_parking" type="Node3D" parent="SiteZones" unique_id=910015054]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 820.000, 5.648, 726.900)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_site_fish_market_visitors_parking")
+show_debug_volume = false
+
 [node name="BuildingZones" type="Node" parent="." unique_id=910016000]
 
-[node name="Bld_2_8" type="Node3D" parent="BuildingZones" unique_id=910016001]
+[node name="Bld_1_7" type="Node3D" parent="BuildingZones" unique_id=910016001]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1638.000, 5.600, -126.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_bld_1_7")
+show_debug_volume = false
+
+[node name="Bld_2_7" type="Node3D" parent="BuildingZones" unique_id=910016002]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1386.000, 5.600, -126.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_bld_2_7")
+show_debug_volume = false
+
+[node name="Bld_2_8" type="Node3D" parent="BuildingZones" unique_id=910016003]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1386.000, 5.600, 126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_2_8")
 show_debug_volume = false
 
-[node name="Bld_2_9" type="Node3D" parent="BuildingZones" unique_id=910016002]
+[node name="Bld_2_9" type="Node3D" parent="BuildingZones" unique_id=910016004]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1386.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_2_9")
 show_debug_volume = false
 
-[node name="Bld_2_10" type="Node3D" parent="BuildingZones" unique_id=910016003]
+[node name="Bld_2_10" type="Node3D" parent="BuildingZones" unique_id=910016005]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1386.000, 5.600, 630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_2_10")
 show_debug_volume = false
 
-[node name="Bld_3_8" type="Node3D" parent="BuildingZones" unique_id=910016004]
+[node name="Bld_3_8" type="Node3D" parent="BuildingZones" unique_id=910016006]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1134.000, 5.600, 126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_3_8")
 show_debug_volume = false
 
-[node name="Bld_3_9" type="Node3D" parent="BuildingZones" unique_id=910016005]
+[node name="Bld_3_9" type="Node3D" parent="BuildingZones" unique_id=910016007]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1134.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_3_9")
 show_debug_volume = false
 
-[node name="Bld_3_10" type="Node3D" parent="BuildingZones" unique_id=910016006]
+[node name="Bld_3_10" type="Node3D" parent="BuildingZones" unique_id=910016008]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1134.000, 5.600, 630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_3_10")
 show_debug_volume = false
 
-[node name="Bld_3_11" type="Node3D" parent="BuildingZones" unique_id=910016007]
+[node name="Bld_3_11" type="Node3D" parent="BuildingZones" unique_id=910016009]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1134.000, 5.600, 882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_3_11")
 show_debug_volume = false
 
-[node name="Bld_4_8" type="Node3D" parent="BuildingZones" unique_id=910016008]
+[node name="Bld_4_8" type="Node3D" parent="BuildingZones" unique_id=910016010]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -882.000, 5.600, 126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_4_8")
 show_debug_volume = false
 
-[node name="Bld_4_9" type="Node3D" parent="BuildingZones" unique_id=910016009]
+[node name="Bld_4_9" type="Node3D" parent="BuildingZones" unique_id=910016011]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -882.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_4_9")
 show_debug_volume = false
 
-[node name="Bld_4_10" type="Node3D" parent="BuildingZones" unique_id=910016010]
+[node name="Bld_4_10" type="Node3D" parent="BuildingZones" unique_id=910016012]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -882.000, 5.600, 630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_4_10")
 show_debug_volume = false
 
-[node name="Bld_4_11" type="Node3D" parent="BuildingZones" unique_id=910016011]
+[node name="Bld_4_11" type="Node3D" parent="BuildingZones" unique_id=910016013]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -882.000, 5.600, 882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_4_11")
 show_debug_volume = false
 
-[node name="Bld_4_12" type="Node3D" parent="BuildingZones" unique_id=910016012]
+[node name="Bld_4_12" type="Node3D" parent="BuildingZones" unique_id=910016014]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -882.000, 5.600, 1134.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_4_12")
 show_debug_volume = false
 
-[node name="Bld_5_3" type="Node3D" parent="BuildingZones" unique_id=910016013]
+[node name="Bld_5_3" type="Node3D" parent="BuildingZones" unique_id=910016015]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -630.000, 5.600, -1134.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_5_3")
 show_debug_volume = false
 
-[node name="Bld_5_8" type="Node3D" parent="BuildingZones" unique_id=910016014]
+[node name="Bld_5_8" type="Node3D" parent="BuildingZones" unique_id=910016016]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -630.000, 5.600, 126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_5_8")
 show_debug_volume = false
 
-[node name="Bld_5_9" type="Node3D" parent="BuildingZones" unique_id=910016015]
+[node name="Bld_5_9" type="Node3D" parent="BuildingZones" unique_id=910016017]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -630.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_5_9")
 show_debug_volume = false
 
-[node name="Bld_5_10" type="Node3D" parent="BuildingZones" unique_id=910016016]
+[node name="Bld_5_10" type="Node3D" parent="BuildingZones" unique_id=910016018]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -630.000, 5.600, 630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_5_10")
 show_debug_volume = false
 
-[node name="Bld_5_11" type="Node3D" parent="BuildingZones" unique_id=910016017]
+[node name="Bld_5_11" type="Node3D" parent="BuildingZones" unique_id=910016019]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -630.000, 5.600, 882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_5_11")
 show_debug_volume = false
 
-[node name="Bld_5_12" type="Node3D" parent="BuildingZones" unique_id=910016018]
+[node name="Bld_5_12" type="Node3D" parent="BuildingZones" unique_id=910016020]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -630.000, 5.600, 1134.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_5_12")
 show_debug_volume = false
 
-[node name="Bld_6_7" type="Node3D" parent="BuildingZones" unique_id=910016019]
+[node name="Bld_6_7" type="Node3D" parent="BuildingZones" unique_id=910016021]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -378.000, 5.600, -126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_6_7")
 show_debug_volume = false
 
-[node name="Bld_6_8" type="Node3D" parent="BuildingZones" unique_id=910016020]
+[node name="Bld_6_8" type="Node3D" parent="BuildingZones" unique_id=910016022]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -378.000, 5.600, 126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_6_8")
 show_debug_volume = false
 
-[node name="Bld_6_9" type="Node3D" parent="BuildingZones" unique_id=910016021]
+[node name="Bld_6_9" type="Node3D" parent="BuildingZones" unique_id=910016023]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -378.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_6_9")
 show_debug_volume = false
 
-[node name="Bld_6_10" type="Node3D" parent="BuildingZones" unique_id=910016022]
+[node name="Bld_6_10" type="Node3D" parent="BuildingZones" unique_id=910016024]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -378.000, 5.600, 630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_6_10")
 show_debug_volume = false
 
-[node name="Bld_6_11" type="Node3D" parent="BuildingZones" unique_id=910016023]
+[node name="Bld_6_11" type="Node3D" parent="BuildingZones" unique_id=910016025]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -378.000, 5.600, 882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_6_11")
 show_debug_volume = false
 
-[node name="Bld_6_12" type="Node3D" parent="BuildingZones" unique_id=910016024]
+[node name="Bld_6_12" type="Node3D" parent="BuildingZones" unique_id=910016026]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -378.000, 5.600, 1134.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_6_12")
 show_debug_volume = false
 
-[node name="Bld_7_4" type="Node3D" parent="BuildingZones" unique_id=910016025]
+[node name="Bld_7_4" type="Node3D" parent="BuildingZones" unique_id=910016027]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -126.000, 5.600, -882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_7_4")
 show_debug_volume = false
 
-[node name="Bld_7_5" type="Node3D" parent="BuildingZones" unique_id=910016026]
+[node name="Bld_7_5" type="Node3D" parent="BuildingZones" unique_id=910016028]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -126.000, 5.600, -630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_7_5")
 show_debug_volume = false
 
-[node name="Bld_7_6" type="Node3D" parent="BuildingZones" unique_id=910016027]
+[node name="Bld_7_6" type="Node3D" parent="BuildingZones" unique_id=910016029]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -126.000, 5.600, -378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_7_6")
 show_debug_volume = false
 
-[node name="Bld_7_7" type="Node3D" parent="BuildingZones" unique_id=910016028]
+[node name="Bld_7_7" type="Node3D" parent="BuildingZones" unique_id=910016030]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -126.000, 5.600, -126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_7_7")
 show_debug_volume = false
 
-[node name="Bld_7_8" type="Node3D" parent="BuildingZones" unique_id=910016029]
+[node name="Bld_7_8" type="Node3D" parent="BuildingZones" unique_id=910016031]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -126.000, 5.600, 126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_7_8")
 show_debug_volume = false
 
-[node name="Bld_7_9" type="Node3D" parent="BuildingZones" unique_id=910016030]
+[node name="Bld_7_9" type="Node3D" parent="BuildingZones" unique_id=910016032]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -126.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_7_9")
 show_debug_volume = false
 
-[node name="Bld_7_10" type="Node3D" parent="BuildingZones" unique_id=910016031]
+[node name="Bld_7_10" type="Node3D" parent="BuildingZones" unique_id=910016033]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -126.000, 5.600, 630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_7_10")
 show_debug_volume = false
 
-[node name="Bld_7_11" type="Node3D" parent="BuildingZones" unique_id=910016032]
+[node name="Bld_7_11" type="Node3D" parent="BuildingZones" unique_id=910016034]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -126.000, 5.600, 882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_7_11")
 show_debug_volume = false
 
-[node name="Bld_7_12" type="Node3D" parent="BuildingZones" unique_id=910016033]
+[node name="Bld_7_12" type="Node3D" parent="BuildingZones" unique_id=910016035]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -126.000, 5.600, 1134.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_7_12")
 show_debug_volume = false
 
-[node name="Bld_8_4" type="Node3D" parent="BuildingZones" unique_id=910016034]
+[node name="Bld_8_4" type="Node3D" parent="BuildingZones" unique_id=910016036]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 126.000, 5.600, -882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_8_4")
 show_debug_volume = false
 
-[node name="Bld_8_5" type="Node3D" parent="BuildingZones" unique_id=910016035]
+[node name="Bld_8_5" type="Node3D" parent="BuildingZones" unique_id=910016037]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 126.000, 5.600, -630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_8_5")
 show_debug_volume = false
 
-[node name="Bld_8_6" type="Node3D" parent="BuildingZones" unique_id=910016036]
+[node name="Bld_8_6" type="Node3D" parent="BuildingZones" unique_id=910016038]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 126.000, 5.600, -378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_8_6")
 show_debug_volume = false
 
-[node name="Bld_8_7" type="Node3D" parent="BuildingZones" unique_id=910016037]
+[node name="Bld_8_7" type="Node3D" parent="BuildingZones" unique_id=910016039]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 126.000, 5.600, -126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_8_7")
 show_debug_volume = false
 
-[node name="Bld_8_8" type="Node3D" parent="BuildingZones" unique_id=910016038]
+[node name="Bld_8_8" type="Node3D" parent="BuildingZones" unique_id=910016040]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 126.000, 5.600, 126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_8_8")
 show_debug_volume = false
 
-[node name="Bld_8_9" type="Node3D" parent="BuildingZones" unique_id=910016039]
+[node name="Bld_8_9" type="Node3D" parent="BuildingZones" unique_id=910016041]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 126.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_8_9")
 show_debug_volume = false
 
-[node name="Bld_8_10" type="Node3D" parent="BuildingZones" unique_id=910016040]
+[node name="Bld_8_10" type="Node3D" parent="BuildingZones" unique_id=910016042]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 126.000, 5.600, 630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_8_10")
 show_debug_volume = false
 
-[node name="Bld_8_11" type="Node3D" parent="BuildingZones" unique_id=910016041]
+[node name="Bld_8_11" type="Node3D" parent="BuildingZones" unique_id=910016043]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 126.000, 5.600, 882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_8_11")
 show_debug_volume = false
 
-[node name="Bld_9_0" type="Node3D" parent="BuildingZones" unique_id=910016042]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, -1890.000)
-script = ExtResource("3_zmark")
-zone = SubResource("Zone_bld_9_0")
-show_debug_volume = false
-
-[node name="Bld_9_1" type="Node3D" parent="BuildingZones" unique_id=910016043]
+[node name="Bld_9_1" type="Node3D" parent="BuildingZones" unique_id=910016044]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, -1638.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_9_1")
 show_debug_volume = false
 
-[node name="Bld_9_2" type="Node3D" parent="BuildingZones" unique_id=910016044]
+[node name="Bld_9_2" type="Node3D" parent="BuildingZones" unique_id=910016045]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, -1386.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_9_2")
 show_debug_volume = false
 
-[node name="Bld_9_3" type="Node3D" parent="BuildingZones" unique_id=910016045]
+[node name="Bld_9_3" type="Node3D" parent="BuildingZones" unique_id=910016046]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, -1134.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_9_3")
 show_debug_volume = false
 
-[node name="Bld_9_4" type="Node3D" parent="BuildingZones" unique_id=910016046]
+[node name="Bld_9_4" type="Node3D" parent="BuildingZones" unique_id=910016047]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, -882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_9_4")
 show_debug_volume = false
 
-[node name="Bld_9_5" type="Node3D" parent="BuildingZones" unique_id=910016047]
+[node name="Bld_9_5" type="Node3D" parent="BuildingZones" unique_id=910016048]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, -630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_9_5")
 show_debug_volume = false
 
-[node name="Bld_9_6" type="Node3D" parent="BuildingZones" unique_id=910016048]
+[node name="Bld_9_6" type="Node3D" parent="BuildingZones" unique_id=910016049]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, -378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_9_6")
 show_debug_volume = false
 
-[node name="Bld_9_7" type="Node3D" parent="BuildingZones" unique_id=910016049]
+[node name="Bld_9_7" type="Node3D" parent="BuildingZones" unique_id=910016050]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, -126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_9_7")
 show_debug_volume = false
 
-[node name="Bld_9_8" type="Node3D" parent="BuildingZones" unique_id=910016050]
+[node name="Bld_9_8" type="Node3D" parent="BuildingZones" unique_id=910016051]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, 126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_9_8")
 show_debug_volume = false
 
-[node name="Bld_9_9" type="Node3D" parent="BuildingZones" unique_id=910016051]
+[node name="Bld_9_9" type="Node3D" parent="BuildingZones" unique_id=910016052]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_9_9")
 show_debug_volume = false
 
-[node name="Bld_9_10" type="Node3D" parent="BuildingZones" unique_id=910016052]
+[node name="Bld_9_10" type="Node3D" parent="BuildingZones" unique_id=910016053]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, 630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_9_10")
 show_debug_volume = false
 
-[node name="Bld_10_1" type="Node3D" parent="BuildingZones" unique_id=910016053]
+[node name="Bld_10_1" type="Node3D" parent="BuildingZones" unique_id=910016054]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 630.000, 5.600, -1638.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_10_1")
 show_debug_volume = false
 
-[node name="Bld_10_2" type="Node3D" parent="BuildingZones" unique_id=910016054]
+[node name="Bld_10_2" type="Node3D" parent="BuildingZones" unique_id=910016055]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 630.000, 5.600, -1386.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_10_2")
 show_debug_volume = false
 
-[node name="Bld_10_3" type="Node3D" parent="BuildingZones" unique_id=910016055]
+[node name="Bld_10_3" type="Node3D" parent="BuildingZones" unique_id=910016056]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 630.000, 5.600, -1134.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_10_3")
 show_debug_volume = false
 
-[node name="Bld_10_4" type="Node3D" parent="BuildingZones" unique_id=910016056]
+[node name="Bld_10_4" type="Node3D" parent="BuildingZones" unique_id=910016057]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 630.000, 5.600, -882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_10_4")
 show_debug_volume = false
 
-[node name="Bld_10_5" type="Node3D" parent="BuildingZones" unique_id=910016057]
+[node name="Bld_10_5" type="Node3D" parent="BuildingZones" unique_id=910016058]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 630.000, 5.600, -630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_10_5")
 show_debug_volume = false
 
-[node name="Bld_10_6" type="Node3D" parent="BuildingZones" unique_id=910016058]
+[node name="Bld_10_6" type="Node3D" parent="BuildingZones" unique_id=910016059]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 630.000, 5.600, -378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_10_6")
 show_debug_volume = false
 
-[node name="Bld_10_7" type="Node3D" parent="BuildingZones" unique_id=910016059]
+[node name="Bld_10_7" type="Node3D" parent="BuildingZones" unique_id=910016060]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 630.000, 5.600, -126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_10_7")
 show_debug_volume = false
 
-[node name="Bld_10_8" type="Node3D" parent="BuildingZones" unique_id=910016060]
+[node name="Bld_10_8" type="Node3D" parent="BuildingZones" unique_id=910016061]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 630.000, 5.600, 126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_10_8")
 show_debug_volume = false
 
-[node name="Bld_10_9" type="Node3D" parent="BuildingZones" unique_id=910016061]
+[node name="Bld_10_9" type="Node3D" parent="BuildingZones" unique_id=910016062]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 630.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_10_9")
 show_debug_volume = false
 
-[node name="Bld_10_10" type="Node3D" parent="BuildingZones" unique_id=910016062]
+[node name="Bld_10_10" type="Node3D" parent="BuildingZones" unique_id=910016063]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 630.000, 5.600, 630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_10_10")
 show_debug_volume = false
 
-[node name="Bld_10_11" type="Node3D" parent="BuildingZones" unique_id=910016063]
+[node name="Bld_10_11" type="Node3D" parent="BuildingZones" unique_id=910016064]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 630.000, 5.600, 882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_10_11")
 show_debug_volume = false
 
-[node name="Bld_11_1" type="Node3D" parent="BuildingZones" unique_id=910016064]
+[node name="Bld_11_1" type="Node3D" parent="BuildingZones" unique_id=910016065]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, -1638.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_11_1")
 show_debug_volume = false
 
-[node name="Bld_11_2" type="Node3D" parent="BuildingZones" unique_id=910016065]
+[node name="Bld_11_2" type="Node3D" parent="BuildingZones" unique_id=910016066]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, -1386.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_11_2")
 show_debug_volume = false
 
-[node name="Bld_11_3" type="Node3D" parent="BuildingZones" unique_id=910016066]
+[node name="Bld_11_3" type="Node3D" parent="BuildingZones" unique_id=910016067]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, -1134.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_11_3")
 show_debug_volume = false
 
-[node name="Bld_11_4" type="Node3D" parent="BuildingZones" unique_id=910016067]
+[node name="Bld_11_4" type="Node3D" parent="BuildingZones" unique_id=910016068]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, -882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_11_4")
 show_debug_volume = false
 
-[node name="Bld_11_5" type="Node3D" parent="BuildingZones" unique_id=910016068]
+[node name="Bld_11_5" type="Node3D" parent="BuildingZones" unique_id=910016069]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, -630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_11_5")
 show_debug_volume = false
 
-[node name="Bld_11_6" type="Node3D" parent="BuildingZones" unique_id=910016069]
+[node name="Bld_11_6" type="Node3D" parent="BuildingZones" unique_id=910016070]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, -378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_11_6")
 show_debug_volume = false
 
-[node name="Bld_11_7" type="Node3D" parent="BuildingZones" unique_id=910016070]
+[node name="Bld_11_7" type="Node3D" parent="BuildingZones" unique_id=910016071]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, -126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_11_7")
 show_debug_volume = false
 
-[node name="Bld_11_8" type="Node3D" parent="BuildingZones" unique_id=910016071]
+[node name="Bld_11_8" type="Node3D" parent="BuildingZones" unique_id=910016072]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, 126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_11_8")
 show_debug_volume = false
 
-[node name="Bld_11_9" type="Node3D" parent="BuildingZones" unique_id=910016072]
+[node name="Bld_11_9" type="Node3D" parent="BuildingZones" unique_id=910016073]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_11_9")
 show_debug_volume = false
 
-[node name="Bld_11_10" type="Node3D" parent="BuildingZones" unique_id=910016073]
+[node name="Bld_11_10" type="Node3D" parent="BuildingZones" unique_id=910016074]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, 630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_11_10")
 show_debug_volume = false
 
-[node name="Bld_11_11" type="Node3D" parent="BuildingZones" unique_id=910016074]
+[node name="Bld_11_11" type="Node3D" parent="BuildingZones" unique_id=910016075]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, 882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_11_11")
 show_debug_volume = false
 
-[node name="Bld_11_12" type="Node3D" parent="BuildingZones" unique_id=910016075]
+[node name="Bld_11_12" type="Node3D" parent="BuildingZones" unique_id=910016076]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, 1134.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_11_12")
 show_debug_volume = false
 
-[node name="Bld_12_2" type="Node3D" parent="BuildingZones" unique_id=910016076]
+[node name="Bld_12_2" type="Node3D" parent="BuildingZones" unique_id=910016077]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1134.000, 5.600, -1386.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_12_2")
 show_debug_volume = false
 
-[node name="Bld_12_3" type="Node3D" parent="BuildingZones" unique_id=910016077]
+[node name="Bld_12_3" type="Node3D" parent="BuildingZones" unique_id=910016078]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1134.000, 5.600, -1134.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_12_3")
 show_debug_volume = false
 
-[node name="Bld_12_4" type="Node3D" parent="BuildingZones" unique_id=910016078]
+[node name="Bld_12_4" type="Node3D" parent="BuildingZones" unique_id=910016079]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1134.000, 5.600, -882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_12_4")
 show_debug_volume = false
 
-[node name="Bld_12_5" type="Node3D" parent="BuildingZones" unique_id=910016079]
+[node name="Bld_12_5" type="Node3D" parent="BuildingZones" unique_id=910016080]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1134.000, 5.600, -630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_12_5")
 show_debug_volume = false
 
-[node name="Bld_12_6" type="Node3D" parent="BuildingZones" unique_id=910016080]
+[node name="Bld_12_6" type="Node3D" parent="BuildingZones" unique_id=910016081]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1134.000, 5.600, -378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_12_6")
 show_debug_volume = false
 
-[node name="Bld_12_7" type="Node3D" parent="BuildingZones" unique_id=910016081]
+[node name="Bld_12_7" type="Node3D" parent="BuildingZones" unique_id=910016082]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1134.000, 5.600, -126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_12_7")
 show_debug_volume = false
 
-[node name="Bld_12_8" type="Node3D" parent="BuildingZones" unique_id=910016082]
+[node name="Bld_12_8" type="Node3D" parent="BuildingZones" unique_id=910016083]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1134.000, 5.600, 126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_12_8")
 show_debug_volume = false
 
-[node name="Bld_12_9" type="Node3D" parent="BuildingZones" unique_id=910016083]
+[node name="Bld_12_9" type="Node3D" parent="BuildingZones" unique_id=910016084]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1134.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_12_9")
 show_debug_volume = false
 
-[node name="Bld_12_10" type="Node3D" parent="BuildingZones" unique_id=910016084]
+[node name="Bld_12_10" type="Node3D" parent="BuildingZones" unique_id=910016085]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1134.000, 5.600, 630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_12_10")
 show_debug_volume = false
 
-[node name="Bld_12_11" type="Node3D" parent="BuildingZones" unique_id=910016085]
+[node name="Bld_12_11" type="Node3D" parent="BuildingZones" unique_id=910016086]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1134.000, 5.600, 882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_12_11")
 show_debug_volume = false
 
-[node name="Bld_12_14" type="Node3D" parent="BuildingZones" unique_id=910016086]
+[node name="Bld_12_14" type="Node3D" parent="BuildingZones" unique_id=910016087]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1134.000, 5.600, 1638.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_12_14")
 show_debug_volume = false
 
-[node name="Bld_13_2" type="Node3D" parent="BuildingZones" unique_id=910016087]
+[node name="Bld_13_2" type="Node3D" parent="BuildingZones" unique_id=910016088]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1386.000, 5.600, -1386.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_13_2")
 show_debug_volume = false
 
-[node name="Bld_13_3" type="Node3D" parent="BuildingZones" unique_id=910016088]
+[node name="Bld_13_3" type="Node3D" parent="BuildingZones" unique_id=910016089]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1386.000, 5.600, -1134.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_13_3")
 show_debug_volume = false
 
-[node name="Bld_13_4" type="Node3D" parent="BuildingZones" unique_id=910016089]
+[node name="Bld_13_4" type="Node3D" parent="BuildingZones" unique_id=910016090]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1386.000, 5.600, -882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_13_4")
 show_debug_volume = false
 
-[node name="Bld_13_7" type="Node3D" parent="BuildingZones" unique_id=910016090]
+[node name="Bld_13_7" type="Node3D" parent="BuildingZones" unique_id=910016091]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1386.000, 5.600, -126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_13_7")
 show_debug_volume = false
 
-[node name="Bld_13_8" type="Node3D" parent="BuildingZones" unique_id=910016091]
+[node name="Bld_13_8" type="Node3D" parent="BuildingZones" unique_id=910016092]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1386.000, 5.600, 126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_13_8")
 show_debug_volume = false
 
-[node name="Bld_13_9" type="Node3D" parent="BuildingZones" unique_id=910016092]
+[node name="Bld_13_9" type="Node3D" parent="BuildingZones" unique_id=910016093]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1386.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_13_9")
 show_debug_volume = false
 
-[node name="Bld_13_10" type="Node3D" parent="BuildingZones" unique_id=910016093]
+[node name="Bld_13_10" type="Node3D" parent="BuildingZones" unique_id=910016094]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1386.000, 5.600, 630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_13_10")
 show_debug_volume = false
 
-[node name="Bld_13_11" type="Node3D" parent="BuildingZones" unique_id=910016094]
+[node name="Bld_13_11" type="Node3D" parent="BuildingZones" unique_id=910016095]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1386.000, 5.600, 882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_bld_13_11")
@@ -5560,511 +5707,529 @@ show_debug_volume = false
 
 [node name="PedZones" type="Node" parent="." unique_id=910017000]
 
-[node name="Ped_2_9" type="Node3D" parent="PedZones" unique_id=910017001]
+[node name="Ped_1_7" type="Node3D" parent="PedZones" unique_id=910017001]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1638.000, 5.600, -126.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_ped_1_7")
+show_debug_volume = false
+
+[node name="Ped_2_7" type="Node3D" parent="PedZones" unique_id=910017002]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1386.000, 5.600, -126.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_ped_2_7")
+show_debug_volume = false
+
+[node name="Ped_2_9" type="Node3D" parent="PedZones" unique_id=910017003]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1386.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_2_9")
 show_debug_volume = false
 
-[node name="Ped_3_8" type="Node3D" parent="PedZones" unique_id=910017002]
+[node name="Ped_3_8" type="Node3D" parent="PedZones" unique_id=910017004]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1134.000, 5.600, 126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_3_8")
 show_debug_volume = false
 
-[node name="Ped_3_9" type="Node3D" parent="PedZones" unique_id=910017003]
+[node name="Ped_3_9" type="Node3D" parent="PedZones" unique_id=910017005]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1134.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_3_9")
 show_debug_volume = false
 
-[node name="Ped_3_10" type="Node3D" parent="PedZones" unique_id=910017004]
+[node name="Ped_3_10" type="Node3D" parent="PedZones" unique_id=910017006]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1134.000, 5.600, 630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_3_10")
 show_debug_volume = false
 
-[node name="Ped_3_11" type="Node3D" parent="PedZones" unique_id=910017005]
+[node name="Ped_3_11" type="Node3D" parent="PedZones" unique_id=910017007]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1134.000, 5.600, 882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_3_11")
 show_debug_volume = false
 
-[node name="Ped_4_8" type="Node3D" parent="PedZones" unique_id=910017006]
+[node name="Ped_4_8" type="Node3D" parent="PedZones" unique_id=910017008]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -882.000, 5.600, 126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_4_8")
 show_debug_volume = false
 
-[node name="Ped_4_9" type="Node3D" parent="PedZones" unique_id=910017007]
+[node name="Ped_4_9" type="Node3D" parent="PedZones" unique_id=910017009]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -882.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_4_9")
 show_debug_volume = false
 
-[node name="Ped_4_10" type="Node3D" parent="PedZones" unique_id=910017008]
+[node name="Ped_4_10" type="Node3D" parent="PedZones" unique_id=910017010]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -882.000, 5.600, 630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_4_10")
 show_debug_volume = false
 
-[node name="Ped_4_11" type="Node3D" parent="PedZones" unique_id=910017009]
+[node name="Ped_4_11" type="Node3D" parent="PedZones" unique_id=910017011]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -882.000, 5.600, 882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_4_11")
 show_debug_volume = false
 
-[node name="Ped_4_12" type="Node3D" parent="PedZones" unique_id=910017010]
+[node name="Ped_4_12" type="Node3D" parent="PedZones" unique_id=910017012]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -882.000, 5.600, 1134.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_4_12")
 show_debug_volume = false
 
-[node name="Ped_5_8" type="Node3D" parent="PedZones" unique_id=910017011]
+[node name="Ped_5_3" type="Node3D" parent="PedZones" unique_id=910017013]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -630.000, 5.600, -1134.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_ped_5_3")
+show_debug_volume = false
+
+[node name="Ped_5_8" type="Node3D" parent="PedZones" unique_id=910017014]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -630.000, 5.600, 126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_5_8")
 show_debug_volume = false
 
-[node name="Ped_5_9" type="Node3D" parent="PedZones" unique_id=910017012]
+[node name="Ped_5_9" type="Node3D" parent="PedZones" unique_id=910017015]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -630.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_5_9")
 show_debug_volume = false
 
-[node name="Ped_5_10" type="Node3D" parent="PedZones" unique_id=910017013]
+[node name="Ped_5_10" type="Node3D" parent="PedZones" unique_id=910017016]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -630.000, 5.600, 630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_5_10")
 show_debug_volume = false
 
-[node name="Ped_5_11" type="Node3D" parent="PedZones" unique_id=910017014]
+[node name="Ped_5_11" type="Node3D" parent="PedZones" unique_id=910017017]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -630.000, 5.600, 882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_5_11")
 show_debug_volume = false
 
-[node name="Ped_5_12" type="Node3D" parent="PedZones" unique_id=910017015]
+[node name="Ped_5_12" type="Node3D" parent="PedZones" unique_id=910017018]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -630.000, 5.600, 1134.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_5_12")
 show_debug_volume = false
 
-[node name="Ped_6_7" type="Node3D" parent="PedZones" unique_id=910017016]
+[node name="Ped_6_7" type="Node3D" parent="PedZones" unique_id=910017019]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -378.000, 5.600, -126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_6_7")
 show_debug_volume = false
 
-[node name="Ped_6_8" type="Node3D" parent="PedZones" unique_id=910017017]
+[node name="Ped_6_8" type="Node3D" parent="PedZones" unique_id=910017020]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -378.000, 5.600, 126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_6_8")
 show_debug_volume = false
 
-[node name="Ped_6_9" type="Node3D" parent="PedZones" unique_id=910017018]
+[node name="Ped_6_9" type="Node3D" parent="PedZones" unique_id=910017021]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -378.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_6_9")
 show_debug_volume = false
 
-[node name="Ped_6_10" type="Node3D" parent="PedZones" unique_id=910017019]
+[node name="Ped_6_10" type="Node3D" parent="PedZones" unique_id=910017022]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -378.000, 5.600, 630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_6_10")
 show_debug_volume = false
 
-[node name="Ped_6_11" type="Node3D" parent="PedZones" unique_id=910017020]
+[node name="Ped_6_11" type="Node3D" parent="PedZones" unique_id=910017023]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -378.000, 5.600, 882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_6_11")
 show_debug_volume = false
 
-[node name="Ped_6_12" type="Node3D" parent="PedZones" unique_id=910017021]
+[node name="Ped_6_12" type="Node3D" parent="PedZones" unique_id=910017024]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -378.000, 5.600, 1134.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_6_12")
 show_debug_volume = false
 
-[node name="Ped_6_13" type="Node3D" parent="PedZones" unique_id=910017022]
+[node name="Ped_6_13" type="Node3D" parent="PedZones" unique_id=910017025]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -378.000, 5.600, 1386.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_6_13")
 show_debug_volume = false
 
-[node name="Ped_7_5" type="Node3D" parent="PedZones" unique_id=910017023]
+[node name="Ped_7_5" type="Node3D" parent="PedZones" unique_id=910017026]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -126.000, 5.600, -630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_7_5")
 show_debug_volume = false
 
-[node name="Ped_7_6" type="Node3D" parent="PedZones" unique_id=910017024]
+[node name="Ped_7_6" type="Node3D" parent="PedZones" unique_id=910017027]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -126.000, 5.600, -378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_7_6")
 show_debug_volume = false
 
-[node name="Ped_7_7" type="Node3D" parent="PedZones" unique_id=910017025]
+[node name="Ped_7_7" type="Node3D" parent="PedZones" unique_id=910017028]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -126.000, 5.600, -126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_7_7")
 show_debug_volume = false
 
-[node name="Ped_7_8" type="Node3D" parent="PedZones" unique_id=910017026]
+[node name="Ped_7_8" type="Node3D" parent="PedZones" unique_id=910017029]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -126.000, 5.600, 126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_7_8")
 show_debug_volume = false
 
-[node name="Ped_7_9" type="Node3D" parent="PedZones" unique_id=910017027]
+[node name="Ped_7_9" type="Node3D" parent="PedZones" unique_id=910017030]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -126.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_7_9")
 show_debug_volume = false
 
-[node name="Ped_7_10" type="Node3D" parent="PedZones" unique_id=910017028]
+[node name="Ped_7_10" type="Node3D" parent="PedZones" unique_id=910017031]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -126.000, 5.600, 630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_7_10")
 show_debug_volume = false
 
-[node name="Ped_7_11" type="Node3D" parent="PedZones" unique_id=910017029]
+[node name="Ped_7_11" type="Node3D" parent="PedZones" unique_id=910017032]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -126.000, 5.600, 882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_7_11")
 show_debug_volume = false
 
-[node name="Ped_7_12" type="Node3D" parent="PedZones" unique_id=910017030]
+[node name="Ped_7_12" type="Node3D" parent="PedZones" unique_id=910017033]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -126.000, 5.600, 1134.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_7_12")
 show_debug_volume = false
 
-[node name="Ped_8_5" type="Node3D" parent="PedZones" unique_id=910017031]
+[node name="Ped_8_5" type="Node3D" parent="PedZones" unique_id=910017034]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 126.000, 5.600, -630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_8_5")
 show_debug_volume = false
 
-[node name="Ped_8_6" type="Node3D" parent="PedZones" unique_id=910017032]
+[node name="Ped_8_6" type="Node3D" parent="PedZones" unique_id=910017035]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 126.000, 5.600, -378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_8_6")
 show_debug_volume = false
 
-[node name="Ped_8_7" type="Node3D" parent="PedZones" unique_id=910017033]
+[node name="Ped_8_7" type="Node3D" parent="PedZones" unique_id=910017036]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 126.000, 5.600, -126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_8_7")
 show_debug_volume = false
 
-[node name="Ped_8_8" type="Node3D" parent="PedZones" unique_id=910017034]
+[node name="Ped_8_8" type="Node3D" parent="PedZones" unique_id=910017037]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 126.000, 5.600, 126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_8_8")
 show_debug_volume = false
 
-[node name="Ped_8_9" type="Node3D" parent="PedZones" unique_id=910017035]
+[node name="Ped_8_9" type="Node3D" parent="PedZones" unique_id=910017038]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 126.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_8_9")
 show_debug_volume = false
 
-[node name="Ped_8_10" type="Node3D" parent="PedZones" unique_id=910017036]
+[node name="Ped_8_10" type="Node3D" parent="PedZones" unique_id=910017039]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 126.000, 5.600, 630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_8_10")
 show_debug_volume = false
 
-[node name="Ped_8_11" type="Node3D" parent="PedZones" unique_id=910017037]
+[node name="Ped_8_11" type="Node3D" parent="PedZones" unique_id=910017040]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 126.000, 5.600, 882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_8_11")
 show_debug_volume = false
 
-[node name="Ped_8_12" type="Node3D" parent="PedZones" unique_id=910017038]
+[node name="Ped_8_12" type="Node3D" parent="PedZones" unique_id=910017041]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 126.000, 5.600, 1134.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_8_12")
 show_debug_volume = false
 
-[node name="Ped_9_0" type="Node3D" parent="PedZones" unique_id=910017039]
+[node name="Ped_9_0" type="Node3D" parent="PedZones" unique_id=910017042]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, -1890.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_9_0")
 show_debug_volume = false
 
-[node name="Ped_9_1" type="Node3D" parent="PedZones" unique_id=910017040]
+[node name="Ped_9_1" type="Node3D" parent="PedZones" unique_id=910017043]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, -1638.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_9_1")
 show_debug_volume = false
 
-[node name="Ped_9_2" type="Node3D" parent="PedZones" unique_id=910017041]
+[node name="Ped_9_2" type="Node3D" parent="PedZones" unique_id=910017044]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, -1386.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_9_2")
 show_debug_volume = false
 
-[node name="Ped_9_3" type="Node3D" parent="PedZones" unique_id=910017042]
+[node name="Ped_9_3" type="Node3D" parent="PedZones" unique_id=910017045]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, -1134.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_9_3")
 show_debug_volume = false
 
-[node name="Ped_9_4" type="Node3D" parent="PedZones" unique_id=910017043]
+[node name="Ped_9_4" type="Node3D" parent="PedZones" unique_id=910017046]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, -882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_9_4")
 show_debug_volume = false
 
-[node name="Ped_9_5" type="Node3D" parent="PedZones" unique_id=910017044]
+[node name="Ped_9_5" type="Node3D" parent="PedZones" unique_id=910017047]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, -630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_9_5")
 show_debug_volume = false
 
-[node name="Ped_9_6" type="Node3D" parent="PedZones" unique_id=910017045]
+[node name="Ped_9_6" type="Node3D" parent="PedZones" unique_id=910017048]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, -378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_9_6")
 show_debug_volume = false
 
-[node name="Ped_9_7" type="Node3D" parent="PedZones" unique_id=910017046]
+[node name="Ped_9_7" type="Node3D" parent="PedZones" unique_id=910017049]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, -126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_9_7")
 show_debug_volume = false
 
-[node name="Ped_9_8" type="Node3D" parent="PedZones" unique_id=910017047]
+[node name="Ped_9_8" type="Node3D" parent="PedZones" unique_id=910017050]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, 126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_9_8")
 show_debug_volume = false
 
-[node name="Ped_9_9" type="Node3D" parent="PedZones" unique_id=910017048]
+[node name="Ped_9_9" type="Node3D" parent="PedZones" unique_id=910017051]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_9_9")
 show_debug_volume = false
 
-[node name="Ped_9_10" type="Node3D" parent="PedZones" unique_id=910017049]
+[node name="Ped_9_10" type="Node3D" parent="PedZones" unique_id=910017052]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, 630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_9_10")
 show_debug_volume = false
 
-[node name="Ped_9_11" type="Node3D" parent="PedZones" unique_id=910017050]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 378.000, 5.600, 882.000)
-script = ExtResource("3_zmark")
-zone = SubResource("Zone_ped_9_11")
-show_debug_volume = false
-
-[node name="Ped_10_1" type="Node3D" parent="PedZones" unique_id=910017051]
+[node name="Ped_10_1" type="Node3D" parent="PedZones" unique_id=910017053]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 630.000, 5.600, -1638.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_10_1")
 show_debug_volume = false
 
-[node name="Ped_10_2" type="Node3D" parent="PedZones" unique_id=910017052]
+[node name="Ped_10_2" type="Node3D" parent="PedZones" unique_id=910017054]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 630.000, 5.600, -1386.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_10_2")
 show_debug_volume = false
 
-[node name="Ped_10_3" type="Node3D" parent="PedZones" unique_id=910017053]
+[node name="Ped_10_3" type="Node3D" parent="PedZones" unique_id=910017055]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 630.000, 5.600, -1134.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_10_3")
 show_debug_volume = false
 
-[node name="Ped_10_4" type="Node3D" parent="PedZones" unique_id=910017054]
+[node name="Ped_10_4" type="Node3D" parent="PedZones" unique_id=910017056]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 630.000, 5.600, -882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_10_4")
 show_debug_volume = false
 
-[node name="Ped_10_5" type="Node3D" parent="PedZones" unique_id=910017055]
+[node name="Ped_10_5" type="Node3D" parent="PedZones" unique_id=910017057]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 630.000, 5.600, -630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_10_5")
 show_debug_volume = false
 
-[node name="Ped_10_6" type="Node3D" parent="PedZones" unique_id=910017056]
+[node name="Ped_10_6" type="Node3D" parent="PedZones" unique_id=910017058]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 630.000, 5.600, -378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_10_6")
 show_debug_volume = false
 
-[node name="Ped_10_7" type="Node3D" parent="PedZones" unique_id=910017057]
+[node name="Ped_10_7" type="Node3D" parent="PedZones" unique_id=910017059]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 630.000, 5.600, -126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_10_7")
 show_debug_volume = false
 
-[node name="Ped_10_8" type="Node3D" parent="PedZones" unique_id=910017058]
+[node name="Ped_10_8" type="Node3D" parent="PedZones" unique_id=910017060]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 630.000, 5.600, 126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_10_8")
 show_debug_volume = false
 
-[node name="Ped_10_9" type="Node3D" parent="PedZones" unique_id=910017059]
+[node name="Ped_10_9" type="Node3D" parent="PedZones" unique_id=910017061]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 630.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_10_9")
 show_debug_volume = false
 
-[node name="Ped_10_10" type="Node3D" parent="PedZones" unique_id=910017060]
+[node name="Ped_10_10" type="Node3D" parent="PedZones" unique_id=910017062]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 630.000, 5.600, 630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_10_10")
 show_debug_volume = false
 
-[node name="Ped_11_1" type="Node3D" parent="PedZones" unique_id=910017061]
+[node name="Ped_10_11" type="Node3D" parent="PedZones" unique_id=910017063]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 630.000, 5.600, 882.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_ped_10_11")
+show_debug_volume = false
+
+[node name="Ped_11_1" type="Node3D" parent="PedZones" unique_id=910017064]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, -1638.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_11_1")
 show_debug_volume = false
 
-[node name="Ped_11_2" type="Node3D" parent="PedZones" unique_id=910017062]
+[node name="Ped_11_2" type="Node3D" parent="PedZones" unique_id=910017065]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, -1386.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_11_2")
 show_debug_volume = false
 
-[node name="Ped_11_4" type="Node3D" parent="PedZones" unique_id=910017063]
+[node name="Ped_11_4" type="Node3D" parent="PedZones" unique_id=910017066]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, -882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_11_4")
 show_debug_volume = false
 
-[node name="Ped_11_5" type="Node3D" parent="PedZones" unique_id=910017064]
+[node name="Ped_11_5" type="Node3D" parent="PedZones" unique_id=910017067]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, -630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_11_5")
 show_debug_volume = false
 
-[node name="Ped_11_6" type="Node3D" parent="PedZones" unique_id=910017065]
+[node name="Ped_11_6" type="Node3D" parent="PedZones" unique_id=910017068]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, -378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_11_6")
 show_debug_volume = false
 
-[node name="Ped_11_7" type="Node3D" parent="PedZones" unique_id=910017066]
+[node name="Ped_11_7" type="Node3D" parent="PedZones" unique_id=910017069]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, -126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_11_7")
 show_debug_volume = false
 
-[node name="Ped_11_8" type="Node3D" parent="PedZones" unique_id=910017067]
+[node name="Ped_11_8" type="Node3D" parent="PedZones" unique_id=910017070]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, 126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_11_8")
 show_debug_volume = false
 
-[node name="Ped_11_9" type="Node3D" parent="PedZones" unique_id=910017068]
+[node name="Ped_11_9" type="Node3D" parent="PedZones" unique_id=910017071]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_11_9")
 show_debug_volume = false
 
-[node name="Ped_11_10" type="Node3D" parent="PedZones" unique_id=910017069]
+[node name="Ped_11_10" type="Node3D" parent="PedZones" unique_id=910017072]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, 630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_11_10")
 show_debug_volume = false
 
-[node name="Ped_11_11" type="Node3D" parent="PedZones" unique_id=910017070]
+[node name="Ped_11_11" type="Node3D" parent="PedZones" unique_id=910017073]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, 882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_11_11")
 show_debug_volume = false
 
-[node name="Ped_11_12" type="Node3D" parent="PedZones" unique_id=910017071]
+[node name="Ped_11_12" type="Node3D" parent="PedZones" unique_id=910017074]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 882.000, 5.600, 1134.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_11_12")
 show_debug_volume = false
 
-[node name="Ped_12_2" type="Node3D" parent="PedZones" unique_id=910017072]
+[node name="Ped_12_2" type="Node3D" parent="PedZones" unique_id=910017075]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1134.000, 5.600, -1386.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_12_2")
 show_debug_volume = false
 
-[node name="Ped_12_3" type="Node3D" parent="PedZones" unique_id=910017073]
+[node name="Ped_12_3" type="Node3D" parent="PedZones" unique_id=910017076]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1134.000, 5.600, -1134.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_12_3")
 show_debug_volume = false
 
-[node name="Ped_12_4" type="Node3D" parent="PedZones" unique_id=910017074]
+[node name="Ped_12_4" type="Node3D" parent="PedZones" unique_id=910017077]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1134.000, 5.600, -882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_12_4")
 show_debug_volume = false
 
-[node name="Ped_12_5" type="Node3D" parent="PedZones" unique_id=910017075]
+[node name="Ped_12_5" type="Node3D" parent="PedZones" unique_id=910017078]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1134.000, 5.600, -630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_12_5")
 show_debug_volume = false
 
-[node name="Ped_12_6" type="Node3D" parent="PedZones" unique_id=910017076]
+[node name="Ped_12_6" type="Node3D" parent="PedZones" unique_id=910017079]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1134.000, 5.600, -378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_12_6")
 show_debug_volume = false
 
-[node name="Ped_12_7" type="Node3D" parent="PedZones" unique_id=910017077]
+[node name="Ped_12_7" type="Node3D" parent="PedZones" unique_id=910017080]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1134.000, 5.600, -126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_12_7")
 show_debug_volume = false
 
-[node name="Ped_12_8" type="Node3D" parent="PedZones" unique_id=910017078]
+[node name="Ped_12_8" type="Node3D" parent="PedZones" unique_id=910017081]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1134.000, 5.600, 126.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_12_8")
 show_debug_volume = false
 
-[node name="Ped_12_9" type="Node3D" parent="PedZones" unique_id=910017079]
+[node name="Ped_12_9" type="Node3D" parent="PedZones" unique_id=910017082]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1134.000, 5.600, 378.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_12_9")
 show_debug_volume = false
 
-[node name="Ped_12_10" type="Node3D" parent="PedZones" unique_id=910017080]
+[node name="Ped_12_10" type="Node3D" parent="PedZones" unique_id=910017083]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1134.000, 5.600, 630.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_12_10")
 show_debug_volume = false
 
-[node name="Ped_12_11" type="Node3D" parent="PedZones" unique_id=910017081]
+[node name="Ped_12_11" type="Node3D" parent="PedZones" unique_id=910017084]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1134.000, 5.600, 882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_12_11")
 show_debug_volume = false
 
-[node name="Ped_12_12" type="Node3D" parent="PedZones" unique_id=910017082]
+[node name="Ped_12_12" type="Node3D" parent="PedZones" unique_id=910017085]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1134.000, 5.600, 1134.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_12_12")
 show_debug_volume = false
 
-[node name="Ped_13_2" type="Node3D" parent="PedZones" unique_id=910017083]
+[node name="Ped_13_2" type="Node3D" parent="PedZones" unique_id=910017086]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1386.000, 5.600, -1386.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_13_2")
 show_debug_volume = false
 
-[node name="Ped_13_3" type="Node3D" parent="PedZones" unique_id=910017084]
+[node name="Ped_13_3" type="Node3D" parent="PedZones" unique_id=910017087]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1386.000, 5.600, -1134.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_13_3")
 show_debug_volume = false
 
-[node name="Ped_13_4" type="Node3D" parent="PedZones" unique_id=910017085]
+[node name="Ped_13_4" type="Node3D" parent="PedZones" unique_id=910017088]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1386.000, 5.600, -882.000)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_ped_13_4")
@@ -6288,4 +6453,4 @@ show_debug_volume = false
 [node name="Landmarks" type="Node3D" parent="." unique_id=910014000]
 
 [node name="RainbowBridge" parent="Landmarks" unique_id=910014001 instance=ExtResource("rb_bridge")]
-transform = Transform3D(0.000000, 0, -1.000000, 0, 1, 0, 1.000000, 0, 0.000000, 1250.000, 5.600, 1121.000)
+transform = Transform3D(0.000000, 0, -1.000000, 0, 1, 0, 1.000000, 0, 0.000000, 1250.000, 5.600, 1116.000)

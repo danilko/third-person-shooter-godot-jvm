@@ -70,13 +70,22 @@ if want layout; then
     stage layout
     # the rail reserve (PLAN.md B10) is a function of the LAND (its profile follows the ground), and the street
     # planner and the building derive both read it -- so it is written here, after land and before anything else
-    python3 tools/island_rail_layout.py --layout tokyo_straight --reserve | tail -1
+    # its station table flags a station ON A CURVE / a 踏切 IN PLATFORM / a foot off its street: print those too (S17:
+    # Castle Town's "ON A CURVE" stood in the table, hidden by the tail, until probe_rail_track found the station's wall)
+    python3 tools/island_rail_layout.py --layout tokyo_straight --reserve | grep -E "ON A CURVE|IN PLATFORM|reserve: .* -- |^reserve: [0-9]"
     python3 tools/island_layout.py | grep -E "^island_layout|^island_grades|^island_dike|^island_streets" | tail -40
     # REACH (S15 [I0]): land within 250 m of a road, scored on the land stage's grid -- a layout that strands land fails
     python3 tools/island_v3_reach.py --record assets/world_source/pieces/IslandRoads.roads.json --min 95.5 \
         | grep -E "^reach|FAIL"
     # the rail record (PLAN.md 3.25 R2): its level crossings take the ROADS' heights, so it follows the layout
     python3 tools/island_rail_record.py | tail -3
+    # island_layout's 踏切 line judged the rail record from BEFORE this one (S17: a moved line read as its old
+    # position), so judge the level crossings again on the record just written
+    python3 -c "
+import sys; sys.path.insert(0, 'tools'); import island_layout as IL
+lx = IL.level_crossings(IL.OUTPUT, IL.RAIL_RECORD, IL.arterial_names()); bad = [r for r in lx if r[5]]
+print('rail record: %d level crossing(s), %d break a 踏切 rule%s' % (len(lx), len(bad), ''.join(
+    '; %s x %s at %s: %s' % (r[0], r[1], r[2], ', '.join(r[5])) for r in bad)))"
     # the civic plots (user, 2026-09-28) must still front a road and have no road through them on the new layout
     python3 tools/island_civic_sites.py --check || echo "WARNING: a civic plot lost its road -- re-site it (--resite=<id>)"
     # the station forecourt's composite is derived from the rotary and its reserve: it must match them

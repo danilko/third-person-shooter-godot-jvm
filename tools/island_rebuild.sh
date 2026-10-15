@@ -92,7 +92,9 @@ for net, pref in (("IslandRoads", "island_"), ("IslandRail", "rail_")):
     zf = "%s/%s.zones.json" % (P, net)
     if not os.path.exists(zf):
         continue
-    zones = {z["zone_id"] if "zone_id" in z else z.get("id") for z in json.load(open(zf))["zones"]}
+    # a piece's file name spells a zone id's "-" as "_" (island_3_-1 -> Roads_IslandRoads_island_3__1, S17: the cape's
+    # first row north of 0) -- compare the spellings, or a live zone's piece is pruned the moment it is baked
+    zones = {str(z["zone_id"] if "zone_id" in z else z.get("id")).replace("-", "_") for z in json.load(open(zf))["zones"]}
     for f in sorted(glob.glob("%s/Roads_%s_%s*.lanekit.json" % (P, net, pref))):
         zid = os.path.basename(f)[len("Roads_%s_" % net):-len(".lanekit.json")]
         if zid not in zones:

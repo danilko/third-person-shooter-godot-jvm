@@ -684,6 +684,13 @@ _R0["lines"]["Blue line"]["corners"] = [((BLUE_WEST_X, y) if x == -800.0 else (x
                                         for x, y in _R0["lines"]["Blue line"]["corners"]]
 _R0["stations"]["Residential"] = ("Blue line", BLUE_WEST_X, -510.8) + tuple(_R0["stations"]["Residential"][3:])
 _R0["stations"]["Light Industry"] = ("Blue line", BLUE_WEST_X, -975.3) + tuple(_R0["stations"]["Light Industry"][3:])
+# ...and its corner a STATION-THROAT curve (S17, user 2026-10-15: "Station east + own 駅前 street" -- MEASURED: the
+# station cannot slide, it fills the 180 m between the jokamachi_sando and nishi_dori 踏切s). At the line's default
+# 200 m the turn began at x -550, 50 m further east with the leg, and Castle Town's west building + ramps (its box
+# reaches x -600.4) stood on it: probe_rail_track found the station's collision in the train's gauge. At 140 m (under
+# R_MIN, over a throat's 100) the turn begins at x -610, the sando's 踏切.
+_R0["lines"]["Blue line"]["radii"] = dict(_R0["lines"]["Blue line"].get("radii", {}))
+_R0["lines"]["Blue line"]["radii"][4] = 140.0
 # Farm moved 2 m south and Residential North 46 m north, onto nishi_dori's crossing: 452 m apart
 _R0["accept_gaps"] = list(_R0["accept_gaps"]) + [("Farm", "Residential North")]
 # THE AIRPORT STATION BEHIND THE BRIDGE (user, 2026-09-29: "let the station at airport combine with the air terminal,
