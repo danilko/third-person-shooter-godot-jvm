@@ -674,6 +674,16 @@ _R0["stations"]["Castle Town"] = ("Blue line", -508.1, -160.0) + tuple(_R0["stat
 _R0["stations"]["Residential"] = ("Blue line", -800.0, -510.8) + tuple(_R0["stations"]["Residential"][3:])
 _R0["stations"]["Light Industry"] = ("Blue line", -800.0, -975.3) + tuple(_R0["stations"]["Light Industry"][3:])
 _R0["lines"]["Blue line"]["corners"] = _R0["lines"]["Blue line"]["corners"][:-1] + [(-800.0, -1023.0)]
+# THE BLUE LINE'S WEST LEG 50 m EAST (S16 E / [I7], user 2026-10-14: "or can move the rail lane slightly toward
+# right/east to free up the 100m?"). The new 4-lane I7 (island_core_streets `shiokaze_dori`) meets rinkai_dori at the
+# nishi_dori junction (x ~-850), which stood 53 m from this leg's 踏切 at x -797: a gate-down queue backs into the
+# junction. The turn west -> south is already at R_MIN and ends at rinkai_dori, so only the whole leg can move: x -800
+# -> BLUE_WEST_X, the 踏切 ~100 m from the junction. Residential and Light Industry keep their slides along the leg.
+BLUE_WEST_X = -750.0
+_R0["lines"]["Blue line"]["corners"] = [((BLUE_WEST_X, y) if x == -800.0 else (x, y))
+                                        for x, y in _R0["lines"]["Blue line"]["corners"]]
+_R0["stations"]["Residential"] = ("Blue line", BLUE_WEST_X, -510.8) + tuple(_R0["stations"]["Residential"][3:])
+_R0["stations"]["Light Industry"] = ("Blue line", BLUE_WEST_X, -975.3) + tuple(_R0["stations"]["Light Industry"][3:])
 # Farm moved 2 m south and Residential North 46 m north, onto nishi_dori's crossing: 452 m apart
 _R0["accept_gaps"] = list(_R0["accept_gaps"]) + [("Farm", "Residential North")]
 # THE AIRPORT STATION BEHIND THE BRIDGE (user, 2026-09-29: "let the station at airport combine with the air terminal,
@@ -769,7 +779,8 @@ STATION_FRONT = {
     # the dike's 側道 teibo_sokudo_4: its own line runs THROUGH the station's north end, and island_dike bends it out
     # along the axis to exactly this street line (FRONT_ESCAPE), easing back to its own line west of it -- the car
     # park is on the WEST side, where the road stays on the line (east of the station it falls away south)
-    "Light Industry": dict(end=-1, street=[(-860.0, -877.5), (-740.0, -877.5)], half=6.5, park="right"),
+    # (S16 E: 50 m east with the leg, BLUE_WEST_X)
+    "Light Industry": dict(end=-1, street=[(-810.0, -877.5), (-690.0, -877.5)], half=6.5, park="right"),
 }
 FRONT_GAP_SLACK = 12.0   # m: a foot further than this from its street is reported (the street moved, or the ground)
 

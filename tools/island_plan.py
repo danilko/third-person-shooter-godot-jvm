@@ -423,6 +423,10 @@ STREET_DROP = (
     ("sw", "x", -1100.0),        # nishi_machi_1100, the westmost N-S residential street
     ("sw", "x", -440.0),         # nishi_machi_440, beside kichi_dori (x -500)
     ("industry", "x", -200.0),   # kojo_michi_200, a one-block stub
+    ("koba", "x", -850.0),       # koba_machi_850: [I7] shiokaze_dori runs on its line (S16 E)
+    ("sw", "x", -1050.0),        # nishi_machi_1050: it met the factory ladder's two legs on their dike ramps (S16 E [I6])
+    ("koba", "x", -780.0),       # koba_machi_780: with the Blue line at x -750 its junctions on the koba legs stood 18 m
+                                 # from the 踏切 (< 20); the 100 m block between shiokaze_dori and the track needs none
 )
 STREET_NAMES = {"city": ("machi", "cho"), "sw": ("nishi_machi", "nishi_cho"), "farm": ("hata_michi", "hata_yoko"),
                 "farm_w": ("hata_michi_w", "hata_yoko_w"), "farm_s": ("hata_michi_s", "hata_yoko_s"), "farm_n": ("hata_michi_n", "hata_yoko_n"),

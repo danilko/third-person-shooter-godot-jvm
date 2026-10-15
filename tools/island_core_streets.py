@@ -114,13 +114,33 @@ STREETS = [
     dict(name="c1_naka_yoko", first="nishi_hondori", corners=[(275.0, 465.0), (600.0, 465.0)], last="naka_hondori"),
     dict(name="c1_naka_yoko_e", first="naka_hondori", corners=[(600.0, 465.0), (975.0, 465.0)],
          last="higashi_hondori"),
-    # the west industrial block (x -1050..-500 between nishi_cho_413 y -413 and the dike, the Blue line down x -800,
+    # the west industrial block (x -1050..-500 between nishi_cho_413 y -413 and the dike, the Blue line down x -750,
     # Residential station y -419..-603, Light Industry station y -883..): ~20 ha with no street. When this runs only
     # kichi_dori exists there (nishi_cho_413 is the planner's, the dike's side road comes later), so the frame is a U
     # off kichi_dori: west along y -655 across the track (52 m south of Residential's platform), down x -960, and back
     # along y -783 -- the legs in line with the koba rows east of kichi_dori. The koba_w lines hang off it.
-    dict(name="koba_waku_w", first="kichi_dori", corners=[(-500.0, -655.0), (-960.0, -655.0), (-960.0, -783.0),
-                                                         (-500.0, -783.0)], last="kichi_dori"),
+    # [I6] THE FACTORY LADDER (S16 E, 2026-10-14): the U's two legs are carried on WEST to the coastal ring, so y -655
+    # and y -783 are STRAIGHT through streets ring -> shiokaze_dori (crossroads) -> the Blue line -> kichi_dori, the
+    # factory yards between them (island_buildings `factory_yards`); the U's west side (x -960) is its own street
+    # T-ing into both (the fire branch and the post office front it). A rung cut into the U's CORNER made a pad there
+    # and the align pass tilted the legs onto it -- the top leg 5-10 m into the safe house's plot, the bottom 2 m into
+    # the post office's (dry e3). The north leg lands on the ring at y -655; nishihama_michi's beach lane joins that
+    # junction (island_site_access) instead of its own T 27 m south. Both come down off the dike (ring 6.4-6.9) on
+    # island_dike's ramps, 210-240 m long (the planner's sw x -1050 line, which met them on the ramps, is dropped).
+    dict(name="koba_waku_w", first="kichi_dori", corners=[(-500.0, -655.0), (-1197.0, -655.0)], last="ring_kita"),
+    dict(name="koba_waku_w_s", first="kichi_dori", corners=[(-500.0, -783.0), (-1172.0, -783.0)], last="ring_kita"),
+    dict(name="koba_waku_w_x", first="koba_waku_w", corners=[(-960.0, -655.0), (-960.0, -783.0)],
+         last="koba_waku_w_s"),
+    # [I7] THE SOUTH-WEST'S EXPRESSWAY DOOR (S16 E, user 2026-10-14: "2. Full I7"): the Wangan's west terminal
+    # (wangan_iriguchi, a T on the dike road ring_kita at x -858) continued STRAIGHT NORTH as a 2 + 2 arterial to
+    # rinkai_dori, where it makes the nishi_dori junction a crossroads -- Wangan -> nishi_dori is one through route.
+    # x -850: three frozen plots front the koba loop's west half (danchi's east edge x -874, the safe house, the
+    # hospital), so the line cannot go further west; it crosses both koba legs (y -655 / -783: crossroads) and replaces
+    # the planner's koba_machi_850 (island_plan STREET_DROP). The Blue line's west leg moved 50 m east for it
+    # (island_rail_layout BLUE_WEST_X): its 踏切 on rinkai_dori stood 53 m from this junction. police_west stood on the
+    # line (re-sited, island_civic_sites).
+    dict(name="shiokaze_dori", first="ring_kita", corners=[(-858.0, -1047.0), (-850.0, -318.0)], last="rinkai_dori",
+         preset="arterial"),
     # THE STATION 商店街 (the second review, 2026-10-03): one local shopping street off each housing station's front,
     # a short block street the shops line both sides of (island_buildings.STREET_MIXES keys the shop-house mix on the
     # "eki_ginza" name). Castle Town's is its 参道, jokamachi_sando (island_site_access), keyed the same way.
@@ -315,8 +335,8 @@ def add(net, s, ground):
         part = _slice(dense, cum, bounds[i], bounds[i + 1])
         pts = _resample(part, step) if s.get("one_way") else _resample_square(part, step)
         pts3 = [(x, y, max(0.0, ground.z(x, y) or 0.0)) for x, y in pts]
-        pieces.append(chain_road(net, s["name"] + ("__c%d" % (i // 2) if i else ""), pts3, preset="block",
-                                 one_way=s.get("one_way", False)))
+        pieces.append(chain_road(net, s["name"] + ("__c%d" % (i // 2) if i else ""), pts3,
+                                 preset=s.get("preset", "block"), one_way=s.get("one_way", False)))
     for k, (sarc, xy, name) in enumerate(kept):
         members = list(cut_road(net, xy, name.split("__")[0], MOUTH))
         make_junction(net, members + [pieces[k].points[-1], pieces[k + 1].points[0]])

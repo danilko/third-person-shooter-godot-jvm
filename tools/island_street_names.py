@@ -81,6 +81,8 @@ NAMED = {
     "kojo_waku": ("工場通り", "Kojo-dori", "street"),
     "teibo_sokudo": ("堤防側道", "Teibo-sokudo", "street"),
     "wangan_iriguchi": ("潮風口通り", "Shiokaze-guchi-dori", "access"),    # the Shiokaze line's west terminal
+    "shiokaze_dori": ("潮風通り", "Shiokaze-dori", "arterial"),          # S16 [I7]: the terminal's road north to rinkai_dori
+    "gyoko_michi": ("漁港通り", "Gyoko-dori", "access"),                  # S16 D: the west hamlet's street
     "shuto_c1": ("海都高速 環状線", "Kaito Expwy Loop", "expressway"),
     "shuto_wangan": ("海都高速 潮風線", "Kaito Expwy Shiokaze", "expressway"),
     "shuto_spur": ("海都高速 空港連絡線", "Kaito Expwy Airport Link", "expressway"),

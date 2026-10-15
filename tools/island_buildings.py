@@ -79,7 +79,7 @@ ALLEY = 1.5            # kept free on a building's sides and back (half the alle
 # side = a 1 m gap; the Civil Code asks 50 cm from the boundary, i.e. the same 1 m between two houses)
 REGION_ALLEY = {"downtown": 0.25, "nightlife": 0.2, "west_ekimae": 0.2, "west_centre": 0.5, "city": 0.5,
                 "residential": 0.6, "residential_north": 0.6, "residential_west": 0.8, "light_industry": 0.6,
-                "light_industry_w": 0.5, "bay_processing": 0.8, "ekimae": 0.25}
+                "light_industry_w": 0.5, "factory_yards": 0.5, "bay_processing": 0.8, "ekimae": 0.25}
 
 
 def alley_of(reg):
@@ -243,6 +243,11 @@ REGIONS = (
     # small works with a flat over them, workers' flats, depots and a few used-car lots on block streets. It has TWO
     # stations on two lines: Light Industry (the Blue line's terminus, x -665) on its west side and Industry (the
     # Harbour line, x 185) past its east edge, so its commuters split instead of all changing at Bay.
+    # THE FACTORY LADDER (S16 E [I6]): the yards between the two rungs (island_core_streets koba_yoko_n / _s), next to
+    # the gang scrapyard -- works and depots on the street, fenced yards (DEEP_BIG) behind them. Before
+    # light_industry_w, whose box it is inside.
+    ("factory_yards", (-1200.0, -800.0, -860.0, -640.0), 1, 26.0,
+     {"FactorySmall": 3, "Warehouse": 1.5, "KonbiniS": 0.2}, 0.1, "dark"),
     ("light_industry_w", (-1450.0, -1040.0, -300.0, -600.0), 1, 20.0,
      {"ShopHouse": 0.8, "FactorySmall": 3, "Apartment": 2, "Warehouse": 0.3, "ParkingLot8": 0.3, "KonbiniS": 0.4,
       "GasStation": 0.2, "ShrineSmall": 0.1},
@@ -496,7 +501,7 @@ SPAWN_UID = "uid://ctq8u5jyp6ijf"
 # ~50 %, working districts halved.
 PED_DENSITY = {"akiba": 15.0, "nightlife": 18.0, "downtown": 13.0, "downtown_core": 15.0, "city": 7.0,
                "residential": 2.5, "residential_north": 2.5, "residential_west": 1.2, "suburb": 1.5, "industry": 0.5,
-               "harbour": 0.4, "farm": 0.4, "fishing_village": 1.0, "light_industry": 1.0, "light_industry_w": 1.2, "west_centre": 9.0,
+               "harbour": 0.4, "farm": 0.4, "fishing_village": 1.0, "factory_yards": 0.5, "light_industry": 1.0, "light_industry_w": 1.2, "west_centre": 9.0,
                "west_ekimae": 14.0, "bay_processing": 0.8, "airport": 1.5, "ekimae": 12.0, None: 0.6}
 PED_MAX = 200          # a single cell's crowd, however much footway it holds
 PED_LOAD = 300.0       # > the cell's own half-diagonal (178 m) and just over the 252 m cell pitch, so the four
@@ -1929,6 +1934,7 @@ DEEP_BIG = {
     "residential_west": ("Danchi", "SupermarketSite", "SuperSento"), "suburb": ("SupermarketSite", "SuperSento"),
     "industry": ("WarehouseYard", "CargoShed"), "light_industry": ("WarehouseYard", "CargoShed"),
     "light_industry_w": ("WarehouseYard", "CargoShed"), "harbour": ("CargoShed", "WarehouseYard"),
+    "factory_yards": ("WarehouseYard", "CargoShed"),
     "bay_processing": ("WarehouseYard",)}
 DEEP_BIG_ACCESS = 25.0
 DEEP_BIG_SPACING = 450.0

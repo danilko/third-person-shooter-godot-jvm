@@ -139,7 +139,9 @@ ACCESS = [
     dict(name="kitahama_michi", site="north_beach", from_road="ring_kita", at=(852.0, 1541.0),
          via=[(845.0, 1598.0)], end=(705.0, 1628.0), parking="ParkingLot14"),
     #  * the WEST residential beach: south along the toe at x -1235 from ring_kita__12
-    dict(name="nishihama_michi", site="west_beach", from_road="ring_kita", at=(-1188.0, -682.0),
+    #    (S16 E: `at` is the factory ladder's north leg's T on the ring, island_core_streets koba_waku_w -- a crossroads;
+    #    its own T at (-1188, -682) stood 27 m from it)
+    dict(name="nishihama_michi", site="west_beach", from_road="ring_kita", at=(-1197.0, -655.0),
          via=[(-1235.0, -690.0)], end=(-1235.0, -795.0), parking="ParkingLot14"),
     #  * the SUBURB beach behind the suburb fill: south off ring_kita__10, west along z 1145
     dict(name="kogaihama_michi", site="suburb_beach", from_road="ring_kita", at=(1065.0, -1085.0),
