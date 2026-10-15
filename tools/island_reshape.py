@@ -422,6 +422,8 @@ def reshape(base):
                 land[srows, c] = True
     out, cape_land = cape(out, xx, zz)
     land = land | cape_land
+    out, hamlet_land = hamlet(out, xx, zz)
+    land = land | hamlet_land
     out, banks = walk_banks(out, xx, zz)
     land = land | (banks & (out > LAND_Z))
     edits = {"fill": fill, "trim": trim | mcut, "dike": dike, "works": works, "market": reclaimed, "banks": banks}
@@ -501,6 +503,80 @@ def cape(out, xx, zz):
     res[j0:j1, i0:i1] = o.astype(out.dtype)
     full = np.zeros(out.shape, bool)
     full[j0:j1, i0:i1] = plat | (zone & (o > LAND_Z))
+    return res, full
+
+
+#: THE WEST HAMLET 漁村 (S16 map review D, 2026-10-14): the only destination on ~5 km of west / north coast, on the SHELF
+#: west of kaigan_dori__7 (measured: a -0.5..-3 m tongue x -1700..-1520, y 140..240; a -5..-14 m trench north of it, the
+#: harbour basin, and another south). A TERRACE at HAMLET_Z (a 漁港's quay height) that rises at 6 % to the coast road's
+#: height over HAMLET_RAMP, so the hamlet's street (`gyoko_michi`, island_site_access) leaves a level T and runs down
+#: onto it. Its north face is the harbour QUAY over the basin, with a 1:SLIP_GRADE SLIPWAY (船揚場) cut into it -- the
+#: basin's way out of the water; its west and south-west faces a bank + beach (the coast walk: no trap). One BREAKWATER
+#: closes the basin (HAMLET_BREAKWATER). Record frame below (y = -Godot z); fill only. It also cures the two cliff coves
+#: the coast walk read at 5-12 (record y ~160, the old shore under the road).
+HAMLET_Z = 3.0                                       # Godot: the quay, 3 m over the sea
+HAMLET_TOP = 1.0 + 5.6                               # Godot: kaigan_dori__7's record z 1.0 + NET_Y
+HAMLET_TERRACE = (-1680.0, -1424.0, 125.0, 255.0)    # record x0, x1 (the coast road's centreline: max() keeps it), y0, y1
+HAMLET_RAMP = (-1520.0, -1460.0)                     # record x: HAMLET_Z west of the first, HAMLET_TOP east of the second
+HAMLET_ROUND = 25.0                                  # the terrace's two west (seaward) corners
+HAMLET_SOUTH_QUAY = -1480.0                          # record x: the south face is a quay east of this
+HAMLET_SLIP = (-1600.0, -1590.0)                     # record x of the slipway on the quay face
+SLIP_GRADE = 8.0
+SLIP_FOOT = -1.0                                     # the slipway runs into the water to this depth
+HAMLET_BREAKWATER = [(-1660.0, 250.0), (-1670.0, 340.0), (-1625.0, 380.0), (-1505.0, 384.0)]   # record polyline
+#: ONE L-shaped arm from the terrace's north-west corner, its mouth at the east by the shore (the basin's entrance, ~60
+#: m). A CAISSON breakwater: vertical faces at the crest's width, the crest at the quay's height, walked onto from the
+#: terrace -- with 1:1 rubble sides a swimmer stood up on its flank and could not climb (the coast walk's cove), and a
+#: second arm from the shore had its root on the coast road's embankment toe, reachable from nowhere.
+BREAKWATER_HALF = 5.0                                # the crest, either side of the line
+HAMLET_BEACH = 12.0
+HAMLET_SHELF = -2.0
+HAMLET_REACH = 70.0
+HAMLET_WIN = (-1800.0, -1300.0, -480.0, 20.0)        # Godot x0, x1, z0, z1: the window the edit touches
+
+
+def hamlet(out, xx, zz):
+    """THE WEST HAMLET (see HAMLET_Z): terrace, quay + slipway, bank and beach, breakwaters. Returns (out, land mask)."""
+    x0, x1, z0, z1 = HAMLET_WIN
+    j0, j1 = int((z0 - Z0) / STEP), int((z1 - Z0) / STEP) + 1
+    i0, i1 = int((x0 - X0) / STEP), int((x1 - X0) / STEP) + 1
+    XX, ZZ = np.broadcast_arrays(xx, zz)
+    sx, sy = XX[j0:j1, i0:i1], -ZZ[j0:j1, i0:i1]          # record frame from here on
+    o = out[j0:j1, i0:i1].astype(np.float64)
+    tx0, tx1, ty0, ty1 = HAMLET_TERRACE
+    r = HAMLET_ROUND
+    terr = (sx >= tx0) & (sx <= tx1) & (sy >= ty0) & (sy <= ty1)
+    for cy, outside in ((ty0 + r, sy < ty0 + r), (ty1 - r, sy > ty1 - r)):
+        terr &= ~(outside & (sx < tx0 + r) & (np.hypot(sx - (tx0 + r), sy - cy) > r))
+    ra, rb = HAMLET_RAMP
+    top = HAMLET_Z + (HAMLET_TOP - HAMLET_Z) * np.clip((sx - ra) / (rb - ra), 0.0, 1.0)
+    sdf = distance_from(terr, HAMLET_REACH + 10.0)
+    sdf[~np.isfinite(sdf)] = 1e6
+    # (the bank falls from the terrace's own height there: its east end stands at the coast road's, top() is x only,
+    # so the cell's own x reads the nearest terrace edge's height)
+    bank = (top - BEACH_TOP) * SHORE_BANK
+    sand = bank + (BEACH_TOP - HAMLET_SHELF) * HAMLET_BEACH
+    prof = np.where(sdf < bank, top - sdf / SHORE_BANK,
+                    np.where(sdf < sand, BEACH_TOP - (sdf - bank) / HAMLET_BEACH, HAMLET_SHELF - (sdf - sand)))
+    # the north face over the basin is a QUAY (no bank), and so is the south face's east end: a beach there would lift
+    # the old shore's sand (0.1-0.2 m, sea) above LAND_Z against the coast road's 5.6 m embankment -- a land cliff
+    # (all of the north side: the beach round the north-west corner climbed the breakwater's flanks)
+    quay = (sy > ty1) | ((sx > HAMLET_SOUTH_QUAY) & (sy < ty0))
+    prof = np.where(quay, SEABED, prof)
+    zone = (sdf > 0.0) & (sdf < HAMLET_REACH)
+    o = np.where(zone, np.maximum(o, prof), o)
+    o = np.where(terr, np.maximum(o, top), o)
+    # the SLIPWAY: a ramp built OUT from the quay face into the basin, HAMLET_Z at the face down to SLIP_FOOT (its sides
+    # stand over water; cut INTO the terrace its side walls were 2.6 m land-to-land steps, the coast slope gate)
+    run = (HAMLET_Z - SLIP_FOOT) * SLIP_GRADE
+    slip = (sx >= HAMLET_SLIP[0]) & (sx <= HAMLET_SLIP[1]) & (sy > ty1 - 2.0) & (sy <= ty1 + run)
+    o = np.where(slip, np.maximum(o, HAMLET_Z - np.maximum(sy - ty1, 0.0) / SLIP_GRADE), o)
+    wall = _polyline_distance(sx, sy, HAMLET_BREAKWATER) <= BREAKWATER_HALF
+    o = np.where(wall, np.maximum(o, HAMLET_Z), o)
+    res = out.copy()
+    res[j0:j1, i0:i1] = o.astype(out.dtype)
+    full = np.zeros(out.shape, bool)
+    full[j0:j1, i0:i1] = terr | wall | (zone & (o > LAND_Z))
     return res, full
 
 

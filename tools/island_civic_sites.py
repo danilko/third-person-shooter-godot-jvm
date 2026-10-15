@@ -51,6 +51,10 @@ RELIEF = 1.5           # m of ground relief the whole footprint may have
 AT_GRADE = 1.5         # m: the frontage road's surface within this of the ground under it
 PLOT_GAP = 6.0         # m between two plots
 STEP = 10.0            # m between candidates along a road
+#: the lowest ground (record z) a plot may stand on: dry land 1 m over the sea. It was -0.2 (Godot 5.4, "the plain")
+#: until S16 D (2026-10-14): the west hamlet's terrace stands at Godot 3.0 (record -2.6), a 漁港's quay height, and its
+#: 駐在所 was pushed 577 m off to rinkai_dori. Frozen plots are not re-searched, so this moves none of them.
+LAND_MIN = 1.0 - island_roadgen.NET_Y
 NO_FRONT = ("shuto_", "kaigan_dori", "rail") + PL.MOUNTAIN_ROADS
 
 # (id, kind, 日本語, frontage m, depth m, min lanes a side, target) -- target is a RECORD (x, y) or "station:<Name>".
@@ -139,7 +143,9 @@ PLOTS = (
     ("koban_fish_market", "koban", "交番", 8.0, 10.0, 1, "station:Fish Market"),
     ("koban_airport", "koban", "交番", 8.0, 10.0, 1, "station:Airport"),
     ("koban_castle_town", "koban", "交番", 8.0, 10.0, 1, "station:Castle Town"),
-    ("koban_light_industry", "koban", "交番", 8.0, 10.0, 1, "station:Light Industry"),
+    # (koban_light_industry RE-SITED as the west hamlet's 駐在所, S16 D 2026-10-14: it stood 154 m from koban_residential,
+    # the nearest pair of police posts on the island, while ~5 km of west / north coast had none -- the kind count kept)
+    ("chuzaisho_gyoson", "koban", "駐在所", 8.0, 10.0, 1, (-1560.0, 205.0)),
     ("koban_industry", "koban", "交番", 8.0, 10.0, 1, "station:Industry"),
     ("koban_harbour", "koban", "交番", 8.0, 10.0, 1, "station:Harbour"),
     ("supermarket_residential", "supermarket", "スーパー", 38.0, 62.0, 1, "station:Residential"),
@@ -382,7 +388,7 @@ def search(spec, g, net, clear, samples, targets, placed):
                     px, py = cx + ux * s + nx * t, cy + uy * s + ny * t
                     z = g.z(px, py)
                     # the frontage road itself only has to stay FRONT_GAP off; every other road ROAD_CLEAR
-                    if (z is None or z < -0.2 or clear.near(px, py, ROAD_CLEAR, but=road, side=(x, y, nx, ny, half))
+                    if (z is None or z < LAND_MIN or clear.near(px, py, ROAD_CLEAR, but=road, side=(x, y, nx, ny, half))
                             or clear.near(px, py, FRONT_GAP - 0.25) or rail_hit(px, py)
                             or site_hit(px, py) or reserves_hit(px, py) or ST._dike_hit(px, py)
                             or plot_hit(px, py, placed)):

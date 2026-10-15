@@ -268,6 +268,13 @@ REGIONS = (
      {"Apato2F4": 0.8, "ApartRC3F": 1.0, "MansionLine4": 0.5, "TerraceHouse4": 0.8, "LuxuryLowRise": 0.3, "HouseTraditional": 0.2, "Apartment": 4, "ShopHouse": 0.5, "Mansion": 1, "KonbiniL": 0.6, "GasStation": 0.4, "CarDealer": 0.2,
       "FamilyRestaurant": 0.4, "DetachedHouse": 2, "DetachedHouseB": 2,
       "ShopDrugstore": 0.2, "ShopCoinLaundry": 0.045}, 0.45, None),
+    # THE WEST HAMLET 漁村 (S16 D, 2026-10-14): ~15 houses, a konbini and the net sheds along its one street
+    # (`gyoko_michi`, island_site_access) on the shelf terrace (island_reshape.hamlet) -- the box is the terrace. Old
+    # wooden houses first; nothing skipped (it is small). The konbini's weight is high so the deterministic draw lands
+    # one (SPACING keeps it to one); check the derive's count after a change.
+    ("fishing_village", (-1690.0, 120.0, -1440.0, 260.0), 1, 14.0,
+     {"HouseTraditional": 3, "DetachedHouse": 1.5, "DetachedHouseB": 1.5, "KonbiniS": 2, "Warehouse": 0.5,
+      "ShopHouse": 0.4}, 0.0, None),
     ("farm", (350.0, 920.0, 1850.0, 1900.0), 1, 30.0, {"HouseTraditional": 1.5, "Apartment": 2, "Warehouse": 0.5, "KonbiniL": 0.2,
                                                         "DetachedHouse": 2, "DetachedHouseB": 2},
      0.65, None),
@@ -320,6 +327,7 @@ PARKING_BY_REGION = {
     "residential_west": {"KonbiniL": "ParkingLot14", "KonbiniS": "ParkingLot8"},
     "suburb": {"KonbiniL": "ParkingLot14", "KonbiniS": "ParkingLot14", "FamilyRestaurant": "ParkingLot14"},
     "farm": {"KonbiniL": "ParkingLot14", "KonbiniS": "ParkingLot14"},
+    "fishing_village": {"KonbiniS": "ParkingLot8"},
     "airport": {"KonbiniL": "ParkingLot14", "FamilyRestaurant": "ParkingLot14"},
 }
 
@@ -488,7 +496,7 @@ SPAWN_UID = "uid://ctq8u5jyp6ijf"
 # ~50 %, working districts halved.
 PED_DENSITY = {"akiba": 15.0, "nightlife": 18.0, "downtown": 13.0, "downtown_core": 15.0, "city": 7.0,
                "residential": 2.5, "residential_north": 2.5, "residential_west": 1.2, "suburb": 1.5, "industry": 0.5,
-               "harbour": 0.4, "farm": 0.4, "light_industry": 1.0, "light_industry_w": 1.2, "west_centre": 9.0,
+               "harbour": 0.4, "farm": 0.4, "fishing_village": 1.0, "light_industry": 1.0, "light_industry_w": 1.2, "west_centre": 9.0,
                "west_ekimae": 14.0, "bay_processing": 0.8, "airport": 1.5, "ekimae": 12.0, None: 0.6}
 PED_MAX = 200          # a single cell's crowd, however much footway it holds
 PED_LOAD = 300.0       # > the cell's own half-diagonal (178 m) and just over the 252 m cell pitch, so the four

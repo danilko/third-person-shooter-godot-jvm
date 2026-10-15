@@ -82,6 +82,16 @@ ACCESS = [
     #    centreline, the other arms' setback;
     #    at MOUTH it stood 2.7 m past the coast road's edge and its turns came out R 5.7 -- dry layout c3. The lot
     #    y 2052..2088, the terrace to 2095)
+    # THE WEST HAMLET 漁村 (S16 D, 2026-10-14): its one street, a T off kaigan_dori__7 (>= 100 m from its joints: 143 m
+    # to the south one at y 47, 357 to the north) running due WEST down onto the hamlet's terrace (island_reshape.hamlet:
+    # the coast road's height at the T, HAMLET_Z on the shelf, a 6 % ramp between) and along it to a car park at the
+    # quay end. AUTHORED heights (`gyoko_stations`): a parking row's one straight grade stood ~2 m over the terrace's
+    # level part, and a draped road is clamped to record 0 (Godot 5.6), 2.6 m over it. Houses front it both sides
+    # (island_buildings' `fishing_village` region), the 駐在所 too (island_civic_sites).
+    dict(name="gyoko_michi", site="west_hamlet", from_road="kaigan_dori", at=(-1422.0, 190.0),
+         stations="gyoko", end=(-1632.0, 190.0), parking="ParkingLot14", signal=False, lock=True, lock_host=True),
+    #    (`lock_host`: kaigan_dori's two mouths held at cut_road's MOUTH -- solved, they came in to ~12 m from the T and
+    #    the right turn out onto the coast road was R 9.1 on the exported lanes, dry d1 / d2)
     # THE PORT (PLAN.md 3.30 L3, 2026-09-26): the platform's interior streets meet no road at their south end (a quay),
     # so the planner cannot make them; these two dead ends leave the port road kichi_dori__2 (a U along the platform's
     # north strip). The MILITARY BASE's gate road enters on the base's north edge; the LOGISTICS road serves the
@@ -498,7 +508,46 @@ def ichiba_joint(net):
         net.link(a.points[-1], b.points[0])
 
 
-STATIONS = {"ichiba": ichiba_stations}
+#: THE HAMLET STREET (see the `gyoko_michi` row): its mouth GYOKO_MOUTH west of the T's centre, level at the coast
+#: road's height, then GYOKO_GRADE down with a GYOKO_VCURVE parabola centred on each end of the terrace's ramp (the ground
+#: and the road part by GYOKO_GRADE * GYOKO_VCURVE / 8 = 0.15 m at the two knees), then level to the end.
+GYOKO_MOUTH = 30.0             # at 24 the right turn OUT onto the coast road came out R 9.1 on the exported lanes (dry d1)
+GYOKO_GRADE = 0.06
+GYOKO_VCURVE = 20.0
+GYOKO_STEP = 25.0
+
+
+def gyoko_stations(ground):
+    import island_reshape as RS
+    a = next(r for r in ACCESS if r["name"] == "gyoko_michi")
+    (cx, cy), (ex, ey) = a["at"], a["end"]
+    L = math.hypot(ex - cx, ey - cy)
+    u = ((ex - cx) / L, (ey - cy) / L)
+    top, foot = RS.HAMLET_TOP - rg.NET_Y, RS.HAMLET_Z - rg.NET_Y
+    k0, k1 = cx - RS.HAMLET_RAMP[1], cx - RS.HAMLET_RAMP[0]          # the ramp's two knees, m from the T's centre
+    h = GYOKO_VCURVE / 2.0
+
+    def z_at(d):
+        if d <= k0 - h:
+            return top
+        if d < k0 + h:
+            return top - GYOKO_GRADE * (d - k0 + h) ** 2 / (2.0 * GYOKO_VCURVE)
+        if d <= k1 - h:
+            return top - GYOKO_GRADE * (d - k0)
+        if d < k1 + h:
+            return foot + GYOKO_GRADE * (k1 + h - d) ** 2 / (2.0 * GYOKO_VCURVE)
+        return foot
+    ds = sorted(set([GYOKO_MOUTH, k0 - h, k0, k0 + h, k1 - h, k1, k1 + h, L]
+                    + [d for d in range(int(GYOKO_MOUTH + GYOKO_STEP), int(L), int(GYOKO_STEP))]))
+    keep = []
+    for d in ds:                                    # the mouth always; nothing within 5 m of the station before it
+        if d >= GYOKO_MOUTH and (not keep or d - keep[-1] >= 5.0):
+            keep.append(d)
+    ds = keep
+    return [(cx + u[0] * d, cy + u[1] * d, z_at(d), u if i == 0 else None) for i, d in enumerate(ds)]
+
+
+STATIONS = {"ichiba": ichiba_stations, "gyoko": gyoko_stations}
 SECTIONS = {"ichiba": ICHIBA_SECTION}
 LOOPS = {"ichiba": ichiba_loop}
 
@@ -739,6 +788,10 @@ def _join(net, a, members, road):
         # its mouth held where it was laid (MOUTH from the junction's centre): solved, the cape crossroads' 道の駅 arm came
         # in to 12.5 m and its right turn out to R 4.5 (S16 C, dry layout c2)
         net.points[road.points[0]].setback_locked = True
+    if a.get("lock_host"):
+        # ...and the HOST road's mouths at the distance they were cut at (the cape's crossroads did the same, S16 C)
+        for u in members:
+            net.points[u].setback_locked = True
     if not a.get("allow_cross", True):
         for u in members + [road.points[0]]:
             net.points[u].allow_cross = False
