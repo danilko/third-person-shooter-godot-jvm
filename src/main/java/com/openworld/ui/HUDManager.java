@@ -721,7 +721,55 @@ public class HUDManager extends CanvasLayer {
 	  hud.setVehicle(v);
 	}
 	applyContext(situationForVehicle(currentVehicle));
+	if (currentVehicle instanceof com.openworld.carrier.helicopter.Helicopter h && h.getOccupant() instanceof Player)
+	  showHelicopterHint();
   }
+
+  /** The helicopter's keys are hard to find (user 2026-10-15: Space climbs, and nothing said so), so the first time a
+   *  session takes a helicopter's pilot seat the status feed names them -- read off the bindings NOW, so a rebind
+   *  shows. Once per session, the minimal-HUD rule. */
+  private static boolean helicopterHintShown;
+
+  private void showHelicopterHint() {
+	if (helicopterHintShown || statusFeed == null) return;
+	helicopterHintShown = true;
+	String text = com.openworld.control.InputDevice.pad()
+		? helicopterHintPad()
+		: com.openworld.control.KeyBindings.label("jump") + " climb · "
+		  + com.openworld.control.KeyBindings.label("crouch") + " descend · "
+		  + com.openworld.control.KeyBindings.label("forward") + "/" + com.openworld.control.KeyBindings.label("back")
+		  + " fly · " + com.openworld.control.KeyBindings.label("left") + "/"
+		  + com.openworld.control.KeyBindings.label("right") + " turn";
+	StatusFeedEntry entry = new StatusFeedEntry();
+	entry.lifespan = Math.max(statusFeed.entryLifespan, HELICOPTER_HINT_SECONDS);
+	entry.setContent(text, null);
+	statusFeed.push(entry);
+	lastHelicopterHint = text;
+	helicopterHints++;
+  }
+
+  private static String helicopterHintPad() {
+	return com.openworld.control.KeyBindings.padLabel("jump") + " climb · "
+		+ com.openworld.control.KeyBindings.padLabel("crouch") + " descend · "
+		+ com.openworld.control.KeyBindings.padLabel("fire") + "/" + com.openworld.control.KeyBindings.padLabel("aim")
+		+ " fly · left stick turn";
+  }
+
+  private static final float HELICOPTER_HINT_SECONDS = 7f;
+  private String lastHelicopterHint = "";
+  private int helicopterHints;
+
+  /** Probe readout: how many times this HUD has shown the helicopter hint. */
+  @Register
+  public int helicopterHintCountNow() { return helicopterHints; }
+
+  /** Probe readout: the helicopter hint this HUD showed ("" if none). */
+  @Register
+  public String helicopterHintNow() { return lastHelicopterHint; }
+
+  /** Probe hook: the hint shows again on the next pilot seat. */
+  @Register
+  public void resetHelicopterHint() { helicopterHintShown = false; lastHelicopterHint = ""; }
 
   @Register
   public void onVehicleExited(CharacterInfo occupantInfo) {

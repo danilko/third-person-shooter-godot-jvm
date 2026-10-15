@@ -284,6 +284,15 @@ so anyone not dead ahead was invisible. Both halves are fixed in `VehicleAIContr
   off-centre and the tail rotor not at all), at most 0.35 rad a frame: two crossed blades repeat every 90 deg and the
   old 0.67 rad/frame strobed. Gate `tools/godot/probe_vehicle_armour.gd` 15/15. Sizes are real (HLC-1 16.5 m rotor
   to tail, TNK-1 12.1 m with its gun, character 1.65 m): `tools/godot/shot_vehicle_scale.gd` (display) is the picture.
+- **The helicopter's keys are named once** (user 2026-10-15: "can descend with ctrl, but not able to raise" -- it
+  climbed fine, Space was just impossible to find). MEASURED first: `tools/godot/probe_helicopter_pad.gd` on the
+  real PoliceStation pad climbs 23.9 m in 4 s with the actions AND with physical keys (`-- --key`,
+  `Input.parse_input_event`), nothing overhead. So the fix is discoverability, not physics: the first pilot seat of a
+  session pushes `Space climb · Ctrl descend · W/S fly · A/D turn` to the status feed for 7 s, read off the bindings
+  now (`HUDManager.showHelicopterHint`; a pad shows its own buttons), and the Settings rows say "Jump / handbrake /
+  climb" and "Crouch / descend". GTA V's layout (W/S altitude, numpad pitch/roll) was considered and NOT taken: it
+  serves a free-tilting airframe, ours holds height and stays level, and Space/Ctrl is Fortnite's Choppa and this
+  game's swim up/down. Mouse steering deferred (the mouse aims the door gun).
 - **A body killed lying prone keeps its pose** (no clip, no ragdoll); standing up to fall back read as "crawls, then dies".
 
 
