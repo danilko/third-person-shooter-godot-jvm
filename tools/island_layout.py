@@ -571,8 +571,41 @@ LX_ANGLE_MIN = 60.0
 LX_ANGLE_REFUSE = 45.0
 LX_PAIR_COMBINED = 12.0
 LX_PAIR_MIN = 30.0
+#: the user's rule (2026-10-15, S17): a road runs STRAIGHT ACROSS the track -- its heading changes at most LX_TURN deg
+#: within +-LX_STRAIGHT m (arc) of the crossing (no > / < kink; a curve either side of that window is fine). The rail's
+#: own turn over the same window is reported beside it (track cant twists the road; sightlines).
+LX_STRAIGHT = 15.0
+LX_TURN = 2.0
 LX_ASSERT = False
 RAIL_RECORD = os.path.join(os.path.dirname(OUTPUT), "IslandRail.roads.json")
+
+
+def _arc_at(pts, x, y):
+    """Arc length (m, plan) along polyline `pts` of its closest point to (x, y)."""
+    best, acc = (1e18, 0.0), 0.0
+    for a, b in zip(pts, pts[1:]):
+        vx, vy = b[0] - a[0], b[1] - a[1]
+        n = vx * vx + vy * vy
+        t = max(0.0, min(1.0, ((x - a[0]) * vx + (y - a[1]) * vy) / n)) if n > 1e-12 else 0.0
+        d = math.hypot(x - a[0] - vx * t, y - a[1] - vy * t)
+        if d < best[0]:
+            best = (d, acc + t * math.sqrt(n))
+        acc += math.sqrt(n)
+    return best[1]
+
+
+def _turn_within(pts, s0, w):
+    """The spread (deg) of the plan headings of `pts`'s segments that overlap arc [s0 - w, s0 + w]."""
+    hs, acc = [], 0.0
+    for a, b in zip(pts, pts[1:]):
+        L = math.hypot(b[0] - a[0], b[1] - a[1])
+        if L > 1e-6 and acc + L >= s0 - w and acc <= s0 + w:
+            hs.append(math.degrees(math.atan2(b[1] - a[1], b[0] - a[0])))
+        acc += L
+    if len(hs) < 2:
+        return 0.0
+    dev = [((h - hs[0] + 180.0) % 360.0) - 180.0 for h in hs]
+    return max(dev) - min(dev)
 
 
 def level_crossings(road_path, rail_path, arterials=()):
@@ -581,8 +614,10 @@ def level_crossings(road_path, rail_path, arterials=()):
     net = pm.load_network(road_path)
     rnet = pm.load_network(rail_path)
     rails = []
+    rail_chain = {}
     for name, r in rnet.roads.items():
         ch = [rnet.points[u] for u in r.points if u in rnet.points]
+        rail_chain[name] = [c.pos for c in ch]
         rails += [(name, a.pos, b.pos) for a, b in zip(ch, ch[1:])]
     mouths = [p.pos for p in net.points.values()
               if any(l.type == pm.LINK_JUNCTION for l in getattr(p, "links", ()))]
@@ -613,7 +648,14 @@ def level_crossings(road_path, rail_path, arterials=()):
                 ang = math.degrees(math.acos(min(1.0, cosang)))     # 90 = square
                 near = min((math.hypot(m[0] - x, m[1] - y) for m in mouths), default=1e9)
                 per_road.setdefault(name.split("__")[0], []).append((acc + seg * t, (x, y)))
-                out.append([name, ln, (round(x, 1), round(y, 1)), round(ang, 1), round(near, 1), []])
+                f = []
+                road_turn = _turn_within([c.pos for c in ch], acc + seg * t, LX_STRAIGHT)
+                rail_turn = _turn_within(rail_chain[ln], _arc_at(rail_chain[ln], x, y), LX_STRAIGHT)
+                if road_turn > LX_TURN:
+                    f.append("road turns %.1f deg within +-%.0f m" % (road_turn, LX_STRAIGHT))
+                if rail_turn > LX_TURN:
+                    f.append("on a rail curve (%.1f deg within +-%.0f m)" % (rail_turn, LX_STRAIGHT))
+                out.append([name, ln, (round(x, 1), round(y, 1)), round(ang, 1), round(near, 1), f])
             acc += seg
     for row in out:
         name, _ln, _xy, ang, near, f = row
