@@ -218,6 +218,9 @@ public class AICharacter extends Character {
 
     // ── Best-weapon cache (-1 = stale) ────────────────────────────────────────
     private int cachedBestWeapon = -1;
+    /** When a pick that weighed an explosive expires (ms; 0 = until the ammo changes): the shared explosive cooldown
+     *  (P1e) is a clock, not an ammo event. */
+    private long cachedBestUntilMs;
 
     // ── Vehicle-target tracking ───────────────────────────────────────────────
     private Node cachedTargetVehicle = null;
@@ -837,10 +840,17 @@ public class AICharacter extends Character {
             meleeFallbackUntilMs = 0;
             cachedBestWeapon = -1;
         }
-        if (cachedBestWeapon >= 0) return cachedBestWeapon;
+        if (cachedBestWeapon >= 0 && (cachedBestUntilMs == 0 || godot.api.Time.getTicksMsec() < cachedBestUntilMs))
+            return cachedBestWeapon;
         if (weaponController == null) { cachedBestWeapon = 0; return 0; }
         int bestIndex = -1;
         float bestDamage = -1f;
+        // an explosive (launcher, grenade) is passed over while its area's shared cooldown runs (PLAN.md P1e step 1,
+        // weapon.ExplosiveCooldown): the unit fights with its gun meanwhile, and the pick is re-asked in 0.5 s
+        boolean explosiveHeld = false;
+        Vector3 here = currentTarget != null && godot.global.GD.isInstanceValid(currentTarget)
+                ? currentTarget.getGlobalPosition() : getGlobalPosition();   // the incident's area: the target's
+        boolean explosiveReady = com.openworld.weapon.ExplosiveCooldown.readyQuiet(here.getX(), here.getZ(), com.openworld.weapon.ExplosiveCooldown.now());
         // a ranged weapon with ammo first; a carried melee weapon (special forces' knife) only when none has any --
         // its close-quarters use is startMeleeFallback's, never the default pick
         for (int pass = 0; pass < 2 && bestIndex < 0; pass++) {
@@ -848,10 +858,15 @@ public class AICharacter extends Character {
                 if (!weaponController.hasAmmoForWeapon(i)) continue;
                 WeaponItem s = weaponController.getWeaponItem(i);
                 if (s == null || (pass == 0 && s.getWeaponType() == WeaponType.MELEE)) continue;
+                if (weaponController.firesAiExplosive(s)) {
+                    explosiveHeld = true;
+                    if (!explosiveReady) continue;
+                }
                 if (s.damage > bestDamage) { bestDamage = s.damage; bestIndex = i; }
             }
         }
         cachedBestWeapon = bestIndex >= 0 ? bestIndex : 0;
+        cachedBestUntilMs = explosiveHeld ? godot.api.Time.getTicksMsec() + 500 : 0;
         return cachedBestWeapon;
     }
 

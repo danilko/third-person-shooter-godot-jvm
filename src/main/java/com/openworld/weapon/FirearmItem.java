@@ -256,6 +256,12 @@ public class FirearmItem extends WeaponItem {
 	fillMagazine();
   }
 
+  /** An AI's firearm never spends its reserve (PLAN.md P1e step 1, {@link AiAmmoRule}); a player's always does. */
+  @Override
+  protected boolean keepsReserveOnReload() {
+	return owningCharacter instanceof com.openworld.character.AICharacter && AiAmmoRule.unlimitedReserve();
+  }
+
   /** True when the trigger can produce another shot (semi-auto lock check only). */
   @Override
   public boolean canUse() {

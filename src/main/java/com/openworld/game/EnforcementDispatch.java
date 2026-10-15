@@ -127,6 +127,8 @@ public class EnforcementDispatch extends Node {
         /** SEARCHING: the point it is walking to round the last known position, and how long it keeps it. */
         Vector3 searchPoint;
         double searchFor;
+        /** Counted toward its wave's attrition (down or dry) -- once (P1e step 1). */
+        boolean lossCounted;
     }
 
     // ── LOSING THE POLICE -- and a gang's hunters (user, 2026-10-10: "even 1 to 3 stars cannot lose the police
@@ -318,7 +320,9 @@ public class EnforcementDispatch extends Node {
     /** Per player|side: no new unit before this clock time (the regroup lull, 1g b3), and units gone dry since the last
      *  lull. */
     private final Map<String, Double> lullUntil = new HashMap<>();
-    private final Map<String, Integer> dryCount = new HashMap<>();
+    /** Per player|side since the last lull: units LOST (down or dry) -- the wave attrition that starts the lull
+     *  (PLAN.md P1e step 1). */
+    private final Map<String, Integer> waveLost = new HashMap<>();
     private int dryRetreats, dryRestocks, restocksDone, lulls, tokenHolds;
     private double radioIn;
     private double tickIn, spawnIn;
@@ -418,6 +422,13 @@ public class EnforcementDispatch extends Node {
             if (u.guard) stars = p != null && held != null ? Integer.valueOf(1) : null;
             double far = nearestPlayer(u.body.getGlobalPosition());
             boolean seenNow = inView(u.body.getGlobalPosition());
+            // a unit DOWN in the fight is part of the wave's attrition (the lull's trigger, P1e step 1): counted once,
+            // the tick it is first seen dead while still on a live call
+            if (u.body.isDead() && !u.lossCounted && !u.guard && u.retiredFor == 0 && stars != null) {
+                DispatchRules rd = POLICE.equals(u.side) ? police
+                        : GangSystem.get() != null ? GangSystem.get().hunterRules() : null;
+                if (rd != null) countLoss(u, stars, rd);
+            }
             if (u.body.isDead() || stars == null || u.retiredFor > 0) {
                 // retired: a corpse, a standing that is gone, or a unit that got stuck -- it leaves the scene, and
                 // is freed out of view (never in front of anyone)
@@ -623,7 +634,7 @@ public class EnforcementDispatch extends Node {
             return true;
         }
         if (!isDry(b) || p == null || flat(b.getGlobalPosition(), p.getGlobalPosition()) <= DRY_MELEE) return false;
-        countDry(u, stars, r);
+        countLoss(u, stars, r);
         com.openworld.item.AmmoSupply a = com.openworld.item.AmmoSupply.nearest(this, b.getGlobalPosition(), r.supplyReach);
         if (a != null && !supplyTaken(a)) {
             u.restockAt = a;
@@ -648,20 +659,29 @@ public class EnforcementDispatch extends Node {
         radio(p, u.side, "out of ammo, falling back");
     }
 
-    /** Count a unit gone dry; past half of the units on this player, hold the next wave (the regroup lull). The lull is
-     *  not started while armour or a helicopter is still on the player (they are the high-star pressure). */
-    private void countDry(Unit u, int stars, DispatchRules r) {
+    /**
+     * WAVE ATTRITION (PLAN.md P1e step 1; it was "half the units dry", which an AI with an unlimited reserve never is):
+     * a unit DOWN or DRY counts against its wave; once half the units sent on this player and side since the last lull
+     * are lost, the next wave is held back for regroup_seconds (the regroup lull, the player's breather). Not started
+     * while armour or a helicopter is still on the player (they are the high-star pressure). Counted once a unit.
+     */
+    private void countLoss(Unit u, int stars, DispatchRules r) {
+        if (u.lossCounted) return;
+        u.lossCounted = true;
         String key = u.playerId + "|" + u.side;
-        int n = dryCount.merge(key, 1, Integer::sum);
-        int live = 0;
+        int lost = waveLost.merge(key, 1, Integer::sum);
+        // the wave = what was lost since the last lull + every unit still in the fight (alive, on the call, not lost):
+        // a unit that walked off stuck and was replaced is in neither
+        int fighting = 0;
         for (Unit o : units)
-            if (key.equals(o.playerId + "|" + o.side) && GD.isInstanceValid(o.body) && !o.body.isDead() && o.retiredFor == 0) live++;
+            if (key.equals(o.playerId + "|" + o.side) && !o.guard && !o.lossCounted && GD.isInstanceValid(o.body)
+                    && !o.body.isDead() && o.retiredFor == 0) fighting++;
         int secs = r.regroupFor(stars);
-        if (secs <= 0 || n * 2 < Math.max(2, live)) return;
+        if (secs <= 0 || !DispatchRules.lullDue(lost, lost + fighting)) return;
         for (Heli h : helis) if (u.playerId.equals(h.playerId) && GD.isInstanceValid(h.h) && h.retiredFor == 0) return;
         for (Car c : cars) if (u.playerId.equals(c.playerId) && c.gun && GD.isInstanceValid(c.car)) return;
         lullUntil.put(key, clock + secs);
-        dryCount.put(key, 0);
+        waveLost.put(key, 0);
         lulls++;
         radioIn = 0;
         radio(null, u.side, "units regrouping -- " + secs + " s");
@@ -736,6 +756,38 @@ public class EnforcementDispatch extends Node {
     @Register
     public String dryNow() {
         return dryRetreats + "," + dryRestocks + "," + restocksDone + "," + lulls + "," + tokenHolds;
+    }
+
+    /** "magazines,reserves,full reserves,reloads" summed over every live unit of {@code side}'s firearms (P1e step 1
+     *  probe readout: with the AI rule the reserve stays full as they fight, while the reloads rise). */
+    @Register
+    public String unitAmmoNow(String side) {
+        int mag = 0, res = 0, full = 0, reloads = 0;
+        for (Unit u : units) {
+            if (!side.equals(u.side) || !GD.isInstanceValid(u.body) || u.body.isDead() || u.body.weaponController == null) continue;
+            var wc = u.body.weaponController;
+            reloads += wc.reloadsStarted();
+            for (int i = 1; i < wc.getSlotCount(); i++) {
+                if (!(wc.getWeaponItem(i) instanceof com.openworld.weapon.FirearmItem w) || w.isInfiniteAmmo) continue;
+                mag += w.getMagazine();
+                res += w.getReserve();
+                full += w.getReserveMax();
+            }
+        }
+        return mag + "," + res + "," + full + "," + reloads;
+    }
+
+    /** "fired,refused,stamped": AI explosives fired and held by the shared cooldown, AI drops made finite (P1e). */
+    @Register
+    public String aiAmmoCountsNow() {
+        return com.openworld.weapon.ExplosiveCooldown.counts() + "," + com.openworld.weapon.AiAmmoRule.stampedCount();
+    }
+
+    /** The P1e step 1 controls: the AI reserve rule and the shared explosive cooldown, on or off. */
+    @Register
+    public void setAiAmmoRulesNow(boolean unlimitedReserve, boolean explosiveCooldown) {
+        com.openworld.weapon.AiAmmoRule.unlimitedOverride = unlimitedReserve;
+        com.openworld.weapon.ExplosiveCooldown.enabled = explosiveCooldown;
     }
 
     /** Seconds left of the regroup lull on {@code playerId}'s {@code side} (0 = none). */
@@ -1120,6 +1172,9 @@ public class EnforcementDispatch extends Node {
         Vector3 muzzle = at.plus(up.times(2.6)).plus(fwd.times(3.0));
         Vector3 aimAt = p.getGlobalPosition().plus(new Vector3(0, 1.0, 0));
         if (!clearLine(muzzle.minus(new Vector3(0, 0.6, 0)), aimAt.minus(new Vector3(0, 0.6, 0)))) return;
+        // the area's shared explosive cooldown (P1e step 1): a launcher just fired here holds the main gun too
+        Vector3 tp = p.getGlobalPosition();     // the incident's area is the target's
+        if (!com.openworld.weapon.ExplosiveCooldown.ready(tp.getX(), tp.getZ(), com.openworld.weapon.ExplosiveCooldown.now())) return;
         if (!(GD.load(SHELL_SCENE) instanceof PackedScene ps) || !(ps.instantiate() instanceof com.openworld.weapon.RocketProjectile rp))
             return;
         rp.speed = 90f;
@@ -1139,6 +1194,7 @@ public class EnforcementDispatch extends Node {
         rp.addCollisionExceptionWith(c.car);
         c.gunIn = r.gunInterval;
         shellsFired++;
+        com.openworld.weapon.ExplosiveCooldown.mark(tp.getX(), tp.getZ(), com.openworld.weapon.ExplosiveCooldown.now());
     }
 
     private int shellsFired;

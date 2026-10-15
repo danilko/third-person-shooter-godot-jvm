@@ -291,6 +291,16 @@ public class VehicleProbeHelper extends Node {
         return n;
     }
 
+    /** The largest magazine among the firearms {@code c} carries (0 = none): probe_ammo_supply's drop bound. */
+    @Register
+    public int largestMagazineOf(Node c) {
+        if (!(c.getNodeOrNull("WeaponController") instanceof com.openworld.weapon.WeaponController wc)) return 0;
+        int n = 0;
+        for (int i = 1; i < wc.getSlotCount(); i++)
+            if (wc.getWeaponItem(i) instanceof com.openworld.weapon.FirearmItem w && !w.isInfiniteAmmo) n = Math.max(n, w.getMagazineSize());
+        return n;
+    }
+
     /** Empty every firearm {@code c} carries. */
     @Register
     public void drainAmmo(Node c) {

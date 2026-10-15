@@ -2,13 +2,16 @@ extends SceneTree
 ## VEHICLE AMMO, ATTACK TOKENS AND THE REGROUP LULL (PLAN.md 1g b2/b3; item.AmmoSupply, game.EnforcementDispatch).
 ##
 ##   stdbuf -oL godot --headless --path . --script tools/godot/probe_ammo_supply.gd [-- --world=island] [-- --control]
-##   --control: attack tokens and the dry retreat OFF (everyone attacks; a dry unit fights on with its fists).
+##   --control: attack tokens, the dry retreat and the AI reserve rule OFF (everyone attacks; a dry unit fights on
+##              with its fists; an AI's reload spends its reserve like a player's).
 ##
 ##   1. a police car carries spare ammunition at its rear; the PLAYER, standing there with an empty rifle, presses
 ##      interact and is full again, and the car's stock goes down by one;
 ##   2. three stars: never more units attacking at once than tokens_by_stars allows (the rest close in and hold);
 ##   3. every unit's ammo emptied: units walk back to the car's spare ammo (or leave), restock there, the squad's
-##      regroup lull starts (no new unit sent for regroup_seconds), and units that restocked fight again.
+##      regroup lull starts (no new unit sent for regroup_seconds), and units that restocked fight again;
+##   4. (P1e step 1) while they fought in 2, the units RELOADED and their reserve stayed full (an AI's firearm never
+##      spends its reserve); one unit killed drops a FINITE firearm (its magazine + 0..1 spare magazines).
 
 const DEBUG := "res://src/main/resources/com/openworld/world/DebugWorld.tscn"
 const ISLAND := "res://src/main/resources/com/openworld/world/World.tscn"
@@ -32,6 +35,12 @@ func _player() -> CharacterBody3D:
 			return p
 	return world.get_node_or_null("Characters/Player")
 
+func _all(n: Node) -> Array:
+	var out := [n]
+	for c in n.get_children():
+		out.append_array(_all(c))
+	return out
+
 func _dry(ed: Node) -> PackedInt32Array:
 	var p := String(ed.call("dry_now")).split(",")
 	return PackedInt32Array([int(p[0]), int(p[1]), int(p[2]), int(p[3]), int(p[4])])
@@ -53,6 +62,7 @@ func _initialize() -> void:
 	if control:
 		ed.set("attack_tokens", false)
 		ed.set("dry_retreat", false)
+		ed.call("set_ai_ammo_rules_now", false, true)
 	for pair in [["police", "enemy"], ["enemy", "police"]]:
 		fm.call("flip_relationship", pair[0], pair[1], "NEUTRAL")
 	var player := _player()
@@ -109,6 +119,15 @@ func _initialize() -> void:
 		_check(max_attack >= 1 and max_attack <= tokens, "never more than %d attacking at once (%d)" % [tokens, max_attack])
 		_check(foot <= tokens or _dry(ed)[4] > 0, "units beyond the tokens were held back")
 
+	# 4a. the AI reserve rule, read after the case-2 fight
+	var am := String(ed.call("unit_ammo_now", "police")).split(",")
+	print("  unit ammo after the fight: magazines %s reserve %s of %s, reloads %s" % [am[0], am[1], am[2], am[3]])
+	if control:
+		_check(int(am[3]) == 0 or int(am[1]) < int(am[2]), "control: a reload spent the reserve")
+	else:
+		_check(int(am[3]) >= 1, "the units reloaded while fighting (%s)" % am[3])
+		_check(int(am[1]) == int(am[2]), "and their reserve stayed full (%s of %s)" % [am[1], am[2]])
+
 	# 3. everyone dry
 	var stock1 := int(sup.call("stock_now"))
 	ed.call("drain_unit_ammo_now", "police")
@@ -137,6 +156,22 @@ func _initialize() -> void:
 		_check(d[2] >= 1 and int(sup.call("stock_now")) < stock1, "a unit restocked there and the car's stock went down")
 		_check(d[3] >= 1 and saw_lull > 5.0, "the squad's regroup lull started (%.1f s)" % saw_lull)
 		_check(max_foot_in_lull <= foot_at_drain, "no new unit was sent during the lull (%d <= %d)" % [max_foot_in_lull, foot_at_drain])
+	# 4b. a unit killed drops a finite firearm
+	var bodies: Array = ed.call("bodies_now", "police")
+	if not control and bodies.size() > 0:
+		var stamped0 := int(String(ed.call("ai_ammo_counts_now")).split(",")[2])
+		var victim: Node = bodies[0]
+		var mag_size := int(helper.call("largest_magazine_of", victim))
+		helper.call("kill", victim)
+		await _tick(30)
+		var stamped := int(String(ed.call("ai_ammo_counts_now")).split(",")[2]) - stamped0
+		var worst := -1
+		for n in _all(root):
+			if n.has_meta("dropped_at_ms") and n.get("reserve") != null:
+				worst = max(worst, int(n.get("reserve")))
+		print("  killed a unit: %d drops stamped, highest dropped reserve %d (largest magazine %d)" % [stamped, worst, mag_size])
+		_check(stamped >= 1, "the dead unit's firearm was made finite as it dropped")
+		_check(worst >= 0 and worst <= mag_size, "a dropped AI firearm keeps at most one spare magazine (%d <= %d)" % [worst, mag_size])
 	ws.call("clear_now", pid)
 	print("RESULT %s (%d failures)" % ["PASS" if fails == 0 else "FAIL", fails])
 	quit(0 if fails == 0 else 1)

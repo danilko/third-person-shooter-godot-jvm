@@ -839,10 +839,17 @@ public class WeaponItem extends Pickup implements WeaponAction {
   }
 
   public void fillMagazine() {
-    int emptySpace = magazineSize - magazine;
-    magazine += min(emptySpace, reserve);
-    reserve -= min(emptySpace, reserve);
+    int take = min(magazineSize - magazine, reserve);
+    magazine += take;
+    if (!keepsReserveOnReload()) reserve -= take;
   }
+
+  /**
+   * Whether a reload leaves the reserve as it was (PLAN.md P1e step 1: an AI's firearm, {@link AiAmmoRule}). A reserve
+   * of 0 still loads nothing, so a drained or empty weapon stays dry. Named as a question so godot-jvm does not merge
+   * it into a property.
+   */
+  protected boolean keepsReserveOnReload() { return false; }
 
   public void fillAmmo() {
     reserve = reserveMax;

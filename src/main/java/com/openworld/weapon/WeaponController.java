@@ -896,6 +896,15 @@ public class WeaponController extends Node {
     // Held, not dropped: the body brings the weapon onto the aim within a frame or two
     // (MovementController.keepAimWithinReach), and a press eaten by a turn reads as a dead trigger.
     if (!w.pointsAtAim()) { holdPressForAim(); return; }
+    // An AI's explosive waits for its AREA's shared cooldown (PLAN.md P1e step 1, ExplosiveCooldown): the trigger is
+    // simply not pulled, and AICharacter.selectBestWeapon picks a gun meanwhile.
+    // keyed by the TARGET's area (the incident), else the shooter's: a tank 200 m off and a rifleman beside the
+    // player are one incident
+    Vector3 firedAt = getParent() instanceof com.openworld.character.AICharacter ai && ai.getTarget() != null
+        && GD.isInstanceValid(ai.getTarget()) ? ai.getTarget().getGlobalPosition()
+        : getParent() instanceof godot.api.Node3D body ? body.getGlobalPosition() : null;
+    boolean aiExplosive = firedAt != null && firesAiExplosive(w);
+    if (aiExplosive && !ExplosiveCooldown.ready(firedAt.getX(), firedAt.getZ(), ExplosiveCooldown.now())) return;
     // The weapon's OWN moving parts (pump, bolt, cylinder) -- see WeaponItem.weaponAnimatorPath.
     // Placed after every gate, so a shot that was suppressed moves nothing.
     w.playMotion(w.fireAnimation);
@@ -905,6 +914,7 @@ public class WeaponController extends Node {
     bufferedFireUntilMs = 0;
 
     w.useWeapon();
+    if (aiExplosive) ExplosiveCooldown.mark(firedAt.getX(), firedAt.getZ(), ExplosiveCooldown.now());
     weaponFired.emit(w.getFireRate() * 0.2f);
     ammoChanged.emit(w.getMagazine(), w.getReserve());
     // Fire is replicated as STATE: bump the rolling shot counter that rides the snapshot stream.
@@ -923,6 +933,12 @@ public class WeaponController extends Node {
       // After the last throw, let the weapon clear its own slot (ThrowableItem auto-empties)
       w.onMagazineEmpty();
     }
+  }
+
+  /** A launcher or a throwable in an AI's hands: what the shared explosive cooldown gates (PLAN.md P1e). */
+  public boolean firesAiExplosive(WeaponItem w) {
+    return (w instanceof ProjectileItem || w instanceof ThrowableItem)
+        && getParent() instanceof com.openworld.character.AICharacter;
   }
 
   /**
@@ -1453,6 +1469,7 @@ public class WeaponController extends Node {
     Vector3 impulse  = forward.times(3.0f)
         .plus(new Vector3(0, 4.0f, 0))
         .plus(character.getVelocity().times(0.3f));
+    if (character instanceof com.openworld.character.AICharacter) AiAmmoRule.stampDropped(item);   // finite once dropped (P1e)
     returnWeaponToWorld(item, spawnPos, impulse);
     announceWeaponDropped(item, slot, spawnPos, impulse, false);
   }
@@ -1467,6 +1484,10 @@ public class WeaponController extends Node {
     Vector3 impulse  = scatter
         .plus(new Vector3(0, (float) GD.randfRange(3.0f, 6.0f), 0))
         .plus(character.getVelocity().times(0.4f));
+    // an AI's firearm never spent its reserve (AiAmmoRule): what it drops is finite -- the magazine left in it and a
+    // rolled spare magazine or none -- stamped HERE, in the death-drop path itself, before the drop is announced (the
+    // announce returns early in single player, and its wire carries magazine + reserve)
+    if (character instanceof com.openworld.character.AICharacter) AiAmmoRule.stampDropped(item);
     returnWeaponToWorld(item, spawnPos, impulse);
     announceWeaponDropped(item, slot, spawnPos, impulse, true);
   }

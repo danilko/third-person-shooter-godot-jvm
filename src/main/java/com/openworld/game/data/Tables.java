@@ -54,12 +54,24 @@ public final class Tables {
     }
 
     /** item/ammo_supply.json: which vehicles carry spare ammunition, and how it is used. */
-    public record AmmoSupplies(double reach, double restockSeconds, Map<String, Integer> stockByVehicle) {
+    public record AmmoSupplies(double reach, double restockSeconds, Map<String, Integer> stockByVehicle, AiAmmo ai) {
         static AmmoSupplies read(DataReader d) {
             Map<String, Integer> stock = new HashMap<>();
             for (Map.Entry<String, DataReader> e : d.rows("vehicles").entrySet())
                 stock.put(e.getKey(), e.getValue().integer("stock", 0));
-            return new AmmoSupplies(d.num("reach", 2.2), d.num("restock_seconds", 2.0), stock);
+            return new AmmoSupplies(d.num("reach", 2.2), d.num("restock_seconds", 2.0), stock, AiAmmo.read(d.child("ai_ammo")));
+        }
+    }
+
+    /** item/ammo_supply.json {@code ai_ammo} (PLAN.md P1e step 1): what an AI's ammunition is. */
+    public record AiAmmo(boolean unlimitedReserve, int dropSpareMags, double explosiveCooldown, double explosiveArea) {
+        public static final AiAmmo DEFAULT = new AiAmmo(true, 1, 6.0, 80.0);
+
+        static AiAmmo read(DataReader a) {
+            if (a == null) return DEFAULT;
+            return new AiAmmo(a.bool("unlimited_reserve", DEFAULT.unlimitedReserve),
+                    a.integer("drop_spare_mags", DEFAULT.dropSpareMags), a.num("explosive_cooldown", DEFAULT.explosiveCooldown),
+                    a.num("explosive_area", DEFAULT.explosiveArea));
         }
     }
 
@@ -77,7 +89,7 @@ public final class Tables {
             ROOT + "item/supplies.json", SupplyCatalog::read, LinkedHashMap::new);
 
     public static final DataTable<AmmoSupplies> AMMO_SUPPLY = DataTable.define("ammo_supply",
-            ROOT + "item/ammo_supply.json", AmmoSupplies::read, () -> new AmmoSupplies(2.2, 2.0, Map.of()));
+            ROOT + "item/ammo_supply.json", AmmoSupplies::read, () -> new AmmoSupplies(2.2, 2.0, Map.of(), AiAmmo.DEFAULT));
 
     public static final DataTable<Map<com.openworld.game.WorldDensity, com.openworld.game.WorldDensity.Row>> DENSITY =
             DataTable.define("density", ROOT + "game/density.json", com.openworld.game.WorldDensity::read, Map::of);

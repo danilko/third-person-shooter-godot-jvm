@@ -13,6 +13,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - Uniforms per force, a think budget for AI, and dummy traffic cars (PLAN.md 1g c/d/e, 2026-10-07)
 - Breaching units walk round the BLOCK, on a baked walk grid (PLAN.md 1g f, 2026-10-07)
 - Losing the police (and a gang's hunters): sight is a line, and the lost are SEARCHED for (2026-10-10, user-reported)
+- AI ammo, finite drops, the shared explosive cooldown, the lull on attrition (PLAN.md P1e step 1, 2026-10-15)
 
 ---
 
@@ -277,7 +278,8 @@ a real counter, dies, is respawned; both print the clock) -- 25/25 with walk + t
   `crimes.json` `weapons_by_stars[1]` = BAT1: at one star police are hostile but melee only; firearms from two.
 - **A melee unit keeps the dispatch's straight approach until 3 m** (`MELEE_ENGAGE_IN/OUT` 3/6 against a gun's 25/35):
   handed to the FSM at 25 m, baton officers stood 22 m off for the whole 90 s case.
-- **No unlimited ammo** (user decision): units carry each weapon's normal full load, and the base reserves were raised
+- **No unlimited ammo** (user decision, SUPERSEDED 2026-10-15 by P1e step 1 -- see "AI ammo, finite drops, the shared
+  explosive cooldown, the lull on attrition" below): units carry each weapon's normal full load, and the base reserves were raised
   to CS's buy-menu loads (PIS1 15+90, PIS2 7+35, REV1 6+36, DUP1 30+120, SMG1 30+120, SHG1 6+32, ASR1/2 30+90,
   SNR1 5+30), which the player gets too. Out of ammo an AI fights with its fists (selectBestWeapon's slot-0 fallback).
 - **A reloading AI with its target within 1.8 m strikes instead** (`AICharacter.startMeleeFallback`, 2 s, its melee
@@ -413,3 +415,33 @@ last known place, found again 3 times in 70 s (hide-and-seek, which is the featu
 standing only); a lost player INSIDE a building is not breached (units search outside until one sees in); there is
 no vision cone (a unit "sees" all round within reach); the helicopter still orbits the player's true position while
 lost (it does not fire); gang hunters were not probed separately (same code path, `sight_of_now(player, gang)`).
+
+## AI ammo, finite drops, the shared explosive cooldown, the lull on attrition (PLAN.md P1e step 1, 2026-10-15)
+
+User (playtest): "AI run dry far too easily". Data: `item/ammo_supply.json` `ai_ammo` (`Tables.AiAmmo`).
+- **An AI's firearm never spends its reserve** (`weapon.AiAmmoRule`; `WeaponItem.fillMagazine` asks
+  `keepsReserveOnReload`, which `FirearmItem` answers for an `AICharacter` holder). Magazines still empty and reload, so
+  the rhythm of a fight is unchanged. A reserve already at 0 loads nothing, so `drainUnitAmmoNow`, the dry retreat, the
+  restock at a car and a scripted dry unit all still work. Keyed on the HOLDER, not the controller: a disconnected
+  player's bot body is a Player and stays finite. Launchers (`ProjectileItem`) and throwables stay finite.
+- **What an AI drops is finite** for whoever picks it up: the magazine left in it plus 0..`drop_spare_mags` (1) whole
+  magazines, rolled (`AiAmmoRule.stampDropped`), stamped in the death-drop path itself
+  (`WeaponController.returnWeaponToWorldOnDeath`, and the manual drop) BEFORE the drop is announced -- the announce
+  returns early in single player, and its wire already carries magazine + reserve (no wire change).
+- **The shared explosive cooldown** (`weapon.ExplosiveCooldown`, engine-free, `AiAmmoTest`): after an AI explosive (a
+  launcher, a grenade, LTK1/TNK1's main gun) aimed into an area -- the TARGET's, `explosive_area` 80 m cells and their 8
+  neighbours -- no other AI explosive is aimed there for `explosive_cooldown` (6 s). Per area, never per player: two
+  players together draw one rocket. The trigger is not pulled (`WeaponController.onWeaponFire`), and
+  `AICharacter.selectBestWeapon` passes an explosive over meanwhile (that pick is re-asked every 0.5 s), so the unit
+  fights with its gun. A player's explosives are never gated.
+- **The regroup lull starts on WAVE ATTRITION** (`EnforcementDispatch.countLoss`, `DispatchRules.lullDue`): a unit DOWN
+  or DRY counts once; when half the wave (lost since the last lull + still fighting; at least 2 lost) is lost, no new
+  unit for `regroup_seconds_by_stars`. Its only trigger used to be `countDry`, which an unlimited reserve never reaches.
+- Controls: `EnforcementDispatch.set_ai_ammo_rules_now(unlimitedReserve, explosiveCooldown)`. Readouts
+  `unit_ammo_now(side)` ("magazines,reserves,full reserves,reloads") and `ai_ammo_counts_now` ("fired,held,stamped").
+- Gates: `probe_ammo_supply.gd` 13/13 (new: the units reloaded and their reserve stayed full; a killed unit drops at
+  most one spare magazine; `--control` also turns the reserve rule off and shows the reserve spent);
+  **`tools/godot/probe_explosives.gd [-- --control]`** (World.tscn, 5 lethal stars, 150 s): cooldown on 9 explosives in
+  145 s from the first (3.7/min, 14 held); control 18 in 84 s (12.9/min, still rising as armour arrived).
+  probe_enforcement (both worlds), probe_breach, probe_lose_police, probe_recovery PASS. Seen once in 4 runs:
+  probe_ammo_supply's token case read 4 attackers against 3 tokens (not reproduced in the next 3).

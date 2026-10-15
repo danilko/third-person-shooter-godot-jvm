@@ -1,5 +1,12 @@
 {
   "note": "Which vehicles carry spare ammunition at their rear (item.AmmoSupply, PLAN.md 1g b3, user 2026-10-07): a police car's trunk, an armoured vehicle's or a tank's stowage. ANY character may restock there -- a unit out of ammo walks back to it (EnforcementDispatch), and a player who has taken (or just stands at) such a vehicle presses interact. Keyed by the vehicle's catalog id (its scene's file stem). `stock` = how many restocks the vehicle holds before it is empty; a restock fills every weapon the character carries (WeaponController.fillWeaponAmmo). `restock_seconds` = how long a unit stands at the trunk. `reach` = how far from the trunk's centre a character may stand.",
+  "ai_ammo_note": "PLAN.md P1e step 1 (user 2026-10-15: AI ran dry far too easily). unlimited_reserve: a FIREARM held by an AICharacter never spends its reserve on a reload (it still empties magazines and reloads; a reserve already at 0 -- drained, or a weapon that came empty -- stays 0). Launchers and throwables stay finite. drop_spare_mags: a firearm dropped by a dead (or dropping) AI is FINITE for whoever picks it up: the magazine left in it plus 0..drop_spare_mags whole magazines, rolled. explosive_cooldown / explosive_area: after any AI explosive (a launcher, a grenade, an armoured vehicle's main gun) AIMED INTO an area (the target's, explosive_area metres, its 8 neighbours included) no other AI explosive is aimed there for explosive_cooldown seconds -- per AREA, so two players together do not draw double rockets.",
+  "ai_ammo": {
+    "unlimited_reserve": true,
+    "drop_spare_mags": 1,
+    "explosive_cooldown": 6.0,
+    "explosive_area": 80.0
+  },
   "reach": 2.2,
   "restock_seconds": 2.0,
   "vehicles": {

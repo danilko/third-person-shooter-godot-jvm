@@ -162,6 +162,10 @@ public final class DispatchRules {
 
     public int regroupFor(int stars) { return at(regroupByStars, stars); }
 
+    /** The regroup lull is due (PLAN.md P1e step 1, WAVE ATTRITION): half the wave ({@code wave} = lost since the last
+     *  lull + still fighting) is down or dry -- at least two lost, so one early casualty does not stall a response. */
+    public static boolean lullDue(int lost, int wave) { return lost >= 2 && lost * 2 >= wave; }
+
     /**
      * Who holds an attack token this tick. {@code held[i]} = seconds unit i has held one (negative = none),
      * {@code rest[i]} = seconds it must still wait after giving one back, {@code dist[i]} = its distance to the player.

@@ -127,4 +127,13 @@ class DispatchRulesTest {
         for (var b : r.bodies) assertTrue(Files.exists(Path.of("src/main/resources/com/openworld/character/CharacterVisuals_"
                 + Character.toUpperCase(b.body().charAt(0)) + b.body().substring(1) + ".tscn")), b.body());
     }
+
+    @Test
+    void theRegroupLullStartsAtHalfTheWaveLost() {
+        assertFalse(DispatchRules.lullDue(1, 2), "one casualty never stalls a response");
+        assertTrue(DispatchRules.lullDue(2, 2));
+        assertTrue(DispatchRules.lullDue(3, 6));
+        assertFalse(DispatchRules.lullDue(2, 6));
+        assertTrue(DispatchRules.lullDue(5, 9));
+    }
 }
