@@ -413,6 +413,12 @@ RESERVES = (
     # island). A street site, and a LEVELLED site (island_sites.reserve_sites): the block ground is filled to footway
     # level round the rotary.
     ("central_forecourt", (619.0, -180.0, 956.0, -119.0)),
+    # THE WEST SUB-CENTRE STATION'S 駅前広場 (S16 E [I5], user 2026-10-14: "B. Bays + plaza"): between the station's east
+    # face (record x -736, the Blue line at BLUE_WEST_X -750), its front street y -413 (paved edge y -420), the 商店街 x
+    # -650 (paved edge ~-657) and the station mall (north edge y -500). Bus stops + taxi rank on the street's kerb, a
+    # plaza; the WestForecourt composite dresses it (tools/building_kit/site_west_forecourt.py). No rotary: two mouths
+    # on the front street overlap its 踏切 and the x -650 junction.
+    ("west_station_forecourt", (-734.0, 421.0, -662.0, 497.0)),
 )
 #: Streets the plan REMOVES by hand (user, 2026-09-22, marked on `reference/island_plan_v16_2026-09-22-remove-too-small-
 #: street-blocks.png`): lines that cut a block too small for a building to be placed simply, so the grid stays larger

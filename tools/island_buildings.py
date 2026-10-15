@@ -602,6 +602,14 @@ def street_region(owner):
     return None
 
 
+def _station_display():
+    """{station slug (`island_sites.rail_stations`' node suffix): its English display name} from StationNames.json."""
+    path = os.path.join(ROOT, "src/main/resources/com/openworld/world/StationNames.json")
+    if not os.path.exists(path):
+        return {}
+    return {k.lower().replace(" ", "_"): v["en"] for k, v in json.load(open(path))["stations"].items()}
+
+
 def region_of(x, y):
     for r in REGIONS:
         x0, y0, x1, y1 = r[1]
@@ -1570,8 +1578,10 @@ def write_places(placed, aabbs, text):
             continue                       # a site's car park is part of the site, not a place of its own
         label, tier = SITE_PLACES.get(name, (name, 2))
         if name.startswith("Station_") and name not in SITE_PLACES:
-            # a rail station's kit scene (`island_sites.rail_stations`, node Station_<slug>): "Farm Station"
-            label = name[len("Station_"):].replace("_", " ").title() + " Station"
+            # a rail station's kit scene (`island_sites.rail_stations`, node Station_<slug>): "Farm Station" -- its
+            # DISPLAYED name from StationNames.json when it has one (S16 E: Residential shows "Nishi-Fukutoshin")
+            slug = name[len("Station_"):]
+            label = _station_display().get(slug, slug.replace("_", " ").title()) + " Station"
         places.append({"name": label, "kind": name, "tier": tier,
                        "at": [round(x, 2), 0.0, round(z, 2)], "go": [round(x, 2), 0.0, round(z, 2)]})
     regions = [{"name": r[0], "box": [r[1][0], -r[1][3], r[1][2], -r[1][1]]} for r in REGIONS]   # record -> godot

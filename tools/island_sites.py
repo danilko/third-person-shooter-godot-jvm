@@ -466,6 +466,7 @@ RESERVE_SITES = {
     "central_forecourt": ("CentralForecourt", 0.0, 1200.0),
     "wangan_pa": ("ExpresswayPA", 0.0, 1200.0),          # the rest building east, by the junction
     "airport_cargo": ("CargoShed", 0.0, 1500.0),         # the docks south, to the apron
+    "west_station_forecourt": ("WestForecourt", 0.0, 1200.0),   # S16 E [I5]: its kerb (north) on the front street
     "airport_forecourt": ("AirportForecourt", 0.0, 1500.0),  # round the kuko_rotary loop, beside the Airport station  # the 駅前広場: its front (+Z) south to ekimae_dori
 }
 #: reserves whose ground is LEVELLED to footway height round the road running through them (the block-ground stage
