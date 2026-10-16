@@ -188,6 +188,30 @@ func _initialize() -> void:
 		print("  killed a unit (largest magazine %d): %d drops stamped, %d dropped weapons, %d keep more than one spare magazine" % [mag_size, stamped, drops, over])
 		_check(stamped >= 1, "the dead unit's firearm was made finite as it dropped")
 		_check(drops >= 1 and over == 0, "every dropped AI firearm keeps at most one spare magazine (%d of %d over)" % [over, drops])
+		# 4c. an AI that PICKS UP such a finite firearm fills its reserve (the AI rule); dropped again it is cut again
+		var finite: Node = null
+		for n in _all(root):
+			if n.has_meta("dropped_at_ms") and n.get("reserve") != null and n.get("reserve_max") != null \
+					and int(n.get("reserve_max")) > 0 and int(n.get("reserve")) < int(n.get("reserve_max")):
+				finite = n
+				break
+		if finite == null:
+			print("  4c: no finite dropped firearm to pick up (every roll kept a spare?) -- skipped")
+		else:
+			var before := int(finite.get("reserve"))
+			var picker: Node3D = ed.call("spawn_body_now", "police", (finite as Node3D).global_position + Vector3(2, 0.3, 0), "")
+			await _tick(10)
+			var refill0 := int(String(ed.call("unit_ammo_now", "police")).split(",")[5])
+			helper.call("equip_item", picker, finite)
+			await _tick(30)
+			var after := int(finite.get("reserve"))
+			var refills := int(String(ed.call("unit_ammo_now", "police")).split(",")[5]) - refill0
+			print("  4c: an AI picked up %s: reserve %d -> %d of %d (refills %d)" % [finite.name, before, after, int(finite.get("reserve_max")), refills])
+			_check(after == int(finite.get("reserve_max")) and refills == 1, "an AI that picks up a finite firearm fills its reserve (%d -> %d)" % [before, after])
+			helper.call("kill", picker)
+			await _tick(30)
+			_check(is_instance_valid(finite) and int(finite.get("reserve")) <= int(finite.get("magazine_size")),
+					"dropped by that AI, it is finite again (%d)" % (int(finite.get("reserve")) if is_instance_valid(finite) else -1))
 	ws.call("clear_now", pid)
 	print("RESULT %s (%d failures)" % ["PASS" if fails == 0 else "FAIL", fails])
 	quit(0 if fails == 0 else 1)

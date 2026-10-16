@@ -441,7 +441,8 @@ public class EnforcementDispatch extends Node {
         }
         // 5th: rounds any AI reload took from a reserve, ever (a unit may hold a FINITE weapon it picked up -- a
         // stamped drop -- so "reserve == max" is not the rule; "a reload never spends it" is)
-        return mag + "," + res + "," + full + "," + reloads + "," + com.openworld.weapon.AiAmmoRule.spentCount();
+        return mag + "," + res + "," + full + "," + reloads + "," + com.openworld.weapon.AiAmmoRule.spentCount()
+                + "," + com.openworld.weapon.AiAmmoRule.refilledCount();
     }
 
     /** "fired,refused,stamped": AI explosives fired and held by the shared cooldown, AI drops made finite (P1e). */

@@ -53,7 +53,21 @@ public final class AiAmmoRule {
         stamped++;
     }
 
-    private static int spent;
+    private static int spent, refilled;
+
+    /**
+     * An AI that PICKS UP a firearm fills its reserve (user, 2026-10-15): a stamped drop (the magazine left + 0..1
+     * spare) would otherwise go dry after a magazine or two in AI hands and send the unit off to restock, against the
+     * rule that an AI's firearm never runs out of reserve. It stays finite for players: whenever an AI lets it go,
+     * {@link #stampDropped} cuts it again. Only while the unlimited rule is on.
+     */
+    public static void fillOnAiPickup(WeaponItem item) {
+        if (!(item instanceof FirearmItem) || item.isInfiniteAmmo || !unlimitedReserve()) return;
+        if (item.getReserve() < item.getReserveMax()) { item.setReserve(item.getReserveMax()); refilled++; }
+    }
+
+    /** Firearms an AI picked up and filled (probe readout). */
+    public static int refilledCount() { return refilled; }
 
     /** Rounds an AI's reload took from a reserve (0 while the unlimited rule is on -- the probe's real check). */
     public static void noteSpent(int rounds) { spent += rounds; }

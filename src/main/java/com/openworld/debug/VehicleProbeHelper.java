@@ -279,6 +279,15 @@ public class VehicleProbeHelper extends Node {
                 && com.openworld.item.WeaponGrant.grant(ch, id, c) != null;
     }
 
+    /** {@code c} picks up {@code item} lying in the world, through the ordinary pickup equip (requestEquip). */
+    @Register
+    public boolean equipItem(Node c, Node item) {
+        if (!(c.getNodeOrNull("WeaponController") instanceof com.openworld.weapon.WeaponController wc)
+                || !(item instanceof com.openworld.weapon.WeaponItem w)) return false;
+        wc.requestEquip(w);
+        return true;
+    }
+
     /** {@code c}'s rounds left over every firearm it carries (magazine + reserve). */
     @Register
     public int roundsOf(Node c) {

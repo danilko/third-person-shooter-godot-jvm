@@ -769,6 +769,7 @@ public class WeaponController extends Node {
 
     item.onPickedUp();
     injectCharacterRefs(item);
+    if (getOwner() instanceof com.openworld.character.AICharacter) AiAmmoRule.fillOnAiPickup(item);
     weapons[targetSlot] = item;
     equippedThisPass.add(item);
 

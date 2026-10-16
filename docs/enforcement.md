@@ -525,6 +525,12 @@ it replaced the planned island-wide total). `game.ForcePools` (engine-free, `For
   no reserve spent -- a unit can hold a FINITE weapon it picked up (a stamped drop). The check is now the rule itself:
   `AiAmmoRule.spentCount()` (rounds any AI reload took from a reserve; `unit_ammo_now`'s 5th field) stays 0 (control:
   36). The case also fights on (<= 30 s) until a first reload, so the rule is always exercised.
+- **An AI that PICKS UP a firearm fills its reserve** (user, 2026-10-15; `AiAmmoRule.fillOnAiPickup`, in
+  `WeaponController`'s runtime equip): a stamped drop in AI hands went dry after a magazine or two and sent the unit
+  off to restock, against "an AI's firearm never runs out". It stays finite for PLAYERS: whenever an AI lets it go,
+  the drop stamp cuts it again. Only while the unlimited rule is on; `unit_ammo_now`'s 6th field counts the fills.
+  Gate probe_ammo_supply 4c: a dropped SMG1 picked up by a fresh officer 30 -> 120 of 120; that officer killed, it
+  drops finite again.
 - The incident board for PLAYER acts is `game.IncidentBoard` (step 6 below); a player's hurt / kill of an officer,
   a civilian or a gang member is put on it for the radio.
 
