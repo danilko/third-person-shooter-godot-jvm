@@ -193,6 +193,7 @@ public class SaveSystem extends Node {
         if (scene != null && scene.getInstanceId() != garageScene) {
             garageScene = scene.getInstanceId();
             com.openworld.world.Garage.ensureHome(scene);
+            com.openworld.world.HomeBikes.ensure(scene);   // 3.1b: a scooter beside the starting car (after the bay)
         }
         sinceWorldWrite += delta;
         sinceProfileWrite += delta;

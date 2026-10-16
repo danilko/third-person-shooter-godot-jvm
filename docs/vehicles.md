@@ -11,6 +11,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - Auto-drive to the GPS waypoint, a testing aid (2026-10-11, user)
 - Engine sound: three re-timed loops and an idle, and which cars get a voice (2026-10-12)
 - A car stops by itself; a person never shoves a car; horn, squeal and crash sounds (PLAN.md 3.1, 2026-10-16)
+- Motorcycles: trying them -- the `spawn` command and the home bike row (PLAN.md 3.1b, 2026-10-16)
 
 ---
 
@@ -569,3 +570,31 @@ PLAN.md phase 3.1 = P2c 2c.1 + 2c.2 + F11. Gates: `tools/godot/probe_car_stop.gd
   * Sources: `tools/audio/build_vehicle_sfx.py` (horn misperpodcast 733553, squeal audible-edge 71737: Freesound CC0
     own recordings, HQ previews), `build_sfx.py` rows `car_crash_light/heavy`. NOTHING WAS HEARD: picked by spectrum.
 
+## Motorcycles: trying them -- the `spawn` command and the home bike row (PLAN.md 3.1b, 2026-10-16)
+
+User: "add a bike to the home car park, or an easy way to test different motorcycles". Both, and neither edits a
+generated scene (World.tscn / DebugWorld.tscn and `island_buildings.patch_start` belong to the map generators).
+The five bikes themselves (SCT1 / POB1 / TRB1 / SSB1 / PMB1, `Motorcycle.java`: 4 narrow rays, visual lean, crash
+throw, one-handed drive-by) are recorded in PLAN.md 3.1b until their own write-up lands here.
+
+- **One way to make a placed vehicle: `world.ParkedVehicle.place(scene, id, faction, transform, drop)`.** Instances
+  any `VehicleModels` id with a fresh `CharacterInfo` + UUID (the shared-sub-resource rule) and lifts an aircraft by
+  its box's reach below the origin. The caller tags groups and calls `announceVehicleSpawn` (host only). Used by the
+  `MARK_vehicle` markers, the console and the bike row.
+- **`spawn [<id>]`** (DebugConsole, the real game's backtick console): `spawn` lists every id
+  (`VehicleModels.ids()`, the prototype `Vehicle` left out), `spawn ssb1` parks one 4 m ahead of the player, facing the
+  camera's way, set down by a ray from 3 m above onto whatever is there. Host / single player only (`spawnPlayer()`,
+  like `give`); announced, so a guest sees it. In no group: nothing reclaims it, it is nobody's.
+- **The home bike row** (`world.HomeBikes.ensure`, called from `SaveSystem._process` right after
+  `Garage.ensureHome`, once per scene -- a `HomeBikes` marker node says it ran): derived from the starting car
+  (`VehicleRoot`), nose-in like it, one bike every 1.1 m along its side, on the nearest offset (2 m from the car's
+  centre outwards, both sides, 0.5 m steps) where every slot's 0.8 x 1.2 x 2.3 m box is clear of WORLD | VEHICLE
+  and outside the garage's bay (the bay has no collider, so `Garage.contains` is asked). Shipped: SCT1 alone, a
+  player's second thing at home. `OW_TEST_BIKES=1`: all five, while 3.1b is tuned. Host only; a joining client frees
+  its local vehicles and gets the host's (`removeLocalPrePlacedVehicles`). On World.tscn it lands at -2.0 m (the
+  garage took +2.5); DebugWorld the same.
+- Gate `tools/godot/probe_home_bikes.gd` (`[-- --debug-world]`): the row, each id exactly once, beside the car and
+  out of the bay, one per slot, still where it was set down after 3 s, the player seated on the home scooter,
+  `spawn nope` / `spawn ssb1`. 12/12 shipped, 21/21 with `OW_TEST_BIKES=1`, also on DebugWorld; the two runs are
+  each other's control. Regression: probe_parked_vehicles, probe_garage, probe_helicopter_pad, probe_debug_weapons
+  PASS.

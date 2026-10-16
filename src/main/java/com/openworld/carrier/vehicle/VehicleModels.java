@@ -58,6 +58,14 @@ public final class VehicleModels {
         return SCENES.contains(path) ? path : null;
     }
 
+    /** Every model's catalog id in index order (the prototype Vehicle.tscn left out): what `spawn` lists. */
+    public static List<String> ids() {
+        java.util.ArrayList<String> out = new java.util.ArrayList<>();
+        for (String sc : SCENES.subList(1, SCENES.size()))
+            out.add(sc.substring(sc.lastIndexOf('/') + 1, sc.length() - ".tscn".length()));
+        return out;
+    }
+
     /** The default car - what a spawner with no scene of its own, and an unknown index, get. */
     public static final int DEFAULT = 1;
     public static final String DEFAULT_SCENE = DIR + "SPC1.tscn";

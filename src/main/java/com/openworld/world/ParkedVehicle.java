@@ -128,17 +128,30 @@ public class ParkedVehicle extends Node3D {
         String key = String.format("%s@%.1f,%.1f,%.1f", vehicleId, o.getX(), o.getY(), o.getZ());
         Vehicle prev = SPAWNED.get(key);
         if (prev != null && GD.isInstanceValid(prev)) return;
-        String path = VehicleModels.sceneOfId(vehicleId);
-        if (path == null) {
+        Vehicle v = place(scene, vehicleId, faction, at, dropHeight);
+        if (v == null) {
             GD.pushWarning("ParkedVehicle: no vehicle model '" + vehicleId + "' at " + getPath());
             return;
         }
-        Object loaded = GD.load(path);
-        if (!(loaded instanceof PackedScene ps)) return;
+        v.addToGroup(new StringName(Vehicle.STREAMED_GROUP));
+        v.addToGroup(new StringName(GROUP));
+        if (nm != null) nm.announceVehicleSpawn(v);
+        SPAWNED.put(key, v);
+    }
+
+    /**
+     * Instance model {@code vehicleId} (a {@link VehicleModels} id) into {@code scene}, parked and unoccupied at
+     * {@code at}, {@code drop} m up, with an identity of its own; null for an unknown id. The caller tags its groups and
+     * announces it (host only) -- the one way a placed vehicle is made: this marker, the console's {@code spawn}, the
+     * safe house's bike row ({@link HomeBikes}).
+     */
+    public static Vehicle place(Node scene, String vehicleId, String faction, Transform3D at, double drop) {
+        String path = VehicleModels.sceneOfId(vehicleId);
+        if (path == null || scene == null || !(GD.load(path) instanceof PackedScene ps)) return null;
         Node inst = ps.instantiate();
         if (!(inst instanceof Vehicle v)) {
             if (inst != null) inst.queueFree();
-            return;
+            return null;
         }
         // own identity in code, never the scene's shared sub-resource (the shared-sub-resource rule)
         v.characterInfo = new CharacterInfo();
@@ -152,11 +165,9 @@ public class ParkedVehicle extends Node3D {
         if (v.getNodeOrNull("CollisionShape3D") instanceof godot.api.CollisionShape3D cs
                 && cs.getShape() instanceof godot.api.BoxShape3D bx)
             below = Math.max(0.0, -(cs.getPosition().getY() - bx.getSize().getY() / 2.0));
-        v.setGlobalTransform(new Transform3D(at.getBasis().orthonormalized(), o.plus(new Vector3(0, dropHeight + below, 0))));
-        v.addToGroup(new StringName(Vehicle.STREAMED_GROUP));
-        v.addToGroup(new StringName(GROUP));
-        if (nm != null) nm.announceVehicleSpawn(v);
-        SPAWNED.put(key, v);
+        v.setGlobalTransform(new Transform3D(at.getBasis().orthonormalized(),
+                at.getOrigin().plus(new Vector3(0, drop + below, 0))));
+        return v;
     }
 
     /** Every vehicle a marker spawned is in this group besides {@link Vehicle#STREAMED_GROUP} (which the network baseline

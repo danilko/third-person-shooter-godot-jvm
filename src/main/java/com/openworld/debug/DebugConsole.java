@@ -248,6 +248,7 @@ public class DebugConsole extends CanvasLayer {
                 print("give <id>                              put a weapon in your hands (the pickup path)");
                 print("drop <id>|all                          lay pickups in a row in front of you");
                 print("ammo                                   refill every weapon you carry");
+                print("spawn [<vehicle id>]                   park a vehicle 4 m ahead, facing your way; no id = list them");
                 print("save [slot]                            write the campaign save (default 1)");
                 print("load [slot]                            restore it (default 1)");
                 print("hud [0-3]                              debug HUD: off / FPS / perf + graph / + game state");
@@ -348,6 +349,7 @@ public class DebugConsole extends CanvasLayer {
                 print(com.openworld.util.MiniJson.write(l.toMap()));
             }
             case "give" -> give(a);
+            case "spawn" -> spawn(a);
             case "drop" -> drop(a);
             case "ammo" -> ammo();
             case "hud" -> {
@@ -597,6 +599,41 @@ public class DebugConsole extends CanvasLayer {
                     .plus(new Vector3(0, 0.6, 0)));
         }
         print("dropped " + String.join(" ", ids));
+    }
+
+    /**
+     * `spawn SSB1`: any VehicleModels id parked 4 m in front of the player, facing where the camera faces (PLAN.md
+     * 3.1b: "an easy way to test different motorcycles"). Host-side, announced like any placed vehicle, so a co-op
+     * guest sees it; it is nobody's and nothing reclaims it.
+     */
+    private void spawn(String[] a) {
+        java.util.List<String> ids = com.openworld.carrier.vehicle.VehicleModels.ids();
+        if (a.length < 2) { print("vehicles: " + String.join(" ", ids)); return; }
+        String id = null;
+        for (String x : ids) if (x.equalsIgnoreCase(a[1])) id = x;
+        if (id == null) { print("no vehicle '" + a[1] + "' -- ids: " + String.join(" ", ids)); return; }
+        Player p = spawnPlayer();
+        if (p == null) return;
+        godot.api.Camera3D cam = getViewport() == null ? null : getViewport().getCamera3d();
+        Vector3 fwd = cam != null ? cam.getGlobalBasis().getZ().times(-1.0) : p.getGlobalBasis().getZ().times(-1.0);
+        fwd = new Vector3(fwd.getX(), 0.0, fwd.getZ());
+        if (fwd.length() < 1e-3) fwd = new Vector3(0, 0, -1);
+        fwd = fwd.normalized();
+        Vector3 at = p.getGlobalPosition().plus(fwd.times(4.0));
+        // set down on whatever is there: a ray from 3 m above the spot (a kerb, a ramp, a roof the player stands on)
+        var space = p.getWorld3d() != null ? p.getWorld3d().getDirectSpaceState() : null;
+        if (space != null) {
+            var q = godot.api.PhysicsRayQueryParameters3D.Companion.create(at.plus(new Vector3(0, 3, 0)), at.plus(new Vector3(0, -6, 0)));
+            q.setCollisionMask(com.openworld.util.CollisionLayers.WORLD);
+            var hit = space.intersectRay(q);
+            if (hit != null && hit.containsKey("position")) at = (Vector3) hit.get("position");
+        }
+        godot.core.Basis facing = new godot.core.Basis(new Vector3(0, 1, 0), Math.atan2(-fwd.getX(), -fwd.getZ()));
+        com.openworld.carrier.vehicle.Vehicle v = com.openworld.world.ParkedVehicle.place(getTree().getCurrentScene(), id,
+                "neutral", new godot.core.Transform3D(facing, at), 0.3);
+        if (v == null) { print("could not load " + id); return; }
+        if (getNodeOrNull("/root/NetworkManager") instanceof com.openworld.net.NetworkManager nm) nm.announceVehicleSpawn(v);
+        print("spawned " + id + String.format(" at x %.1f y %.1f z %.1f", at.getX(), at.getY(), at.getZ()));
     }
 
     private void ammo() {
