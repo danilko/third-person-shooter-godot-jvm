@@ -337,6 +337,12 @@ public class VehicleConfig extends Resource {
     @Export public float riderThighRaise = 0f;
     @Export public float riderKneeBend = 0f;
 
+    /**
+     * Which engine it sounds like: an {@link EngineProfile} id ("" = the car; kei, truck, scooter, bike_small, bike_big,
+     * sport). A profile's own loops in {@code assets/audio/engine/<id>/} replace the car's take band by band.
+     */
+    @Export public String engineSound = "";
+
     /** Real seats (0 = every seat the scene has): a bike's scene inherits Vehicle.tscn's four and keeps one or two. */
     @Export public int seatLimit = 0;
 

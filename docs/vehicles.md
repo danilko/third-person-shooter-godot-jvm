@@ -13,6 +13,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - A car stops by itself; a person never shoves a car; horn, squeal and crash sounds (PLAN.md 3.1, 2026-10-16)
 - Motorcycles: trying them -- the `spawn` command and the home bike row (PLAN.md 3.1b, 2026-10-16)
 - Motorcycles in traffic, the 白バイ, and the rider (PLAN.md 3.1b's rest, 2026-10-16)
+- Engine sound profiles: one recording pitched per class now, a folder per class later (2026-10-16)
 
 ---
 
@@ -650,4 +651,28 @@ Runtime + data only (no generator or world scene touched; the S18 map session ow
 - NOT done: hands on the bar grips (the bike models have no `grip_l` / `grip_r` markers yet; the hands are where the
   car clip holds a wheel), parked bikes at shop fronts (needs `vehicle` props in the building kits plus a rebake: the
   rebuild's buildings stage), the city bike, a two-peer bike run.
+
+## Engine sound profiles: one recording pitched per class now, a folder per class later (2026-10-16)
+
+User: "add sound as different engine sound options, so it can be replaced later if needed, or GTA-like use the same
+sound". `carrier.vehicle.EngineProfile` (engine-free, `EngineProfileTest`): a vehicle's `VehicleConfig.engineSound`
+names a profile -- `car` (default, every car not listed), `kei` (KEC1 KET1 POV1 MPC1), `truck` (CRT1 POT1 COT1 BOT1
+FIE1 LAT1 ARV1 LTK1 TNK1), `scooter` (SCT1), `bike_small` (POB1 TRB1), `bike_big` (PMB1), `sport` (SSB1); the
+`ENGINE` table in `build_vehicle_scenes.py` writes it. A profile is a folder, a fallback pitch, gears and a level.
+`EngineAudio` plays each band from `assets/audio/engine/<profile>/` when that file exists (pitch 1), else the car's
+take at the profile's pitch (truck x0.72, kei x1.18, bike_big x1.12, bike_small x1.32, scooter x1.45, sport x1.52 --
+MY PICKS, unheard). Gears: the car's five as before (EngineProfileTest pins them), a scooter's CVT one long gear whose
+revs never drop and jump to 0.55 as the throttle opens, the Cub's four short, the sport bike's six close, the truck's
+six low. The starter uses the profile's own `start` the same way. The cost rule is unchanged (voice only for a running
+vehicle within 45 m, at most 6). How to add a recording: `assets/audio/README.md` "Engine sound PROFILES".
+- Gate `tools/godot/probe_engine_profiles.gd`: five idling vehicles name their profile, have a voice, and idle at
+  their profile's pitch against SPC1 (x0.72 / 1.00 / 1.18 / 1.45 / 1.52 exactly). Proved the drop-in once: a copy of
+  idle.wav as `engine/sport/idle.wav`, imported -> SSB1 idled at x1.00 (its own file), removed again.
+- probe_engine_audio's pitch check now reads each vehicle's own range (`Vehicle.enginePitchRangeNow`: 0.65-1.6
+  widened by the profile's pitch) and passes. Its "there was traffic to hear (a running car within 40 m)" check FAILS
+  -- 0 car-samples in three runs, and the same with the bikes turned down to nothing through a table override, so it is
+  not this work; it passed in the 2026-10-12 nightly (13 samples). Something since moved the traffic away from the
+  probe's standing spot. Not chased.
+- Not done: real recordings for any profile (Freesound CC0 candidates go in assets/audio/SHORTLIST.md first), a
+  per-vehicle tweak inside a profile, an electric / no-engine profile (the city bike will need "none").
 

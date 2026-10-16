@@ -23,8 +23,11 @@ import godot.global.GD;
  * one loop, two while it is between bands. {@code OW_ENGINE_AUDIO=0} (or the console's {@code engine 0}) turns the
  * whole thing off; {@code OW_ENGINE_AUDIO=all} drops the distance and the count, which is the probe's control.
  *
- * <p>There is no gearbox in {@link Vehicle}, so the engine speed is read off the road speed through five made-up
- * gears: it climbs through each, drops at the change, and is held up by the throttle when the car is standing.
+ * <p>There is no gearbox in {@link Vehicle}, so the engine speed is read off the road speed through the profile's
+ * made-up gears: it climbs through each, drops at the change, and is held up by the throttle when the car is standing.
+ *
+ * <p><b>WHICH engine</b> is the vehicle's {@link EngineProfile} ({@link VehicleConfig#engineSound}): its own loops from
+ * {@code assets/audio/engine/<folder>/} where they exist, else the car's take at the profile's pitch (2026-10-16).
  */
 final class EngineAudio {
 
@@ -39,7 +42,7 @@ final class EngineAudio {
     /** Firing frequency at the red line (a four at ~6 900 rpm). */
     private static final float REDLINE_HZ = 230.0f;
     /** Top of each made-up gear, as a share of the car's top speed. */
-    private static final double[] GEAR_TOP = {0.20, 0.38, 0.58, 0.80, 1.25};
+    private static final String[] BAND_NAME = {"idle", "low", "mid", "high"};
 
     static final double HEAR_DISTANCE = 45.0;
     /** A voiced car keeps its voice out to here, so one at the edge does not flicker. Also the players' max distance. */
@@ -61,12 +64,51 @@ final class EngineAudio {
     private final Vehicle car;
     private final AudioStreamPlayer3D[] player = new AudioStreamPlayer3D[2];
     private final int[] playerBand = {-1, -1};
+    /** The profile's pitch on each player: 1 for its own file, its fallbackPitch for the car's take. */
+    private final double[] playerPitch = {1.0, 1.0};
     private boolean voiced, wasRunning;
     private double askIn = Math.random() * ASK_EVERY;
     private Vector3 lastPos;
     private double speed, lastSpeed, accel, rpm, load, startHold;
 
+    private EngineProfile profile;
+
     EngineAudio(Vehicle car) { this.car = car; }
+
+    /** This vehicle's engine (read once, after its config has bound). */
+    EngineProfile profile() {
+        if (profile == null) profile = EngineProfile.of(car.getConfig() != null ? car.getConfig().engineSound : "");
+        return profile;
+    }
+
+    /** A profile's own file for a band, or null (the band then falls back to the car's take). Cached per path. */
+    private static final java.util.Map<String, AudioStream> OWN = new java.util.HashMap<>();
+    private static final java.util.Set<String> NO_OWN = new java.util.HashSet<>();
+
+    static AudioStream ownStream(EngineProfile p, String band) {
+        if (p.folder().isEmpty()) return null;
+        String stem = p.stem(band);
+        AudioStream st = OWN.get(stem);
+        if (st != null || NO_OWN.contains(stem)) return st;
+        for (String ext : Sound.EXTENSIONS) {
+            String path = Sounds.DIR + stem + ext;
+            if (godot.api.ResourceLoader.INSTANCE.exists(path, "") && GD.load(path) instanceof AudioStream found) {
+                OWN.put(stem, found);
+                return found;
+            }
+        }
+        NO_OWN.add(stem);
+        return null;
+    }
+
+    /** The pitch range this vehicle's loops may play at: the car's 0.65-1.6, widened by its profile's fallback pitch. */
+    float[] pitchRange() {
+        double fb = profile().fallbackPitch();
+        return new float[] {(float) (PITCH_MIN * Math.min(1.0, fb)), (float) (PITCH_MAX * Math.max(1.0, fb))};
+    }
+
+    /** Drop the cached streams (GameManager's teardown, like IconRegistry: Godot resources must not outlive the engine). */
+    static void clearCache() { OWN.clear(); NO_OWN.clear(); }
 
     /** Players of this car sounding now (0, 1, or 2 between bands). */
     int playingNow() {
@@ -98,10 +140,10 @@ final class EngineAudio {
         lastSpeed = speed;
         double wantLoad = Math.max(Math.min(1.0, Math.abs(throttle)), Math.max(0.0, Math.min(1.0, accel / 2.5)));
         load += (wantLoad - load) * Math.min(1.0, delta * 6.0);
-        rpm += (targetRpm(speed / Math.max(1.0, topSpeed), wantLoad) - rpm) * Math.min(1.0, delta * 5.0);
+        rpm += (profile().targetRpm(speed / Math.max(1.0, topSpeed), wantLoad) - rpm) * Math.min(1.0, delta * 5.0);
         if (startHold > 0.0) startHold -= delta;
         float hz = BAND_HZ[0] + (float) rpm * (REDLINE_HZ - BAND_HZ[0]);
-        float level = LEVEL_DB + COAST_DB * (float) (1.0 - load)
+        float level = LEVEL_DB + profile().levelDb() + COAST_DB * (float) (1.0 - load)
                 + (startHold > 0.5 ? SILENT_DB : startHold > 0.0 ? (float) (-30.0 * startHold / 0.5) : 0f);
         int k = 0;
         while (k < FADE_FROM.length - 1 && hz >= FADE_FROM[k + 1]) k++;
@@ -110,19 +152,8 @@ final class EngineAudio {
         sound(k + 1, w, hz, level, k);
     }
 
-    /** Engine speed 0..1 for a road speed (as a share of top speed) and a throttle: see the class comment. */
-    static double targetRpm(double speedShare, double throttle) {
-        double lo = 0.0;
-        for (int g = 0; g < GEAR_TOP.length; g++) {
-            if (speedShare <= GEAR_TOP[g] || g == GEAR_TOP.length - 1) {
-                double f = Math.max(0.0, Math.min(1.0, (speedShare - lo) / (GEAR_TOP[g] - lo)));
-                double bottom = g == 0 ? 0.0 : 0.42;
-                return Math.max(bottom + (0.95 - bottom) * f, g == 0 ? throttle * 0.3 : 0.0);
-            }
-            lo = GEAR_TOP[g];
-        }
-        return 0.0;
-    }
+    /** Engine speed 0..1 for a road speed and a throttle, through the CAR's gears (EngineProfile.targetRpm). */
+    static double targetRpm(double speedShare, double throttle) { return EngineProfile.of("").targetRpm(speedShare, throttle); }
 
     /** Band {@code band} at {@code weight} (equal-power), on the player that has it or on the one not playing
      *  {@code other}. A band at no weight is stopped, not played silently. */
@@ -134,8 +165,10 @@ final class EngineAudio {
         }
         if (i < 0) {
             i = playerBand[0] == other ? 1 : 0;
-            AudioStream st = Sounds.stream(BAND[band]);
+            AudioStream own = ownStream(profile(), BAND_NAME[band]);
+            AudioStream st = own != null ? own : Sounds.stream(BAND[band]);
             if (st == null) return;
+            playerPitch[i] = own != null ? 1.0 : profile().fallbackPitch();
             if (player[i] == null || !GD.isInstanceValid(player[i])) {
                 AudioStreamPlayer3D p = new AudioStreamPlayer3D();
                 p.setName(new StringName(i == 0 ? "EngineA" : "EngineB"));
@@ -150,7 +183,8 @@ final class EngineAudio {
             playerBand[i] = band;
         }
         AudioStreamPlayer3D p = player[i];
-        p.setPitchScale(Math.max(PITCH_MIN, Math.min(PITCH_MAX, hz / BAND_HZ[band])));
+        p.setPitchScale((float) Math.max(0.4, Math.min(2.5,
+                Math.max(PITCH_MIN, Math.min(PITCH_MAX, hz / BAND_HZ[band])) * playerPitch[i])));
         p.setVolumeDb(levelDb + (band == 0 ? IDLE_DB : 0f) + (float) (10.0 * Math.log10(weight)));
         if (!p.isPlaying()) p.play((float) (Math.random() * 0.5));
     }
@@ -170,14 +204,29 @@ final class EngineAudio {
             speed = lastSpeed = accel = load = 0.0;
             rpm = 0.0;
             // a player getting into a standing car turns the key; traffic is born running
-            if (playerDriven && !wasRunning && Sounds.stream(Sound.ENGINE_START) != null) {
-                Sounds.play3D(car, Sound.ENGINE_START, car.getGlobalPosition(), UNIT_SIZE, 0f, LEVEL_DB + 3f);
-                startHold = 1.9;
-            }
+            if (playerDriven && !wasRunning) startEngine();
         } else if (!want && voiced) {
             release();
         }
         wasRunning = running;
+    }
+
+    /** The starter: the profile's own `start` file where it has one, else the car's, at the profile's pitch. */
+    private void startEngine() {
+        AudioStream own = ownStream(profile(), "start");
+        if (own == null && Sounds.stream(Sound.ENGINE_START) == null) return;
+        AudioStreamPlayer3D p = new AudioStreamPlayer3D();
+        p.setName(new StringName("StarterSound"));   // not "Engine*": the loop counters skip it
+        p.setStream(own != null ? own : Sounds.stream(Sound.ENGINE_START));
+        p.setUnitSize(UNIT_SIZE);
+        p.setMaxDistance((float) RELEASE_DISTANCE);
+        p.setPitchScale((float) (own != null ? 1.0 : profile().fallbackPitch()));
+        p.setVolumeDb(LEVEL_DB + profile().levelDb() + 3f);
+        car.addChild(p);
+        p.connect("tree_exiting", MethodCallable.createUnsafe(p, "stop"));   // CLAUDE.md audio rule
+        p.connect("finished", MethodCallable.createUnsafe(p, "queue_free"));
+        p.play(0f);
+        startHold = 1.9;
     }
 
     /** Gives the voice back and frees the players (the car stopped, went out of earshot, or is leaving the tree). */

@@ -118,6 +118,13 @@ TUNING = {
              "max_speed": 55.0, "accel": 2400.0, "crash_hp": 6.0, "health": 300, "paint": "",
              "bike": True, "lean": 42.0, "aero": 0.26, "steer": 26.0, "rider": [6.0, 22.0, 25.0]},
 }
+# ENGINE SOUND per vehicle (carrier.vehicle.EngineProfile; user 2026-10-16: "different engine sound options, replaceable
+# later, or GTA-like the same sound"): a row not listed is the car. Until a profile has its own loops in
+# assets/audio/engine/<profile>/ it plays the car's take at its own pitch and gearing. MY PICKS, unheard.
+ENGINE = {"KEC1": "kei", "KET1": "kei", "POV1": "kei", "MPC1": "kei",
+          "CRT1": "truck", "POT1": "truck", "COT1": "truck", "BOT1": "truck", "FIE1": "truck", "LAT1": "truck",
+          "ARV1": "truck", "LTK1": "truck", "TNK1": "truck",
+          "SCT1": "scooter", "POB1": "bike_small", "TRB1": "bike_small", "PMB1": "bike_big", "SSB1": "sport"}
 WHEELS = {"RR": "wheel_rb", "RL": "wheel_lb", "FR": "wheel_rf", "FL": "wheel_lf"}
 # a motorcycle's four rays: each axle's pair stands BIKE_TRACK either side of its one wheel, inside the tyre's
 # footprint plus a hand's width -- wide enough to stand, narrow enough that a kerb meets both rays of an axle together
@@ -218,6 +225,8 @@ taillight_offset = Vector3({f(tail[0])}, {f(tail[1])}, {f(tail[2])})
 seat_drop = {f(t.get("seat_drop", 0.0))}
 glass_armor = {f(t.get("glass_armor", 0.0))}
 """
+    if vid in ENGINE:
+        cfg += f'engine_sound = "{ENGINE[vid]}"\n'
     if bike:
         cfg += f"""seat_limit = {seat_limit}
 motorcycle_lean_degrees = {f(t["lean"])}

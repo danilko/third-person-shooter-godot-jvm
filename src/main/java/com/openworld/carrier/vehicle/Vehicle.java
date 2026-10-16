@@ -1337,6 +1337,15 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     @Register public int engineVoicedCarsNow() { return EngineAudio.voicedCarsNow(); }
     /** The console's {@code engine 0|1}: the whole engine sound on or off. */
     public static void setEngineAudio(boolean on) { EngineAudio.enabled = on; }
+
+    /** The engine profiles' cached streams (GameManager's teardown). */
+    public static void clearEngineCaches() { EngineAudio.clearCache(); }
+
+    /** This vehicle's engine sound profile (EngineProfile), for probes and the console. */
+    @Register public String engineProfileNow() { return engineAudio.profile().id(); }
+
+    /** The pitch range its engine loops may play at, "lo,hi" (probe_engine_audio). */
+    @Register public String enginePitchRangeNow() { float[] r = engineAudio.pitchRange(); return r[0] + "," + r[1]; }
     public static String engineAudioReport() {
         return "engine audio " + (EngineAudio.enabled ? "on" : "off") + ", " + EngineAudio.voicedCarsNow() + " of at most "
                 + EngineAudio.MAX_VOICED + " cars voiced (within " + (int) EngineAudio.HEAR_DISTANCE + " m)";

@@ -110,3 +110,22 @@ World
 
 UI
 - Pickup notice, a refused purchase (`UI_ERROR` exists, not played), the radio chatter line
+
+## Engine sound PROFILES -- giving a vehicle class its own engine (2026-10-16)
+
+Every vehicle names an engine profile (`carrier.vehicle.EngineProfile`; the `ENGINE` table in
+`tools/build_vehicle_scenes.py` writes `engine_sound` into its config): `car` (default), `kei`, `truck`, `scooter`,
+`bike_small` (Cub, trail), `bike_big` (白バイ), `sport` (SSB1). Today only `car` has recordings; every other profile
+plays the car's take at its own pitch and gearing -- GTA's way, one recording for many classes.
+
+**To give a profile its own sound, drop files in `assets/audio/engine/<profile>/`** -- `idle`, `low`, `mid`, `high`
+(loops) and `start` (one shot), `.wav` or `.ogg` -- and open the project once so Godot imports them. Nothing in code
+changes. Any band you leave out keeps the car's take at the profile's pitch, so a profile can be replaced a file at a
+time. The loops must sit at the car's steady firing frequencies (idle 31.3, low 95, mid 150, high 220 Hz:
+`EngineAudio.BAND_HZ`) with `smpl` loop points -- cut a pull with `python3 tools/audio/build_engine.py` (its `FIRING`
+table). A profile's own file always plays at pitch 1 against its band.
+
+To give a vehicle another profile, change its entry in `ENGINE` and run `python3 tools/build_vehicle_scenes.py <ID>`.
+A new profile is one row in `EngineProfile.ALL` (folder, fallback pitch, gears, level). Gate:
+`tools/godot/probe_engine_profiles.gd` (update its `EXPECT` pitch to 1.0 for a profile that got its own `idle`).
+

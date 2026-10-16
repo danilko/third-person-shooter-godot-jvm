@@ -122,10 +122,12 @@ func _run() -> void:
 		all_cars = max(all_cars, list.size())
 		for c in list:
 			var v := 0
+			# each vehicle's own range: its engine profile pitches the car's take (EngineProfile.fallbackPitch)
+			var rng := String(c.call("engine_pitch_range_now")).split(",")
 			for ch in c.get_children():
 				if ch is AudioStreamPlayer3D and String(ch.name).begins_with("Engine") and ch.playing:
 					v += 1
-					if ch.pitch_scale < 0.649 or ch.pitch_scale > 1.601:
+					if ch.pitch_scale < float(rng[0]) - 0.001 or ch.pitch_scale > float(rng[1]) + 0.001:
 						bad_pitch += 1
 			var d: float = (c.global_position - eye).length()
 			if v > 0:
@@ -164,7 +166,7 @@ func _run() -> void:
 			"%d a car, %d in all" % [max_per_car, max_players])
 		_check("no voice beyond %d m (+5 m: a car asks 5 times a second)" % int(RELEASE), far_voiced <= RELEASE + 5.0, "%.1f m" % far_voiced)
 		_check("the engine speed follows the road (some car above 0.3)", max_rpm > 0.3, "%.2f" % max_rpm)
-		_check("every playing loop is pitched inside 0.65-1.6", bad_pitch == 0, "%d outside" % bad_pitch)
+		_check("every playing loop is pitched inside its profile's range", bad_pitch == 0, "%d outside" % bad_pitch)
 	_check("Vehicle.engine_voices_now agrees with the players counted", counter_wrong == 0, "%d disagreements" % counter_wrong)
 	_check("every case ran", checks >= (7 if off else 13), "%d checks" % checks)
 	print("RESULT %s (%d checks, %d failures)" % ["PASS" if fails == 0 else "FAIL", checks, fails])

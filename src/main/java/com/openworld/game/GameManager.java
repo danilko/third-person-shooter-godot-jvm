@@ -327,6 +327,7 @@ public class GameManager extends Node {
         com.openworld.world.InteriorNav.clear();
         com.openworld.carrier.vehicle.Vehicle.clearLampCaches();
         com.openworld.carrier.vehicle.Glass.clearCaches();
+        com.openworld.carrier.vehicle.Vehicle.clearEngineCaches();
         com.openworld.audio.Sounds.clear();
         com.openworld.carrier.vehicle.VehicleDamageModel.clearCaches();
         com.openworld.character.ToonLook.clear();
