@@ -3,6 +3,7 @@ package com.openworld.world;
 import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
+import godot.annotation.Visible;
 import godot.api.DirectionalLight3D;
 import godot.api.Environment;
 import godot.api.FileAccess;
@@ -413,12 +414,37 @@ public class ZoneManager extends Node {
 		enforcementCars = Math.max(0, cars);
 	}
 
+	/** The other COMBAT bodies by who stands them up (PLAN.md 2.3 step 8, user 2026-10-16: "reduce the crowd when more
+	 *  engagement comes"): the light tier's promoted bodies, each encounter's full members. Each source reports its
+	 *  own count every tick it runs and 0 when it goes. */
+	private final java.util.Map<String, Integer> combatLoads = new java.util.HashMap<>();
+
+	public void setCombatLoad(String source, int bodies) {
+		if (bodies <= 0) combatLoads.remove(source);
+		else combatLoads.put(source, bodies);
+	}
+
+	/** Every combat body the ambient budgets make room for: the dispatch's plus every other source's. */
+	int combatBodies() {
+		int n = enforcementBodies;
+		for (int v : combatLoads.values()) n += v;
+		return n;
+	}
+
+	/** Probe: report a combat load as a source would. */
+	@Register public void setCombatLoadNow(String source, int bodies) { setCombatLoad(source, bodies); }
+
+	/** Probe readout: "combat bodies,walker budget now,fighter budget now,promoted walkers". */
+	@Register public String combatLoadNow() {
+		return combatBodies() + "," + effectiveWalkerBudget() + "," + effectiveFighterBudget() + "," + promotedWalkers();
+	}
+
 	/** Each dispatched car is a car + crew (two ambient cars' worth); each two bodies another. */
 	int effectiveTrafficBudget() {
 		if (trafficBudget <= 0) return trafficBudget;
 		int budget = regionTrafficBudget();
 		if (!enforcementBalancing) return budget;
-		return Math.max(Math.min(trafficFloor, budget), budget - 2 * enforcementCars - enforcementBodies / 2);
+		return Math.max(Math.min(trafficFloor, budget), budget - 2 * enforcementCars - combatBodies() / 2);
 	}
 
 	/**
@@ -463,12 +489,12 @@ public class ZoneManager extends Node {
 
 	int effectiveWalkerBudget() {
 		if (walkerBudget <= 0 || !enforcementBalancing) return walkerBudget;
-		return Math.max(2, walkerBudget - enforcementBodies / 2);
+		return Math.max(2, walkerBudget - combatBodies() / 2);
 	}
 
 	int effectiveFighterBudget() {
 		if (fighterBudget <= 0 || !enforcementBalancing) return fighterBudget;
-		return Math.max(1, fighterBudget - enforcementBodies / 3);
+		return Math.max(1, fighterBudget - combatBodies() / 3);
 	}
 
 	@Register public int effectiveTrafficBudgetNow() { return effectiveTrafficBudget(); }
@@ -2030,6 +2056,9 @@ public class ZoneManager extends Node {
 	}
 
 	/** Every live promoted sidewalk body, and how many of them fight: the two budgets above. */
+	/** Promoted walkers alive now (not the fighters). */
+	int promotedWalkers() { return sidewalkBodies()[0]; }
+
 	private int[] sidewalkBodies() {
 		int walkers = 0, fighters = 0;
 		for (LoadedZone lz : loaded.values()) {
@@ -2124,6 +2153,11 @@ public class ZoneManager extends Node {
 	private void maintainPedestrians() {
 		NetworkManager net = networkManager();
 		if (net != null && net.isNetworked() && !net.isServer()) return;
+		// SHED (PLAN.md 2.3 step 8): walkers over the budget the fight left them go back first, farthest first, and
+		// only where nobody is looking -- the budget only stopped NEW promotions, and a crowd promoted before the fight
+		// stood up kept every body it had
+		int over = shedWalkers && enforcementBalancing ? promotedWalkers() - effectiveWalkerBudget() : 0;
+		List<Object[]> shed = new ArrayList<>();
 		for (LoadedZone lz : loaded.values()) {
 			PedCrowd crowd = lz.crowd;
 			if (crowd == null || !GD.isInstanceValid(crowd)) continue;
@@ -2135,22 +2169,59 @@ public class ZoneManager extends Node {
 					continue;
 				}
 				if (!(ai.getController() instanceof com.openworld.ai.SidewalkWalkerController w)) continue;
-				if (nearestPlayerDistXZ(ai.getGlobalPosition()) <= crowd.demoteDistance) continue;
+				double near = nearestPlayerDistXZ(ai.getGlobalPosition());
+				boolean hurt = ai.getNodeOrNull("Health") instanceof com.openworld.character.Health hh && hh.hurtWithin(20.0);
+				if (near <= crowd.demoteDistance) {
+					if (over > 0 && !hurt && near > shedMinDistance && !inLocalView(ai.getGlobalPosition()))
+						shed.add(new Object[] { lz, ai, near });
+					continue;
+				}
 				// A body stays a body for a while: one promoted a moment ago (a shot from 70 m, a fighter's
 				// scare) or hurt recently is exactly what a player is dealing with, wherever they stand.
 				Long at = promotedAtMsec.get(ai.getInstanceId());
 				if (at != null && godot.api.Time.getTicksMsec() - at < DEMOTE_AFTER_MSEC) continue;
-				if (ai.getNodeOrNull("Health") instanceof com.openworld.character.Health hh && hh.hurtWithin(20.0)) continue;
-				promotedAtMsec.remove(ai.getInstanceId());
-				if (ai.characterInfo != null && ai.characterInfo.characterId.startsWith("ped:"))
-					crowd.handBack(ai.characterInfo.characterId, ai.getGlobalPosition(), false);
-				else crowd.addPed(w.path, w.along, w.dir);
-				lz.pooled.remove(i);
-				if (net != null && ai.characterInfo != null) net.announceDespawn(ai.characterInfo.characterId);
-				silenceWeaponAudio(ai);
-				ai.queueFree();
+				if (hurt) continue;
+				demoteWalker(lz, ai, crowd, w, net);
+				over--;
 			}
 		}
+		if (over <= 0 || shed.isEmpty()) return;
+		shed.sort((a, b) -> Double.compare((double) b[2], (double) a[2]));
+		for (int k = 0; k < Math.min(over, Math.min(SHED_PER_PASS, shed.size())); k++) {
+			LoadedZone lz = (LoadedZone) shed.get(k)[0];
+			AICharacter ai = (AICharacter) shed.get(k)[1];
+			if (ai.getController() instanceof com.openworld.ai.SidewalkWalkerController w) {
+				demoteWalker(lz, ai, lz.crowd, w, net);
+				walkersShed++;
+			}
+		}
+	}
+
+	/** Shed walkers over the combat-reduced budget (the control: off = they stay until they leave reach). */
+	@Export public boolean shedWalkers = true;
+	/** A walker this close to a player is never shed (m): it is what the player is looking at or bumping into. */
+	@Export public double shedMinDistance = 20.0;
+	private static final int SHED_PER_PASS = 2;
+	/** Readout: walkers shed over the budget, lifetime. */
+	@Visible public int walkersShed;
+
+	/** Hand a promoted walker back to its crowd where it stands, and free the body. */
+	private void demoteWalker(LoadedZone lz, AICharacter ai, PedCrowd crowd, com.openworld.ai.SidewalkWalkerController w, NetworkManager net) {
+		promotedAtMsec.remove(ai.getInstanceId());
+		if (ai.characterInfo != null && ai.characterInfo.characterId.startsWith("ped:"))
+			crowd.handBack(ai.characterInfo.characterId, ai.getGlobalPosition(), false);
+		else crowd.addPed(w.path, w.along, w.dir);
+		lz.pooled.remove(ai);
+		if (net != null && ai.characterInfo != null) net.announceDespawn(ai.characterInfo.characterId);
+		silenceWeaponAudio(ai);
+		ai.queueFree();
+	}
+
+	/** Is {@code p} in this peer's own camera's view (the host's: a remote player's view is not known here, so a
+	 *  shed also keeps {@link #shedMinDistance} from every player)? */
+	private boolean inLocalView(Vector3 p) {
+		var cam = getViewport() != null ? getViewport().getCamera3d() : null;
+		return cam != null && cam.isPositionInFrustum(p.plus(new Vector3(0, 1.0, 0)));
 	}
 
 	private static String titleCase(String body) {

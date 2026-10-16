@@ -29,7 +29,22 @@ const CLIPS := {
 	"cower": "crouch_idle",
 	"phone": "upright_phone",
 	"talk": "upright_talk",
+	# the light combatant tier (PLAN.md 2.3, ai.light.LightCombatants): a few more rows on the same texture
+	"jog": "upright_run_forward",
+	"run_rifle": "upright_run_forward_rifle",
+	"aim_rifle": "upright_aim_rifle",
+	"aim_pistol": "upright_aim_pistol",
+	"attack": "punch_jab",
+	"death": "death_fall_back",
+	"zombie_walk": "zombie_walk_forward",
+	"zombie_attack": "zombie_attack",
+	"zombie_idle": "zombie_idle",
 }
+## The full body's cloth parts, numbered for the mesh's COLOR.r (part / 8): Outfits / OutfitTable.partOf name them
+## from the material, `cloth` is any other _CLOTH material, 0 is skin / hair / face.
+const PARTS := ["", "Tops", "Bottoms", "Onepice", "Accessory", "Shoes", "cloth"]
+## The weapon sockets a light combatant can hold (WeaponItem.holdSocket), read off the body's own visuals.
+const SOCKETS := ["SocketRifle", "SocketPistol", "SocketLauncher", "SocketMelee", "SocketShotgun", "SocketFist"]
 const GAITS := "res://src/main/resources/com/openworld/character/anim/character_gaits.json"
 ## A body whose default simplification tears (measured 2026-09-27: Fumiriya's trousers opened at 4k-5k
 ## vertices, LOD 2-3) gets its own budget. --verts overrides.
@@ -136,6 +151,10 @@ func _initialize() -> void:
 	# -- bake every clip, frame by frame -------------------------------------------------------------
 	var rows: Array[PackedFloat32Array] = []
 	var table := {}
+	var hand_bone := skel.find_bone("hand_r")
+	if hand_bone < 0:
+		_die("%s has no hand_r" % body)
+		return
 	for key in CLIPS:
 		var clip := String(CLIPS[key])
 		if not ap.has_animation(clip):
@@ -145,10 +164,12 @@ func _initialize() -> void:
 		var length := ap.get_animation(clip).length
 		var frames := maxi(1, int(round(length * fps)))
 		table[key] = {"clip": clip, "row": rows.size(), "frames": frames, "fps": frames / maxf(length, 1e-3)}
+		var hands := []
 		ap.play(clip)
 		for f in frames:
 			ap.seek(length * f / frames, true)
 			var gp := _globals(skel)
+			hands.append(_t12(to_root * gp[hand_bone]))
 			var mats: Array[Transform3D] = []
 			mats.resize(bind_bone.size())
 			for b in bind_bone.size():
@@ -170,7 +191,26 @@ func _initialize() -> void:
 				row[i * 4 + 2] = r.z
 				row[i * 4 + 3] = 1.0
 			rows.append(row)
+		table[key]["hand"] = hands
 		print("[vat]   %-6s %-26s %3d frames at %.1f fps" % [key, clip, frames, table[key]["fps"]])
+
+	# -- the light tier's extras: cloth part per vertex, the weapon sockets -----------------------------
+	var vis_path := "res://src/main/resources/com/openworld/character/CharacterVisuals_%s.tscn" % body.capitalize()
+	var colors := PackedColorArray(); colors.resize(n)
+	var sockets := {}
+	if ResourceLoader.exists(vis_path):
+		var vis: Node3D = (load(vis_path) as PackedScene).instantiate()
+		root.add_child(vis)
+		var parts := _parts_of(vis, pos, skel, mesh_to_skel)
+		for i in n: colors[i] = Color(parts[i] / 8.0, 0, 0, 1)
+		var att := vis.find_child("WeaponAttachment", true, false)
+		for sname in SOCKETS:
+			var sk: Node3D = att.get_node_or_null(sname) if att != null else null
+			if sk != null: sockets[sname] = _t12(sk.transform)
+		vis.free()
+	else:
+		print("[vat] FAIL: no %s (cloth parts and sockets unknown)" % vis_path)
+		_fail += 1
 
 	# -- write --------------------------------------------------------------------------------------
 	var data := PackedFloat32Array()
@@ -183,6 +223,7 @@ func _initialize() -> void:
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = _rest_pose(pos, to_root, mesh_to_skel)
 	arrays[Mesh.ARRAY_TEX_UV] = uv
+	arrays[Mesh.ARRAY_COLOR] = colors
 	arrays[Mesh.ARRAY_INDEX] = idx
 	am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	var mat := mi.mesh.surface_get_material(0)
@@ -203,6 +244,8 @@ func _initialize() -> void:
 		"atlas": atlas.resource_path if atlas != null else "",
 		"alpha_scissor": cutoff,
 		"clips": table,
+		"parts": PARTS,
+		"sockets": sockets,
 	}
 	var fh := FileAccess.open(meta_path, FileAccess.WRITE)
 	fh.store_string(JSON.stringify(meta, "  ", true) + "\n")
@@ -228,6 +271,77 @@ func _global(skel: Skeleton3D, b: int, out: Array[Transform3D], done: PackedByte
 	if p >= 0: t = _global(skel, p, out, done) * t
 	out[b] = t
 	done[b] = 1
+	return t
+
+## A transform as 12 floats, the basis COLUMNS then the origin (x.x x.y x.z  y.x y.y y.z  z.x z.y z.z  o.x o.y o.z).
+func _t12(t: Transform3D) -> Array:
+	var b := t.basis
+	var a := [b.x.x, b.x.y, b.x.z, b.y.x, b.y.y, b.y.z, b.z.x, b.z.y, b.z.z, t.origin.x, t.origin.y, t.origin.z]
+	for i in a.size(): a[i] = snappedf(a[i], 0.0001)
+	return a
+
+## Each simplified vertex's cloth part, from the NEAREST vertex of the full body (the playable visuals, whose
+## materials carry the _CLOTH names; the ped's single atlas surface has lost them). Both are compared at rest in
+## their own skeleton's space, which is the same skeleton.
+func _parts_of(vis: Node, pos: PackedVector3Array, skel: Skeleton3D, mesh_to_skel: Transform3D) -> PackedInt32Array:
+	var vskel := vis.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	const CELL := 0.04
+	var grid := {}
+	var total := 0
+	for m in vis.find_children("*", "MeshInstance3D", true, false):
+		var mi := m as MeshInstance3D
+		if mi.mesh == null: continue
+		var xf := _rel(mi, vskel)
+		for si in mi.mesh.get_surface_count():
+			var mat := mi.mesh.surface_get_material(si)
+			var part := 0
+			if mat != null and mat.resource_name.ends_with("_CLOTH"):
+				var bits := mat.resource_name.split("_")
+				var pname := bits[bits.size() - 3] if bits.size() >= 3 else "cloth"
+				part = PARTS.find(pname)
+				if part < 0: part = PARTS.size() - 1
+			var verts: PackedVector3Array = mi.mesh.surface_get_arrays(si)[Mesh.ARRAY_VERTEX]
+			for v in verts:
+				var p := xf * v
+				var key := Vector3i(floori(p.x / CELL), floori(p.y / CELL), floori(p.z / CELL))
+				if not grid.has(key): grid[key] = []
+				grid[key].append([p, part])
+				total += 1
+	var out := PackedInt32Array(); out.resize(pos.size())
+	var far := 0
+	var counts := {}
+	for i in pos.size():
+		var p := mesh_to_skel * pos[i]
+		var c := Vector3i(floori(p.x / CELL), floori(p.y / CELL), floori(p.z / CELL))
+		var best := INF
+		var bp := 0
+		for r in [1, 2, 4]:
+			for dx in range(-r, r + 1):
+				for dy in range(-r, r + 1):
+					for dz in range(-r, r + 1):
+						for e in grid.get(c + Vector3i(dx, dy, dz), []):
+							var d := p.distance_squared_to(e[0])
+							if d < best:
+								best = d
+								bp = e[1]
+			if best < INF: break
+		if sqrt(best) > 0.05: far += 1
+		out[i] = bp
+		counts[PARTS[bp] if bp > 0 else "skin"] = int(counts.get(PARTS[bp] if bp > 0 else "skin", 0)) + 1
+	print("[vat]   cloth parts from %d full-body vertices: %s (%d vertices over 5 cm from any)" % [total, counts, far])
+	if far > pos.size() / 20:
+		print("[vat] FAIL: %d of %d vertices found no full-body vertex within 5 cm -- the two meshes are not in one frame" % [far, pos.size()])
+		_fail += 1
+	return out
+
+## `node`'s transform in `ancestor`'s space, by its parent chain (a script run in _initialize is not in the tree yet,
+## so global_transform is not available).
+func _rel(node: Node3D, ancestor: Node3D) -> Transform3D:
+	var t := Transform3D()
+	var n: Node = node
+	while n != null and n != ancestor:
+		if n is Node3D: t = (n as Node3D).transform * t
+		n = n.get_parent()
 	return t
 
 func _rest_pose(pos: PackedVector3Array, to_root: Transform3D, mesh_to_skel: Transform3D) -> PackedVector3Array:

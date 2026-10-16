@@ -112,10 +112,10 @@ public class AttackState implements AIState {
         // Only evaluate when the hold timer has expired to prevent per-frame
         // oscillation when hasLoS or pitchOut flickers near the threshold.
         ctrl.tickStanceHoldTimer(delta);
-        boolean holding = body.holdPoint != null && !isMelee;
-        if (holding && body.holdCrouch) {
+        boolean holding = body.blackboard.holdPoint != null && !isMelee;
+        if (holding && body.blackboard.holdCrouch) {
             // at a low cover: down while it reloads or has no line, up to shoot (PLAN.md 2.2)
-            boolean atCover = flat(myPos, body.holdPoint) <= HOLD_ARRIVED;
+            boolean atCover = flat(myPos, body.blackboard.holdPoint) <= HOLD_ARRIVED;
             boolean reloading = body.weaponController != null && body.weaponController.isWeaponReloading();
             StanceName target = atCover && (reloading || !hasLoS) ? StanceName.CROUCH : StanceName.UPRIGHT;
             if (target != ctrl.getIntendedAttackStance() && ctrl.canChangeStance()) {
@@ -142,17 +142,17 @@ public class AttackState implements AIState {
         boolean closeForMelee = isMelee && hDist > 0.01f && dist > attackRange * 0.85f;
         if (holding) {
             // it fights FROM its point (a cover marker, a guard's post): there first, then it stands and shoots
-            double off = flat(myPos, body.holdPoint);
+            double off = flat(myPos, body.blackboard.holdPoint);
             if (off <= HOLD_ARRIVED) {
                 cmd.movementType = MovementType.IDLE;
             } else {
                 // straight there when the way is clear (a cover point is a few metres off, in the open); the agent
                 // only round a wall -- on a coarse navmesh its next point flips behind the body (probe_encounter)
-                Vector3 step = body.holdPoint.minus(myPos);
+                Vector3 step = body.blackboard.holdPoint.minus(myPos);
                 step.setY(0f);
-                if (!ChaseState.walkableLine(body, body.holdPoint)) {
-                    if (body.getNavAgent().getTargetPosition().distanceTo(body.holdPoint) > 0.5)
-                        body.getNavAgent().setTargetPosition(body.holdPoint);
+                if (!ChaseState.walkableLine(body, body.blackboard.holdPoint)) {
+                    if (body.getNavAgent().getTargetPosition().distanceTo(body.blackboard.holdPoint) > 0.5)
+                        body.getNavAgent().setTargetPosition(body.blackboard.holdPoint);
                     Vector3 nav = body.getNavAgent().getNextPathPosition().minus(myPos);
                     nav.setY(0f);
                     if (nav.length() >= 0.5f) step = nav;

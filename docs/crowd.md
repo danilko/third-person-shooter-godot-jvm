@@ -7,6 +7,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - A LIGHT PED IS ONE SURFACE: the crowd's LOD body (2026-09-22)
 - Kerb damage was street-tree planters; crowd shots land like AI shots (2026-10-06, user-reported)
 - The crowd: a GPU-animated far tier, promotion on need, six bodies, a holster, a female walk (2026-09-27, user-asked)
+- The crowd makes room for a fight: combat load, walker shedding, panic thinning (PLAN.md 2.3 step 8, 2026-10-16)
 
 ---
 
@@ -304,3 +305,34 @@ duplicated; promoted walkers stuck face to face.
 `probe_island_peds` segfaults on World after a teleport, with the light crowd switched OFF too (headless streaming,
 the world mid-rebuild); `probe_recoil_kick`'s ASR1 checks fail by a hair per body (rifle path, untouched here).
 
+
+
+## The crowd makes room for a fight: combat load, walker shedding, panic thinning (PLAN.md 2.3 step 8, 2026-10-16)
+
+User, 2026-10-16: "can it automatically reduce the peds when more engagement comes? the crowd seems to run around in
+big chunks ... in GTA they just disappear by themselves, but not fully". Three parts, each with its own switch:
+
+- **One combat load.** `ZoneManager.setCombatLoad(source, bodies)` beside the dispatch's `setEnforcementLoad`: the
+  light combatant tier reports its promoted bodies (`"light"`), each `Encounter` its live full members
+  (`"encounter:<path>"`), each 0 when it goes. `combatBodies()` (dispatch + every source) is what the existing
+  balancing subtracts: walkers `8 - n/2` (floor 2), fighters `6 - n/3` (floor 1), traffic `budget - 2 x cars - n/2`.
+  Before, a horde or a placed fight did not thin the street at all. `combatLoadNow()` reads it.
+- **Shedding** (`ZoneManager.shedWalkers`, on). The reduced budget used to stop only NEW promotions; walkers promoted
+  before the fight kept their bodies until they walked out of reach. Now `maintainPedestrians` hands back the walkers
+  over the budget: farthest first, at most 2 a pass, only ones not hurt in 20 s, past `shedMinDistance` (20 m) from
+  every player and out of this peer's camera view. Fighters are never shed.
+- **Panic thinning** (`PedCrowd.panicThinning`, on). A FLEEING light ped that is out of this peer's camera view and
+  more than `thinMinDistance` (30 m) from what scared it goes INSIDE: hidden, not promotable, deaf, for
+  `insideSeconds` (20 s), then walks back onto its shared schedule -- and only when it is out of view (in view it
+  waits 2 s more), so nobody pops in or out in front of the camera. Never more than `thinMaxShare` (70 %) of a crowd
+  is inside at once: the street keeps people. A fighter never goes inside (it turns to fight; probe_ped_crowd's
+  "exactly the fighter budget" failed 5 of 6 until it was excluded). The crowd is local per peer, so each peer thins
+  by its own camera (accepted: the scare itself already was local).
+
+Gate **`tools/godot/probe_crowd_thinning.gd`** (World.tscn, a 120-ped zone downtown; 10/10, 3 runs): a gunshot sends
+the out-of-view fleeing peds inside (10-30), never past 70 %, the ones in view keep running, they come back after
+`insideSeconds` and none comes out in view; the light tier's promoted bodies raise the combat load one for one and
+the walker budget drops; walkers over a budget a 16-body fight leaves are shed. `-- --control` (both switches off)
+fails exactly the 3 thinning / shedding checks. The island's own fights scare a probe crowd while it streams in, so
+the probe calms it (`calmNow`) before each case. probe_ped_crowd 16/16 (x2), probe_light_tier, probe_encounter
+unchanged.

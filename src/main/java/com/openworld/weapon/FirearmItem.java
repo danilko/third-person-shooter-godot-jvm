@@ -456,6 +456,7 @@ public class FirearmItem extends WeaponItem {
 	Vector3[] dirs = new Vector3[pellets];
 	TraceHit[] traced = new TraceHit[pellets];
 	com.openworld.world.PedCrowd.CrowdHit[] crowd = new com.openworld.world.PedCrowd.CrowdHit[pellets];
+	com.openworld.ai.light.LightCombatants.LightHit[] light = new com.openworld.ai.light.LightCombatants.LightHit[pellets];
 	for (int i = 0; i < pellets; i++) {
 	  double[] d = SpreadPattern.direction(aim.getX(), aim.getY(), aim.getZ(), spreadDeg * 0.5, seed, i);
 	  digest += (i + 1) * (d[0] + 3 * d[1] + 7 * d[2]);
@@ -466,7 +467,32 @@ public class FirearmItem extends WeaponItem {
 		// before anything solid.
 		double reached = traced[i] != null ? traced[i].point.minus(origin).length() : range;
 		crowd[i] = com.openworld.world.PedCrowd.shoot(origin, dirs[i], reached);
+		// and the light combatant tier the same way (PLAN.md 2.3): whichever body is nearer takes the pellet
+		double past = crowd[i] != null ? crowd[i].distance() : reached;
+		light[i] = com.openworld.ai.light.LightCombatants.shoot(origin, dirs[i], past, owningCharacter);
+		if (light[i] != null) crowd[i] = null;
 	  }
+	}
+	// A light combatant takes the pull's pellets AT ONCE: lethal, it dies in the tier (no promotion to make a
+	// ragdoll for one frame); not lethal, it is promoted and every pellet lands on its new body below.
+	java.util.Map<Integer, Double> lightDamage = new java.util.HashMap<>();
+	for (int i = 0; i < pellets; i++) {
+	  if (light[i] == null) continue;
+	  double dealt = damage * (light[i].heightFraction() > 0.84 ? headshotScale : 1f);
+	  lightDamage.merge(light[i].id(), dealt, Double::sum);
+	}
+	java.util.Map<Integer, Node> lightBodies = new java.util.HashMap<>();
+	for (var e : lightDamage.entrySet()) {
+	  var tier = com.openworld.ai.light.LightCombatants.get();
+	  lightBodies.put(e.getKey(), tier != null ? tier.hitOrPromote(e.getKey(), e.getValue()) : null);
+	}
+	Vector3[] lightOnly = new Vector3[pellets];   // a pellet that landed on a body that stayed in the tier
+	for (int i = 0; i < pellets; i++) {
+	  if (light[i] == null) continue;
+	  Node body = lightBodies.get(light[i].id());
+	  if (body != null) traced[i] = new TraceHit(com.openworld.world.PedCrowd.hitPart(body, light[i].heightFraction()),
+		  light[i].point(), dirs[i].times(-1.0));
+	  else lightOnly[i] = light[i].point();
 	}
 	// Promote each ped the pull reached ONCE, and land every pellet that reached it on the body, on the hitbox at
 	// the height it struck (a head shot is a head shot).
@@ -483,6 +509,13 @@ public class FirearmItem extends WeaponItem {
 	}
 	for (int i = 0; i < pellets; i++) {
 	  Vector3 dir = dirs[i];
+	  if (lightOnly[i] != null) {
+		// it stayed a light body: flesh and a tracer, the damage already taken in the tier
+		hits.add("light");
+		results.add(new com.openworld.net.NetMessageCodec.PelletResult(SurfaceType.FLESH.ordinal() + 1, lightOnly[i], dir.times(-1.0)));
+		if (drawTracers) spawnBulletTracer(lightOnly[i]);
+		continue;
+	  }
 	  TraceHit hit = traced[i];
 	  hits.add(hit != null && hit.node != null ? hit.node.getName().toString() : "-");
 	  if (hit != null) {

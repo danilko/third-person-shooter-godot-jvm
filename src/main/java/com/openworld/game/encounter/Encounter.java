@@ -80,6 +80,9 @@ public class Encounter extends Node3D {
     /** A world flag set when it is cleared; a world with the flag set never stands it up again (a saved win). */
     @Export public String ledgerFlag = "";
     @Export public boolean enabled = true;
+    /** Members of one wave past this many are LIGHT combatants (PLAN.md 2.3, ai.light.LightCombatants): same orders,
+     *  no nodes, promoted to full bodies as players close in or as the budget frees. 0 = every member a full body. */
+    @Export public int fullCap = 0;
 
     public boolean getEnabled() { return enabled; }
     public void setEnabled(boolean v) { enabled = v; }
@@ -97,6 +100,8 @@ public class Encounter extends Node3D {
 
     private EncounterWaves life;
     private final List<AICharacter> members = new ArrayList<>();
+    /** The orders of the members that went to the light tier (PLAN.md 2.3): engage() turns them on the players too. */
+    private final List<com.openworld.ai.AIBlackboard> lightMembers = new ArrayList<>();
     private final Set<Node3D> claimedCover = new HashSet<>();
     private AISquad squad;
     private double scanIn;
@@ -121,10 +126,15 @@ public class Encounter extends Node3D {
     @Register
     @Override
     public void _exitTree() {
+        if (getNodeOrNull("/root/ZoneManager") instanceof com.openworld.world.ZoneManager zm)
+            zm.setCombatLoad("encounter:" + getPath().getPath(), 0);
         com.openworld.game.event.GameplayEvents.unsubscribe(onEvent);
         // a streamed-out scene takes its fight with it
         for (AICharacter m : members) if (GD.isInstanceValid(m) && !m.isDead()) despawn(m);
         members.clear();
+        com.openworld.ai.light.LightCombatants tier = com.openworld.ai.light.LightCombatants.get();
+        if (tier != null && !lightMembers.isEmpty()) tier.releaseOwnedBy(lightOwner());
+        lightMembers.clear();
     }
 
     private static Loadouts.EncounterRules rules() {
@@ -156,6 +166,10 @@ public class Encounter extends Node3D {
             alive++;
             if (m.getTarget() instanceof Player) provoked = true;
         }
+        // its full members are COMBAT load: the ambient crowd and traffic make room (PLAN.md 2.3 step 8)
+        if (getNodeOrNull("/root/ZoneManager") instanceof com.openworld.world.ZoneManager zm)
+            zm.setCombatLoad("encounter:" + getPath().getPath(), alive);
+        alive += liveLight();
         life.step(dt, nearestPlayer(), alive, provoked, out);
     }
 
@@ -266,7 +280,10 @@ public class Encounter extends Node3D {
         EnforcementDispatch ed = EnforcementDispatch.get();
         if (ed == null || getTree() == null) return 0;
         int room = Math.max(0, rules().cap() - liveAll());
-        int n = Math.min(count, room);
+        // the full bodies are capped (the island-wide encounter cap); a wave's overflow past fullCap is light
+        int full = fullCap > 0 ? Math.min(count, fullCap) : count;
+        int nFull = Math.min(full, room);
+        int n = nFull + (count - full);
         if (n <= 0) return 0;
         Loadouts lo = Tables.LOADOUTS.get();
         Loadouts.Loadout l = lo != null ? lo.get(loadout) : null;
@@ -293,22 +310,27 @@ public class Encounter extends Node3D {
                 face = at.plus(new Vector3(Math.cos(a) * 5.0, 1.4, Math.sin(a) * 5.0));
             }
             String key = getPath().getPath() + "#" + spawnedTotal;
+            if (i >= nFull) {
+                if (spawnLight(at, face, covers, route, l, side, key, engaged)) made++;
+                spawnedTotal++;
+                continue;
+            }
             AICharacter ai = ed.spawnPlaced(side, faction, l, at, Loadouts.roll(key));
             spawnedTotal++;
             if (ai == null) continue;
             ai.setSquad(squad);
-            ai.postFacePoint = face;
-            ai.holdLeash = holdLeash;
-            ai.holdCrouch = crouchAtCover;
+            ai.blackboard.postFacePoint = face;
+            ai.blackboard.holdLeash = holdLeash;
+            ai.blackboard.holdCrouch = crouchAtCover;
             Node3D cover = nearestFree(covers, at);
             if (cover != null) {
                 claimedCover.add(cover);
-                ai.holdPoint = cover.getGlobalPosition();
+                ai.blackboard.holdPoint = cover.getGlobalPosition();
             }
             if (!route.isEmpty() && cover == null) {
                 List<Vector3> r = new ArrayList<>();
                 for (Node3D p : route) r.add(p.getGlobalPosition());
-                ai.patrolRoute = r;
+                ai.blackboard.patrolRoute = r;
             }
             members.add(ai);
             made++;
@@ -316,6 +338,45 @@ public class Encounter extends Node3D {
         }
         if (made > 0) wavesOut = index + 1;
         return made;
+    }
+
+    /** What its light members are owned as in the tier. */
+    private String lightOwner() { return "encounter:" + getPath().getPath(); }
+
+    /** A wave member past {@link #fullCap}: the same orders a full member gets, in the light tier. */
+    private boolean spawnLight(Vector3 at, Vector3 face, List<Node3D> covers, List<Node3D> route, Loadouts.Loadout l,
+                               String side, String key, boolean engaged) {
+        com.openworld.ai.light.LightCombatants tier = com.openworld.ai.light.LightCombatants.ensure(this);
+        if (tier == null) return false;
+        com.openworld.ai.AIBlackboard bb = new com.openworld.ai.AIBlackboard();
+        bb.owner = lightOwner();
+        bb.faction = faction;
+        bb.side = side;
+        bb.loadout = loadout;
+        if (l != null) bb.weapon = l.weapon(Loadouts.roll(key));
+        bb.postFacePoint = face;
+        bb.holdLeash = holdLeash;
+        bb.holdCrouch = crouchAtCover;
+        Node3D cover = nearestFree(covers, at);
+        if (cover != null) {
+            claimedCover.add(cover);
+            bb.holdPoint = cover.getGlobalPosition();
+        }
+        if (!route.isEmpty() && cover == null) {
+            List<Vector3> r = new ArrayList<>();
+            for (Node3D p : route) r.add(p.getGlobalPosition());
+            bb.patrolRoute = r;
+        }
+        bb.huntsPlayers = engaged;
+        if (tier.spawn(bb, at, 100.0, com.openworld.ai.light.LightSim.HUMAN) <= 0) return false;
+        lightMembers.add(bb);
+        return true;
+    }
+
+    /** Its light members alive now (light, or promoted to a body that lives). */
+    private int liveLight() {
+        com.openworld.ai.light.LightCombatants tier = com.openworld.ai.light.LightCombatants.get();
+        return tier == null || lightMembers.isEmpty() ? 0 : tier.liveOwnedBy(lightOwner());
     }
 
     /** The nearest unclaimed cover point within 25 m of {@code at}, else null. */
@@ -332,7 +393,7 @@ public class Encounter extends Node3D {
 
     /** A member turns on the players: hostile to every player, held at full AI detail, the squad told who. */
     private void arm(AICharacter m) {
-        m.huntsPlayers = true;
+        m.blackboard.huntsPlayers = true;
         m.lodPinnedActive = true;
         Player p = nearestPlayerBody();
         if (p != null) squad.broadcastSpotted(m, p, p.getGlobalPosition());
@@ -340,12 +401,16 @@ public class Encounter extends Node3D {
 
     private void engageNow() {
         for (AICharacter m : members) if (GD.isInstanceValid(m) && !m.isDead()) arm(m);
+        for (com.openworld.ai.AIBlackboard bb : lightMembers) bb.huntsPlayers = true;
         encounterTriggered.emit();
     }
 
     private void releaseNow() {
         for (AICharacter m : members) if (GD.isInstanceValid(m) && !m.isDead()) despawn(m);
         members.clear();
+        com.openworld.ai.light.LightCombatants tier = com.openworld.ai.light.LightCombatants.get();
+        if (tier != null && !lightMembers.isEmpty()) tier.releaseOwnedBy(lightOwner());
+        lightMembers.clear();
         claimedCover.clear();
         wavesOut = 0;
     }
@@ -388,7 +453,7 @@ public class Encounter extends Node3D {
     public int liveNow() {
         int n = 0;
         for (AICharacter m : members) if (GD.isInstanceValid(m) && !m.isDead()) n++;
-        return n;
+        return n + liveLight();
     }
 
     /** Waves not out yet (an activity's "is it over" with {@link #liveNow}). */
@@ -424,12 +489,12 @@ public class Encounter extends Node3D {
         }
         String target = m.getTarget() instanceof Player ? "player" : m.getTarget() != null ? "other" : "";
         double dh = -1;
-        if (m.holdPoint != null) {
-            double x = m.getGlobalPosition().getX() - m.holdPoint.getX(), z = m.getGlobalPosition().getZ() - m.holdPoint.getZ();
+        if (m.blackboard.holdPoint != null) {
+            double x = m.getGlobalPosition().getX() - m.blackboard.holdPoint.getX(), z = m.getGlobalPosition().getZ() - m.blackboard.holdPoint.getZ();
             dh = Math.sqrt(x * x + z * z);
         }
         return (m.isDead() ? "dead" : "alive") + ";" + (m.characterInfo != null ? m.characterInfo.faction : "") + ";"
-                + weapon + ";" + (m.huntsPlayers ? 1 : 0) + ";" + target + ";" + (m.holdPoint != null ? 1 : 0) + ";" + dh
+                + weapon + ";" + (m.blackboard.huntsPlayers ? 1 : 0) + ";" + target + ";" + (m.blackboard.holdPoint != null ? 1 : 0) + ";" + dh
                 + ";" + (m.getController() instanceof com.openworld.ai.AIController c && c.getCurrentState() != null
                         ? c.getCurrentState().getClass().getSimpleName() : "-")
                 + ";" + (m.weaponController != null && m.weaponController.getCurrentWeaponItem() != null

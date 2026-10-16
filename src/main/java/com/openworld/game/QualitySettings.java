@@ -191,6 +191,7 @@ public class QualitySettings extends Node {
         }
         EnforcementDispatch.attackTokenBonus = d.attackTokens();
         EnforcementDispatch.densityBodyCap = d.bodyCap();
+        com.openworld.ai.light.LightCombatants.applyDensity(d.lightCap(), d.lightFullBudget());
     }
 
     private boolean densityForced;

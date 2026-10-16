@@ -176,24 +176,11 @@ public class AICharacter extends Character {
      */
     public boolean lodPinnedActive;
 
-    // ── Placed AI (PLAN.md 2.2: game.encounter -- an Encounter's members, a building's guards) ──
-    /** Hostile to every PLAYER whatever the faction table says (an engaged encounter: a gang crew that has turned on
-     *  the players without the whole gang turning). Other AI are judged by the table as usual. */
-    public boolean huntsPlayers;
-    /** A point it fights FROM (a cover marker, a guard's post): it goes there and holds it instead of strafing, and
-     *  will not chase further than {@link #holdLeash} from it. Null = fights anywhere (the default). */
-    public Vector3 holdPoint;
-    /** How far from {@link #holdPoint} it may chase a target (m); 0 = it never leaves the point. */
-    public double holdLeash;
-    /** Crouch at the hold point between shots (a low cover: a car, a crate, a wall's end). */
-    public boolean holdCrouch;
-    /** A patrol ROUTE walked in order and round again, instead of the random walk round the spawn point. */
-    public java.util.List<Vector3> patrolRoute;
+    // ── Placed AI (PLAN.md 2.2 / 2.3): its ORDERS -- hunt the players, a hold point + leash, a patrol route, a post --
+    //    live on the blackboard, which a light combatant hands across on promotion (ai.AIBlackboard) ──
+    /** What an encounter / guard post / activity / the light tier told it. Never null; replaced whole on a promotion. */
+    public com.openworld.ai.AIBlackboard blackboard = new com.openworld.ai.AIBlackboard();
     private int patrolRouteIndex;
-    /** Calm, it stands ON {@link #holdPoint} instead of strolling round its spawn point (a guard's post). */
-    public boolean standsAtPost;
-    /** Where a calm body stands facing when its walk is done (a guard's post looks out of its marker's -Z). */
-    public Vector3 postFacePoint;
 
     private AILodLevel classifyLod(float nearestPlayer) {
         if (lodPinnedActive) return AILodLevel.ACTIVE;
@@ -526,9 +513,9 @@ public class AICharacter extends Character {
     }
 
     /** May this AI target {@code c} (faction {@code tf})? The faction table narrowed per target (P1e step 4), or --
-     *  for a body that {@link #huntsPlayers} -- any player. */
+     *  for a body that {@link com.openworld.ai.AIBlackboard#huntsPlayers} -- any player. */
     private boolean targets(String myFaction, String tf, Character c) {
-        if (huntsPlayers && c instanceof Player) return true;
+        if (blackboard.huntsPlayers && c instanceof Player) return true;
         return Faction.areHostile(myFaction, tf) && com.openworld.game.Hostility.mayTarget(myFaction, c);
     }
 
@@ -985,22 +972,16 @@ public class AICharacter extends Character {
 
     // ── Navigation ────────────────────────────────────────────────────────────
 
-    /** {@code goal} kept within {@link #holdLeash} of {@link #holdPoint} (the same object when there is no hold point
+    /** {@code goal} kept within {@link com.openworld.ai.AIBlackboard#holdLeash} of {@link com.openworld.ai.AIBlackboard#holdPoint} (the same object when there is no hold point
      *  or it is inside the leash). */
     public Vector3 leashed(Vector3 goal) {
-        if (!holds() || goal == null) return goal;
-        Vector3 d = goal.minus(holdPoint);
-        d.setY(0);
-        double len = d.length();
-        if (len <= holdLeash) return goal;
-        if (holdLeash <= 0.01 || len < 1e-3) return new Vector3(holdPoint);
-        return holdPoint.plus(d.times(holdLeash / len));
+        return holds() ? blackboard.leashed(goal) : goal;
     }
 
-    /** Does it fight from {@link #holdPoint} now? Only while it CARRIES a gun with ammunition, whatever is in its hands
+    /** Does it fight from {@link com.openworld.ai.AIBlackboard#holdPoint} now? Only while it CARRIES a gun with ammunition, whatever is in its hands
      *  (a calm guard holds its fists; the best-weapon pick may be the baton when nobody is near): a body with only a
      *  knife or a bat has to close in (PLAN.md 2.2). */
-    public boolean holds() { return holdPoint != null && carriesLoadedGun(); }
+    public boolean holds() { return blackboard.holdPoint != null && carriesLoadedGun(); }
 
     private boolean carriesLoadedGun() {
         if (weaponController == null) return false;
@@ -1015,14 +996,14 @@ public class AICharacter extends Character {
     public boolean beyondLeash(Vector3 goal) { return goal != null && leashed(goal) != goal; }
 
     public void setNextPatrolTarget() {
-        if (patrolRoute != null && !patrolRoute.isEmpty()) {
-            patrolRouteIndex = (patrolRouteIndex + 1) % patrolRoute.size();
-            navAgent.setTargetPosition(patrolRoute.get(patrolRouteIndex));
+        if (blackboard.patrolRoute != null && !blackboard.patrolRoute.isEmpty()) {
+            patrolRouteIndex = (patrolRouteIndex + 1) % blackboard.patrolRoute.size();
+            navAgent.setTargetPosition(blackboard.patrolRoute.get(patrolRouteIndex));
             return;
         }
-        if (holdPoint != null && (standsAtPost || holdLeash <= 0)) {
+        if (blackboard.holdPoint != null && (blackboard.standsAtPost || blackboard.holdLeash <= 0)) {
             // a post: it stands on its point while calm (a guard at a gate, a desk)
-            navAgent.setTargetPosition(holdPoint);
+            navAgent.setTargetPosition(blackboard.holdPoint);
             return;
         }
         float angle = godot.global.GD.randf() * (float) Math.PI * 2.0f;

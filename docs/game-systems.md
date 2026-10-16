@@ -13,6 +13,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - The campaign graph, its lint, and the career override stack (PLAN.md 2.1 step 1, 2026-10-10, after it)
 - The Activity runtime: typed Java missions, the konbini job as the reference, replay, game-over rules (PLAN.md 2.1, 2026-10-10, after it)
 - Placed fights and guarded buildings: Encounter, SiteGuards, loadouts.json, cover / posts / patrol routes (PLAN.md 2.2, 2026-10-15, after it)
+- The light combatant tier and the AI blackboard (PLAN.md 2.3 / F8, 2026-10-16, at the end)
 
 ---
 
@@ -1158,3 +1159,181 @@ checks its "Wired in code" table against the enum. Licence rule as for art: CC0 
 - Re-placed for room: `Y3_ON_Y` -700 -> -650 (Y3 descends in one straight grade after its last crossing,
   `Y3_GORE_HOLD`), `PORT_OFF_X` -200 -> -170, `PORT_ON_X` -250 -> -230; Y2 flies on a 4.5 % cone.
 
+
+## The light combatant tier and the AI blackboard (PLAN.md 2.3 / F8, 2026-10-16)
+
+### The design (written before the build, as 2.3 asked)
+
+**The problem (F8).** Every hostile body is a full `AICharacter` (~125 nodes, ~10 JVM-scripted, 3-4 ms to
+instantiate, ~0.06 ms a physics tick even glided), so the island holds walkers 8 + fighters 6 + the dispatch's
+body cap. 5-star police, a gang war and the 4.11 outbreak want 20-80 hostiles NEAR the player. The ambient crowd
+solved the same problem for walkers (the VAT far tier, `docs/crowd.md`): the answer is a MIDDLE tier that has no
+nodes at all.
+
+**What a light combatant is.** Plain Java state in ONE `ai.light.LightCombatants` node (one per world, created on
+first use, like the crowd's own MultiMesh): a position, a yaw, a velocity, a few-field brain, hit points, and an
+`AIBlackboard` -- the SAME blackboard object the full body uses, handed across on promotion and back on demotion,
+so an order ("hold this point, leash 8 m", "hunt the players", "patrol this route", "you belong to encounter X /
+station Y") survives the tier change. It is drawn by the crowd's own vertex-animation shader (`ped_vat.gdshader`),
+one `MultiMesh` per (body, outfit), its weapon one more `MultiMesh` per weapon model riding the right hand's baked
+per-frame transform. Its brain is stepped in plain Java (engine-free `ai.light.LightSim`, unit-tested); the only
+engine calls are path requests to the navigation server, a few a tick, round-robin.
+
+**The rule that keeps it cheap and fair: a light combatant NEVER deals damage.** It approaches, takes positions,
+holds back, aims, swings -- but only a full body hurts anyone. That removes hit-scan simulation, lag compensation
+and any co-op disagreement from the light tier: what it shows is cosmetic, what decides a fight is real.
+
+**The brain (few fields).** `kind` MELEE | RANGED (from the loadout: any firearm = RANGED). States:
+- `IDLE` -- no target: stand at the hold point / walk the patrol route / mill near the spawn.
+- `ADVANCE` -- a target: follow a nav path toward a GOAL. A melee goal is the target itself; a ranged goal is
+  the hold point if it has one (inside the leash), else the point `standoff` (25 m) short of the target on the
+  line to it. Re-path every 1.5 s or when the target moved > 3 m; at most `pathsPerTick` (4) requests a tick.
+  Separation from neighbours (0.8 m, a 2 m spatial hash) so a horde does not collapse onto one point.
+- `HOLD` -- at the goal: a ranged one faces the target and plays the aim clip; a melee one whose promotion was
+  REFUSED (the budget is full) stops on the `holdBackRing` (6 m) and waits its turn instead of swinging harmlessly.
+- `DEAD` -- the death clip, then held, then removed after `corpseSeconds` (20 s).
+- `PROMOTED` -- a full body stands in for it; nothing is drawn.
+
+**Promotion is a decision, ZoneManager-style** (one a tick, nearest first, under a budget):
+- within `promoteDistance` (15 m) of a player, or
+- a RANGED one in `HOLD` with line of sight to its target within `engageDistance` (40 m) -- the fight's shooters
+  are real, the reserve behind them is light; or
+- HIT by a non-lethal bullet (at once, the budget ignored up to `hitCeiling` = budget + 4).
+A lethal hit kills it IN THE TIER (the death clip; no 3-4 ms promotion to make a ragdoll for one frame), so a spray
+into a horde never stacks promotions. A blast damages every light body in its radius in the tier the same way.
+`fullBudget` (full bodies promoted from this tier at once) is a measured number per World density level, and the
+enforcement balancing subtracts the dispatch's live bodies from it the way it does from the crowd's budgets.
+Promotion spawns the full body with the light one's body, outfit, weapon, faction, hit points and blackboard
+(`UnitSpawner.spawnPlaced` with a fixed body). **Demotion**: a promoted body that has had no target for 10 s, is
+not hurt in the last 20 s, and is beyond `demoteDistance` (40 m) of every player goes back to the tier where it
+stands, hit points and blackboard carried.
+
+**Co-op.** The tier is HOST-simulated (unlike the crowd, it has no shared schedule to compute: it chases people).
+The host sends `MSG_LIGHT_BATCH` (unreliable, 10 Hz): per light body id u16, x/z/y i16 (0.1 m / 0.05 m), yaw u8,
+state+clip u8, look u8 (body x outfit x weapon index from one shared table) -- 10 bytes, 800 B per message at 80,
+~8 KB/s per peer. A client interpolates and draws; a promoted one's full body replicates as an ordinary character
+with the id `light:<n>`, and the client hides that light id while the body exists (the crowd's
+`followHostBodies` rule). A client's shot is resolved by the host as every shot is, so it hits the host's copy.
+
+**The AI blackboard (P1c).** `ai.AIBlackboard`, one per `AICharacter` and one per light combatant: the orders an
+outside system writes -- `huntsPlayers`, `holdPoint` / `holdLeash` / `holdCrouch`, `patrolRoute`,
+`standsAtPost` / `postFacePoint` (the 2.2 fields, moved), plus `owner` (the encounter / activity / station that
+placed it), `pinnedTarget` (a character id an activity says to go for), and the LOOK it was given (body, outfit,
+loadout, weapon) so the other tier can wear it. The FSM states read it; activities and encounters write it. No
+behaviour-tree rewrite.
+
+**Who uses it in 2.3.** `Encounter` spawns a wave's members beyond its `fullCap` as light combatants with the same
+blackboard (they feed in as the full ones die or as players close in); the debug console's `horde <n> [faction]
+[loadout]` spawns a ring of hunters round the player. The dispatch's 5-star overflow and the 4.11 outbreak are its
+next users (phase 3 / 4), not this item.
+
+**How it is measured (the Deck preset).** `tools/godot/bench_light_tier.gd` (NEEDS A DISPLAY, `--deck` like
+`probe_walk_perf`): DebugWorld, N light hunters (0 / 40 / 80 / 160) converging on an invulnerable player, with a
+full budget of 8 / 12 / 16, printing deck_ms p50 / p95 per case; `probe_walk_perf.gd --horde=N` puts the same load
+on the island legs. The density table gets `light_cap` and `light_full_budget` from those numbers, not by eye.
+Gates: `LightSimTest` (unit: converge, separation, hold-back ring, leash, standoff, promotion order, lethal vs
+non-lethal hits, demotion rule), `probe_light_tier.gd` (DebugWorld: a horde converges and draws, NO damage while
+light, promotion inside 15 m and on a hit inside the budget, a lethal hit kills in the tier, demotion hands the
+blackboard back, an encounter's overflow is light) with a `--control` that spawns every member as a full body.
+
+### As built (2026-10-16)
+
+Package `ai.light`: `LightSim` (the engine-free brain, `LightSimTest` 12), `LightLooks` (the baked bodies and weapons,
+the draw layers), `LightCombatants` (the node), `LightBatch` (MSG_LIGHT_BATCH's body, `LightBatchTest` 3). The
+blackboard is `ai.AIBlackboard`; `AICharacter.blackboard` replaced the six 2.2 fields (huntsPlayers, holdPoint,
+holdLeash, holdCrouch, patrolRoute, standsAtPost / postFacePoint) and gained owner / pinnedTarget / the look.
+
+- **The bake.** `tools/godot/bake_ped_vat.gd` now also bakes `jog`, `run_rifle`, `aim_rifle`, `aim_pistol`,
+  `attack` (punch_jab), `death` (death_fall_back) and `zombie_walk / _attack / _idle` onto the same texture (appended
+  rows: the crowd's six clips keep their rows), the right hand's transform per frame (`hand` per clip, for the
+  weapon), the body's weapon sockets read off its `CharacterVisuals_<Body>.tscn`, and each vertex's CLOTH PART in the
+  mesh's vertex colour (r = part / 8), found by the nearest vertex of the full body at rest (all six bodies: every
+  vertex within 5 cm). `ped_vat.gdshader` paints a part its outfit's flat colour when the layer is `dressed`, so a
+  light police officer wears the police uniform the full body wears (Outfits' own rule). The crowd's look is unchanged
+  (its layers are not dressed; probe_ped_crowd 16/16).
+- **The weapons.** `tools/godot/bake_light_weapons.gd` turns each catalog weapon's `Model` into one mesh with each
+  part's mean colour in the vertex colour (`assets/characters/crowd/weapons/<ID>.res`, `light_weapons.json`: socket,
+  ranged); `light_weapon.gdshader` reads the SAME instance data as the body and puts the weapon on the socket in the
+  hand's pose for that frame, so the two cannot disagree. Trap: a weapon scene also carries visible effect meshes (the
+  muzzle's glow sphere is 0.3 m wide), so only `Model` is baked and anything under Muzzle / VFX / Flash is skipped.
+- **Think groups** (user, 2026-10-16: "update one pool per round"). A body re-decides its goal and state on every 4th
+  tick, the tier split into staggered groups; it moves every tick. Paths: 4 nav requests a tick over the whole tier,
+  round-robin; ground snaps: 12 a tick.
+- **Shots.** `FirearmItem.resolvePellets` asks `LightCombatants.shoot` beside `PedCrowd.shoot` (the nearer body takes
+  the pellet); a pull's pellets on one light body are summed: lethal kills it IN THE TIER (`killedInTier`), not lethal
+  promotes it (budget ignored to budget + 4) and the pellets land on the new body's hitboxes. The sight point stops on
+  a light body (WeaponItem), melee swings and the player's car promote the ones in reach, a blast promotes the nearest
+  4 and damages the rest in the tier. **An AI's bullet passes through the light bodies of a faction it is not hostile
+  to** -- measured: without that, the promoted shooters' own rounds into their light reserve filled the hit ceiling on
+  every bench case. A player's shot hits anyone.
+- **Promotion / demotion.** One promotion a tick, most pressing first (nearest to a player or its target); a refused
+  melee body holds back on the 6 m ring. A promoted body is `light:<id>` (`EnforcementDispatch.spawnPlacedAs`: the
+  exact body, outfit and weapon; the blackboard object handed over). Demotion: idle -- no target, **or its target past
+  detect range** (a full AI keeps hunting a player it lost; one followed a player 260 m away and never demoted, a 1-in-3
+  flake of probe_light_tier D) -- for 10 s, unhurt 20 s, every player beyond 40 m.
+- **Co-op.** The host sends `MSG_LIGHT_BATCH` (tag 37, channel 3 unreliable, 10 Hz, `LightBatch`: a look table and 11
+  bytes a body); a client draws it eased toward the host's positions and draws nothing for a promoted one (its body
+  replicates). Not yet run on two peers.
+- **Users.** `Encounter.fullCap`: a wave's members past it are light, with the same orders, counted in `liveNow`,
+  turned on the players by `engage`, taken away by `stop` / reset. Console: `horde [n] [faction] [loadout|-] [zombie]`,
+  `horde clear`, `horde` (status). `game/density.json` `light_cap` / `light_full_budget` per World density level
+  (QualitySettings applies them).
+
+**Measured** (`tools/godot/bench_light_tier.gd -- --deck`, DebugWorld, this PC, the Deck proxy = max(cpu x 2.2,
+gpu x 12); half gang_member, half fist zombies; GPU-bound here):
+
+| case | cpu p50 / p95 ms | gpu p50 / p95 ms | deck p50 / p95 ms |
+|---|---|---|---|
+| nobody | 1.65 / 2.84 | 0.92 / 1.08 | 11.1 / 12.9 |
+| 40 light, budget 12 | 3.58 / 6.46 | 1.32 / 1.56 | 15.9 / 18.7 |
+| 80 light, budget 8 | 2.73 / 4.93 | 1.02 / 1.17 | 12.2 / 14.0 |
+| 80 light, budget 12 | 3.40 / 6.28 | 1.30 / 1.46 | 15.6 / 18.0 |
+| 80 light, budget 16 | 3.38 / 7.04 | 1.17 / 1.56 | 14.1 / 18.9 |
+| 160 light, budget 12 | 3.84 / 6.82 | 1.45 / 1.56 | 17.4 / 18.8 |
+| control: 12 full bodies | 2.62 / 4.90 | 0.98 / 1.09 | 11.8 / 13.1 |
+| control: 24 full bodies | 4.14 / 7.67 | 1.52 / 1.69 | 18.3 / 21.1 |
+
+**The cost is the full bodies, not the horde**: 80 light with 8 full costs what 12 full bodies alone cost, and 160
+light costs ~2 ms of deck time more than 40. So the density levels are 80 / 8 (NORMAL), 120 / 12, 160 / 16.
+
+**A measuring trap found on the way:** `QualitySettings` applies the saved vsync once the game is up, AFTER a probe's
+own `window_set_vsync_mode(DISABLED)` -- every frame then reads 16.7 ms whatever it costs (the first bench run: CPU
+p50 16.6-16.7 in every case, nobody included). Both `bench_light_tier.gd` and `probe_walk_perf.gd` now switch vsync off
+again after the world is up, and run under `--display-driver x11` (Wayland may force vsync). Any perf number recorded
+since QualitySettings started applying vsync, with a saved vsync on, is suspect.
+
+**Gates:** `probe_light_tier.gd` 19/19 (A-F; A-E 3 runs in a row, A-F 2; `-- --control` fails the 9 mechanism checks: the same
+horde stands up as 30 full bodies), `LightSimTest` 12, `LightBatchTest` 3, and unchanged: probe_encounter 21/21,
+probe_site_guards 13/13, probe_ped_crowd 16/16.
+
+**On the island** (`probe_walk_perf.gd -- --deck --legs=walk_station --horde=80`, `--horde-budget` 8, this PC, vsync
+really off; deck ms p50 / p95, frame ms p50 / p95, physics ms p50, characters p95):
+
+| run | deck | frame | physics | chars |
+|---|---|---|---|---|
+| no horde (the control) | 40.9 / 57.7 | 9.9 / 15.9 | 9.4 | 54 |
+| horde, first build | 108.6 / 186.7 | -- | 14-16, 2 ticks a frame | 76 |
+| horde, fists only, drawing off | 89.2 / 142.9 | 22.0 / 35.3 | 14.2 | 69 |
+| horde, after the snap fix | 72.7 / 102.1 | 17.9 / 29.9 | 12.5 | 73 |
+| walk_downtown, no horde | 26.7 / 55.8 | 6.45 / 15.1 | 9.0 | 47 |
+| walk_downtown, horde, after the fix | 23.2 / 63.0 | 6.65 / 16.4 | 9.2 | 48 |
+
+Downtown the horde of 80 costs ~0.2 ms of frame p50 (the tier's tick 0.23 ms); the station is where the full bodies a
+fight draws in tip an already-full tick over.
+
+- **The first build's cost was the tier's own GROUND SNAPS**: `NavigationServer3D.mapGetClosestPoint` is ~0.3-0.6 ms
+  a call on the island's nav map, and 12 a tick were 3.4 ms of the tier's 3.9 ms -- the station's tick, already 9.4
+  ms with no horde, crossed 16.7 ms, Godot ran 2 physics ticks a frame and the frame doubled. Now a body is snapped only
+  when separation PUSHED it (2 a tick), by a physics ray down (`snapMs` 0.017); the tier's tick is **0.50 ms** for 80
+  (paths 0.38). Neither the gunfire (`--horde-armed=0`) nor the drawing (`--horde-draw=0`, LightCombatants.drawBodies)
+  was the cause: both controls changed nothing.
+- **What remains is the full bodies a fight brings**, not the tier: +19 characters at p95 (the budget's promoted
+  bodies, vigilantes and responders drawn by the gunfire), +3 ms of physics and the GPU of 17-surface skinned bodies.
+- **The station is over the Deck budget with nobody fighting** (p95 57.7 against 33.3; this is the first measurement
+  with vsync really off since QualitySettings, see above). That is the map's and the full body's problem (a cheaper
+  promoted body: an LOD skin, a shadow LOD -- P3 / PLAN F10), not the light tier's; 2.4 / the S18 rebuild should
+  re-measure it. `HORDE <leg>` lines now carry `tickMs,pathMs,snapMs`.
+
+**Not done (the follow-ups):** a two-peer run of MSG_LIGHT_BATCH; the enforcement dispatch's 5-star overflow and the
+4.11 outbreak as users (phase 3 / 4); a flow field when one target is chased by many (the path budget measured fine at
+160); light bodies fire no cosmetic shots (deliberately: a tracer that cannot hurt reads as a miss).

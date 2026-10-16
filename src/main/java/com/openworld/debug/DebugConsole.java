@@ -253,6 +253,7 @@ public class DebugConsole extends CanvasLayer {
                 print("hud [0-3]                              debug HUD: off / FPS / perf + graph / + game state");
                 print("traffic                                cars round you now: by distance, by side, budget, region mix");
                 print("pools [off|on]                         each force's bodies on hand per tier (station pools), drawn, lost");
+                print("horde [n] [faction] [loadout] [zombie] light combatants hunting you, 40-60 m out; `horde clear` / `horde` = status");
                 print("engine [0|1]                           engine sound on / off, and how many cars have a voice");
                 print("activity [start|replay|retry|abort|why <id>]   the running activities; start / replay / retry one");
                 print("where                                  the bug-report line (postal code, position, zone, road)");
@@ -355,6 +356,7 @@ public class DebugConsole extends CanvasLayer {
                 print("hud level " + hud.levelNow());
             }
             case "traffic" -> traffic();
+            case "horde" -> horde(a);
             case "pools" -> {
                 // the forces' station pools (PLAN.md P1e step 3, game.ForcePools): on hand / full per side and tier
                 com.openworld.game.EnforcementDispatch ed = com.openworld.game.EnforcementDispatch.get();
@@ -462,6 +464,26 @@ public class DebugConsole extends CanvasLayer {
         String why = pc.startAutoDrive();
         print(why.isEmpty() ? "autodrive on: driving to the GPS waypoint (steer, brake or accelerate to take over)"
                 : "autodrive: " + why);
+    }
+
+    /** The light combatant tier (PLAN.md 2.3): spawn a ring of hunters, clear them, or show the tier's numbers. */
+    private void horde(String[] a) {
+        Player p = localPlayer();
+        if (p == null) { print("no local player"); return; }
+        com.openworld.ai.light.LightCombatants t = com.openworld.ai.light.LightCombatants.ensure(p);
+        if (t == null) { print("no tier"); return; }
+        if (a.length >= 2 && a[1].equals("clear")) { t.clearNow(); print("horde cleared"); return; }
+        if (a.length >= 2) {
+            int n;
+            try { n = Integer.parseInt(a[1]); } catch (NumberFormatException e) { print("horde <n> [faction] [loadout] [zombie]"); return; }
+            String faction = a.length >= 3 ? a[2] : "gang_a";
+            String loadout = a.length >= 4 && !a[3].equals("-") ? a[3] : "";
+            boolean zombie = a.length >= 5 && a[4].equals("zombie");
+            print("horde: " + t.hordeNow(p.getGlobalPosition(), n, 50.0, faction, loadout, zombie) + " of " + n + " spawned");
+        }
+        String[] s = t.statsNow().split(",");
+        print("light " + s[0] + "  promoted " + s[1] + " / " + t.fullBudget + "  dead " + s[2] + "  (promoted " + s[3]
+                + ", demoted " + s[4] + ", killed in tier " + s[5] + ", refused " + s[6] + ")");
     }
 
     private Player localPlayer() {

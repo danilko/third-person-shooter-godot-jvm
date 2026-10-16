@@ -460,6 +460,8 @@ public class WeaponItem extends Pickup implements WeaponAction {
       // does not work, it works on an AI" -- an AI's hitbox stops the camera ray). Stop the sight at the ped.
       var crowd = com.openworld.world.PedCrowd.shoot(origin, toFar.div(len), end.minus(origin).length());
       if (crowd != null && crowd.distance() > SIGHT_MIN_DISTANCE) end = crowd.point();
+      var light = com.openworld.ai.light.LightCombatants.shoot(origin, toFar.div(len), end.minus(origin).length());
+      if (light != null && light.distance() > SIGHT_MIN_DISTANCE) end = light.point();
     }
     return end;
   }

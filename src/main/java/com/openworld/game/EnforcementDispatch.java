@@ -618,6 +618,12 @@ public class EnforcementDispatch extends Node {
     String outfitOverride = "";
     /** A placed body's own faction (PLAN.md 2.2), "" = its side's. Set only around one spawnBody call. */
     String factionOverride = "";
+    /** The body the next spawnBody wears instead of a roll of its side's rows, "" = roll (PLAN.md 2.3: a light
+     *  combatant's full body wears the body it was drawn in). Set only around one spawnBody call. */
+    String bodyOverride = "";
+    /** The characterId the next spawnBody is announced with, "" = a fresh UUID (PLAN.md 2.3: "light:<n>", so a
+     *  client hides that light combatant while its body exists). Set only around one spawnBody call. */
+    String idOverride = "";
 
     /** The pools, bound to this world's places (re-bound when the places record changes). */
     ForcePools pools() {
@@ -1038,6 +1044,30 @@ public class EnforcementDispatch extends Node {
     /** See {@link UnitSpawner#spawnPlaced}. */
     public AICharacter spawnPlaced(String side, String faction, com.openworld.game.encounter.Loadouts.Loadout l, Vector3 at, double roll) {
         return spawner.spawnPlaced(side, faction, l, at, roll);
+    }
+
+    /** A light combatant's full body (PLAN.md 2.3): {@link #spawnPlaced} wearing exactly the LOOK on its blackboard
+     *  (body, outfit, the one weapon it was drawn with, the loadout's extras) and announced as {@code characterId}. */
+    public AICharacter spawnPlacedAs(com.openworld.ai.AIBlackboard bb, com.openworld.game.encounter.Loadouts.Loadout l,
+                                     Vector3 at, String characterId) {
+        var exact = new com.openworld.game.encounter.Loadouts.Loadout(l != null ? l.id() : "light", l != null ? l.side() : "",
+                bb.outfit, bb.weapon == null || bb.weapon.isEmpty() ? List.of() : List.of(bb.weapon), new double[] { 1.0 },
+                l != null ? l.extra() : List.of());
+        bodyOverride = bb.body != null ? bb.body : "";
+        idOverride = characterId != null ? characterId : "";
+        try {
+            return spawner.spawnPlaced(bb.side, bb.faction, exact, at, 0.0);
+        } finally {
+            bodyOverride = "";
+            idOverride = "";
+        }
+    }
+
+    /** The body and outfit a body of {@code side} would be drawn in now ({body, outfit}; "" when the side has no rows):
+     *  a light combatant is drawn in it, so its full body can wear the same (PLAN.md 2.3). */
+    public String[] lookFor(String side) {
+        DispatchRules.BodyPick b = spawner.bodyFor(side);
+        return b == null ? new String[] { "", "" } : new String[] { b.body(), b.outfit() == null ? "" : b.outfit() };
     }
 
     /** See {@link UnitSpawner#spawnHangoutBody}. */

@@ -248,7 +248,8 @@ final class UnitSpawner {
     AICharacter spawnBody(String side, Vector3 at, String weapon) {
         if (ed.getTree() == null || ed.getTree().getCurrentScene() == null) return null;
         if (!(GD.load(AI_SCENE) instanceof PackedScene ps) || !(ps.instantiate() instanceof AICharacter ai)) return null;
-        DispatchRules.BodyPick look = bodyFor(side);
+        DispatchRules.BodyPick look = ed.bodyOverride == null || ed.bodyOverride.isEmpty() ? bodyFor(side)
+                : new DispatchRules.BodyPick(ed.bodyOverride, "", 1.0, 0, 99);
         if (look != null) {
             String vis = "res://src/main/resources/com/openworld/character/CharacterVisuals_"
                     + java.lang.Character.toUpperCase(look.body().charAt(0)) + look.body().substring(1) + ".tscn";
@@ -256,7 +257,7 @@ final class UnitSpawner {
                 ai.characterVisuals = vps;   // before _ready, which is what instances it
         }
         CharacterInfo info = new CharacterInfo();
-        info.characterId = UUID.randomUUID().toString();
+        info.characterId = ed.idOverride != null && !ed.idOverride.isEmpty() ? ed.idOverride : UUID.randomUUID().toString();
         info.displayName = POLICE.equals(side) ? "Police" : side;
         // a placed body may be another faction than the body rows it wears (an Encounter's "enemy" crew in gang_a
         // clothes); set before the spawn is announced, so every peer gets the right one

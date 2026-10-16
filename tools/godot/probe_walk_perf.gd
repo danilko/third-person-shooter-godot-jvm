@@ -10,6 +10,11 @@ extends SceneTree
 ##
 ##   <godot> --path . --script tools/godot/probe_walk_perf.gd [-- --legs=a,b] [--budget=16.7] [--top=12]
 ##       [--no-peds] [--no-traffic] [--no-buildings] [--no-hlod] [--no-parked]      (controls: remove that derived block before the world loads)
+##       [--horde=N] [--horde-budget=B]   LIGHT COMBATANT LOAD (PLAN.md 2.3): every leg starts with N hunters of the
+##                  light tier (ai.light.LightCombatants: half gang_member, half fist "zombies", gang_a) 40-60 m round
+##                  the player, at most B of them full bodies (default 8, NORMAL's light_full_budget); the player is
+##                  invulnerable. A `HORDE <leg> light,promoted,...` line per leg. --horde-armed=0: fists only (no
+##                  gunfire: attributes the cost of the horde's shots and what they scare)
 ##       [--wanted=N] [--gang=N]   PEAK LOAD (PLAN.md W5): hold the player at N police stars (lethal, so they shoot
 ##                  rather than arrest; the player is invulnerable) and/or N stars with gang_a, so the enforcement
 ##                  dispatch's officers, patrol cars and gang hunters are in the ring for every leg
@@ -116,6 +121,24 @@ func _hold_standing() -> void:
 	if _arg("gang") != null and gm.get_node_or_null("GangSystem") != null:
 		gm.get_node("GangSystem").call("set_gang_stars_now", pid, "gang_a", int(_arg("gang")))
 
+var horde_tier: Node
+## PLAN.md 2.3: a fresh horde round the player at the start of every leg (the last leg's is cleared first).
+func _horde_start() -> void:
+	if horde_tier == null:
+		horde_tier = load("res://src/main/java/com/openworld/ai/light/LightCombatants.java").new()
+		w.add_child(horde_tier)
+		await process_frame
+	horde_tier.call("clear_now")
+	horde_tier.set("draw_bodies", _arg("horde-draw", "1") != "0")
+	var n := int(_arg("horde"))
+	horde_tier.call("tune_now", 400, int(_arg("horde-budget", "8")), 15.0, 4, true)
+	var at := player.global_position
+	if _arg("horde-armed", "1") == "0":
+		horde_tier.call("horde_now", at, n, 45.0, "gang_a", "", true)     # fists only: no gunfire at all
+	else:
+		horde_tier.call("horde_now", at, n / 2, 50.0, "gang_a", "gang_member", false)
+		horde_tier.call("horde_now", at, n - n / 2, 45.0, "gang_a", "", true)
+
 func _settle(seconds: float) -> void:
 	var t0 := Time.get_ticks_msec()
 	while Time.get_ticks_msec() - t0 < seconds * 1000.0:
@@ -133,6 +156,12 @@ func _leg(label: String, path: Array, speed: float) -> void:
 		return
 	_place(path[0], path[1] - path[0])
 	_hold_standing()
+	if _arg("horde") != null:
+		await _horde_start()
+	# QualitySettings applies the saved vsync once the game is up (settings.cfg): with it on every frame reads 16.7 ms
+	# whatever it costs (found 2026-10-16 by bench_light_tier.gd), so it is switched off again before each leg
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+	Engine.max_fps = 0
 	await _settle(12.0)             # streaming + the crowd around the start
 	var under0 := under_terrain
 	var near_sum := [0.0, 0.0]
@@ -284,6 +313,8 @@ func _leg(label: String, path: Array, speed: float) -> void:
 			float(eng.reduce(func(x, y): return x + y, 0)) / maxf(1.0, eng.size()), int(eng.max()) if not eng.is_empty() else 0,
 			int(sir.max()) if not sir.is_empty() else 0, eng.size(),
 			"; furniture control hid %d batches, removed %d wire surfaces" % furniture_hidden if _arg("no-furniture", false) else ""])
+	if horde_tier != null:
+		print("HORDE %s light,promoted,dead,promotedTotal,demotedTotal,killedInTier,refused,paths,thinks,tickMs,pathMs,snapMs %s" % [label, horde_tier.call("stats_now")])
 	if deck:
 		var fb := float(budget_cfg.get("frame_deck_ms_p95", 33.3))
 		var cb: Dictionary = budget_cfg.get("counts_p95", {})
@@ -358,7 +389,7 @@ func _initialize() -> void:
 	player = w.get_node("Characters/Player")
 	world_bounds = w.find_child("WorldBounds", true, false)
 	player.get_node("Health").set("max_health", 1000000.0)
-	if _arg("wanted") != null or _arg("gang") != null:
+	if _arg("wanted") != null or _arg("gang") != null or _arg("horde") != null:
 		player.get_node("Health").set("invulnerable", true)
 	if _arg("density") != null and root.get_node_or_null("QualitySettings") != null:
 		root.get_node("QualitySettings").call("set_world_density_now", str(_arg("density")))

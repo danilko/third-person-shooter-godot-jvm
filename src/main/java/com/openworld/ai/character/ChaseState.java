@@ -52,7 +52,7 @@ public class ChaseState implements AIState {
             // 60 navAgent path-recomputes/sec while chasing a moving player.
             if (ctrl.shouldUpdateNav(targetPos)) {
                 // a body holding a point (cover, a post) goes back to it while it can see the target
-                body.getNavAgent().setTargetPosition(body.holds() ? body.holdPoint : targetPos);
+                body.getNavAgent().setTargetPosition(body.holds() ? body.blackboard.holdPoint : targetPos);
                 ctrl.recordNavTarget(targetPos);
             }
             Vector3 aimTarget = new Vector3(targetPos.getX(),
@@ -81,7 +81,7 @@ public class ChaseState implements AIState {
         // (back to it, then it waits there for the target to come into range); out of sight it hunts no further than
         // its leash, then stands at the edge watching
         if (body.holds()) {
-            Vector3 to = hasLoS ? body.holdPoint : body.leashed(goal);
+            Vector3 to = hasLoS ? body.blackboard.holdPoint : body.leashed(goal);
             Vector3 off = to.minus(body.getGlobalPosition());
             off.setY(0f);
             if (off.length() < 1.0) {

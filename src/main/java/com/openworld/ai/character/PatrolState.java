@@ -69,20 +69,20 @@ public class PatrolState implements AIState {
         // a guard's post (PLAN.md 2.2): stand ON it, facing out. Never by the nav agent once there -- inside a building
         // with no navmesh the agent's target snaps to the nearest navmesh point OUTSIDE, and the guard walked off 15 m
         // (probe_site_guards); back to it straight when the way is clear
-        if (body.standsAtPost && body.holdPoint != null) {
-            Vector3 off = body.holdPoint.minus(body.getGlobalPosition());
+        if (body.blackboard.standsAtPost && body.blackboard.holdPoint != null) {
+            Vector3 off = body.blackboard.holdPoint.minus(body.getGlobalPosition());
             off.setY(0f);
             if (off.length() < 0.8) {
                 cmd.movementType = MovementType.IDLE;
-                if (body.postFacePoint != null) {
-                    body.aimAtPosition(body.postFacePoint, delta);
-                    cmd.aimTargetPosition = body.postFacePoint;
+                if (body.blackboard.postFacePoint != null) {
+                    body.aimAtPosition(body.blackboard.postFacePoint, delta);
+                    cmd.aimTargetPosition = body.blackboard.postFacePoint;
                 }
                 return this;
             }
             Vector3 dir = off.normalized();
-            if (!ChaseState.walkableLine(body, body.holdPoint)) {
-                body.getNavAgent().setTargetPosition(body.holdPoint);
+            if (!ChaseState.walkableLine(body, body.blackboard.holdPoint)) {
+                body.getNavAgent().setTargetPosition(body.blackboard.holdPoint);
                 Vector3 nav = body.getNavAgent().getNextPathPosition().minus(body.getGlobalPosition());
                 nav.setY(0f);
                 if (nav.length() >= 0.5f) dir = nav.normalized();
@@ -102,9 +102,9 @@ public class PatrolState implements AIState {
         } else {
             body.setNextPatrolTarget();
             // a post (a guard, an encounter member standing): look out the way its marker faces (PLAN.md 2.2)
-            if (body.postFacePoint != null && (body.patrolRoute == null || body.patrolRoute.isEmpty())) {
-                body.aimAtPosition(body.postFacePoint, delta);
-                cmd.aimTargetPosition = body.postFacePoint;
+            if (body.blackboard.postFacePoint != null && (body.blackboard.patrolRoute == null || body.blackboard.patrolRoute.isEmpty())) {
+                body.aimAtPosition(body.blackboard.postFacePoint, delta);
+                cmd.aimTargetPosition = body.blackboard.postFacePoint;
             }
         }
 

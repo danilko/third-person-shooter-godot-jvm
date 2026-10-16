@@ -79,6 +79,9 @@ src/main/java/com/openworld/
   ai/             # AI brain + FSM: AIController, AIState (base), AIBehaviorConfig, AILodLevel
     character/    #   7 behaviour states: Patrol/Chase/Attack/Search/RefillAmmo/Escort/Flee
     vehicle/      #   VehicleAIController (reserved for future vehicle AI states)
+    light/        #   the LIGHT COMBATANT tier (2.3/F8): LightSim (engine-free brain), LightCombatants (node: VAT
+                  #   draw, promote/demote under a budget, shots/blasts), LightLooks, LightBatch (MSG_LIGHT_BATCH);
+                  #   AIBlackboard (ai/) = the orders both tiers share
   control/        # controller framework + input: Controllable, Controller, CharacterController,
                   #   PlayerController, UserCommand (per-tick input snapshot), ModalInput
   camera/         # AI/Player/FPS/TPS/Vehicle CameraControllers, CameraMode, ControlRotation

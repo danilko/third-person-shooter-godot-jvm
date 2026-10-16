@@ -777,6 +777,8 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             Vector3 nose = pos.plus(fwd.times((float) hullHalfLength));
             com.openworld.world.PedCrowd.promoteNear(nose, nose.plus(vel.times((float) PROMOTE_AHEAD_SECONDS)),
                     hullHalfWidth, 3);
+            com.openworld.ai.light.LightCombatants.promoteNear(nose, nose.plus(vel.times((float) PROMOTE_AHEAD_SECONDS)),
+                    hullHalfWidth, 3);
         }
         peopleScratch.clear();
         float reach = (float) (hullHalfLength + speed * delta * PropBreakRules.LOOKAHEAD_STEPS + 2.0);

@@ -122,6 +122,7 @@ public class NetworkManager extends Node {
     private static final int MSG_SHOP_GRANT             = 33; // W3  — host→owner: a shop sale the host accepted; the owner grants it to its own body
     private static final int MSG_PROFILE                = 35; // 1.4 AR2 — client→host at join: my PlayerProfile; host→owner: it as the host now holds it
     private static final int MSG_VEHICLE_PUSH           = 36; // any→the car's owner (a client's goes through the host): my car hit yours, take the impulse
+    private static final int MSG_LIGHT_BATCH            = 37; // PLAN.md 2.3 — host→all: the light combatant tier as drawn (ai.light.LightBatch), 10 Hz
 
     /** WeaponController's slotTypes table has 7 entries (FIST/PRIMARY×2/SECONDARY/MELEE/THROWABLE/CONSUMABLE) — bounds isValidSnapshot's activeSlotIndex check. */
     private static final int WEAPON_SLOT_COUNT = 7;
@@ -185,6 +186,8 @@ public class NetworkManager extends Node {
             case MSG_SHOT, MSG_MELEE, MSG_LAUNCH, MSG_DETONATE_REQUEST, MSG_SHOP_REQUEST, MSG_SUPPLY_USE, MSG_VEHICLE_PUSH -> new ChannelSpec(1, ENetPacketPeer.FLAG_RELIABLE);
             // Shot results are cosmetic and superseded by the next pull: unreliable, own lane (N1b).
             case MSG_SHOT_RESULT_BATCH -> new ChannelSpec(3, 0L);
+            // The light tier is cosmetic and superseded by the next batch: unreliable, the cosmetic lane (PLAN.md 2.3).
+            case MSG_LIGHT_BATCH -> new ChannelSpec(3, 0L);
             default -> throw new IllegalArgumentException("No channel mapping for MSG_* tag " + msgType);
         };
     }
@@ -922,6 +925,7 @@ public class NetworkManager extends Node {
                 }
                 case MSG_VEHICLE_SEAT_REQUEST -> handleVehicleSeatRequestMessage(senderPeerId, buf);
                 case MSG_VEHICLE_PUSH -> handleVehiclePushMessage(senderPeerId, buf);
+                case MSG_LIGHT_BATCH -> handleLightBatch(senderPeerId, buf);
                 case MSG_VEHICLE_OCCUPANCY -> handleVehicleOccupancyMessage(senderPeerId, buf);
                 case MSG_VEHICLE_SPAWN -> handleVehicleSpawnMessage(senderPeerId, buf);
                 case MSG_WEAPON_SWITCH -> handleWeaponSwitchMessage(senderPeerId, buf);
@@ -1259,6 +1263,29 @@ public class NetworkManager extends Node {
         com.openworld.net.NetStats.increment("vehicle_push_sent");
         sendMessage(isServer() ? owner : SERVER_PEER_ID, NetMessageCodec.encodeVehiclePush(MSG_VEHICLE_PUSH,
                 target.getCharacterInfo().characterId, impulse, point));
+    }
+
+    /** Host: send the light combatant tier to every peer (PLAN.md 2.3; ai.light.LightCombatants, 10 Hz). */
+    public void broadcastLightBatch(byte[] body) {
+        if (!isNetworked() || !isServer() || peersById.isEmpty()) return;
+        byte[] framed = new byte[body.length + 1];
+        framed[0] = (byte) MSG_LIGHT_BATCH;
+        System.arraycopy(body, 0, framed, 1, body.length);
+        PackedByteArray frame = new PackedByteArray(framed);
+        for (Integer peerId : peersById.keySet()) sendMessage(peerId, frame);
+        com.openworld.net.NetStats.increment("light_batches_sent");
+    }
+
+    private void handleLightBatch(int senderPeerId, StreamPeerBuffer buf) {
+        if (amServer || senderPeerId != SERVER_PEER_ID) {
+            dropInvalid("light_batch", "MSG_LIGHT_BATCH", senderPeerId);
+            return;
+        }
+        // the rest of the frame after the tag, as plain bytes (LightBatch decodes it engine-free)
+        byte[] all = buf.getDataArray().toByteArray();
+        byte[] body = java.util.Arrays.copyOfRange(all, Math.min(all.length, buf.getPosition()), all.length);
+        com.openworld.ai.light.LightCombatants tier = com.openworld.ai.light.LightCombatants.ensure(this);
+        if (tier != null) tier.applyBatch(body);
     }
 
     private void handleVehiclePushMessage(int senderPeerId, StreamPeerBuffer buf) {

@@ -205,16 +205,16 @@ public class SiteGuards extends Node {
             AICharacter g = ed.spawnPlaced(side, side, l, at, Loadouts.roll(m.node.getPath().getPath()));
             if (g == null) continue;
             Vector3 f = m.facing();
-            g.postFacePoint = at.plus(new Vector3(f.getX() * 5, 1.4, f.getZ() * 5));
-            g.holdPoint = new Vector3(at);
+            g.blackboard.postFacePoint = at.plus(new Vector3(f.getX() * 5, 1.4, f.getZ() * 5));
+            g.blackboard.holdPoint = new Vector3(at);
             boolean patrols = "patrol".equals(m.prop("post", "stand"));
-            g.standsAtPost = !patrols;
-            g.holdLeash = patrols ? 10.0 : 6.0;
+            g.blackboard.standsAtPost = !patrols;
+            g.blackboard.holdLeash = patrols ? 10.0 : 6.0;
             if (patrols) {
-                g.patrolRoute = List.of(at.plus(new Vector3(f.getZ() * 4, 0, -f.getX() * 4)),
+                g.blackboard.patrolRoute = List.of(at.plus(new Vector3(f.getZ() * 4, 0, -f.getX() * 4)),
                         at.plus(new Vector3(-f.getZ() * 4, 0, f.getX() * 4)));
             }
-            g.holdCrouch = false;
+            g.blackboard.holdCrouch = false;
             s.guards.add(g);
             spawned++;
             byTeam.merge(m.team(), 1, Integer::sum);
@@ -267,12 +267,12 @@ public class SiteGuards extends Node {
                 w.append(it.weaponId);
             }
             String t = g.getTarget() instanceof Player ? "player" : g.getTarget() != null ? "other" : "";
-            double d = g.holdPoint == null ? -1 : Math.hypot(g.getGlobalPosition().getX() - g.holdPoint.getX(),
-                    g.getGlobalPosition().getZ() - g.holdPoint.getZ());
+            double d = g.blackboard.holdPoint == null ? -1 : Math.hypot(g.getGlobalPosition().getX() - g.blackboard.holdPoint.getX(),
+                    g.getGlobalPosition().getZ() - g.blackboard.holdPoint.getZ());
             String st = g.getController() instanceof com.openworld.ai.AIController c && c.getCurrentState() != null
                     ? c.getCurrentState().getClass().getSimpleName() : "-";
             return (g.characterInfo != null ? g.characterInfo.faction : "") + ";" + w + ";" + t + ";" + d + ";" + st
-                    + ";" + g.getLodLevel() + ";" + (g.holdPoint != null ? g.holdPoint.getY() - g.getGlobalPosition().getY() : 0);
+                    + ";" + g.getLodLevel() + ";" + (g.blackboard.holdPoint != null ? g.blackboard.holdPoint.getY() - g.getGlobalPosition().getY() : 0);
         }
         return "gone";
     }

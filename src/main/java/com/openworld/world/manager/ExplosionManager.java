@@ -91,6 +91,8 @@ public class ExplosionManager extends Node {
         // A LIGHT crowd ped has no body (world.PedCrowd): the ones in the blast become real bodies first, so the
         // loop below damages and pushes them like anyone else (zb1). Budget-free, capped.
         com.openworld.world.PedCrowd.promoteNear(center, center, radius, 12);
+        // the light combatant tier (PLAN.md 2.3): the nearest few become bodies, the rest take the blast in the tier
+        com.openworld.ai.light.LightCombatants.blast(center, radius, maxDamage);
         for (Node node : getTree().getNodesInGroup("characters")) {
             if (node == excludeNode) continue;
             if (node instanceof Character c) {

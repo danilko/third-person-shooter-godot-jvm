@@ -181,7 +181,22 @@ public class PedCrowd extends Node3D {
 
 	// ── the peds ──────────────────────────────────────────────────────────────────────────────────
 
-	private static final int WALK = 0, STOP = 1, FLEE = 2, COWER = 3;
+	private static final int WALK = 0, STOP = 1, FLEE = 2, COWER = 3, INSIDE = 4;
+
+	// ── PANIC THINNING (PLAN.md 2.3 step 8, user 2026-10-16: "the crowd runs around in big chunks"; GTA's peds that
+	//    flee round a corner are simply gone) ──
+	/** Off = the control: every scared ped runs its whole panic in the street. */
+	@Visible public boolean panicThinning = true;
+	/** A fleeing ped further than this from what scared it (m), and out of this peer's camera view, goes INSIDE. */
+	@Visible public double thinMinDistance = 30.0;
+	/** Never more than this share of the crowd inside at once: the street keeps some people. */
+	@Visible public double thinMaxShare = 0.7;
+	/** Seconds a ped stays inside before it walks back onto its schedule -- out of view only, so nobody pops in. */
+	@Visible public double insideSeconds = 20.0;
+	private Camera3D viewCam;
+	private int insideCount;
+	/** Readouts: peds that went inside / came out, lifetime, and came out IN VIEW (must stay 0). */
+	private int wentInside, cameOut, cameOutInView;
 	private static final int TEMPER_FLEE = 0, TEMPER_COWER = 1, TEMPER_FIGHT = 2;
 
 	private static final class Ped {
@@ -201,6 +216,7 @@ public class PedCrowd extends Node3D {
 		Clip stopClip;
 		boolean hidden;
 		boolean wantsFight;
+		double fleeX, fleeZ;  // where what scared it was (panic thinning measures the distance from it)
 		// ── the shared schedule (PLAN.md 1c, user 2026-10-06: the crowd matches across co-op peers) ──
 		int index;            // its place in its zone's crowd: the id a promoted body carries (ped:<zone>:<index>)
 		long seed;            // hash of (zone id, index): everything about the ped is drawn from it
@@ -565,6 +581,9 @@ public class PedCrowd extends Node3D {
 		Camera3D cam = getViewport() != null ? getViewport().getCamera3d() : null;
 		Vector3 eye = cam != null ? cam.getGlobalPosition() : null;
 		boolean canPromote = owner != null && authoritative();
+		viewCam = cam;
+		insideCount = 0;
+		for (Ped q : peds) if (q.state == INSIDE && !q.promoted && !q.gone) insideCount++;
 		double now = clock();
 		if (!authoritative()) followHostBodies(now);
 		if (reactions) hear();
@@ -587,12 +606,12 @@ public class PedCrowd extends Node3D {
 			step(p, delta, now);
 			here = pointAt(p, p.along);
 			double d = nearest(here, px, pz, np);
-			boolean need = d < promoteDistance || (p.wantsFight && d < panicRange);
+			boolean need = p.state != INSIDE && (d < promoteDistance || (p.wantsFight && d < panicRange));
 			if (need && canPromote && d < promoteD) { promote = p; promoteD = d; }
 			// A client draws its own copy of every ped the host has NOT promoted (followHostBodies hides the ones
 			// it has): the same people, in the same places, on both peers.
 			boolean hide = drawDistance > 0.0 && eye != null && here.distanceTo(eye) > drawDistance;
-			p.hidden = hide;
+			p.hidden = hide || p.state == INSIDE;
 			write(p, here);
 		}
 		// ONE promotion a frame, the nearest: a promotion is milliseconds of main-thread work.
@@ -838,6 +857,14 @@ public class PedCrowd extends Node3D {
 				if (p.along >= L - 0.5) { p.along = Math.max(0.5, L - 0.5); p.dir = -1; }
 				if (p.along <= 0.5) { p.along = 0.5; p.dir = 1; }
 				if (p.timer <= 0.0) { p.state = WALK; p.wantsFight = false; p.rejoin = true; }
+				else if (mayGoInside(p)) { p.state = INSIDE; p.timer = insideSeconds; p.wantsFight = false; insideCount++; wentInside++; }
+			}
+			case INSIDE -> {
+				p.timer -= dt;
+				if (p.timer <= 0.0) {
+					if (inView(pointAt(p, p.along))) p.timer = 2.0;   // never back in front of the camera
+					else { p.state = WALK; p.rejoin = true; insideCount--; cameOut++; if (inView(pointAt(p, p.along))) cameOutInView++; }
+				}
 			}
 			case COWER -> {
 				p.timer -= dt;
@@ -948,8 +975,73 @@ public class PedCrowd extends Node3D {
 		return out;
 	}
 
+	/** A fleeing ped that is far enough from the scare, out of view, and with room under the share, goes inside. */
+	private boolean mayGoInside(Ped p) {
+		if (!panicThinning || peds.isEmpty() || insideCount + 1 > thinMaxShare * peds.size()) return false;
+		if (p.temper == TEMPER_FIGHT) return false;   // a fighter turns to fight, it does not hide (probe_ped_crowd)
+		Vector3 here = pointAt(p, p.along);
+		double dx = here.getX() - p.fleeX, dz = here.getZ() - p.fleeZ;
+		if (dx * dx + dz * dz < thinMinDistance * thinMinDistance) return false;
+		return !inView(here);
+	}
+
+	/** In this peer's camera's view (a ped's chest)? No camera (headless probes without one) = not in view. */
+	private boolean inView(Vector3 here) {
+		return viewCam != null && GD.isInstanceValid(viewCam) && viewCam.isPositionInFrustum(here.plus(new Vector3(0, 1.0, 0)));
+	}
+
+	/** Probe: how many peds are in each state "walk,stop,flee,cower,inside" (promoted / gone not counted). */
+	@Register
+	public String statesNow() {
+		int[] n = new int[5];
+		for (Ped p : peds) if (!p.promoted && !p.gone && p.state >= 0 && p.state < 5) n[p.state]++;
+		return n[0] + "," + n[1] + "," + n[2] + "," + n[3] + "," + n[4];
+	}
+
+	/** Probe: "went inside,came out,came out in view" lifetime, and fleeing peds in view now. */
+	@Register
+	public String thinningStatsNow() {
+		int fleeView = 0;
+		for (Ped p : peds) if (p.state == FLEE && !p.promoted && !p.gone && inView(pointAt(p, p.along))) fleeView++;
+		return wentInside + "," + cameOut + "," + cameOutInView + "," + fleeView;
+	}
+
+	/** Probe: everyone inside or running comes back out now and walks (a clean crowd for the next case: the island
+	 *  can scare a crowd while it streams in). */
+	@Register
+	public void calmNow() {
+		for (Ped p : peds) {
+			if (p.state == INSIDE || p.state == FLEE || p.state == COWER) { p.state = WALK; p.rejoin = true; p.wantsFight = false; }
+		}
+		insideCount = 0;
+	}
+
+	/** Probe: the Java side's panic-thinning switch (a GDScript `get` can read a property's binding, not the field). */
+	@Register
+	public boolean thinningNow() { return panicThinning; }
+
+	/** Peds inside now (panic thinning). */
+	@Register
+	public int insideNow() {
+		int n = 0;
+		for (Ped p : peds) if (p.state == INSIDE && !p.promoted && !p.gone) n++;
+		return n;
+	}
+
+	/** Probe readout: peds inside now that this peer's camera WOULD see if they were out (must stay 0 while the camera
+	 *  holds still: a ped only goes in, and only comes back, out of view). */
+	@Register
+	public int insideInViewNow() {
+		int n = 0;
+		for (Ped p : peds) if (p.state == INSIDE && !p.promoted && !p.gone && inView(pointAt(p, p.along))) n++;
+		return n;
+	}
+
 	/** Scared: run AWAY along the footway, or cower where it stands, or (a fighter) ask to be promoted. */
 	private void scare(Ped p, Vector3 from) {
+		if (p.state == INSIDE) return;      // it went in: it does not hear the street
+		p.fleeX = from.getX();
+		p.fleeZ = from.getZ();
 		if (p.state != FLEE && p.state != COWER) scaresTotal++;
 		if (p.temper == TEMPER_COWER) {
 			p.state = COWER;

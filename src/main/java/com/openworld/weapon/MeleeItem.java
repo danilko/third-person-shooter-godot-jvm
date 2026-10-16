@@ -376,7 +376,10 @@ public class MeleeItem extends WeaponItem {
     // 0. A LIGHT crowd ped has no collider (world.PedCrowd): on the authoritative peer, the ones in reach become
     // real bodies now and take this swing directly -- a body added this frame is not in the space query yet.
     if (authoritative) {
-      for (com.openworld.character.AICharacter ai : com.openworld.world.PedCrowd.promoteNear(chest, tip, Math.max(0.05f, st.radius), 4)) {
+      java.util.List<com.openworld.character.AICharacter> reached = new java.util.ArrayList<>(
+          com.openworld.world.PedCrowd.promoteNear(chest, tip, Math.max(0.05f, st.radius), 4));
+      reached.addAll(com.openworld.ai.light.LightCombatants.promoteNear(chest, tip, Math.max(0.05f, st.radius), 4));
+      for (com.openworld.character.AICharacter ai : reached) {
         long key = ai.getInstanceId();
         if (hitSet.contains(key)) continue;
         hitSet.add(key);
