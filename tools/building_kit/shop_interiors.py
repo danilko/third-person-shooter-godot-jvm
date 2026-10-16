@@ -361,7 +361,7 @@ def supermarket():
 # -Z the way the clerk faces). Frame and yaw as the plans above (Godot axes; yaw 0 faces -Z, 90 faces -X).
 FOOD = "onigiri,bento,energy_drink"
 KONBINI_S_STOCK = "PIS1,PIS2,REV1,DUP1,SMG1,MEW1,FRG1," + FOOD
-KONBINI_L_STOCK = "PIS1,PIS2,REV1,DUP1,SMG1,ASR1,ASR2,SHG1,SNR1,ATL1,FRG1,MEW1," + FOOD
+KONBINI_L_STOCK = "PIS1,PIS2,REV1,DUP1,SMG1,ASR1,ASR2,SHG1,SNR1,ATL1,FRG1,PIB1,FLA1,SMO1,MEW1," + FOOD   # + the thrown ones (PLAN.md 3.2 H4, user 2026-10-16)
 
 
 def counter_mark(x, z, yaw, stock, title, w=3.0, d=1.4, h=2.0):
