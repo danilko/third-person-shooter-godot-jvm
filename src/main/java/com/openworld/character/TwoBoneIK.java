@@ -49,6 +49,11 @@ final class TwoBoneIK {
             axis = dir.cross(gu.getBasis().getColumn(2));   // straight arm: any stable perpendicular
             if (axis.lengthSquared() < 1e-10) return null;
         }
+        // ... made perpendicular to the target direction: rotating `dir` by alpha about an axis that is NOT
+        // perpendicular to it opens a smaller angle than alpha, so the hand fell short of a target off the clip's arm
+        // plane (6-8 cm on a rider's hand carrying a helmet up from the bars, PLAN.md 3.1b).
+        axis = axis.minus(dir.times(axis.dot(dir)));
+        if (axis.lengthSquared() < 1e-10) return null;
         axis = axis.normalized();
 
         double cosAlpha = (a * a + c * c - b * b) / (2.0 * a * c);

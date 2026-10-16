@@ -80,7 +80,7 @@ public class GameMenu extends Control {
     private VBoxContainer statusLeft, statusRight;
     private OptionButton presetBox, windowMode, resolution, worldDensity, signLanguage;
     private HSlider renderScale, shadowDist, viewDist, lookSens, padLook, volume, fov;
-    private CheckButton invertY, aimAssist, hudMinimal, vsync, loadingTour;
+    private CheckButton invertY, aimAssist, hudMinimal, vsync, loadingTour, showMyHelmet;
     private final Map<HSlider, Label> sliderValues = new LinkedHashMap<>();
     /** "key_<row>" / "pad_<row>" -> its button. */
     private final Map<String, Button> bindButtons = new LinkedHashMap<>();
@@ -265,6 +265,8 @@ public class GameMenu extends Control {
         VBoxContainer o = column(h, "OPTIONS");
         volume = slider(o, "Master volume", 0.0, 1.0, 0.05, "on_controls");
         hudMinimal = check(o, "Minimal HUD");
+        showMyHelmet = check(o, "Show my helmet");
+        note(o, "Off hides your own motorcycle helmet. Everyone else still sees theirs.");
         worldDensity = new OptionButton();
         for (com.openworld.game.WorldDensity d : com.openworld.game.WorldDensity.values()) worldDensity.addItem(d.label, d.ordinal());
         worldDensity.setName("WorldDensity");
@@ -551,6 +553,7 @@ public class GameMenu extends Control {
         volume.setValue(q.masterVolume);
         hudMinimal.setPressed(q.hudMinimal);
         loadingTour.setPressed(q.loadingTour);
+        showMyHelmet.setPressed(q.showMyHelmet);
         signLanguage.select(Math.max(0, com.openworld.world.SignText.languages().indexOf(q.signLanguage)));
         worldDensity.select(q.worldDensity.ordinal());
         fov.setValue(q.fovOffset);
@@ -564,7 +567,7 @@ public class GameMenu extends Control {
 
     private void showValues() {
         // a switch spells its state: the default theme's "off" is a faint dot at this size
-        for (CheckButton c : new CheckButton[] {invertY, aimAssist, hudMinimal, vsync, loadingTour})
+        for (CheckButton c : new CheckButton[] {invertY, aimAssist, hudMinimal, vsync, loadingTour, showMyHelmet})
             if (c != null) c.setText(c.isPressed() ? "On" : "Off");
         for (Map.Entry<HSlider, Label> e : sliderValues.entrySet()) {
             double v = e.getKey().getValue(), step = e.getKey().getStep();
@@ -612,6 +615,7 @@ public class GameMenu extends Control {
         q.masterVolume = volume.getValue();
         q.hudMinimal = hudMinimal.isPressed();
         q.loadingTour = loadingTour.isPressed();
+        q.showMyHelmet = showMyHelmet.isPressed();
         java.util.List<String> langs = com.openworld.world.SignText.languages();
         if (signLanguage.getSelected() >= 0 && signLanguage.getSelected() < langs.size())
             q.signLanguage = langs.get(signLanguage.getSelected());

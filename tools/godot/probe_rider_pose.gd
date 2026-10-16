@@ -18,7 +18,10 @@ extends SceneTree
 ##   5. HANDS ON THE BARS (3.1b): each hand's grip point (3/4 of the way from the wrist to the middle knuckle, read from
 ##      the posed bones) within 3 cm of the bike's grip_l / grip_r marker, standing and riding;
 ##   6. with a pistol in hand the right hand is off the bar (> 0.10 m), the left still on it;
-##   7. off the bike, the gear is gone.
+##   7. off the bike, the pose goes at once and the helmet comes off by the right hand: gone within 0.6 s;
+##   8. THE HELMET (3.1b, the artist's model): the bike's .glb (Helmet_full on the SSB1, Helmet_open on the rest), its
+##      shell tinted (white on the 白バイ), put on by the right hand -- the hand on the helmet's `grab` mid-way, the helmet
+##      on the head (its model at the head pivot) within 0.6 s of sitting down.
 
 const AI := "res://src/main/resources/com/openworld/character/AICharacter.tscn"
 const HELPER := "res://src/main/java/com/openworld/debug/VehicleProbeHelper.java"
@@ -58,6 +61,17 @@ func _watch(rider: Node, bike: Node3D) -> void:
 		for side in ["_l", "_r"]:
 			var g: Node3D = bike.get_node_or_null("Model/grip" + side)
 			d["grip" + side] = g.global_position if g else Vector3(1e6, 1e6, 1e6)
+		# the helmet's grab from the head bone's pose IN THIS PASS (the attachment's global transform is a frame old)
+		var at := skel.get_node_or_null("RiderHelmet") as BoneAttachment3D
+		var grab: Node3D = at.find_child("grab", true, false) if at else null
+		d["grab"] = Vector3(1e6, 1e6, 1e6)
+		if grab:
+			var under := grab.transform
+			var n: Node = grab.get_parent()
+			while n != at:
+				under = (n as Node3D).transform * under
+				n = n.get_parent()
+			d["grab"] = skel.global_transform * skel.get_bone_global_pose(skel.find_bone(at.bone_name)) * under.origin
 		d["bike_inv"] = bike.global_transform.affine_inverse()
 		for bone in ["head", "pelvis", "foot_l", "hand_l", "hand_r", "middle_01_l", "middle_01_r", "upperarm_l"]:
 			d[bone] = _bone_world(skel, bone)
@@ -77,6 +91,27 @@ func _hand_miss(bike: Node, rider: Node) -> Array:
 		var d: Dictionary = seen.get(rider.get_instance_id(), {})
 		out.append(_grip_point(rider, side).distance_to(d["grip" + side]) if d.has("grip" + side) else 1e6)
 	return out
+
+## The helmet model under the rider's RiderHelmet attachment (null: none, or the sphere stand-in).
+func _helmet_model(rider: Node) -> Node3D:
+	var at := rider.find_child("RiderHelmet", true, false)
+	if at == null:
+		return null
+	for c in at.get_children():
+		if String(c.name).begins_with("Helmet_"):
+			return c
+	return null
+
+## The tint on the helmet's `shell` surface (null: no override).
+func _shell_colour(model: Node3D):
+	if model == null:
+		return null
+	for mi in model.find_children("*", "MeshInstance3D", true, false):
+		for i in mi.mesh.get_surface_count():
+			var m: Material = mi.mesh.surface_get_material(i)
+			if m and m.resource_name == "shell" and mi.get_surface_override_material(i) is BaseMaterial3D:
+				return (mi.get_surface_override_material(i) as BaseMaterial3D).albedo_color
+	return null
 
 func _initialize() -> void:
 	_run.call_deferred()
@@ -144,7 +179,30 @@ func _run() -> void:
 		helper.call("seat_driver_quietly", bikes[key], d)
 		riders[key] = d
 		_watch(d, bikes[key])
-	await _tick(120)
+	# 8. the helmet goes on: the right hand carries it (mid-way), on the head within 0.6 s
+	await _tick(15)
+	for id in keys:
+		var d: Dictionary = seen.get((riders[id] as Node).get_instance_id(), {})
+		var miss := _grip_point(riders[id], "_r").distance_to(d.get("grab", Vector3(1e6, 1e6, 1e6)))
+		var model := _helmet_model(riders[id])
+		var hm := (riders[id] as Node).find_child("RiderHandsModifier", true, false)
+		_check("%s: putting the helmet on, the right hand holds it (<= 1 cm of grab)" % id, miss <= 0.01 and model != null
+				and model.position.length() > 0.05, "%.3f m (solver's own %s, reach %s); helmet %.2f m from the head" % [miss,
+				str(hm.call("grip_miss_now", 1)) if hm else "-", str(hm.call("reach_ratio_now", 1)) if hm else "-",
+				model.position.length() if model else -1.0])
+	await _tick(21)          # 36 ticks = 0.6 s since seating
+	for id in keys:
+		var model := _helmet_model(riders[id])
+		var want := "Helmet_full" if id.begins_with("SSB1") else "Helmet_open"
+		_check("%s: the helmet is the bike's model (%s) and ON within 0.6 s" % [id, want], model != null and String(model.name) == want
+				and model.position.length() < 0.005 and model.basis.is_equal_approx(Basis.IDENTITY),
+				"%s at %.3f m" % [String(model.name) if model else "none", model.position.length() if model else -1.0])
+		var tint: Variant = _shell_colour(model)
+		var white: bool = id.begins_with("PMB1")
+		var c: Color = tint if tint is Color else Color(0, 0, 0, 0)
+		_check("%s: ... its shell tinted%s" % [id, " white (白バイ)" if white else ""], tint is Color
+				and (c.r > 0.9 and c.g > 0.9 and c.b > 0.9 if white else true), str(tint))
+	await _tick(84)
 
 	# 1-3. standing still
 	var fwd := {}
@@ -257,15 +315,22 @@ func _run() -> void:
 		_check("%s: holding a pistol the right hand is off the bar, the left on it" % id,
 				miss[1] > 0.10 and miss[0] <= HAND_TOL, "held %s; left %.3f, right %.3f m" % [str(wc.call("get_current_weapon_id_now")), miss[0], miss[1]])
 
-	# 7. off the bike
+	# 7. off the bike: the pose at once, the helmet taken off by the right hand
 	for id in keys:
 		helper.call("release_driver", bikes[id], riders[id])
 	await _tick(10)
 	for id in keys:
 		var skel: Skeleton3D = (riders[id] as Node).find_child("Skeleton3D", true, false)
-		_check("%s: off the bike the gear is gone" % id, skel.get_node_or_null("RiderPoseModifier") == null
+		var model := _helmet_model(riders[id])
+		_check("%s: off the bike the pose is gone and the helmet is coming off" % id, skel.get_node_or_null("RiderPoseModifier") == null
+				and int(bikes[id].call("rider_gear_now")) == 0 and model != null and model.position.length() > 0.02
+				and int(bikes[id].call("riders_leaving_now")) == 1, "helmet %.2f m off the head" % [model.position.length() if model else -1.0])
+	await _tick(30)          # 40 ticks = 0.67 s since getting off
+	for id in keys:
+		var skel: Skeleton3D = (riders[id] as Node).find_child("Skeleton3D", true, false)
+		_check("%s: ... and within 0.67 s every piece of gear is gone" % id, skel.get_node_or_null("RiderPoseModifier") == null
 				and skel.get_node_or_null("RiderHandsModifier") == null
-				and skel.get_node_or_null("RiderHelmet") == null and int(bikes[id].call("rider_gear_now")) == 0)
+				and skel.get_node_or_null("RiderHelmet") == null and int(bikes[id].call("riders_leaving_now")) == 0)
 	any_bike.call("set_rider_gear_now", true)
 	any_bike.call("set_hands_on_bars_now", true)
 	print("RESULT %s (%d failures)%s" % ["PASS" if fails == 0 else "FAIL", fails, "  (CONTROL)" if control else ""])

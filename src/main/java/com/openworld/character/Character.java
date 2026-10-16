@@ -1777,6 +1777,9 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         headVisibleApplied = visible;
     }
 
+    /** False while the camera is behind this character's own eyes (the head meshes hidden): head-worn gear hides too. */
+    public boolean headShownNow() { return headVisibleApplied; }
+
     /**
      * Re-derives head-mesh visibility from the live view. Cheap to call every frame — it touches
      * the meshes only when the answer changes.

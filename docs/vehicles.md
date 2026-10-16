@@ -15,6 +15,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - Motorcycles in traffic, the 白バイ, and the rider (PLAN.md 3.1b's rest, 2026-10-16)
 - Engine sound profiles: one recording pitched per class now, a folder per class later (2026-10-16)
 - Hands on the bars, the rider triangle, the bike drift and the SSB1 hop (PLAN.md 3.1b, 2026-10-16)
+- The helmet: an artist's model, put on by the right hand; TwoBoneIK's bend axis (PLAN.md 3.1b, 2026-10-16)
 
 ---
 
@@ -733,4 +734,47 @@ changed. Gate `probe_bike_handling.gd [-- --control]` (straight + drift, the fiv
 PASS; `--control` (drift_yaw_accel 0 through the resource cache) fails all five drift turns and POB1's spin-on.
 - Not done (BIKE DRIFT's (2)-(3) in PLAN.md): the LEAN in a slide (today the lean still follows the yaw rate, not the
   slip), the front wheel counter-steered along the velocity, a dust puff at the rear wheel.
+
+## The helmet: an artist's model, put on by the right hand; TwoBoneIK's bend axis (PLAN.md 3.1b, 2026-10-16)
+
+User: "a blender model that can be modified by artist later"; then "a more regular helmet as standard size and let hair
+poke through for now" -- so no hair fold, no hair gate.
+
+- **The models** (`blender/tools/make_placeholder_helmets.py` -> `assets/characters/gear/Helmet_open.blend|.glb`,
+  `Helmet_full.blend|.glb`, `SOURCE.md` = the artist's contract). `open` = a jet helmet with a clear shield (SCT1 / POB1 /
+  TRB1, and the 白バイ PMB1's tinted white), `full` = full-face with a dark visor (SSB1). Origin = the head-bone pivot
+  (`head_2`), materials `shell` (tinted per rider by `Motorcycle`) / `visor` / `trim`, an Empty `grab` for the right
+  hand. The generator never overwrites an existing `.blend` without `--force`; `--export-only` re-exports an artist's.
+  Size: a large real shell, 0.28 x 0.32 m, 0.245 m over the pivot. MEASURED first (2026-10-16, the six bodies' Face +
+  Hair001 in head-bone space): faces x +-0.108, y -0.05..0.205, z -0.03..0.12; hair on the head bone to x +-0.15,
+  z -0.17..0.14, top 0.22-0.245; long hair is on `HairJoint-*` bones (38-63 a body) and shows through by decision.
+- **Which helmet:** a `helmet` key in `build_vehicle_scenes.py`'s bike rows -> `VehicleConfig.riderHelmet` ("open" when
+  not given). `Motorcycle.dress` loads `Helmet_<kind>.glb` under the `RiderHelmet` BoneAttachment3D, duplicating the
+  `shell` material into a surface override with the rider's colour; a missing file falls back to the 3.1b sphere.
+- **Put-on / take-off** (placeholder for an artist's clip: the library has none). Getting on, the helmet starts low at
+  the right in front of the chin, rises on a quadratic curve over the forehead and comes down onto the head in
+  `HELMET_ON_SECONDS` 0.5 s, tipped back 70 deg at the start; the right hand holds its `grab` all the way
+  (`RiderHandsModifier.setRightHold`: blends in at 14/s and wins over the bar, and any hand whose marker changes moves
+  across over 0.2 s instead of snapping). Getting off, the pose goes at once and the helmet comes off the same way
+  reversed (`Motorcycle.leaving`), then the gear is freed. A THROWN rider, a dead one, or one whose helmet never got
+  on loses it at once. Visual, every peer, from the seat occupancy: no message. MY PICKS: the path, 0.5 s, the tilt.
+- **The hold marker is read from the head bone's pose in the same pass** (`RiderHandsModifier.onBone`), not from the
+  attachment's global transform, which syncs after the skeleton (a frame old). The JVM-wrapper trap applies: the
+  parent test compares instance ids, `==` on two wrappers of the skeleton was false and silently skipped it.
+- **TwoBoneIK fix (shared: support hand, stock mount, recoil, rider hands and feet).** The elbow's bend axis came from
+  the clip's arm plane and was never made perpendicular to the new target direction, so for a target OFF that plane
+  the rotation opened less than the solved angle and the hand fell short: 3.5-8 cm on a hand carrying the helmet up
+  from the bars at 0.6 of its reach (the solver's own miss, not reach). The axis is now projected off `dir`; the miss is
+  under 1 um. Regression: probe_support_hand_ik, probe_weapon_fit, AimDebugAuto (yaw 12/12 ... clav 1/1),
+  probe_rider_pose, probe_motorcycle_driveby PASS; probe_recoil_kick's support grip went 0.4 mm -> 0. Its ASR1 "hand
+  visibly kicks" FAILS 0.0205 vs the clip's 0.009 (needs > 3x) -- the SAME with the old solver (0.0206): pre-existing.
+- **"Show my helmet"** (Game page, `QualitySettings.showMyHelmet`, settings.cfg `[game] show_my_helmet`, GTA V's):
+  off hides only the LOCAL player's helmet. Every helmet also hides while its wearer's head is hidden
+  (`Character.headShownNow`: a first-person view is inside the shell, looking at its liner).
+- Gate `tools/godot/probe_rider_pose.gd` (step 8 + the new step 7), five bikes x Shino + Fumiriya: mid put-on the right
+  hand's grip point within 1 cm of `grab` (0.000 m), the bike's model (Helmet_full on SSB1) on within 0.6 s, the shell
+  tinted (white on PMB1), off the bike the helmet coming off and every piece gone within 0.67 s. PASS; `--control`
+  (no gear) fails them.
+- NOT done: hair under the shell (folding the HairJoint chains), a show-my-helmet check in a probe (needs a local
+  Player riding), cutscenes hiding it, an authored put-on clip.
 

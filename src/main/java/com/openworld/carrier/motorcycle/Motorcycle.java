@@ -106,7 +106,7 @@ public class Motorcycle extends Vehicle {
         updateLean(delta);              // before the seat pin (super), so the rider rolls with THIS tick's lean
         super._physicsProcess(delta);
         animateWheels(delta);
-        updateRiders();
+        updateRiders(delta);
         lastVel = getLinearVelocity();
         haveLastVel = true;
     }
@@ -227,11 +227,28 @@ public class Motorcycle extends Vehicle {
     private static final class Gear {
         com.openworld.character.RiderPoseModifier pose;
         com.openworld.character.RiderHandsModifier hands;
-        Node3D helmet;
+        Node3D helmet;                  // the BoneAttachment3D on the head bone
+        Node3D model;                   // the helmet itself under it: moves from the hand onto the head and back
+        Node3D grab;                    // the helmet's `grab` Empty: the right hand holds it while it goes on / off
+        Transform3D fit;                // the model's own place under the head bone (the .glb's root: identity)
         godot.api.Skeleton3D skel;
+        double donning;                 // s into the put-on; >= HELMET_ON_SECONDS = on
+        double doffing = -1.0;          // s into the take-off once the rider got off; -1 = still riding
     }
 
     private final java.util.Map<Character, Gear> gear = new java.util.HashMap<>();
+    /** Riders who got off and are taking the helmet off (their gear goes when it is off). */
+    private final java.util.Map<Character, Gear> leaving = new java.util.HashMap<>();
+
+    /** The helmet goes on (and comes off) over this long (s): the right hand carries it from beside the chin up over the
+     *  head and down onto it. A placeholder for an artist's clip (no helmet clip in the library, searched 2026-10-16). */
+    static final double HELMET_ON_SECONDS = 0.5;
+    /** Where the put-on starts / the take-off ends, in the head bone's frame (m): low at the right, in front of the chin
+     *  -- the hand's reach from the bars -- and the path's top, over the forehead. */
+    private static final Vector3 HELMET_FROM = new Vector3(-0.16, -0.10, 0.26);
+    private static final Vector3 HELMET_OVER = new Vector3(-0.04, 0.34, 0.16);
+    /** The helmet tips back this far (deg, about the head's x) at the start, as a hand holds one by the rim. */
+    private static final double HELMET_FROM_TILT = 70.0;
 
     private boolean footDown() {
         Character drv = getSeatOccupant(0);
@@ -242,12 +259,15 @@ public class Motorcycle extends Vehicle {
     public static boolean riderGear = true;
     @Register public void setRiderGearNow(boolean on) { riderGear = on; }
 
-    /** Every rider aboard wears its gear; one who got off loses it. Visual, every peer, from the seat occupancy. */
-    private void updateRiders() {
+    /** Every rider aboard wears its gear; one who got off takes the helmet off and loses it. Visual, every peer, from
+     *  the seat occupancy. */
+    private void updateRiders(double delta) {
         java.util.Set<Character> aboard = new java.util.HashSet<>();
         if (!riderGear) {
             for (Gear g : gear.values()) undress(g);
+            for (Gear g : leaving.values()) undress(g);
             gear.clear();
+            leaving.clear();
             return;
         }
         for (int seat = 0; seat < getSeatCount(); seat++) {
@@ -256,6 +276,8 @@ public class Motorcycle extends Vehicle {
             aboard.add(c);
             Gear g = gear.get(c);
             if (g == null || !GD.isInstanceValid(g.pose) || !GD.isInstanceValid(g.hands)) {
+                Gear off = leaving.remove(c);      // back on before the helmet was off: start again
+                if (off != null) undress(off);
                 g = dress(c);
                 if (g == null) continue;
                 gear.put(c, g);
@@ -267,16 +289,65 @@ public class Motorcycle extends Vehicle {
             // the rider's hands on the bars (the pillion keeps the clip's); the right lets go to hold a weapon
             g.hands.setGrips(seat == 0 ? gripLeft : null, seat == 0 ? gripRight : null);
             g.hands.setRightHandOnBar(!holdsWeapon(c));
+            g.donning += delta;
+            placeHelmet(g, g.donning / HELMET_ON_SECONDS);
+            g.hands.setRightHold(g.donning < HELMET_ON_SECONDS ? g.grab : null);
+            showHelmet(g, c);
         }
         if (gear.size() > aboard.size()) {
             java.util.Iterator<java.util.Map.Entry<Character, Gear>> it = gear.entrySet().iterator();
             while (it.hasNext()) {
                 java.util.Map.Entry<Character, Gear> e = it.next();
                 if (aboard.contains(e.getKey())) continue;
-                undress(e.getValue());
+                Character c = e.getKey();
+                Gear g = e.getValue();
                 it.remove();
+                // got off: the pose goes now; the helmet comes off by the right hand. A THROWN rider, a dead one, or
+                // one whose helmet never went on loses it at once (there is no clip for a helmet flying off).
+                if (g.pose != null && GD.isInstanceValid(g.pose)) g.pose.queueFree();
+                g.pose = null;
+                boolean calm = GD.isInstanceValid(c) && !clearOf.containsKey(c) && c.isAlive()
+                        && g.model != null && g.donning >= HELMET_ON_SECONDS;
+                if (!calm) { undress(g); continue; }
+                g.hands.setGrips(null, null);
+                g.doffing = 0.0;
+                leaving.put(c, g);
             }
         }
+        if (!leaving.isEmpty()) {
+            java.util.Iterator<java.util.Map.Entry<Character, Gear>> it = leaving.entrySet().iterator();
+            while (it.hasNext()) {
+                java.util.Map.Entry<Character, Gear> e = it.next();
+                Gear g = e.getValue();
+                g.doffing += delta;
+                boolean done = g.doffing >= HELMET_ON_SECONDS || !GD.isInstanceValid(e.getKey())
+                        || g.model == null || !GD.isInstanceValid(g.model);
+                if (done) { undress(g); it.remove(); continue; }
+                placeHelmet(g, 1.0 - g.doffing / HELMET_ON_SECONDS);
+                g.hands.setRightHold(g.grab);
+            }
+        }
+    }
+
+    /** The helmet {@code u} of the way on (0 = in the right hand beside the chin, 1 = on the head): over the forehead
+     *  on a quadratic curve, tipping forward as it comes. */
+    private static void placeHelmet(Gear g, double u) {
+        if (g.model == null || !GD.isInstanceValid(g.model)) return;
+        u = Math.max(0.0, Math.min(1.0, u));
+        double e = u * u * (3.0 - 2.0 * u);
+        double a = 1.0 - e;
+        Vector3 p = HELMET_FROM.times(a * a).plus(HELMET_OVER.times(2.0 * a * e)).plus(g.fit.getOrigin().times(e * e));
+        Basis tilt = new Basis(Vector3.Companion.getRIGHT(), -Math.toRadians(HELMET_FROM_TILT) * a);
+        g.model.setTransform(new Transform3D(tilt.times(g.fit.getBasis()), p));
+    }
+
+    /** "Show my helmet" off (QualitySettings, GTA V's): the LOCAL player's helmet is not drawn; everyone else's is.
+     *  Hidden with the head too (a first-person view is inside the helmet, looking at its liner). */
+    private static void showHelmet(Gear g, Character c) {
+        if (g.helmet == null || !GD.isInstanceValid(g.helmet)) return;
+        com.openworld.game.QualitySettings q = com.openworld.game.QualitySettings.get();
+        boolean hide = !c.headShownNow() || q != null && !q.showMyHelmet && c.isLocallyOwnedPlayer();
+        if (g.helmet.isVisible() == hide) g.helmet.setVisible(!hide);
     }
 
     /** True while {@code c} has a weapon in hand (anything but bare fists): the one-handed drive-by's grip. */
@@ -323,6 +394,18 @@ public class Motorcycle extends Vehicle {
             at.setName(new godot.core.StringName("RiderHelmet"));
             at.setBoneName(head);
             skel.addChild(at);
+            g.helmet = at;
+            Node3D model = helmetModel(c);
+            if (model != null) {
+                at.addChild(model);
+                g.model = model;
+                g.fit = model.getTransform();
+                g.grab = model.findChild("grab", true, false) instanceof Node3D n ? n : null;
+                placeHelmet(g, 0.0);
+                return g;
+            }
+            // no .glb: the 3.1b sphere, on at once
+            g.donning = HELMET_ON_SECONDS;
             MeshInstance3D shell = new MeshInstance3D();
             godot.api.SphereMesh m = new godot.api.SphereMesh();
             m.setRadius(HELMET_RADIUS);
@@ -335,9 +418,32 @@ public class Motorcycle extends Vehicle {
             shell.setPosition(HELMET_OFFSET);
             shell.setCastShadowsSetting(godot.api.GeometryInstance3D.ShadowCastingSetting.OFF);
             at.addChild(shell);
-            g.helmet = at;
         }
         return g;
+    }
+
+    /** The bike's helmet .glb ({@link VehicleConfig#riderHelmet}), its {@code shell} material tinted for this rider;
+     *  null when the file is missing (the sphere stands in). */
+    private Node3D helmetModel(Character c) {
+        VehicleConfig cfg = getConfig();
+        String kind = cfg != null && cfg.riderHelmet != null && !cfg.riderHelmet.isEmpty() ? cfg.riderHelmet : "open";
+        String path = "res://assets/characters/gear/Helmet_" + kind + ".glb";
+        if (!godot.api.ResourceLoader.INSTANCE.exists(path, "") || !(GD.load(path) instanceof godot.api.PackedScene ps)) return null;
+        if (!(ps.instantiate() instanceof Node3D root)) return null;
+        root.setName(new godot.core.StringName("Helmet_" + kind));
+        godot.core.Color colour = helmetColour(c);
+        for (Node n : root.findChildren("*", "MeshInstance3D", true, false)) {
+            if (!(n instanceof MeshInstance3D mi) || mi.getMesh() == null) continue;
+            mi.setCastShadowsSetting(godot.api.GeometryInstance3D.ShadowCastingSetting.OFF);
+            for (int s = 0; s < mi.getMesh().getSurfaceCount(); s++) {
+                if (!(mi.getMesh().surfaceGetMaterial(s) instanceof godot.api.BaseMaterial3D m)) continue;
+                if (!"shell".equals(m.getName())) continue;
+                godot.api.BaseMaterial3D tint = (godot.api.BaseMaterial3D) m.duplicate();
+                tint.setAlbedo(colour);
+                mi.setSurfaceOverrideMaterial(s, tint);
+            }
+        }
+        return root;
     }
 
     /** A helmet shell's radius (m) and its centre from the head bone (bone space, m): the MY PICKS of 3.1b. */
@@ -360,11 +466,15 @@ public class Motorcycle extends Vehicle {
     @Override
     public void _exitTree() {
         for (Gear g : gear.values()) undress(g);
+        for (Gear g : leaving.values()) undress(g);
         gear.clear();
+        leaving.clear();
         super._exitTree();
     }
 
     @Register public int riderGearNow() { return gear.size(); }
+    /** probe_rider_pose: riders still taking a helmet off after getting off. */
+    @Register public int ridersLeavingNow() { return leaving.size(); }
 
     // ── A hard crash throws the riders ───────────────────────────────────────
 

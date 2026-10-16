@@ -53,6 +53,9 @@ public class QualitySettings extends Node {
     public boolean aimAssist = true;
     public double masterVolume = 1.0;        // linear 0..1
     public boolean hudMinimal = false;
+    /** "Show my helmet" (GTA V's): off = the LOCAL player's motorcycle helmet is not drawn (everyone else's still is).
+     *  Client-local, cosmetic. */
+    public boolean showMyHelmet = true;
     /** The loading screen's warm-up TOUR when the island comes up (game.WorldWarmup). Off = the world starts at once
      *  (user, 2026-10-10: "so I do not wait for the tour every time when testing"); the first minutes then stream
      *  and compile shaders in play, which is what the tour is there to hide. Client-local: it changes nobody's world.
@@ -294,6 +297,7 @@ public class QualitySettings extends Node {
         aimAssist = bool(cf, "controls", "aim_assist", aimAssist);
         masterVolume = num(cf, "audio", "master", masterVolume);
         loadingTour = bool(cf, "world", "loading_tour", loadingTour);
+        showMyHelmet = bool(cf, "game", "show_my_helmet", showMyHelmet);
         signLanguage = String.valueOf(cf.getValue("game", "sign_language", signLanguage));
         hudMinimal = "minimal".equals(String.valueOf(cf.getValue("hud", "mode", hudMinimal ? "minimal" : "full")));
         fovOffset = num(cf, "view", "fov_offset", fovOffset);
@@ -320,6 +324,7 @@ public class QualitySettings extends Node {
         cf.setValue("view", "fov_offset", fovOffset);
         cf.setValue("world", "density", worldDensity.name());
         cf.setValue("world", "loading_tour", loadingTour);
+        cf.setValue("game", "show_my_helmet", showMyHelmet);
         cf.setValue("game", "sign_language", signLanguage);
         cf.setValue("display", "window_mode", windowMode.name());
         cf.setValue("display", "resolution", resolution);
@@ -353,6 +358,8 @@ public class QualitySettings extends Node {
     @Register public String signLanguageNow() { return com.openworld.world.SignText.language(); }
     @Register public void setSignLanguageNow(String lang) { signLanguage = lang; com.openworld.world.SignText.setLanguage(lang); }
     @Register public boolean hudMinimalNow() { return hudMinimal; }
+    @Register public boolean showMyHelmetNow() { return showMyHelmet; }
+    @Register public void setShowMyHelmetNow(boolean on) { showMyHelmet = on; }
     @Register public void setHudMinimalNow(boolean on) { hudMinimal = on; }
     @Register public void setFovOffsetNow(double deg) { fovOffset = clamp(deg, FOV_OFFSET_MIN, FOV_OFFSET_MAX); apply(); }
     @Register public boolean rebindNow(String row, String spec) { return com.openworld.control.KeyBindings.rebind(row, spec); }

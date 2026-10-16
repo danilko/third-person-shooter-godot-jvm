@@ -347,6 +347,12 @@ public class VehicleConfig extends Resource {
     @Export public float riderKneeBend = 0f;
 
     /**
+     * Motorcycle: the rider's HELMET, a kind of {@code assets/characters/gear/Helmet_<kind>.glb} ("" = "open", the jet
+     * helmet; "full" = full-face). An artist's model (blender/tools/make_placeholder_helmets.py writes the defaults).
+     */
+    @Export public String riderHelmet = "";
+
+    /**
      * Which engine it sounds like: an {@link EngineProfile} id ("" = the car; kei, truck, scooter, bike_small, bike_big,
      * sport). A profile's own loops in {@code assets/audio/engine/<id>/} replace the car's take band by band.
      */
