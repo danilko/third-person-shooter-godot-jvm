@@ -89,4 +89,26 @@ class DataTablesTest {
         assertEquals(1, told[0]);
         assertTrue(Tables.ECONOMY.version() > v);
     }
+
+    @Test
+    void anOverridePatchesAShippedTableByName() {
+        // a host's density.json override: one level's body cap, nothing else
+        DataTable.setOverrides(name -> name.equals("density") ? "{\"levels\": {\"HIGH\": {\"body_cap\": 99}}}" : null);
+        try {
+            var t = Tables.DENSITY.get();
+            assertEquals(99, t.get(com.openworld.game.WorldDensity.HIGH).bodyCap(), "the override's number");
+            assertEquals(26, t.get(com.openworld.game.WorldDensity.HIGH).traffic(), "the rest of the row is the shipped one");
+            assertEquals(48, t.get(com.openworld.game.WorldDensity.NORMAL).bodyCap(), "other levels untouched");
+            assertTrue(Tables.DENSITY.overridden());
+            assertEquals(List.of(), Tables.DENSITY.problems());
+            // a misspelt key in an override is still an unknown key
+            DataTable.setOverrides(name -> name.equals("density") ? "{\"levels\": {\"HIGH\": {\"body_kap\": 99}}}" : null);
+            assertTrue(Tables.DENSITY.problems().stream().anyMatch(p -> p.contains("body_kap")), Tables.DENSITY.problems().toString());
+            DataTable.setOverrides(name -> name.equals("density") ? "[1, 2]" : null);
+            assertTrue(Tables.DENSITY.problems().stream().anyMatch(p -> p.contains("override")), Tables.DENSITY.problems().toString());
+        } finally {
+            DataTable.setOverrides(null);
+        }
+        assertFalse(Tables.DENSITY.overridden());
+    }
 }

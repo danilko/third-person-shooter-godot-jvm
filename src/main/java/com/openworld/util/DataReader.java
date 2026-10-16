@@ -52,6 +52,42 @@ public final class DataReader {
         return new DataReader(m, "", problems);
     }
 
+    /**
+     * {@code json} with {@code patch} laid over it (a host's or a tester's override of a shipped table, see
+     * {@link DataTable#setOverrides}): an object in the patch MERGES into the object under the same key, anything else
+     * (a number, a string, a list) REPLACES it, and a key the shipped file does not have is added -- so a misspelt key
+     * in an override is still an unknown key to the parser. A patch that is not a JSON object is a problem and is
+     * ignored.
+     */
+    public static DataReader of(String json, String patch) {
+        if (patch == null) return of(json);
+        DataReader base = of(json);
+        Object p;
+        try {
+            p = MiniJson.parse(patch);
+        } catch (RuntimeException e) {
+            base.problems.add("override: not JSON: " + e.getMessage());
+            return base;
+        }
+        Map<String, Object> pm = asMap(p);
+        if (pm == null) {
+            base.problems.add("override: the document is not a JSON object");
+            return base;
+        }
+        merge(base.map, pm);
+        return base;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void merge(Map<String, Object> into, Map<String, Object> patch) {
+        for (Map.Entry<String, Object> e : patch.entrySet()) {
+            Object have = into.get(e.getKey());
+            if (have instanceof Map<?, ?> hm && e.getValue() instanceof Map<?, ?> pm)
+                merge((Map<String, Object>) hm, (Map<String, Object>) pm);
+            else into.put(e.getKey(), e.getValue());
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private static Map<String, Object> asMap(Object o) { return o instanceof Map<?, ?> m ? (Map<String, Object>) m : null; }
 

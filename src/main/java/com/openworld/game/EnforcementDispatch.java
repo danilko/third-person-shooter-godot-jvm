@@ -270,13 +270,23 @@ public class EnforcementDispatch extends Node {
             return n;
         };
         com.openworld.game.event.GameplayEvents.subscribe(com.openworld.game.event.GameplayEvents.Phase.OBSERVER, responders.onEvent);
+        com.openworld.game.data.Tables.FORCES.onReload(onForcesReload);
+        com.openworld.game.data.Tables.AMMO_SUPPLY.onReload(onAmmoReload);
     }
+
+    /** `tables reload` (debug): forces.json -- the stations are bound again FULL and the incident board starts empty
+     *  (a tuning pass, not a save); ammo_supply.json -- the explosive cooldown re-reads its numbers (the AI reserve rule
+     *  reads the table every reload of a weapon already). */
+    private final Runnable onForcesReload = () -> { this.pools = null; this.board = null; };
+    private final Runnable onAmmoReload = com.openworld.weapon.ExplosiveCooldown::reset;
 
     @Register
     @Override
     public void _exitTree() {
         if (instance == this) instance = null;
         com.openworld.game.event.GameplayEvents.unsubscribe(responders.onEvent);
+        com.openworld.game.data.Tables.FORCES.offReload(onForcesReload);
+        com.openworld.game.data.Tables.AMMO_SUPPLY.offReload(onAmmoReload);
         responders.clear();
         RadioMarkers.clear();
         units.clear();
@@ -546,11 +556,15 @@ public class EnforcementDispatch extends Node {
         return b.toString();
     }
 
-    /** The island-wide ceiling on dispatched bodies, all sides (crimes.json dispatch.body_cap; 0 = none). */
+    /** The host's World density level's body cap (QualitySettings.applyDensity; -1 = not applied: NORMAL's). */
+    public static int densityBodyCap = -1;
+    /** A probe's override of the cap (-1 = none). */
+    static int capOverride = -1;
+
+    /** The island-wide ceiling on dispatched bodies, all sides (game/density.json body_cap of the host's level; 0 = none). */
     int bodyCap() {
-        WantedSystem ws = WantedSystem.get();
-        DispatchRules r = ws != null ? ws.dispatchRules() : null;
-        return r != null ? r.bodyCap : 0;
+        if (capOverride >= 0) return capOverride;
+        return densityBodyCap >= 0 ? densityBodyCap : WorldDensity.NORMAL.row().bodyCap();
     }
 
     /** Dispatched bodies alive right now, every side: units on foot, the crews of cars on their way, helicopter crews
@@ -579,7 +593,8 @@ public class EnforcementDispatch extends Node {
     public void setCapAndMergeNow(int cap, double mergeRadius) {
         WantedSystem ws = WantedSystem.get();
         GangSystem gs = GangSystem.get();
-        if (ws != null && ws.dispatchRules() != null) { ws.dispatchRules().bodyCap = cap; ws.dispatchRules().mergeRadius = mergeRadius; }
+        capOverride = cap;
+        if (ws != null && ws.dispatchRules() != null) ws.dispatchRules().mergeRadius = mergeRadius;
         if (gs != null && gs.hunterRules() != null) gs.hunterRules().mergeRadius = mergeRadius;
     }
 

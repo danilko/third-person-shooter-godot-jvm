@@ -213,6 +213,12 @@ physics ms p50 6.2 / 9.3 / 13.9 and frame p95 18.1 / 18.1 / 19.6 at 10 / 16 / 22
 13.7 / 15.0 / 21.9. HIGH is free on a desktop, ULTRA starts to show; with the Deck's CPU factor (x2.2, uncalibrated)
 only NORMAL is safe there. Only the CAR column was measured; the ped and token columns are my picks in proportion
 (unreviewed). Graphics (render scale, shadows, view distance) stay per machine and never change what is simulated.
+
+**The enforcement body cap is a density column too** (`body_cap`, 2026-10-15, PLAN.md P1e): the island-wide ceiling on
+police, gang hunters, incident responders and their crews together (`EnforcementDispatch.bodyCap`) -- 48 / 60 / 72,
+UNMEASURED picks. Measure with `probe_walk_perf -- --density=<LEVEL> --wanted=5 --gang=5` and set the shipped number
+in `game/density.json`; a host or a tester runs with other numbers through an override file
+(`user://overrides/density.json`, see "Overrides" in docs/game-systems.md) without touching the shipped one.
 Not applied under a probe (`--script`): probes set their own budgets; `set_world_density_now` is their door.
 
 **Later the same day the levels became 20 / 26 / 32 cars** (user: "stable around 12 cars most of the time, even if it

@@ -517,6 +517,22 @@ debug hot reload (console: `tables reload`; `tables` lists them). Each parser ke
 tests use it) beside `read(DataReader)`. Not in the list: the generated `weapon/weapon_catalog.json` and the baked
 world records (places, street names, sidewalks) -- build outputs, not tuning.
 
+**Overrides: a host or a tester patches a table without touching the shipped file (2026-10-15).** User: "allow a server
+hoster / performance tester to run, and ship better default numbers" -- the dedicated-server convention (a shipped
+default, the host's config over it). `DataTable.overridesIn(dir)`: `<dir>/<table name>.json` is laid over the shipped
+file before parsing (`DataReader.of(json, patch)`: an object MERGES into the object under the same key, a value or a
+list REPLACES, so `{"levels": {"HIGH": {"body_cap": 60}}}` changes one number). The patch goes through the same parser,
+so a misspelt key in it is an unknown-key problem like any other, and a patch that is not a JSON object is a problem
+and ignored. `dir` = `--overrides=<dir>` on the command line, else the environment's `OW_TABLE_OVERRIDES`, else
+`user://overrides/`; every overridden table is named in the log at start ("DataTable density: OVERRIDDEN by ...").
+It is the HOST's simulation that reads crimes / gangs / forces / density, so in co-op the host's overrides are the
+ones that count. A tester who finds a better number changes the SHIPPED file; the override is for running with
+other numbers. Hot reload (`tables reload`) re-derives crimes.json / gangs.json (WantedSystem, GangSystem),
+forces.json (the stations bound again full, the incident board empty) and ammo_supply.json (the explosive
+cooldown); density.json applies on the next `applyDensity` (the settings page, a new session). Gates
+`DataTablesTest.anOverridePatchesAShippedTableByName`, `probe_world_density.gd` (an override file patches NORMAL's
+body cap and car budget in the engine, the rest of the row stays shipped).
+
 **`world.MarkerRegistry` -- the one reader of level-design markers.** A building's `MARK_<kind>_<n>` Empties are
 baked into its scene as nodes in the group `mission_marker` with their props as metadata (`kind`, `team`, `weapon`,
 ...; -Z is the way one faces). `ofKind(ctx, kind)`, `near(ctx, kind, at, radius)` (nearest first), `nearest(...)`,

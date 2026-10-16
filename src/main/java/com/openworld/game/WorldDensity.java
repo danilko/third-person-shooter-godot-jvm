@@ -21,16 +21,18 @@ import java.util.Map;
  * 20 cars 13.6 / 16.5, 28 cars 14.7 / 19.0.
  */
 public enum WorldDensity {
-    NORMAL("Normal", new Row(20, 8, 6, 0)),
-    HIGH("High", new Row(26, 12, 8, 1)),
-    ULTRA("Ultra", new Row(32, 16, 10, 2));
+    NORMAL("Normal", new Row(20, 8, 6, 0, 48)),
+    HIGH("High", new Row(26, 12, 8, 1, 60)),
+    ULTRA("Ultra", new Row(32, 16, 10, 2, 72));
 
     /**
      * One level's numbers: simulated ambient cars (ZoneManager.trafficBudget), crowd peds promoted to full bodies and
      * how many of them may fight (walkerBudget / fighterBudget), and the units added to the dispatch's attack tokens
-     * at every star level that has a limit.
+     * at every star level that has a limit, and the island-wide ceiling on enforcement bodies (police, gangs,
+     * responders together -- EnforcementDispatch.bodyCap; PLAN.md P1e step 2, here since 2026-10-15 so the host's
+     * level decides it).
      */
-    public record Row(int traffic, int walkers, int fighters, int attackTokens) {}
+    public record Row(int traffic, int walkers, int fighters, int attackTokens, int bodyCap) {}
 
     public final String label;
     private final Row builtIn;
@@ -69,9 +71,10 @@ public enum WorldDensity {
             if (level == null) { levels.problem(key, "not a density level"); continue; }
             if (r == null) continue;
             Row row = new Row(r.integer("traffic", level.builtIn.traffic()), r.integer("walkers", level.builtIn.walkers()),
-                    r.integer("fighters", level.builtIn.fighters()), r.integer("attack_tokens", level.builtIn.attackTokens()));
-            if (row.traffic() < 1 || row.walkers() < 1 || row.fighters() < 0 || row.attackTokens() < 0) {
-                levels.problem(key, "traffic and walkers must be at least 1, the others not negative");
+                    r.integer("fighters", level.builtIn.fighters()), r.integer("attack_tokens", level.builtIn.attackTokens()),
+                    r.integer("body_cap", level.builtIn.bodyCap()));
+            if (row.traffic() < 1 || row.walkers() < 1 || row.fighters() < 0 || row.attackTokens() < 0 || row.bodyCap() < 0) {
+                levels.problem(key, "traffic and walkers must be at least 1, the others not negative (body_cap 0 = no cap)");
                 continue;
             }
             out.put(level, row);

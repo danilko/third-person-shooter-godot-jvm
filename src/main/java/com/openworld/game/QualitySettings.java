@@ -190,6 +190,7 @@ public class QualitySettings extends Node {
             zm.fighterBudget = d.fighters();
         }
         EnforcementDispatch.attackTokenBonus = d.attackTokens();
+        EnforcementDispatch.densityBodyCap = d.bodyCap();
     }
 
     private boolean densityForced;

@@ -42,6 +42,49 @@ public final class DataTable<T> {
     };
 
     private static Source source = ENGINE;
+
+    /**
+     * OVERRIDES (2026-10-15, user: "allow a server hoster / performance tester to run with other numbers, and ship better
+     * defaults"): a table may be PATCHED, by its NAME, from outside the shipped files -- {@code <dir>/<name>.json}, laid
+     * over the shipped file ({@link DataReader#of(String, String)}: objects merge, values replace, and the unknown-key
+     * check covers the patch too). The shipped file stays the default; a tester who finds a better number changes it
+     * there. Default: none (unit tests); the engine sets {@link #overridesIn}.
+     */
+    private static Source overrides = name -> null;
+    private static String overridesDir = "";
+
+    /** Where overrides are read from now ("" = none). */
+    public static synchronized String overridesDir() { return overridesDir; }
+
+    /**
+     * Read overrides from {@code dir} ({@code user://overrides/}, an absolute path ...): {@code <dir>/<table>.json}. Every
+     * table is read again on its next use, so this may be called after some were loaded.
+     */
+    public static synchronized void overridesIn(String dir) {
+        overridesDir = dir == null ? "" : dir.endsWith("/") || dir.isEmpty() ? dir : dir + "/";
+        String d = overridesDir;
+        overrides = d.isEmpty() ? name -> null : name -> {
+            String p = d + name + ".json";
+            if (p.startsWith("res://") || p.startsWith("user://"))
+                return godot.api.FileAccess.fileExists(p) ? godot.api.FileAccess.getFileAsString(p) : null;
+            return DISK.read(p);
+        };
+        for (DataTable<?> t : ALL) t.invalidate();
+    }
+
+    /** Overrides from a {@link Source} keyed by table name (tests). */
+    public static synchronized void setOverrides(Source s) {
+        overrides = s == null ? name -> null : s;
+        for (DataTable<?> t : ALL) t.invalidate();
+    }
+
+    private synchronized void invalidate() { loaded = false; }
+
+    /** Was this table patched by an override at its last load? */
+    public synchronized boolean overridden() {
+        if (!loaded) load();
+        return overridden;
+    }
     private static BiConsumer<DataTable<?>, String> log = (t, m) -> System.err.println("DataTable " + t.name + ": " + m);
     private static final List<DataTable<?>> ALL = new ArrayList<>();
 
@@ -62,6 +105,7 @@ public final class DataTable<T> {
     private boolean loaded;
     private List<String> problems = List.of();
     private int version;
+    private boolean overridden;
 
     private DataTable(String name, String path, Function<DataReader, T> parser, Supplier<T> fallback) {
         this.name = name;
@@ -107,11 +151,18 @@ public final class DataTable<T> {
         } catch (RuntimeException e) {
             found.add("unreadable: " + e);
         }
+        String patch = null;
+        try {
+            patch = overrides.read(name);
+        } catch (RuntimeException e) {
+            found.add("override unreadable: " + e);
+        }
+        overridden = text != null && patch != null;
         if (text == null) {
             if (found.isEmpty()) found.add("no file at " + path);
             value = fallback.get();
         } else {
-            DataReader r = DataReader.of(text);
+            DataReader r = DataReader.of(text, patch);
             try {
                 value = parser.apply(r);
                 found.addAll(r.finish());

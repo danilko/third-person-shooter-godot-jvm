@@ -204,6 +204,15 @@ public class GameManager extends Node {
         // first, while everything is valid, so it is the one reliable place to silence them.
         // the data tables' problems and the gameplay event stream (PLAN.md 2.0): authority-only, told to the log
         com.openworld.util.DataTable.setLog((t, m) -> GD.printErr("DataTable " + t.name + " (" + t.path + "): " + m));
+        // a host's / a performance tester's overrides of the shipped tables (util.DataTable.overridesIn):
+        // --overrides=<dir> on the command line, else OW_TABLE_OVERRIDES, else user://overrides/
+        String ov = "user://overrides/";
+        String envOv = godot.api.OS.getEnvironment("OW_TABLE_OVERRIDES");
+        if (envOv != null && !envOv.isEmpty()) ov = envOv;
+        for (String a : godot.api.OS.getCmdlineUserArgs()) if (a.startsWith("--overrides=")) ov = a.substring("--overrides=".length());
+        com.openworld.util.DataTable.overridesIn(ov);
+        for (com.openworld.util.DataTable<?> t : com.openworld.game.data.Tables.all())
+            if (t.overridden()) GD.print("DataTable " + t.name + ": OVERRIDDEN by " + ov + t.name + ".json");
         com.openworld.game.event.GameplayEvents.setAuthority(this::isAuthority);
         com.openworld.game.event.GameplayEvents.setErrorLog((s, e) -> GD.printErr("GameplayEvents: " + s + " threw " + e));
         com.openworld.game.profile.Economy.listen(economyToEvents);
@@ -1380,6 +1389,9 @@ public class GameManager extends Node {
             default -> GD.print("GameManager: unhandled world event type " + eventType + " key=" + key);
         }
     }
+
+    /** Read the data tables' overrides from {@code dir} ("" = none) -- a probe, or a host from the console. */
+    @Register public void setTableOverridesNow(String dir) { com.openworld.util.DataTable.overridesIn(dir); }
 
     /** Radio lines from the host shown on THIS peer (its own player's, or everyone's), and the last few of them
      *  (probe readout; the co-op harness). */

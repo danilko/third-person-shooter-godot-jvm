@@ -457,7 +457,8 @@ User (playtest): "AI run dry far too easily". Data: `item/ammo_supply.json` `ai_
   building's walk round), `DispatchSight` (seen / lost / last known), `UnitSpawner` (what a standing calls for, bodies,
   squads), `UnitDirector` (units on foot each tick), `VehicleDirector` (cars, helicopters). Later steps added
   `IncidentResponders` and `RadioNet` the same way. (The split was a one-off script, not kept.)
-- **The global body cap** (`crimes.json dispatch.body_cap` 48, all sides; `EnforcementDispatch.bodyRoom`): units on
+- **The global body cap** (all sides; `EnforcementDispatch.bodyRoom`; since 2026-10-15 a WORLD DENSITY column,
+  `game/density.json body_cap` 48 / 60 / 72 for NORMAL / HIGH / ULTRA, so the host's level decides it): units on
   foot, crews of cars on their way, helicopter crews and incident responders; guards and hangout members are not the
   dispatch's load. Before it, per-player tables put ~150 bodies round 4 co-op players at 5 stars with two gangs.
 - **Co-op players together are one incident** (`merge_radius` 120 m, police and hunters; `UnitSpawner.sameIncident`):

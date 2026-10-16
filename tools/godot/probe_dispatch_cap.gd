@@ -1,6 +1,6 @@
 extends SceneTree
 ## ONE INCIDENT FOR PLAYERS TOGETHER, AND ONE CEILING ON BODIES (PLAN.md P1e step 2; game.UnitSpawner.spawnFor,
-## crimes.json dispatch body_cap / merge_radius, gangs.json hunters merge_radius).
+## density.json body_cap (the host's World density level), crimes.json / gangs.json merge_radius).
 ##
 ##   stdbuf -oL godot --headless --path . --script tools/godot/probe_dispatch_cap.gd [-- --control]
 ##   --control: merge_radius 0 and no cap -- each player draws their own full complement (the old rule).
@@ -72,7 +72,13 @@ func _initialize() -> void:
 		_check(peak >= 3 and peak <= 12, "one complement for the pair (%d in 3..12)" % peak)
 	ws.call("clear_now", ida)
 	ws.call("clear_now", idb)
-	await _tick(60)
+	# a clean start: the cap stops NEW bodies, it does not remove the ones already out (case 1's walk off, and any
+	# incident responders leave once their incident is over)
+	var w := 0.0
+	while w < 120.0 and int(String(ed.call("body_cap_now")).split(",")[0]) > 0:
+		await _tick(60)
+		w += 1.0
+	print("  case 1's bodies gone after %.0f s (%s left)" % [w, String(ed.call("body_cap_now")).split(",")[0]])
 
 	# 2. a low cap at 5 stars
 	if not control:
