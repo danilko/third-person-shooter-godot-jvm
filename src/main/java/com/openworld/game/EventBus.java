@@ -9,7 +9,7 @@ import godot.core.Signal1;
 import godot.core.Signal2;
 import godot.core.Signal3;
 import godot.core.Signal4;
-import godot.core.Signal7;
+import godot.core.Signal6;
 import godot.core.StringName;
 import godot.core.Vector3;
 import com.openworld.carrier.vehicle.Vehicle;
@@ -77,10 +77,13 @@ public class EventBus extends Node {
 
     /**
      * Emitted by Health when any character is eliminated.
-     * Payload: attackerName, attackerFaction, victimName, victimFaction, weaponName, weaponIcon, headshot.
+     * Payload: attackerName, attackerFaction, victimName, victimFaction, weaponName, headshot. A listener that wants
+     * the weapon's icon reads {@code IconRegistry.get(weaponName)}: the icon is NOT in the payload because it is null
+     * for a weapon with none, and since godot-jvm rc3 a null Object argument makes the registered listener throw
+     * (the registrar casts it non-null) -- the kill feed and ELIMINATE_ALL missions silently missed those kills.
      */
-    public final Signal7<String, String, String, String, String, Texture2D, Boolean> characterEliminated =
-            new Signal7<>(this, new StringName("character_eliminated"));
+    public final Signal6<String, String, String, String, String, Boolean> characterEliminated =
+            new Signal6<>(this, new StringName("character_eliminated"));
 
     /**
      * Emitted by Pickup when a character enters or leaves interact range.

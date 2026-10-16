@@ -841,15 +841,15 @@ public class HUDManager extends CanvasLayer {
   @Register
   public void onCharacterEliminated(String attackerName, String attackerFaction,
 									String victimName,   String victimFaction,
-									String weaponName,   Texture2D weaponIcon,
-									boolean headshot) {
+									String weaponName,   boolean headshot) {
 	if (feed == null) return;
 	PackedScene scene = resolveDefeatedEntryScene();
 	if (scene == null) return;
 	DefeatedFeedEntry entry = (DefeatedFeedEntry) scene.instantiate();
 	entry.lifespan = feed.entryLifespan;
 	feed.push(entry);
-	entry.populate(attackerName, attackerFaction, victimName, victimFaction, weaponIcon, headshot);
+	entry.populate(attackerName, attackerFaction, victimName, victimFaction,
+		  com.openworld.weapon.IconRegistry.get(weaponName), headshot);
   }
 
   // ── C2: per-character HUD routing ─────────────────────────────────────────

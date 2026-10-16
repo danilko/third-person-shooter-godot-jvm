@@ -506,6 +506,25 @@ it replaced the planned island-wide total). `game.ForcePools` (engine-free, `For
 - **Radio lines go to the player they are about** (`EnforcementDispatch.say`): shown here when that is this peer's
   player (or everyone), sent to every other peer as `WORLD_EVENT_RADIO` (17) and shown only by the peer whose player it
   is; the 4 s throttle is per player (it was one global throttle on the host).
+- **Police hold fire on an innocent PLAYER** (2026-10-15, after the step): per-target hostility kept the police from
+  AIMING at a wanted player's partner, but their misses (aimed beside the target) and shots past it still took a
+  partner standing 10 m off from 1000 to 195 HP in a 30 s fight with no officer ever targeting them. An OFFICER now
+  holds a shot when a player it may not target (`Hostility.mayTarget`) is within 0.7 m of the line from its aim ray to
+  the aim point (up to 3 m past it, the first 80 m), retries in 0.25 s and refreshes its strafe so it steps aside.
+  Deliberately narrow (user, 2026-10-15: GTA-style, and cheap): **gangs are careless**, and the police do not hold for
+  civilians or for each other. `AICharacter.bystanderInLine` loops over the players only (no grid query, no ray); a
+  player in a vehicle is left out. A body standing BETWEEN the shooter and its target needs no rule: it blocks the
+  shooter's sight and nobody fires. Toggle `AICharacter.holdFireOnBystanders` (`set_hold_fire_on_bystanders_now`);
+  readouts `shots_fired_now`, `shots_held_now`, `shots_through_now`. Gate: probe_engagement_v2 case 1b (B kept 1.6 m
+  behind A on an armed officer's line for 12 s: 20-26 shots held, 0 through, B unhurt; `--hold-fire-off`: 15 of 31
+  shots through B).
+- **The attack-token race** (same day): units were spawned AFTER the token pass in the tick, so a new unit attacked
+  unbidden for one tick (probe_ammo_supply saw 4 attackers on 3 tokens ~1 run in 5). A new unit on foot and a car's
+  crew now start `attackHeld` while tokens are on; the next pass hands out the tokens.
+- **probe_ammo_supply's reserve check** (same day): "every unit's reserve == its max" failed ~1 run in 5 (90 short) with
+  no reserve spent -- a unit can hold a FINITE weapon it picked up (a stamped drop). The check is now the rule itself:
+  `AiAmmoRule.spentCount()` (rounds any AI reload took from a reserve; `unit_ammo_now`'s 5th field) stays 0 (control:
+  36). The case also fights on (<= 30 s) until a first reload, so the rule is always exercised.
 - The incident board for PLAYER acts is `game.IncidentBoard` (step 6 below); a player's hurt / kill of an officer,
   a civilian or a gang member is put on it for the radio.
 
@@ -535,10 +554,14 @@ one. A radio tells of the force's OTHER incidents (not the ones from that player
 (`game.RadioMarkers`, `MinimapController`) for 45 s; the host sends them only for the players who have the channel
 (`WORLD_EVENT_INCIDENT` 18). `RespawnSystem.respawn` takes every radio (death, arrest, abduction). Session-only.
 
-Gate for 4-7: **`tools/godot/probe_engagement_v2.gd [-- --control]`** (DebugWorld, `--fixed-fps 60`) 17/17: B beside a
-3-star A unhurt (control: 1000 -> 184); no star at 1 s, a star at 5 s, the police told the crime spot after the player
+Gate for 4-7: **`tools/godot/probe_engagement_v2.gd [-- --control | --hold-fire-off]`** (DebugWorld, `--fixed-fps 60`):
+no officer ever TARGETS B beside a 3-star A (it was "B unhurt", which failed ~1 run in 3 on stray fire -- now case 1b
+above); case 1b; no star at 1 s, a star at 5 s, the police told the crime spot after the player
 left (control: the star at once); a witness killed first = no star; `holdNow` holds B at 2 stars with no police sent;
 the AI-vs-AI case above (control: none); no radio = nothing heard, gang_a's radio = a line and a ring, a patrol car =
-the scanner, a respawn = no radio. Two-process: `tools/net/run_net_debugworld.sh` coop checks a radio line about the
+the scanner, a respawn = no radio. Flakes fixed 2026-10-15: the call-in cases now clear every other body within 50 m
+first (a leftover officer or crowd body nearer than the probe's civilian WAS the witness: an officer reports at once,
+anybody else calls it in), and every non-player body is freed before the respawn case (respawned beside case 4's
+dead, the player took a gang radio again -- standing over a dead member is how a radio is taken). Two-process: `tools/net/run_net_debugworld.sh` coop checks a radio line about the
 client's player reaches it and one about somebody else does not.
 

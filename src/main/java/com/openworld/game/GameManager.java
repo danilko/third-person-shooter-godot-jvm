@@ -1251,9 +1251,8 @@ public class GameManager extends Node {
         }
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) {
-            godot.api.Texture2D weaponIcon = com.openworld.weapon.IconRegistry.get(elim.weaponName());
             bus.characterEliminated.emit(elim.attackerName(), elim.attackerFaction(),
-                    elim.victimName(), elim.victimFaction(), elim.weaponName(), weaponIcon, elim.headshot());
+                    elim.victimName(), elim.victimFaction(), elim.weaponName(), elim.headshot());
             if (victim != null && victim.characterInfo != null) bus.characterDied.emit(victim.characterInfo);
         }
     }

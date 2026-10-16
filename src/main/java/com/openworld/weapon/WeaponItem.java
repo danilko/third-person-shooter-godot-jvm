@@ -841,7 +841,10 @@ public class WeaponItem extends Pickup implements WeaponAction {
   public void fillMagazine() {
     int take = min(magazineSize - magazine, reserve);
     magazine += take;
-    if (!keepsReserveOnReload()) reserve -= take;
+    if (!keepsReserveOnReload()) {
+      reserve -= take;
+      if (take > 0 && owningCharacter instanceof com.openworld.character.AICharacter) AiAmmoRule.noteSpent(take);
+    }
   }
 
   /**

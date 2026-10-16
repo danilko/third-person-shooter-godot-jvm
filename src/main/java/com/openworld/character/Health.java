@@ -248,7 +248,7 @@ public class Health extends Node {
                 }
                 bus.characterEliminated.emit(
                         attackerName, attackerFaction, victimName, victimFaction,
-                        weaponName, weaponIcon, headshot);
+                        weaponName, headshot);
                 if (victimInfo != null) bus.characterDied.emit(victimInfo);
                 // Round 11 N2: death is a reliable, ordered network event — not just a
                 // health==0 snapshot. Clients use it for the kill feed / mission progress /

@@ -65,8 +65,8 @@ func _initialize() -> void:
 	var bus := root.get_node_or_null("/root/EventBus")
 	if bus != null:
 		for k in 3:
-			# attacker, attacker faction, victim, victim faction, weapon, icon, headshot (EventBus.characterEliminated)
-			bus.emit_signal("character_eliminated", "Player", "player", "Enemy %d" % k, "enemy", "ASR-1", null, k == 1)
+			# attacker, attacker faction, victim, victim faction, weapon, headshot (EventBus.characterEliminated)
+			bus.emit_signal("character_eliminated", "Player", "player", "Enemy %d" % k, "enemy", "ASR-1", k == 1)
 	await _tick(20)
 	await _snap("hud_foot")
 	if bus != null:                      # the interact prompt's keycap glyph (KeyGlyph), two spellings

@@ -360,6 +360,13 @@ buildings.
   requirement`). Use `set(k, v)`. It broke every runtime faction flip, and a joining client dropped the
   faction baseline as "malformed" (found by `tools/net/run_net_shot_test.sh`; `FactionTable` fixed).
   `NetworkManager`'s malformed-packet log now names the tag and the top stack frames — it named neither.
+- **godot-jvm rc3: a registered method's Object argument is cast NON-NULL** (`args[0] as FactionTable` in the
+  generated registrar; `@Nullable` on the parameter is not read). A `null` from GDScript, or from a signal emit
+  (`Signal.emit(..., null, ...)` into a connected `@Register` handler), throws `NullPointerException: null cannot be
+  cast to non-null type` and the method never runs. It cost the kill feed and ELIMINATE_ALL missions every kill
+  with an icon-less weapon (`characterEliminated` carried a `Texture2D` that was null; it now carries none and
+  listeners read `IconRegistry.get(weaponName)`). Never pass a possibly-null Object through a registered method or
+  a signal: give GDScript a no-argument entry (`FactionManager.clearRegionTable()`), or send an id/name instead.
 - **A fully-qualified annotation is silently NOT registered**: `@godot.annotation.Visible public boolean x`
   compiles and produces no property at all (GDScript `set` does nothing, `get` returns null). Import the
   annotation and write `@Visible`. Found by `probe_gps_route.gd`'s control reading as a pass.

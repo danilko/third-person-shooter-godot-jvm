@@ -439,7 +439,9 @@ public class EnforcementDispatch extends Node {
                 full += w.getReserveMax();
             }
         }
-        return mag + "," + res + "," + full + "," + reloads;
+        // 5th: rounds any AI reload took from a reserve, ever (a unit may hold a FINITE weapon it picked up -- a
+        // stamped drop -- so "reserve == max" is not the rule; "a reload never spends it" is)
+        return mag + "," + res + "," + full + "," + reloads + "," + com.openworld.weapon.AiAmmoRule.spentCount();
     }
 
     /** "fired,refused,stamped": AI explosives fired and held by the shared cooldown, AI drops made finite (P1e). */
@@ -757,6 +759,10 @@ public class EnforcementDispatch extends Node {
     /** Per-target hostility on / off (the control, P1e step 4). */
     @Register
     public void setPerTargetHostilityNow(boolean on) { Hostility.enabled = on; }
+
+    /** An AI holding a shot while a body it may not shoot is in the line, on / off (the control). */
+    @Register
+    public void setHoldFireOnBystandersNow(boolean on) { com.openworld.character.AICharacter.holdFireOnBystanders = on; }
 
     /** Probe: hold EVERY player as an activity would (P1e step 5), until {@link #releaseHoldNow}. Empty / 0 = not asked. */
     @Register

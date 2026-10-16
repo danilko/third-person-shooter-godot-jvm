@@ -119,14 +119,25 @@ func _initialize() -> void:
 		_check(max_attack >= 1 and max_attack <= tokens, "never more than %d attacking at once (%d)" % [tokens, max_attack])
 		_check(foot <= tokens or _dry(ed)[4] > 0, "units beyond the tokens were held back")
 
-	# 4a. the AI reserve rule, read after the case-2 fight
+	# 4a. the AI reserve rule, read after the case-2 fight -- fought on (<= 30 s) until a unit has reloaded: case 2 may
+	# stop at 20 s before any magazine ran out, and then the rule was never exercised (~1 run in 5 read "reloads 0")
 	var am := String(ed.call("unit_ammo_now", "police")).split(",")
-	print("  unit ammo after the fight: magazines %s reserve %s of %s, reloads %s" % [am[0], am[1], am[2], am[3]])
+	var more := 0.0
+	while not control and int(am[3]) == 0 and more < 30.0:
+		ws.call("set_stars_now", pid, 3, false)
+		await _tick(30)
+		more += 0.5
+		am = String(ed.call("unit_ammo_now", "police")).split(",")
+	if more > 0.0:
+		print("  fought %.1f s more for the first reload" % more)
+	print("  unit ammo after the fight: magazines %s reserve %s of %s, reloads %s, rounds a reload took from a reserve %s"
+			% [am[0], am[1], am[2], am[3], am[4]])
 	if control:
-		_check(int(am[3]) == 0 or int(am[1]) < int(am[2]), "control: a reload spent the reserve")
+		_check(int(am[3]) == 0 or int(am[4]) > 0, "control: a reload spent the reserve (%s rounds)" % am[4])
 	else:
 		_check(int(am[3]) >= 1, "the units reloaded while fighting (%s)" % am[3])
-		_check(int(am[1]) == int(am[2]), "and their reserve stayed full (%s of %s)" % [am[1], am[2]])
+		# (not "reserve == max": a unit may hold a finite weapon it PICKED UP -- a stamped drop; 90 short ~1 run in 5)
+		_check(int(am[4]) == 0, "and no reload took from a reserve (%s rounds; reserve %s of %s)" % [am[4], am[1], am[2]])
 
 	# 3. everyone dry
 	var stock1 := int(sup.call("stock_now"))

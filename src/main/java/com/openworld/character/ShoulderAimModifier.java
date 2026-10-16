@@ -382,7 +382,8 @@ public class ShoulderAimModifier extends SkeletonModifier3D {
             if (headAimOn) applyHeadAim(skel, skelBasis, solveHeadAim(skel, skelXf, skelBasis, targetPos, bodyFlat, up));
             return;
         }
-        Vector3 axis = new Vector3(aim[0], aim[1], aim[2]);
+        // normalized again: a solver axis can be off unit by more than godot-jvm Basis(axis, angle) accepts (threw in a coop run)
+        Vector3 axis = new Vector3(aim[0], aim[1], aim[2]).normalized();
         double angle = aim[3];
 
         // Apply it to each driven bone about that bone's OWN origin, so the shoulders and head
@@ -434,7 +435,7 @@ public class ShoulderAimModifier extends SkeletonModifier3D {
             Vector3 eye = skelXf.times(head.getOrigin());
             if (best != null) {
                 // where the head WILL be once this pass's rotation is applied about the neck
-                Basis turn = new Basis(new Vector3(best[0], best[1], best[2]), best[3]);
+                Basis turn = new Basis(new Vector3(best[0], best[1], best[2]).normalized(), best[3]);
                 eye = pivot.plus(turn.times(eye.minus(pivot)));
                 from = turn.times(from);
             }
@@ -464,7 +465,7 @@ public class ShoulderAimModifier extends SkeletonModifier3D {
         if (headAim == null || headAim[3] == 0.0 || headBone == null || headBone.isEmpty()) return;
         int neck = skel.findBone(headBone);
         if (neck < 0) return;
-        Basis delta = new Basis(new Vector3(headAim[0], headAim[1], headAim[2]), headAim[3]);
+        Basis delta = new Basis(new Vector3(headAim[0], headAim[1], headAim[2]).normalized(), headAim[3]);
         Transform3D g = skel.getBoneGlobalPose(neck);
         Basis rotated = skelBasis.inverse().times(delta).times(skelBasis).times(g.getBasis());
         skel.setBoneGlobalPose(neck, new Transform3D(rotated, g.getOrigin()));

@@ -53,6 +53,13 @@ public final class AiAmmoRule {
         stamped++;
     }
 
+    private static int spent;
+
+    /** Rounds an AI's reload took from a reserve (0 while the unlimited rule is on -- the probe's real check). */
+    public static void noteSpent(int rounds) { spent += rounds; }
+
+    public static int spentCount() { return spent; }
+
     /** AI drops made finite since start (probe readout). */
     public static int stampedCount() { return stamped; }
 }

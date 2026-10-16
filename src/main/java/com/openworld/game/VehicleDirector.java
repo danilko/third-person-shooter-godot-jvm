@@ -149,6 +149,7 @@ final class VehicleDirector {
             u.playerId = c.playerId;
             ai.setSquad(ed.spawner.squadFor(c.playerId, c.side));
             if (!c.crewOrigins.isEmpty()) u.origin = c.crewOrigins.remove(0);   // each walks off with its station
+            ai.attackHeld = ed.attackTokens;   // held until the token pass hands it one (UnitSpawner, a unit on foot)
             ed.units.add(u);
         }
         for (ForcePools.Station st : c.crewOrigins) ed.settle(st, false);        // seats whose crew died aboard

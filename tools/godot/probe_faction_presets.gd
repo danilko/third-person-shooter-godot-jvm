@@ -117,7 +117,7 @@ func _initialize() -> void:
 
 	print("")
 	print("=== 2. control: the shipped defaults (no preset) ===")
-	fm.call("apply_table", null)
+	fm.call("clear_region_table")
 	var t: Dictionary = await _targets(90)
 	print("   targets %s  layer=%s" % [t, fm.call("active_layer_now")])
 	_check("defaults: police goes for the nearest body, the civilian", t["police"] == "civilian", t["police"])
@@ -145,7 +145,7 @@ func _initialize() -> void:
 	_check("gang_b sits it out (gang_b>* NEUTRAL)", t["gang_b"] == "" and _nobody_targets(t, "gang_b"), str(t))
 	_check("nobody targets the civilian", _nobody_targets(t, "civilian"), str(t))
 	_check("the player sides with the police", not fm.call("hostile_now", "police", "player"), "")
-	fm.call("apply_table", null)
+	fm.call("clear_region_table")
 	_check("a region change while the mission runs does not replace it",
 		fm.call("active_layer_now") == "mission" and fm.call("hostile_now", "gang_a", "police")
 		and not fm.call("hostile_now", "gang_b", "police"), fm.call("active_layer_now"))

@@ -25,6 +25,8 @@ public class AttackState implements AIState {
     private static final float MELEE_CHASE_HYSTERESIS = 1.5f;
     /** Within this plan distance a reloading unit strikes instead (PLAN.md 1g b). */
     private static final float MELEE_FALLBACK_REACH = 1.8f;
+    /** A shot held because a body it may not shoot is in the line is tried again this soon (s), from a new strafe. */
+    private static final double HOLD_FIRE_RETRY = 0.25;
     private static final double MELEE_FALLBACK_SECONDS = 2.0;
 
     @Override
@@ -185,6 +187,16 @@ public class AttackState implements AIState {
                     ? body.computeAimTarget(GD.randf() < body.computeEffectiveHitChance(), hDist)
                     : ctrl.computeSuppressTarget(hDist);
             if (newTarget == null) return SearchState.INSTANCE;
+            // somebody it may not shoot stands in the line: hold this shot, try again shortly from a new spot
+            if (body.bystanderInLine(newTarget)) {
+                if (AICharacter.holdFireOnBystanders) {
+                    body.shotsHeld++;
+                    ctrl.resetAttackTimer(HOLD_FIRE_RETRY);
+                    ctrl.refreshStrafe();
+                    return this;
+                }
+                body.shotsThrough++;
+            }
 
             ctrl.setCurrentAimTarget(newTarget);
             body.aimAtPosition(newTarget, delta);
@@ -194,6 +206,7 @@ public class AttackState implements AIState {
             // startStillPhase is a no-op when shootStillDuration == 0.
             ctrl.startStillPhase(body.behaviorConfigOrDefaults().shootStillDuration);
             cmd.fire = true;
+            body.shotsFired++;
         }
 
         return this;

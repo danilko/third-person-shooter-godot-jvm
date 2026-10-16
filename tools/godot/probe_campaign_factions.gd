@@ -37,13 +37,13 @@ func _initialize() -> void:
 
 	fm.call("apply_table", load(REGION))
 	_check(fm.call("hostile_now", "police", "gang_a"), "it survives entering a region")
-	fm.call("apply_table", null)
+	fm.call("clear_region_table")
 	_check(fm.call("hostile_now", "police", "gang_a"), "and leaving it")
 	_check(not fm.call("hostile_now", "police", "gang_b"), "a plain runtime flip is still dropped by a rebuild")
 
 	fm.call("apply_mission_table", load(MISSION))
 	_check(fm.call("active_layer_now") == "mission", "a mission table is the live layer")
-	fm.call("apply_mission_table", null)
+	fm.call("clear_mission_table")
 	_check(fm.call("hostile_now", "police", "gang_a"), "it is back when the mission ends")
 
 	_check(saves.call("save_slot", SLOT), "saved: %s" % saves.call("last_save_message"))
@@ -51,7 +51,7 @@ func _initialize() -> void:
 	_check(not fm.call("hostile_now", "police", "gang_a"), "reset (a new game) clears it")
 	_check(saves.call("load_slot", SLOT), "loaded: %s" % saves.call("last_save_message"))
 	_check(fm.call("hostile_now", "police", "gang_a"), "the save brings it back")
-	fm.call("apply_table", null)
+	fm.call("clear_region_table")
 	_check(fm.call("hostile_now", "police", "gang_a"), "and as the campaign layer, not a runtime flip")
 
 	saves.call("delete_slot", SLOT) if saves.has_method("delete_slot") else null

@@ -131,6 +131,9 @@ final class UnitSpawner {
             u.side = side;
             u.playerId = pid;
             u.origin = dr.station();
+            // held until the token pass hands it one: units are spawned AFTER assignTokens in the tick, so a new
+            // unit otherwise attacked unbidden for a tick (probe_ammo_supply saw 4 attackers on 3 tokens)
+            ai.attackHeld = ed.attackTokens;
             ed.units.add(u);
         }
     }

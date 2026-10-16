@@ -761,6 +761,52 @@ public class AICharacter extends Character {
         setMovementState(currentMovementType);
     }
 
+    /** Off = the control: an officer fires through a player it is not after (probe_engagement_v2 case 1b). */
+    public static boolean holdFireOnBystanders = true;
+    /** A body within this of the shot's line is "in the line": a capsule's radius plus the miss offset's slack. */
+    private static final double LINE_CLEARANCE = 0.7;
+    /** Bodies this far PAST the aim point still count: a bullet does not stop where it was aimed. */
+    private static final double LINE_OVERSHOOT = 3.0;
+    /** Only the line's first stretch is checked; past it the spread is wider than any body anyway. */
+    private static final double LINE_REACH = 80.0;
+    /** Shots this AI fired / held for a body in the line / fired THROUGH one (the control, hold off) -- probe readouts. */
+    public int shotsFired, shotsHeld, shotsThrough;
+    @Register public int shotsFiredNow() { return shotsFired; }
+    @Register public int shotsHeldNow() { return shotsHeld; }
+    @Register public int shotsThroughNow() { return shotsThrough; }
+
+    /**
+     * Would a POLICE shot from this AI's aim ray at {@code aimAt} pass a PLAYER it is not after? P1e: per-target
+     * hostility kept the police from AIMING at a wanted player's co-op partner, but a miss aimed beside the wanted
+     * player still took the partner from 1000 to 195 HP in a 30 s fight. The officer then holds that shot and steps
+     * aside. Deliberately narrow (user, 2026-10-15, GTA-style and cheap): gangs are careless, and the police do not
+     * hold for civilians or each other -- only an innocent player is protected. The players only (no grid query),
+     * then a point-to-segment distance; no ray. A player in a vehicle is left out (the hull).
+     */
+    public boolean bystanderInLine(Vector3 aimAt) {
+        if (aimAt == null || characterInfo == null || !Faction.POLICE.equals(characterInfo.faction)) return false;
+        Vector3 from = aimRay != null ? aimRay.getGlobalPosition() : getGlobalPosition().plus(new Vector3(0.0, 1.5, 0.0));
+        Vector3 dir = aimAt.minus(from);
+        double len = dir.length();
+        if (len < 0.5) return false;
+        dir = dir.div(len);
+        double reach = Math.min(len + LINE_OVERSHOOT, LINE_REACH);
+        for (Player c : PlayerRegistry.getPlayers()) {
+            if (!godot.global.GD.isInstanceValid(c) || c == currentTarget || !c.isAlive() || c.currentVehicleNode != null) continue;
+            if (com.openworld.game.Hostility.mayTarget(Faction.POLICE, c)) continue;
+            // the body's centre, about chest height: a standing capsule spans ~0..1.8 m above its origin
+            Vector3 p = c.getGlobalPosition().plus(new Vector3(0.0, 1.0, 0.0));
+            double along = p.minus(from).dot(dir);
+            if (along < 0.3 || along > reach) continue;
+            Vector3 closest = from.plus(dir.times(along));
+            double dy = Math.abs(p.getY() - closest.getY());
+            Vector3 off = p.minus(closest);
+            double lateral = Math.sqrt(off.getX() * off.getX() + off.getZ() * off.getZ());
+            if (lateral < LINE_CLEARANCE && dy < 1.0) return true;
+        }
+        return false;
+    }
+
     public void snapAimRay(Vector3 worldTarget) {
         if (aimRay == null || worldTarget == null) return;
         aimRay.setTargetPosition(aimRay.toLocal(worldTarget));

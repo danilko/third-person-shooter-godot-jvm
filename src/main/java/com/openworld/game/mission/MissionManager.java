@@ -5,7 +5,6 @@ import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.api.Node;
 import godot.api.Object;
-import godot.api.Texture2D;
 import godot.core.Callable;
 import godot.core.MethodCallable;
 import godot.core.StringName;
@@ -270,8 +269,7 @@ public class MissionManager extends Node {
     @Register
     public void onCharacterEliminated(String attackerName, String attackerFaction,
                                        String victimName, String victimFaction,
-                                       String weaponName, Texture2D weaponIcon,
-                                       boolean headshot) {
+                                       String weaponName, boolean headshot) {
         if (!active || activeMission == null) return;
         if (!MissionObjectiveType.ELIMINATE_ALL.equals(activeMission.objectiveType)) return;
 

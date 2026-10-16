@@ -175,6 +175,21 @@ public class FactionManager extends Node {
         rebuildLiveTable();
     }
 
+    /**
+     * {@code applyTable(null)} / {@code applyMissionTable(null)} for GDScript. Since godot-jvm rc3 the registrar
+     * casts an Object argument non-null ({@code args[0] as FactionTable}), so a GDScript {@code null} throws a
+     * NullPointerException before the method runs -- and {@code @Nullable} on the parameter is not read.
+     */
+    @Register
+    public void clearRegionTable() {
+        applyTable(null);
+    }
+
+    @Register
+    public void clearMissionTable() {
+        applyMissionTable(null);
+    }
+
     /** Which layer the live table came from: "mission", "region" or "default" (probe/debug readout). */
     @Register
     public String activeLayerNow() {

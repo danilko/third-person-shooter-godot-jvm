@@ -109,7 +109,7 @@ func _initialize() -> void:
 		await _tick(30)
 	var bus := root.get_node_or_null("/root/EventBus")
 	for k in 3:
-		bus.emit_signal("character_eliminated", "Player", "player", "Enemy %d" % k, "enemy", "ASR-1", null, false)
+		bus.emit_signal("character_eliminated", "Player", "player", "Enemy %d" % k, "enemy", "ASR-1", false)
 	await _tick(10)
 
 	print("== on foot")
