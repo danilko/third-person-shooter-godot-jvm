@@ -69,6 +69,8 @@ public class ActivityRuntime extends Node implements ActivityHost, ActivityDirec
     private ActivityDirector director;
     private final Map<String, Node3D> placements = new LinkedHashMap<>();
     private final Map<String, List<Door>> doors = new LinkedHashMap<>();
+    /** The encounters each run set off (taken away at its release, PLAN.md 2.2). */
+    private final Map<String, List<String>> encounters = new LinkedHashMap<>();
     private final Map<String, String> marks = new LinkedHashMap<>();
     private final Set<String> consents = new LinkedHashSet<>();
     private final List<ActivityResult> lastResults = new ArrayList<>();
@@ -635,7 +637,25 @@ public class ActivityRuntime extends Node implements ActivityHost, ActivityDirec
 
     @Override public void stage(String instanceId, List<Requirement> needs) { }
 
+    @Override public boolean startEncounter(String instanceId, String encounterId) {
+        com.openworld.game.encounter.Encounter e = com.openworld.game.encounter.Encounter.find(this, encounterId);
+        if (e == null) return false;
+        e.startNow();
+        encounters.computeIfAbsent(instanceId, k -> new ArrayList<>()).add(encounterId);
+        return true;
+    }
+
+    @Override public int encounterLeft(String encounterId) {
+        com.openworld.game.encounter.Encounter e = com.openworld.game.encounter.Encounter.find(this, encounterId);
+        return e == null ? -1 : e.liveNow() + e.wavesLeftNow();
+    }
+
     @Override public void release(String instanceId) {
+        List<String> started = encounters.remove(instanceId);
+        if (started != null) for (String id : started) {
+            com.openworld.game.encounter.Encounter e = com.openworld.game.encounter.Encounter.find(this, id);
+            if (e != null) e.stopNow();
+        }
         List<Door> held = doors.remove(instanceId);
         if (held != null) for (Door d : held) if (GD.isInstanceValid(d)) d.setLocked(true);
         if (getNodeOrNull("/root/FactionManager") instanceof FactionManager fm) fm.setActivityOverlay(instanceId, List.of());

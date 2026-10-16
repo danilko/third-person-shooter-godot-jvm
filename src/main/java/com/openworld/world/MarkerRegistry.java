@@ -99,7 +99,7 @@ public final class MarkerRegistry {
     }
 
     /** A marker's kind: its {@code kind} property, else its name {@code MARK_<kind>_<n>}. */
-    static String kindOf(Node3D n) {
+    public static String kindOf(Node3D n) {
         if (n.hasMeta(KIND)) {
             String k = String.valueOf(n.getMeta(KIND));
             if (!k.isEmpty()) return k;

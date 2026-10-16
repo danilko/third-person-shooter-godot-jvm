@@ -73,6 +73,8 @@ GATES=(
   "minimal_hud|300|0|0|$HF --script $P/probe_minimal_hud.gd"
   "gameplay_events|300|0|0|$HF --script $P/probe_gameplay_events.gd"
   "markers|200|0|0|$H --script $P/probe_markers.gd"
+  "encounter|600|0|0|$H --script $P/probe_encounter.gd"
+  "site_guards|600|0|0|$H --script $P/probe_site_guards.gd"
   "world_density|200|0|0|$H --script $P/probe_world_density.gd"
   "stairs|900|0|0|$H --script $P/probe_stairs.gd"
   "building_nav|600|0|0|$H --script $P/check_building_nav.gd"

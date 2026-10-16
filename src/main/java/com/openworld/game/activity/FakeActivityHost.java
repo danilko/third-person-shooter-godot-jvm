@@ -75,6 +75,9 @@ public final class FakeActivityHost implements ActivityHost {
     public final List<String> said = new ArrayList<>(), commands = new ArrayList<>(), log = new ArrayList<>(),
             released = new ArrayList<>();
     public double now;
+    /** encounter id -> what is left of it (a test counts it down); a started one is listed against its run. */
+    public final Map<String, Integer> encounters = new LinkedHashMap<>();
+    public final Map<String, List<String>> encountersStarted = new LinkedHashMap<>();
 
     public FakePlayer player(String id) { return players.computeIfAbsent(id, k -> new FakePlayer()); }
 
@@ -157,7 +160,16 @@ public final class FakeActivityHost implements ActivityHost {
     @Override public boolean canStage(Requirement need) { return stageable.contains(need.toString()); }
     @Override public void stage(String instanceId, List<Requirement> needs) { staged.put(instanceId, needs); }
 
+    @Override public boolean startEncounter(String instanceId, String encounterId) {
+        if (!encounters.containsKey(encounterId)) return false;
+        encountersStarted.computeIfAbsent(instanceId, k -> new ArrayList<>()).add(encounterId);
+        return true;
+    }
+
+    @Override public int encounterLeft(String encounterId) { return encounters.getOrDefault(encounterId, -1); }
+
     @Override public void release(String instanceId) {
+        encountersStarted.remove(instanceId);
         lockedDoors += doorsHeld.getOrDefault(instanceId, 0);
         doorsHeld.remove(instanceId);
         relations.remove(instanceId);

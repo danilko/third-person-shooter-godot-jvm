@@ -100,6 +100,15 @@ public interface ActivityHost {
      *  reserved bodies, its marker, a staged replay world. Called once at its end, whatever the end. */
     void release(String instanceId);
 
+    // ── placed fights (PLAN.md 2.2: game.encounter.Encounter) ──
+
+    /** Set off the level's Encounter named {@code encounterId} for this run (wave 1 at once, turned on the players);
+     *  {@link #release} takes its living away. False when the world has no such encounter. */
+    boolean startEncounter(String instanceId, String encounterId);
+
+    /** That encounter's members still up plus its waves not out yet: 0 = it is over (cleared); -1 = no such encounter. */
+    int encounterLeft(String encounterId);
+
     // ── telling the player ──
 
     /** This player stands where the activity starts and may start it: offer it (a prompt naming it; taking it is

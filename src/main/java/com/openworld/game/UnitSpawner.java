@@ -225,6 +225,26 @@ final class UnitSpawner {
         return ai;
     }
 
+    /**
+     * A PLACED body (PLAN.md 2.2: an Encounter's member, a building's guard): the side's body rows at 1 star, the
+     * loadout's uniform and ONE weapon picked by {@code roll} + its extras. Not drawn from a station's pool and not
+     * pinned to the active LOD tier -- the caller pins it once it fights. {@code faction} "" = the side.
+     */
+    AICharacter spawnPlaced(String side, String faction, com.openworld.game.encounter.Loadouts.Loadout l, Vector3 at, double roll) {
+        int keep = ed.bodyStars;
+        ed.bodyStars = 1;
+        ed.outfitOverride = l != null ? l.outfit() : "";
+        ed.factionOverride = faction != null ? faction : "";
+        AICharacter ai = spawnBody(side, at, l != null ? l.weapon(roll) : "");
+        ed.outfitOverride = "";
+        ed.factionOverride = "";
+        ed.bodyStars = keep;
+        if (ai == null) return null;
+        ai.lodPinnedActive = false;
+        if (l != null) for (String x : l.extra()) WeaponGrant.grant(ai, x, ed);
+        return ai;
+    }
+
     AICharacter spawnBody(String side, Vector3 at, String weapon) {
         if (ed.getTree() == null || ed.getTree().getCurrentScene() == null) return null;
         if (!(GD.load(AI_SCENE) instanceof PackedScene ps) || !(ps.instantiate() instanceof AICharacter ai)) return null;
@@ -238,7 +258,9 @@ final class UnitSpawner {
         CharacterInfo info = new CharacterInfo();
         info.characterId = UUID.randomUUID().toString();
         info.displayName = POLICE.equals(side) ? "Police" : side;
-        info.faction = side;
+        // a placed body may be another faction than the body rows it wears (an Encounter's "enemy" crew in gang_a
+        // clothes); set before the spawn is announced, so every peer gets the right one
+        info.faction = ed.factionOverride != null && !ed.factionOverride.isEmpty() ? ed.factionOverride : side;
         ai.characterInfo = info;
         Node container = ed.getTree().getCurrentScene().getNodeOrNull("Characters");
         if (container == null) container = ed.getTree().getCurrentScene();

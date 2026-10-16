@@ -616,6 +616,8 @@ public class EnforcementDispatch extends Node {
     int emptyLulls;
     /** The tier outfit the next spawnBody wears over the stars' row (set around a draw, like bodyStars). */
     String outfitOverride = "";
+    /** A placed body's own faction (PLAN.md 2.2), "" = its side's. Set only around one spawnBody call. */
+    String factionOverride = "";
 
     /** The pools, bound to this world's places (re-bound when the places record changes). */
     ForcePools pools() {
@@ -1032,6 +1034,11 @@ public class EnforcementDispatch extends Node {
 
     /** See {@link UnitSpawner#guard}. */
     public void guard(Player p, String gang, Vector3 at, int n, List<String> weapons) { spawner.guard(p, gang, at, n, weapons); }
+
+    /** See {@link UnitSpawner#spawnPlaced}. */
+    public AICharacter spawnPlaced(String side, String faction, com.openworld.game.encounter.Loadouts.Loadout l, Vector3 at, double roll) {
+        return spawner.spawnPlaced(side, faction, l, at, roll);
+    }
 
     /** See {@link UnitSpawner#spawnHangoutBody}. */
     AICharacter spawnHangoutBody(String gang, Vector3 at, String weapon) { return spawner.spawnHangoutBody(gang, at, weapon); }

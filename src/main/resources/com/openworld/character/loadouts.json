@@ -1,0 +1,20 @@
+{
+  "note": "WHAT A PLACED AI CARRIES AND WEARS (PLAN.md 2.2 / 1j). One table for every AI that a level designer puts in the world rather than the dispatch sending it: an Encounter's members and the guards standing at a building's MARK_spawn markers (game.encounter.SiteGuards). A LOADOUT is `side` (whose body rows and faction: police / a gang id; \"\" = the caller's faction), `outfit` (character/outfits.json; \"\" = the side's own body row), `weapons` (catalog id -> weight: ONE is picked per body, by the body's id so a peer and a replay agree) and `extra` (always given, e.g. a baton beside the gun). `teams` maps a marker's `team` prop to its default loadout; a marker or an Encounter may name a loadout itself. A team that is not listed is not a guard (civilian, staff, doctor ... are someone else's).",
+  "loadouts": {
+    "police_station": {"side": "police", "outfit": "police", "weapons": {"PIS1": 3.0, "ASR2": 1.0}, "extra": ["BAT1"]},
+    "security": {"side": "police", "outfit": "", "weapons": {"BAT1": 2.0, "PIS1": 1.0}},
+    "military": {"side": "police", "outfit": "military", "weapons": {"ASR2": 3.0, "SMG1": 1.0}},
+    "gang_member": {"side": "", "outfit": "", "weapons": {"ASR1": 1.0, "PIS2": 2.0, "MEW1": 1.0, "SMG1": 1.0}},
+    "gang_heavy": {"side": "", "outfit": "", "weapons": {"ASR1": 2.0, "SHG1": 2.0}, "extra": ["PIS2"]}
+  },
+  "teams": {
+    "police": "police_station",
+    "guard": "security",
+    "soldier": "military",
+    "gang": "gang_member"
+  },
+  "site_guards_note": "Guards at a building's MARK_spawn markers whose team is in `teams` (SiteGuards). Spawned like a shop clerk: within `near` of a player, taken away past `far` of every player while calm; a building whose guards fought or died stays empty until every player has gone past `far`. Only in a building variant someone can walk into (_Shop / _Open scenes). `per_building` caps one building (the military base carries 26 spawn markers), `cap` the island. Guards are the place's own staff: they are NOT drawn from the forces' station pools (forces.json).",
+  "site_guards": {"near": 60.0, "far": 100.0, "per_building": 4, "cap": 12},
+  "encounter_note": "Defaults for an Encounter node's exports that are left at 0 / empty (its own inspector values win). `cap` bounds the live members of ALL encounters together.",
+  "encounter": {"spawn_near": 90.0, "despawn_far": 150.0, "cap": 24}
+}

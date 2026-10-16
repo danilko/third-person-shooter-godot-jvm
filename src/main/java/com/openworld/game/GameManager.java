@@ -244,6 +244,11 @@ public class GameManager extends Node {
             gh.setName(new godot.core.StringName("GangHangouts"));
             addChild(gh);
         }
+        if (getNodeOrNull("SiteGuards") == null) {
+            com.openworld.game.encounter.SiteGuards sg = new com.openworld.game.encounter.SiteGuards();
+            sg.setName(new godot.core.StringName("SiteGuards"));
+            addChild(sg);
+        }
         if (getNodeOrNull("RespawnSystem") == null) {
             RespawnSystem rs = new RespawnSystem();
             rs.setName(new godot.core.StringName("RespawnSystem"));

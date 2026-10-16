@@ -109,6 +109,8 @@ src/main/java/com/openworld/
                   #   content/ = the content packs (Act1) and their mission classes (KonbiniActivity)
     activity/     #   the Activity runtime (typed Java missions): Activity, Plan, Stage, RuleSet,
                   #   ActivityDirector, ActivityHost + FakeActivityHost, ActivityRuntime (AutoLoad)
+    encounter/    #   placed fights + guarded buildings (2.2): Encounter (a node a designer drops in), EncounterWaves,
+                  #   SiteGuards (guards from the buildings' baked MARK_spawn), Loadouts (character/loadouts.json)
   net/            # NetworkManager (AutoLoad RPC), NetMessageCodec, NetworkController,
                   #   VehicleNetworkController, snapshot interpolators, policies, NetStats, Vec3/Quat
     session/      #   PlayerSession, PersistentPlayerId
@@ -224,7 +226,7 @@ means that section title in one of these files (`grep -l "<title>" docs/*.md`).
 
 | doc | what is in it |
 |---|---|
-| `docs/game-systems.md` | Part D: spatial grid, AI LOD, factions (presets, campaign layer), MissionDirector + ZoneTrigger, SaveSystem, the profile / economy / save v2, the garage, the authoring foundations (GameplayEvents, DataTable, MarkerRegistry, WorldLedger), the campaign graph, the Activity runtime (how a mission is written and tested), RaceDirector; the AI FSM; EventBus; audio |
+| `docs/game-systems.md` | Part D: spatial grid, AI LOD, factions (presets, campaign layer), MissionDirector + ZoneTrigger, SaveSystem, the profile / economy / save v2, the garage, the authoring foundations (GameplayEvents, DataTable, MarkerRegistry, WorldLedger), the campaign graph, the Activity runtime (how a mission is written and tested), placed encounters + site guards (game.encounter), RaceDirector; the AI FSM; EventBus; audio |
 | `docs/open-world-simulation.md` | Part E: zone streaming, ambient traffic + the lane graph, traffic by region (traffic.json) + the idle-car recycle + the three car tiers, the old terrain/seam notes, StimulusManager, AISquad |
 | `docs/combat.md` | weapons (spread, two-stage trace, the long-ray fix, networked shots/melee/projectiles, damage, VFX, throwables, the blocked-muzzle hint), glass, ladders |
 | `docs/enforcement.md` | wanted level, dispatch, gang hangouts, escalation, recovery outcomes, co-op correctness batch |

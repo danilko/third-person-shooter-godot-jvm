@@ -12,6 +12,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - Authoring foundations: GameplayEvents, DataTable, MarkerRegistry, WorldLedger (PLAN.md 2.0, 2026-10-10, after it)
 - The campaign graph, its lint, and the career override stack (PLAN.md 2.1 step 1, 2026-10-10, after it)
 - The Activity runtime: typed Java missions, the konbini job as the reference, replay, game-over rules (PLAN.md 2.1, 2026-10-10, after it)
+- Placed fights and guarded buildings: Encounter, SiteGuards, loadouts.json, cover / posts / patrol routes (PLAN.md 2.2, 2026-10-15, after it)
 
 ---
 
@@ -786,6 +787,78 @@ offered only where its world holds); the consent prompt, the retry prompt and th
 APIs are `grantWorldConsent`, `retryNow`, `whyNotNow`; a guest's `carryHome` effects; world markers drawn for
 `Stage.marker` (stored, `markedNow`); the faction overlay is island-wide, not participant-scoped (hostility is by
 faction string); the game-over card.
+
+### Placed fights and guarded buildings -- `game.encounter` (PLAN.md 2.2: F6 + 1j, 2026-10-15)
+
+A level designer can now place "a group of 6 armed gang members that spawns when the player enters this courtyard,
+attacks in two waves, uses this cover" without code, and the guarded buildings (police stations, koban, the bank,
+the military base) have people on site. Everything is RUNTIME: the baked buildings already carried 108
+`MARK_spawn` (with a `team`) and 12 `MARK_cover` markers as `mission_marker` nodes, so nothing was rebaked.
+
+**`character/loadouts.json` (`Tables.LOADOUTS`, `Loadouts`) -- what a PLACED AI carries and wears.** A loadout is
+`side` (whose body rows and faction: police / a gang id; "" = the caller's), `outfit` (outfits.json; "" = the side's
+own row), `weapons` (id -> weight; ONE is picked per body by a stable roll of its marker path / encounter key, so a
+peer and a replay agree) and `extra` (always given: the police baton). `teams` maps a marker's `team` to its default
+loadout (police -> police_station, guard -> security, soldier -> military, gang -> gang_member); a team not listed
+(civilian, staff, doctor, vip, prisoner ...) is not a guard. `site_guards` and `encounter` hold the distances and
+caps. Bodies come from `EnforcementDispatch.spawnPlaced(side, faction, loadout, at, roll)`: the dispatch's body /
+uniform / weapon path at 1 star, NOT drawn from a station's pool (forces.json), not pinned to the active LOD tier
+until it fights. The roll was a one-round hash at first: keys differing in the last character ("#0", "#1") rolled
+within 0.3 % of each other and a whole crew carried the same gun -- it is murmur3's full fmix64 now (unit-tested).
+
+**`Encounter` (a Node3D a designer drops in a scene).** Children are its points, found by name `MARK_<kind>_<n>` or a
+`kind` meta (any Node3D; they need not be in the `mission_marker` group): `spawn` (where a member stands up, facing
+-Z; a `wave` meta keeps it for that wave, later waves use the point farthest from the players first; none = a ring
+round the node), `cover` (a point a member fights FROM; the buildings' baked `MARK_cover` within `cover_radius` count
+too), `patrol` (a route the first wave walks in name order before it is set off). Exports: `encounter_id`,
+`faction`, `loadout`, `waves` ("4,3"), `trigger_radius`, `spawn_near` / `despawn_far` (0 = the table's 90 / 150),
+`next_wave_at` + `wave_gap`, `manual`, `once`, `cover_radius`, `hold_leash`, `crouch_at_cover`, `ledger_flag`,
+`enabled`. Signals `encounter_triggered`, `encounter_cleared` (wire a door, a ZoneTrigger, a beat).
+The life is `EncounterWaves` (engine-free, `EncounterWavesTest`): DORMANT -> a player within spawn_near -> STANDING
+(wave 1 calm at its points) -> a player inside the trigger, a PLAYER's hit on a member (the GameplayEvents stream,
+phase OBSERVER), a member already on a player (gang heat), or `start_now` -> ENGAGED (every member `huntsPlayers`,
+pinned ACTIVE, the squad told who) -> the next wave once `alive <= next_wave_at` and `wave_gap` s passed -> CLEARED
+(signal, ledger flag). Every player past despawn_far: the living are taken away and it may happen again. Another
+AI fighting the crew does NOT set it off (DebugWorld's zone `enemy` AI shot a crew at its spawn in the first runs and
+turned it on a player 45 m away). A full cap (`encounter.cap`, all encounters together) holds a wave until there is
+room. A world whose `ledger_flag` is set never stands it up again (a saved win).
+Activities: `ActivityHost.startEncounter(instance, id)` (wave 1 at once, engaged; `release` takes the living away)
+and `encounterLeft(id)` (members up + waves not out; 0 = cleared, -1 = none) -- for a `Stage.when(...)`.
+
+**The AI side (AICharacter fields; the states read them).** `huntsPlayers` (any player is a target whatever the
+table), `holdPoint` + `holdLeash` + `holdCrouch` (fight FROM a point), `standsAtPost` (calm, stand ON the hold
+point facing `postFacePoint`), `patrolRoute` (walked in order instead of the random walk). `holds()` = a hold point
+AND a loaded gun carried -- whatever is in the hands (a calm guard holds its fists; the best-weapon pick may be the
+baton when nobody is near), so a knife / bat crew closes in instead. Rules: AttackState goes to the point first and
+fights there (crouched while reloading / without a line at a low cover); ChaseState with the target IN SIGHT goes
+back to the point (it waits there for the target to come into range) and out of sight hunts no further than the
+leash; SearchState looks no further than the leash; PatrolState stands a post-stander on its point. All of them move
+STRAIGHT to the point when the line is walkable and use the nav agent only round a wall: on DebugWorld's coarse
+navmesh the agent's next point flipped behind the body (members stuck 4-7 m from cover), and inside a building with
+no navmesh it leads to the nearest navmesh point OUTSIDE (a guard walked 15 m off its post after a distant sound).
+
+**`SiteGuards` (GameManager child, authority only).** Every `MARK_spawn` whose team (or `loadout` prop) names a guard
+loadout is a post; its building is the marker's scene owner. Spawned like a shop clerk: within `near` 60 m of a
+player, up to `per_building` 4 per building and `cap` 12 on the island; taken away past `far` 100 m while calm; a
+building whose guards fought (a target) or went down stays empty until every player has left. Only in a variant
+someone can walk into (`_Shop` / `_Open`) OR at a post under open sky (a ray up, asked once per marker after it has
+existed 1 s so the building's colliders are in): the island places `MilitaryBase.tscn` SHUT, and its duty guard
+stands at the gate. A guard is its loadout's side (police; soldiers are police with the military outfit, P1e's
+tiers), so it joins in through the ordinary faction + per-target hostility: calm with a clean record, on a player at
+shoot_at stars. `post=patrol` on a marker walks a few metres either side of it.
+Found on the way: a guard 40-60 m off was in the FROZEN/PASSIVE tier and its queued weapon equips wait in
+`WeaponController._process` until it wakes -- normal LOD, but a probe must walk in before reading the weapons.
+
+Gates: unit `EncounterWavesTest` (9) + `DataTablesTest` (loadouts declared, every team names a loadout, every outfit
+exists); `probe_encounter.gd` 21/21 (A waves / trigger / patrol / cover / clear / ledger, B a player's hit from 45 m +
+reset + stands up again, C manual start / stop, D control `enabled=false`), `probe_site_guards.gd` 13/13 (A
+PoliceStation_Shop: none far, 4 of 6 posts near, PIS1/ASR2 + BAT1, on post, leash held while looking about, calm then
+on the player at 3 stars, taken away; B the SHUT station mans only its 2 open-sky gate posts; C the bank's lobby
+guard only; D control `enabled=false`). Both clear DebugWorld's zone `enemy` AI first (they fight police and gangs,
+which is the world's business, not what the probes measure). Both are in `tools/nightly_gates.sh`.
+NOT done (1j's crime rows): stealing a car parked at a guarded site, drawing a weapon inside, staff-only zones; the
+hospital has no guard marker (its .blend needs one: a rebake, with the map session's); gang places have one
+`team=gang` marker (the hangouts are their people).
 
 ### Street races — `game.mission.RaceDirector` + `world.RaceCheckpoint` (R2, AutoLoad, 2026-09-17)
 

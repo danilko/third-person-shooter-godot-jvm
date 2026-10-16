@@ -28,6 +28,13 @@ public class AttackState implements AIState {
     /** A shot held because a body it may not shoot is in the line is tried again this soon (s), from a new strafe. */
     private static final double HOLD_FIRE_RETRY = 0.25;
     private static final double MELEE_FALLBACK_SECONDS = 2.0;
+    /** Within this of its hold point a body is AT it; beyond {@link #HOLD_SPRINT} it runs there (PLAN.md 2.2). */
+    private static final double HOLD_ARRIVED = 1.0, HOLD_SPRINT = 6.0;
+
+    private static double flat(Vector3 a, Vector3 b) {
+        double x = a.getX() - b.getX(), z = a.getZ() - b.getZ();
+        return Math.sqrt(x * x + z * z);
+    }
 
     @Override
     public void enter(AICharacter body, AIController ctrl) {
@@ -105,7 +112,18 @@ public class AttackState implements AIState {
         // Only evaluate when the hold timer has expired to prevent per-frame
         // oscillation when hasLoS or pitchOut flickers near the threshold.
         ctrl.tickStanceHoldTimer(delta);
-        if (body.behaviorConfigOrDefaults().useCombatCrouch && ctrl.canChangeStance()) {
+        boolean holding = body.holdPoint != null && !isMelee;
+        if (holding && body.holdCrouch) {
+            // at a low cover: down while it reloads or has no line, up to shoot (PLAN.md 2.2)
+            boolean atCover = flat(myPos, body.holdPoint) <= HOLD_ARRIVED;
+            boolean reloading = body.weaponController != null && body.weaponController.isWeaponReloading();
+            StanceName target = atCover && (reloading || !hasLoS) ? StanceName.CROUCH : StanceName.UPRIGHT;
+            if (target != ctrl.getIntendedAttackStance() && ctrl.canChangeStance()) {
+                ctrl.setIntendedAttackStance(target);
+                ctrl.startStanceHoldTimer(0.8);
+                body.forceSetStance(target);
+            }
+        } else if (body.behaviorConfigOrDefaults().useCombatCrouch && ctrl.canChangeStance()) {
             boolean wantCrouch = hasLoS && !pitchOut && ctrl.isReactionReady()
                     && (!body.behaviorConfigOrDefaults().crouchOnSuppression || ctrl.isUnderAttack());
             StanceName target = wantCrouch ? StanceName.CROUCH : StanceName.UPRIGHT;
@@ -122,7 +140,29 @@ public class AttackState implements AIState {
         // Moving phase: WALK with a valid strafe/reposition/closing direction, or IDLE
         // to hold a melee swing position (lateral strafing has no place at arm's reach).
         boolean closeForMelee = isMelee && hDist > 0.01f && dist > attackRange * 0.85f;
-        if (ctrl.isStillPhase()) {
+        if (holding) {
+            // it fights FROM its point (a cover marker, a guard's post): there first, then it stands and shoots
+            double off = flat(myPos, body.holdPoint);
+            if (off <= HOLD_ARRIVED) {
+                cmd.movementType = MovementType.IDLE;
+            } else {
+                // straight there when the way is clear (a cover point is a few metres off, in the open); the agent
+                // only round a wall -- on a coarse navmesh its next point flips behind the body (probe_encounter)
+                Vector3 step = body.holdPoint.minus(myPos);
+                step.setY(0f);
+                if (!ChaseState.walkableLine(body, body.holdPoint)) {
+                    if (body.getNavAgent().getTargetPosition().distanceTo(body.holdPoint) > 0.5)
+                        body.getNavAgent().setTargetPosition(body.holdPoint);
+                    Vector3 nav = body.getNavAgent().getNextPathPosition().minus(myPos);
+                    nav.setY(0f);
+                    if (nav.length() >= 0.5f) step = nav;
+                }
+                Vector3 dir = step.length() > 0.001f ? step.normalized() : Vector3.Companion.getZERO();
+                cmd.movementType = off > HOLD_SPRINT ? MovementType.SPRINT : MovementType.WALK;
+                cmd.movementDirection.setX(dir.getX());
+                cmd.movementDirection.setZ(dir.getZ());
+            }
+        } else if (ctrl.isStillPhase()) {
             cmd.movementType = MovementType.IDLE;
         } else if (pitchOut && hDist > 0.01f) {
             cmd.movementType = MovementType.WALK;

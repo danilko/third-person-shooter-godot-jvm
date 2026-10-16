@@ -176,6 +176,25 @@ public class AICharacter extends Character {
      */
     public boolean lodPinnedActive;
 
+    // ── Placed AI (PLAN.md 2.2: game.encounter -- an Encounter's members, a building's guards) ──
+    /** Hostile to every PLAYER whatever the faction table says (an engaged encounter: a gang crew that has turned on
+     *  the players without the whole gang turning). Other AI are judged by the table as usual. */
+    public boolean huntsPlayers;
+    /** A point it fights FROM (a cover marker, a guard's post): it goes there and holds it instead of strafing, and
+     *  will not chase further than {@link #holdLeash} from it. Null = fights anywhere (the default). */
+    public Vector3 holdPoint;
+    /** How far from {@link #holdPoint} it may chase a target (m); 0 = it never leaves the point. */
+    public double holdLeash;
+    /** Crouch at the hold point between shots (a low cover: a car, a crate, a wall's end). */
+    public boolean holdCrouch;
+    /** A patrol ROUTE walked in order and round again, instead of the random walk round the spawn point. */
+    public java.util.List<Vector3> patrolRoute;
+    private int patrolRouteIndex;
+    /** Calm, it stands ON {@link #holdPoint} instead of strolling round its spawn point (a guard's post). */
+    public boolean standsAtPost;
+    /** Where a calm body stands facing when its walk is done (a guard's post looks out of its marker's -Z). */
+    public Vector3 postFacePoint;
+
     private AILodLevel classifyLod(float nearestPlayer) {
         if (lodPinnedActive) return AILodLevel.ACTIVE;
         if (nearestPlayer > LOD_FREEZE_DIST * lodDistanceBias) return AILodLevel.FROZEN;
@@ -473,7 +492,7 @@ public class AICharacter extends Character {
             if (shared != null && shared != this && shared.currentVehicleNode == null) {
                 String tf = (shared.characterInfo != null && shared.characterInfo.faction != null)
                         ? shared.characterInfo.faction : "";
-                if (Faction.areHostile(myFaction, tf) && com.openworld.game.Hostility.mayTarget(myFaction, shared)) return shared;
+                if (targets(myFaction, tf, shared)) return shared;
             }
         }
 
@@ -506,6 +525,13 @@ public class AICharacter extends Character {
         return closest;
     }
 
+    /** May this AI target {@code c} (faction {@code tf})? The faction table narrowed per target (P1e step 4), or --
+     *  for a body that {@link #huntsPlayers} -- any player. */
+    private boolean targets(String myFaction, String tf, Character c) {
+        if (huntsPlayers && c instanceof Player) return true;
+        return Faction.areHostile(myFaction, tf) && com.openworld.game.Hostility.mayTarget(myFaction, c);
+    }
+
     /**
      * Returns the targetable Character for a candidate node — the node itself for an on-foot
      * Character, or the occupant for a Vehicle — when it is a live hostile, else null. On a hit,
@@ -518,8 +544,7 @@ public class AICharacter extends Character {
             // Unknown faction → treated as opponent (empty string is hostile to all named factions).
             String tf = (c.characterInfo != null && c.characterInfo.faction != null)
                     ? c.characterInfo.faction : "";
-            if (!Faction.areHostile(myFaction, tf)) return null;
-            if (!com.openworld.game.Hostility.mayTarget(myFaction, c)) return null;   // per target (P1e step 4)
+            if (!targets(myFaction, tf, c)) return null;
             if (c.currentVehicleNode != null) return null;   // vehicle entry handles this
             candidateDist = (float) myPos.distanceTo(c.getGlobalPosition());
             return c;
@@ -528,8 +553,7 @@ public class AICharacter extends Character {
             if (occ == null || !occ.isAlive() || !v.isAlive()) return null;
             String tf = (occ.characterInfo != null && occ.characterInfo.faction != null)
                     ? occ.characterInfo.faction : "";
-            if (!Faction.areHostile(myFaction, tf)) return null;
-            if (!com.openworld.game.Hostility.mayTarget(myFaction, occ)) return null;
+            if (!targets(myFaction, tf, occ)) return null;
             candidateDist = (float) myPos.distanceTo(v.getGlobalPosition());
             return occ;
         }
@@ -961,7 +985,46 @@ public class AICharacter extends Character {
 
     // ── Navigation ────────────────────────────────────────────────────────────
 
+    /** {@code goal} kept within {@link #holdLeash} of {@link #holdPoint} (the same object when there is no hold point
+     *  or it is inside the leash). */
+    public Vector3 leashed(Vector3 goal) {
+        if (!holds() || goal == null) return goal;
+        Vector3 d = goal.minus(holdPoint);
+        d.setY(0);
+        double len = d.length();
+        if (len <= holdLeash) return goal;
+        if (holdLeash <= 0.01 || len < 1e-3) return new Vector3(holdPoint);
+        return holdPoint.plus(d.times(holdLeash / len));
+    }
+
+    /** Does it fight from {@link #holdPoint} now? Only while it CARRIES a gun with ammunition, whatever is in its hands
+     *  (a calm guard holds its fists; the best-weapon pick may be the baton when nobody is near): a body with only a
+     *  knife or a bat has to close in (PLAN.md 2.2). */
+    public boolean holds() { return holdPoint != null && carriesLoadedGun(); }
+
+    private boolean carriesLoadedGun() {
+        if (weaponController == null) return false;
+        for (int i = 0; i < weaponController.slotCount(); i++) {
+            WeaponItem w = weaponController.getWeaponItem(i);
+            if (w != null && w.getWeaponType() == WeaponType.RANGED && weaponController.hasAmmoForWeapon(i)) return true;
+        }
+        return false;
+    }
+
+    /** Is {@code goal} past the leash of its hold point? */
+    public boolean beyondLeash(Vector3 goal) { return goal != null && leashed(goal) != goal; }
+
     public void setNextPatrolTarget() {
+        if (patrolRoute != null && !patrolRoute.isEmpty()) {
+            patrolRouteIndex = (patrolRouteIndex + 1) % patrolRoute.size();
+            navAgent.setTargetPosition(patrolRoute.get(patrolRouteIndex));
+            return;
+        }
+        if (holdPoint != null && (standsAtPost || holdLeash <= 0)) {
+            // a post: it stands on its point while calm (a guard at a gate, a desk)
+            navAgent.setTargetPosition(holdPoint);
+            return;
+        }
         float angle = godot.global.GD.randf() * (float) Math.PI * 2.0f;
         float dist  = godot.global.GD.randf() * behaviorConfigOrDefaults().patrolRadius;
         navAgent.setTargetPosition(spawnPosition.plus(new Vector3(

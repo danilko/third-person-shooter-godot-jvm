@@ -51,7 +51,8 @@ public class ChaseState implements AIState {
             // Only request a path recompute when the target has moved > 1.5 m — prevents
             // 60 navAgent path-recomputes/sec while chasing a moving player.
             if (ctrl.shouldUpdateNav(targetPos)) {
-                body.getNavAgent().setTargetPosition(targetPos);
+                // a body holding a point (cover, a post) goes back to it while it can see the target
+                body.getNavAgent().setTargetPosition(body.holds() ? body.holdPoint : targetPos);
                 ctrl.recordNavTarget(targetPos);
             }
             Vector3 aimTarget = new Vector3(targetPos.getX(),
@@ -65,7 +66,7 @@ public class ChaseState implements AIState {
             if (ctrl.hasLastKnownPosition()) {
                 Vector3 lastKnown = ctrl.getLastKnownTargetPosition();
                 if (ctrl.shouldUpdateNav(lastKnown)) {
-                    body.getNavAgent().setTargetPosition(lastKnown);
+                    body.getNavAgent().setTargetPosition(body.leashed(lastKnown));
                     ctrl.recordNavTarget(lastKnown);
                 }
             }
@@ -76,8 +77,28 @@ public class ChaseState implements AIState {
         // point is a real step ahead; otherwise steer at the target (in sight) or its last known place.
         Vector3 goal = hasLoS ? body.getTarget().getGlobalPosition()
                 : ctrl.hasLastKnownPosition() ? ctrl.getLastKnownTargetPosition() : body.getGlobalPosition();
+        // a body holding a point (cover, a post, PLAN.md 2.2): with the target in sight it fights from the point
+        // (back to it, then it waits there for the target to come into range); out of sight it hunts no further than
+        // its leash, then stands at the edge watching
+        if (body.holds()) {
+            Vector3 to = hasLoS ? body.holdPoint : body.leashed(goal);
+            Vector3 off = to.minus(body.getGlobalPosition());
+            off.setY(0f);
+            if (off.length() < 1.0) {
+                cmd.movementType = MovementType.IDLE;
+                cmd.movementDirection.setX(0);
+                cmd.movementDirection.setZ(0);
+                return this;
+            }
+            goal = to;
+        }
         Vector3 dir;
-        if (hasLoS && dist < CLOSE_DIRECT && walkableLine(body, goal)) {
+        if (body.holds() && walkableLine(body, goal)) {
+            // back to its point (or the leash's edge) in the open: straight there
+            dir = goal.minus(body.getGlobalPosition());
+            dir.setY(0f);
+            dir = dir.length() > 0.001f ? dir.normalized() : null;
+        } else if (hasLoS && dist < CLOSE_DIRECT && !body.holds() && walkableLine(body, goal)) {
             // In sight and close: straight at it. The agent leads to the nearest NAVMESH point, which for a target
             // on a slab or a kerb island is metres off it -- baton officers circled 3.5 m from a still player while
             // their reach is 1.9 m (probe_enforcement, 2026-10-07).

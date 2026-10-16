@@ -115,6 +115,11 @@ public final class Tables {
     public static final DataTable<Map<String, Map<String, Object>>> OUTFITS = DataTable.define("outfits",
             ROOT + "character/outfits.json", OutfitTable::read, HashMap::new);
 
+    /** character/loadouts.json: what a PLACED AI carries and wears -- encounters and site guards (PLAN.md 2.2). */
+    public static final DataTable<com.openworld.game.encounter.Loadouts> LOADOUTS = DataTable.define("loadouts",
+            ROOT + "character/loadouts.json", com.openworld.game.encounter.Loadouts::read,
+            com.openworld.game.encounter.Loadouts::new);
+
     // The recovery rules are read out of TWO files; each block is read while its own file loads, so the unknown-key
     // check of that file covers it.
     private static DataReader fees(DataReader crimes) {

@@ -27,7 +27,7 @@ class DataTablesTest {
         assertNotNull(Tables.CRIMES.get());
         List<String> names = new ArrayList<>();
         for (DataTable<?> t : Tables.all()) names.add(t.name);
-        assertEquals(List.of("crimes", "gangs", "economy", "supplies", "ammo_supply", "forces", "density", "traffic", "outfits"), names);
+        assertEquals(List.of("crimes", "gangs", "economy", "supplies", "ammo_supply", "forces", "density", "traffic", "outfits", "loadouts"), names);
         assertEquals(List.of(), DataTable.validateAll());
     }
 
@@ -44,6 +44,11 @@ class DataTablesTest {
         assertTrue(Tables.SUPPLIES.get().containsKey("onigiri"));
         assertTrue(Tables.AMMO_SUPPLY.get().stockByVehicle().get("POC1") > 0);
         assertTrue(Tables.OUTFITS.get().containsKey("police"));
+        // every team names a loadout, and every loadout's outfit is a row of outfits.json
+        var lo = Tables.LOADOUTS.get();
+        assertTrue(lo.forTeam("police") != null && lo.forTeam("soldier") != null && lo.forTeam("civilian") == null);
+        for (var l : lo.loadouts.values())
+            assertTrue(l.outfit().isEmpty() || Tables.OUTFITS.get().containsKey(l.outfit()), l.id() + " wears " + l.outfit());
         // every density level has its row in the file, each one more than the last, and NORMAL is at least the
         // 12 cars the user asked for
         var normal = com.openworld.game.WorldDensity.NORMAL.row();
