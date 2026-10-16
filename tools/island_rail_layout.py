@@ -726,6 +726,17 @@ _R0["lines"]["Harbour line"]["form"] = _R0["lines"]["Harbour line"]["form"] + \
 # the track centre). Suburb and the throat move with the leg.
 _R0["lines"]["Main line"]["corners"] = [((x, MAIN_EW_Y) if y == -400.0 else (x, y))
                                         for x, y in _R0["lines"]["Main line"]["corners"]]
+# ...and OVER the dike road (S18, the 踏切 batch): the viaduct (ground + ELEVATED_Z, ~7.6) met ring_kita__5 on the
+# dike's crest (7.45) on the throat curve at 48 deg -- a level crossing nobody would build, the one 踏切 on the island
+# under LX_MIN_ANGLE. A FLOOR there (the crest + DECK_T + CLEAR_ROAD_UNDER + a margin) lifts the rail over it: the
+# climb starts ~170 m before (x ~1040, clear of Suburb's box, east end x 926), the rail is HELD there to the bridge
+# (a point floor crested over the dike and sagged 3 m before the bridge climb) and climbs the last 2.3 m onto the
+# deck. It stays under shuto_t4 80 m before the dike and under the spur on the bridge axis -- a span held at the deck height from the
+# dike on (tried first) put the rail 0.8 m into the spur's clearance and 1.2 m into T4's. TIGHT BOTH WAYS (measured
+# 2026-10-15 on the rail record's 20 m stations): ring_kita 4.78 m under the deck (CLEAR_ROAD_UNDER 4.7), T4 6.08 m
+# over the catenary (CLEAR_RAIL_UNDER 6.0) -- the 3.5 % between them is the whole budget; a dike crest or a T4 profile
+# that moves shows as a crossing CONFLICT.
+_R0["lines"]["Main line"]["floors"] = [(1196.0, -461.0, 1250.0, -697.0, 7.45 + DECK_T + CLEAR_ROAD_UNDER + 0.22)]
 for _n in ("Fish Market", "Suburb"):
     _R0["stations"][_n] = (_R0["stations"][_n][0], 445.0 if _n == "Fish Market" else _R0["stations"][_n][1], MAIN_EW_Y) + tuple(_R0["stations"][_n][3:])
 _R0["title"] = "Tokyo hub, straight Harbour (r0 route fixes)"
@@ -1078,6 +1089,13 @@ def profile(line, pts, cum, ground, level=()):
             base.append(-1e9)                   # takes no part in the floors: the cut is a CEILING below
         else:
             base.append(g[i] + 0.3)
+    # a held floor (line["floors"]: from (x0, y0) to (x1, y1), min rail head z) -- the rail lifted over a road and
+    # HELD there on to where the next floor takes over, never a crest and a sag between
+    near = lambda x, y: min(range(len(pts)), key=lambda i: (pts[i][0] - x) ** 2 + (pts[i][1] - y) ** 2)
+    for x0, y0, x1, y1, fz in line.get("floors", ()):
+        k0, k1 = sorted((near(x0, y0), near(x1, y1)))
+        for k in range(k0, k1 + 1):
+            base[k] = max(base[k], fz)
     # a station's platform is LEVEL: over each (s0, s1) the deck stands at its highest floor there
     for s0, s1 in level:
         idx = [i for i in range(len(pts)) if s0 <= cum[i] <= s1]

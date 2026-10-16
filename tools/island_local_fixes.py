@@ -175,12 +175,73 @@ def port_crossing(net):
     return "port_crossing: no 4-arm pad near (%.0f, %.0f) -- nothing done" % PC_PAD
 
 
+# lx_straight (user, 2026-10-15, the 踏切 batch: "not opposite direction for in and out" at the track): a road runs
+# STRAIGHT across a level crossing -- island_layout.LX_TURN deg within +-LX_STRAIGHT m. island_align puts a through
+# road's arms on one line at its junction, so a road whose line beyond the junction differs bends at its first station
+# past the mouth -- chuo_dori's sat 8 m south of the Blue line (5.8 deg). An interior vertex of the crossing span that
+# stands inside the window slides back along that span's own line to LX_MOVE_TO from the crossing: the bend moves off
+# the track, the line over it does not (the C1 connector stands on chuo_dori's median north of it).
+LX_MOVE_TO = 22.0
+
+
+def lx_straight(net):
+    import island_layout as IL
+    if not os.path.exists(IL.RAIL_RECORD):
+        return "lx_straight: no rail record -- nothing done"
+    rnet = pm.load_network(IL.RAIL_RECORD)
+    rails = []
+    for r in rnet.roads.values():
+        ch = [rnet.points[u].pos for u in r.points if u in rnet.points]
+        rails += list(zip(ch, ch[1:]))
+    linked = {u for u, p in net.points.items() if any(l.type != pm.LINK_SEGMENT for l in getattr(p, "links", ()))}
+    moved = []
+    for name, r in net.roads.items():
+        if r.road_class == "rail" or name.startswith("shuto_"):
+            continue
+        us = [u for u in r.points if u in net.points]
+        for i in range(len(us) - 1):
+            a, b = net.points[us[i]].pos, net.points[us[i + 1]].pos
+            for ra, rb in rails:
+                d = (b[0] - a[0]) * (rb[1] - ra[1]) - (b[1] - a[1]) * (rb[0] - ra[0])
+                if abs(d) < 1e-9:
+                    continue
+                t = ((ra[0] - a[0]) * (rb[1] - ra[1]) - (ra[1] - a[1]) * (rb[0] - ra[0])) / d
+                v = ((ra[0] - a[0]) * (b[1] - a[1]) - (ra[1] - a[1]) * (b[0] - a[0])) / d
+                if not (0.0 <= t <= 1.0 and 0.0 <= v <= 1.0) or abs(a[2] + (b[2] - a[2]) * t - (ra[2] + (rb[2] - ra[2]) * v)) > 1.0:
+                    continue
+                c = (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+                L = math.dist(a[:2], b[:2])
+                ux, uy = (b[0] - a[0]) / L, (b[1] - a[1]) / L
+                # the vertex behind (k = i, its neighbour i - 1) or ahead (k = i + 1, its neighbour i + 2)
+                for k, nb, sgn in ((i, i - 1, -1.0), (i + 1, i + 2, 1.0)):
+                    if not (0 <= nb < len(us)) or us[k] in linked or math.dist(net.points[us[k]].pos[:2], c) >= IL.LX_STRAIGHT:
+                        continue
+                    p, q = net.points[us[nb]].pos, net.points[us[k]].pos
+                    # the outer span in the road's direction: p -> q behind the crossing span, q -> p ahead of it
+                    ox, oy = (q[0] - p[0], q[1] - p[1]) if sgn < 0 else (p[0] - q[0], p[1] - q[1])
+                    turn = abs(math.degrees(math.atan2(ox * uy - oy * ux, ox * ux + oy * uy)))
+                    if turn <= IL.LX_TURN:
+                        continue
+                    nx, ny = c[0] + sgn * ux * LX_MOVE_TO, c[1] + sgn * uy * LX_MOVE_TO
+                    if math.dist((nx, ny), c) >= math.dist(p[:2], c) - 10.0:
+                        moved.append("%s: no room (its neighbour %.0f m from the track)" % (name, math.dist(p[:2], c)))
+                        continue
+                    # z on the straight between the neighbour and the far end of the crossing span
+                    far = b if sgn < 0 else a
+                    f = math.dist(p[:2], (nx, ny)) / (math.dist(p[:2], far[:2]) or 1.0)
+                    net.points[us[k]].pos = (nx, ny, p[2] + (far[2] - p[2]) * f)
+                    moved.append("%s %.1f deg at %.0f m -> %.0f m from the track at (%.0f, %.0f)" % (
+                        name, turn, math.dist(q[:2], c), LX_MOVE_TO, c[0], c[1]))
+    return "lx_straight: %s" % (", ".join(moved) or "every 踏切 already straight")
+
+
 def main(argv):
     path = argv[0]
     net = pm.load_network(path)
     if "--late" in argv:
         # after the alignment, before the setback: a mouth placed here is locked and kept by the solve
         print("island_local_fixes: " + port_crossing(net))
+        print("island_local_fixes: " + lx_straight(net))
     else:
         ground = rg.Ground()
         print("island_local_fixes: " + industry_corner(net, ground))

@@ -576,6 +576,10 @@ LX_PAIR_MIN = 30.0
 #: own turn over the same window is reported beside it (track cant twists the road; sightlines).
 LX_STRAIGHT = 15.0
 LX_TURN = 2.0
+#: crossings on a rail curve the user ACCEPTED (2026-10-15, S18): the road is straight across, the track turns under it
+#: (nishi_dori on the Blue line's R 100 corner, 22.5 deg; chuo_dori at the start of its R 160 corner, 3.5 deg). Keyed by
+#: road base name + rail base name; any other crossing on a curve is still a finding.
+LX_RAIL_CURVE_ACCEPTED = {("nishi_dori", "rail_blue"), ("chuo_dori", "rail_blue")}
 LX_ASSERT = False
 RAIL_RECORD = os.path.join(os.path.dirname(OUTPUT), "IslandRail.roads.json")
 
@@ -653,7 +657,7 @@ def level_crossings(road_path, rail_path, arterials=()):
                 rail_turn = _turn_within(rail_chain[ln], _arc_at(rail_chain[ln], x, y), LX_STRAIGHT)
                 if road_turn > LX_TURN:
                     f.append("road turns %.1f deg within +-%.0f m" % (road_turn, LX_STRAIGHT))
-                if rail_turn > LX_TURN:
+                if rail_turn > LX_TURN and (name.split("__")[0], ln.split("__")[0]) not in LX_RAIL_CURVE_ACCEPTED:
                     f.append("on a rail curve (%.1f deg within +-%.0f m)" % (rail_turn, LX_STRAIGHT))
                 out.append([name, ln, (round(x, 1), round(y, 1)), round(ang, 1), round(near, 1), f])
             acc += seg
