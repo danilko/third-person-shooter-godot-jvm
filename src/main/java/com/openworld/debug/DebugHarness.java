@@ -644,10 +644,13 @@ public class DebugHarness extends Node {
             else if ("--car-test-control".equals(arg)) { com.openworld.carrier.vehicle.Vehicle.pushRemoteCars = false; }
             else if ("--crowd-dump".equals(arg)) { crowdDump = true; }
             else if ("--light-test".equals(arg)) { lightTest = true; }
+            else if (arg.startsWith("--bike-test=")) { bikeTest = arg.substring("--bike-test=".length()); }
+            else if (arg.startsWith("--bike-id=")) { bikeId = arg.substring("--bike-id=".length()); }
+            else if ("--bike-test-control".equals(arg)) { bikeControl = true; }
             else if ("--car-trace".equals(arg)) { com.openworld.net.VehicleNetworkController.TRACE = true; }
         }
         setPhysicsProcess(autoWalk || dumpCollisionDelay > 0.0 || spawnRoutesDelay > 0.0 || netDelay > 0.0 || holdAction != null
-                || coopTest || carTest != null || lightTest);
+                || coopTest || carTest != null || lightTest || bikeTest != null);
         if (autoWalk) GD.print("DebugHarness: auto-walk enabled — touring every zone marker in zoneId order"
                 + (autoWalkStartFilter != null ? ", starting at first match of '" + autoWalkStartFilter + "'" : ""));
     }
@@ -1167,6 +1170,109 @@ public class DebugHarness extends Node {
         }
     }
 
+    /**
+     * {@code -- --bike-test=<host|guest> [--bike-id=TRB1] [--bike-test-control]} (tools/net/run_net_bike.sh, PLAN.md
+     * 3.1b): a motorcycle on two peers. The host parks the bike on DebugWorld's west ring road (x -445, z 60, facing
+     * south) and announces it; the named peer's player gets on (the seat request), waits 3 s (the helmet goes on), rides
+     * 3 s on the throttle, SLIDES 1.5 s (throttle + full left + Space), then brakes. Both peers print a "[biketest]" line
+     * every 0.1 s -- the bike's place, lean, front wheel, slip, dust and the rider gear built on THIS peer -- and the
+     * script pairs them: the lean, wheel and dust are read from the bike's motion, so the puppet must show the same
+     * with no message of its own. --bike-test-control: the OBSERVING peer draws the old yaw-rate lean and no slide
+     * (Motorcycle.slideLean false), which must fail the match.
+     */
+    private String bikeTest = null;
+    private String bikeId = "TRB1";
+    private boolean bikeControl = false;
+    private double bikeT = 0.0, bikeReadyAt = -1, bikeSeatedAt = -1, bikeNextAsk = 0, bikeNextPrint = 0;
+    private int bikeStep = 0;
+    private boolean bikeSpawned, bikeGlided;
+    private Vector3 bikeGlideTo;
+    private com.openworld.carrier.motorcycle.Motorcycle bike;
+    private static final Vector3 BIKE_AT = new Vector3(-445.0, 5.8, 60.0);
+
+    private void bikeTestTick(double delta) {
+        bikeT += delta;
+        NetworkManager net = getNodeOrNull("/root/NetworkManager") instanceof NetworkManager n ? n : null;
+        if (net == null || !net.isNetworked()) return;
+        boolean client = !net.isServer();
+        String role = client ? "guest" : "host";
+        boolean rider = role.equals(bikeTest);
+        if (!client && getNodeOrNull("/root/FactionManager") instanceof com.openworld.character.FactionManager fm && bikeT < 1.0)
+            fm.setCampaignRelationship(com.openworld.character.Faction.PLAYER, com.openworld.character.Faction.ENEMY,
+                    com.openworld.character.FactionRules.NEUTRAL);
+        if (bikeControl && !rider) com.openworld.carrier.motorcycle.Motorcycle.slideLean = false;
+        Player me = localPlayer();
+        if (me != null && me.getNodeOrNull("Health") instanceof com.openworld.character.Health h) h.invulnerable = true;
+        if (me == null || PlayerRegistry.getPlayers().size() < 2) return;
+        if (bikeReadyAt < 0) bikeReadyAt = bikeT + 3.0;
+        if (bikeT < bikeReadyAt) return;
+        if (!client && !bikeSpawned) {
+            bikeSpawned = true;
+            com.openworld.carrier.vehicle.Vehicle v = com.openworld.world.ParkedVehicle.place(getTree().getCurrentScene(), bikeId,
+                    "neutral", new godot.core.Transform3D(godot.core.Basis.Companion.getIDENTITY(), BIKE_AT), 0.3);
+            if (v != null) net.announceVehicleSpawn(v);
+            GD.print("[biketest] host parked " + bikeId + " " + (v != null));
+        }
+        if (bike == null || !GD.isInstanceValid(bike)) {
+            bike = null;
+            for (Node n : getTree().getNodesInGroup(new StringName("characters")))
+                if (n instanceof com.openworld.carrier.motorcycle.Motorcycle m && !m.isQueuedForDeletion()
+                        && m.getGlobalPosition().distanceTo(BIKE_AT) < 6.0) bike = m;
+            if (bike == null) return;
+            GD.print("[biketest] " + role + " sees the bike " + bike.getName());
+        }
+        long ms = (long) (godot.api.Time.INSTANCE.getUnixTimeFromSystem() * 1000.0);
+        if (rider) {
+            if (!bikeGlided) { bikeGlided = true; bikeGlideTo = bike.getGlobalPosition().plus(new Vector3(1.2, 0.3, 0)); }
+            if (bikeGlideTo != null) {
+                Vector3 at = me.getGlobalPosition();
+                Vector3 to = new Vector3(bikeGlideTo.getX() - at.getX(), 0, bikeGlideTo.getZ() - at.getZ());
+                me.setGlobalPosition(to.length() <= 0.3 ? bikeGlideTo
+                        : new Vector3(at.getX(), bikeGlideTo.getY() + 4.0, at.getZ()).plus(to.normalized().times(0.3)));
+                me.setVelocity(new Vector3());
+                if (me.movementControllerNow() != null) me.movementControllerNow().clearMotion();
+                if (to.length() <= 0.3) { bikeGlideTo = null; bikeNextAsk = bikeT + 0.5; }
+                return;
+            }
+            if (me.currentVehicleNode == null && bikeSeatedAt < 0 && bikeT >= bikeNextAsk) {
+                bike.requestEnter(me);
+                bikeNextAsk = bikeT + 1.0;
+            }
+            if (me.currentVehicleNode != null && bikeSeatedAt < 0) {
+                bikeSeatedAt = bikeT;
+                GD.print("[biketest] seated sim=" + bike.isLocallySimulated());
+            }
+            if (bikeSeatedAt >= 0) {
+                double t = bikeT - bikeSeatedAt;
+                if (bikeStep == 0 && t >= 3.0) { bikeStep = 1; godot.api.Input.actionPress(new StringName("throttle")); GD.print("[biketest] phase ride unix_ms=" + ms); }
+                if (bikeStep == 1 && t >= 6.0) {
+                    bikeStep = 2;
+                    godot.api.Input.actionPress(new StringName("left"));
+                    godot.api.Input.actionPress(new StringName("handbrake"));
+                    GD.print("[biketest] phase slide unix_ms=" + ms);
+                }
+                if (bikeStep == 2 && t >= 7.5) {
+                    bikeStep = 3;
+                    godot.api.Input.actionRelease(new StringName("left"));
+                    godot.api.Input.actionRelease(new StringName("handbrake"));
+                    godot.api.Input.actionRelease(new StringName("throttle"));
+                    godot.api.Input.actionPress(new StringName("brake"));
+                    GD.print("[biketest] phase brake unix_ms=" + ms);
+                }
+                if (bikeStep == 3 && t >= 10.5) { bikeStep = 4; godot.api.Input.actionRelease(new StringName("brake")); GD.print("[biketest] phase done unix_ms=" + ms); }
+            }
+        }
+        if (bikeT >= bikeNextPrint) {
+            bikeNextPrint = bikeT + 0.1;
+            Vector3 p = bike.getGlobalPosition();
+            GD.print(String.format(java.util.Locale.ROOT,
+                    "[biketest] role=%s unix_ms=%d pos=%.2f,%.2f,%.2f lean=%.2f wheel=%.2f slip=%.2f dust=%d gear=%d seated=%d sim=%d",
+                    role, ms, p.getX(), p.getY(), p.getZ(), bike.leanDegreesNow(), bike.frontWheelSteerDegreesNow(),
+                    bike.slipDegreesNow(), bike.dustNow() ? 1 : 0, bike.riderGearNow(), bike.getSeatOccupant(0) != null ? 1 : 0,
+                    bike.isLocallySimulated() ? 1 : 0));
+        }
+    }
+
     private Vector3 coopGlideTo;
     private double coopArrivedAt = -1, coopNextAsk, coopSeatedAt = 1e9;
     private int coopAsks;
@@ -1200,6 +1306,7 @@ public class DebugHarness extends Node {
         if (carTest != null) carTestTick(delta);
         if (crowdDump) crowdDumpTick(delta);
         if (lightTest) lightTestTick(delta);
+        if (bikeTest != null) bikeTestTick(delta);
         if (holdAction != null) {
             holdDelay -= delta;
             if (holdDelay <= 0.0) godot.api.Input.actionPress(new StringName(holdAction));

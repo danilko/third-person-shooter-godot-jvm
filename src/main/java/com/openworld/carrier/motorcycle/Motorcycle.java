@@ -70,6 +70,12 @@ public class Motorcycle extends Vehicle {
     private Vector3 lastVel = Vector3.Companion.getZERO();
     private boolean haveLastVel = false;
     private double motionSpeed, motionYawRate;
+    /** This tick's ground velocity from MOTION (m/s, world), the last one, and the acceleration along the bike's left (m/s^2, eased). */
+    private Vector3 motionVel = Vector3.Companion.getZERO();
+    private Vector3 lastMotionVel;
+    private double lateralAccel;
+    /** The slip angle (rad, + = the nose LEFT of where it is going, folded into -90..90: see slipAngle), eased; 0 below SLIP_FROM_SPEED. */
+    private double slip;
     private int throwCount;
 
     @Register
@@ -106,6 +112,7 @@ public class Motorcycle extends Vehicle {
         updateLean(delta);              // before the seat pin (super), so the rider rolls with THIS tick's lean
         super._physicsProcess(delta);
         animateWheels(delta);
+        updateDust(delta);
         updateRiders(delta);
         lastVel = getLinearVelocity();
         haveLastVel = true;
@@ -128,24 +135,118 @@ public class Motorcycle extends Vehicle {
             if (speed < 120.0) {
                 motionSpeed = speed;
                 motionYawRate = dh / delta;
+                measureSlide(heading, delta);
+            } else {
+                posTrail.clear();
+                velTrail.clear();
             }
         }
         lastPos = pos;
         lastHeading = heading;
     }
 
-    /** The lean this bike should hold now (radians, + = left). */
+    /** Below this speed (m/s) there is no slip angle worth the name: the direction of travel is noise. */
+    static final double SLIP_FROM_SPEED = 2.0;
+    /** The acceleration and slip ease over ~1/this s (a position's second difference is noisy at 60 Hz). */
+    private static final double SLIDE_EASE = 14.0;
+
+    /** Velocity and acceleration are differences over this window (s), not frame to frame: a puppet moves in snapshot
+     *  steps (a frame standing still, then a double one), whose raw second difference is +-900 m/s^2 of noise --
+     *  measured on two peers, it leaned the observer's bike 20 deg the WRONG way into a slide, and an eased (EMA)
+     *  velocity still dipped it 12 deg. A window spans several steps, so it sees the true motion. Both peers measure
+     *  alike, so they agree; the cost is ~0.1 s of lag, inside the lean's own easing. */
+    static final double MOTION_WINDOW = 0.1;
+    private final java.util.ArrayDeque<double[]> posTrail = new java.util.ArrayDeque<>();   // {t, x, z}
+    private final java.util.ArrayDeque<double[]> velTrail = new java.util.ArrayDeque<>();   // {t, vx, vz}
+    private double motionClock;
+
+    /** The difference of the newest entry over the oldest one at least MOTION_WINDOW back, per second; null if too short. */
+    private static double[] windowRate(java.util.ArrayDeque<double[]> trail, double now) {
+        while (trail.size() > 2) {
+            java.util.Iterator<double[]> it = trail.iterator();
+            it.next();
+            if (now - it.next()[0] >= MOTION_WINDOW) trail.removeFirst(); else break;
+        }
+        double[] a = trail.peekFirst(), b = trail.peekLast();
+        if (a == null || b == null || b[0] - a[0] < 0.5 * MOTION_WINDOW) return null;
+        double dt = b[0] - a[0];
+        return new double[] {(b[1] - a[1]) / dt, (b[2] - a[2]) / dt};
+    }
+
+    /** The body-frame lateral acceleration (dv_lat/dt + v_long x yaw rate, read as one vector derivative) and the slip angle. */
+    private void measureSlide(double heading, double delta) {
+        motionClock += delta;
+        Vector3 p = getGlobalPosition();
+        posTrail.addLast(new double[] {motionClock, p.getX(), p.getZ()});
+        double[] v = windowRate(posTrail, motionClock);
+        if (v == null) return;
+        Vector3 vel = new Vector3(v[0], 0.0, v[1]);
+        motionVel = vel;
+        double k = Math.min(1.0, SLIDE_EASE * delta);
+        velTrail.addLast(new double[] {motionClock, v[0], v[1]});
+        double[] acc = windowRate(velTrail, motionClock);
+        if (acc != null) {
+            Vector3 left = getGlobalBasis().getColumn(0).times(-1.0);
+            double a = acc[0] * left.getX() + acc[1] * left.getZ();
+            if (Math.abs(a) < 60.0) lateralAccel += (a - lateralAccel) * k;      // a hit or a reset is not a lean
+        }
+        lastMotionVel = vel;
+        double sp = Math.hypot(vel.getX(), vel.getZ());
+        double target = sp >= SLIP_FROM_SPEED ? slipAngle(heading, Math.atan2(-vel.getX(), -vel.getZ())) : 0.0;
+        slip += (target - slip) * k;
+    }
+
+    /**
+     * The nose's angle left of the direction of travel (rad), both as headings atan2(back.x, back.z), FOLDED about 90 deg
+     * into -90..90: a slide that swings past sideways keeps its sign and comes back down continuously (100 deg reads 80),
+     * and a bike rolling straight backwards reads 0, not 180 -- so nothing snaps when a spin passes sideways.
+     */
+    static double slipAngle(double heading, double travelHeading) {
+        double b = heading - travelHeading;
+        while (b > Math.PI) b -= 2 * Math.PI;
+        while (b < -Math.PI) b += 2 * Math.PI;
+        if (b > Math.PI / 2) b = Math.PI - b;
+        else if (b < -Math.PI / 2) b = -Math.PI - b;
+        return b;
+    }
+
+    /** The lean this bike should hold now from its yaw rate alone (radians, + = left): right in a turn that grips, wrong
+     *  in a slide -- a spin leans it to the cap while nothing pushes it sideways. The control of {@link #slideLean}. */
     public static double targetLean(double speed, double yawRate, double maxDeg) {
         double max = Math.toRadians(maxDeg);
         double a = Math.atan(speed * yawRate / G);
         return Math.max(-max, Math.min(max, a));
     }
 
+    /** In a slide the rider leans this much further into it per radian of slip (the dirt-track look, past what the force
+     *  alone asks for): 30 deg of slip adds 10 deg. */
+    static final double SLIP_LEAN = 1.0 / 3.0;
+
+    /**
+     * The lean from what really pushes the bike sideways (radians, + = left): the tyres' force balances gravity at
+     * atan(a_lat / g), a_lat the acceleration along the bike's own left -- in a turn that grips that is v x yaw rate,
+     * in a slide it is the sliding tyres' drag, so a spin with the bike still going straight leans it hardly at all --
+     * plus {@link #SLIP_LEAN} of the slip angle, so a powerslide leans INTO the turn with the rear stepping out.
+     */
+    public static double slideLeanTarget(double lateralAccel, double slip, double speed, double maxDeg) {
+        double max = Math.toRadians(maxDeg);
+        double a = Math.atan(lateralAccel / G) + SLIP_LEAN * slip * Math.min(1.0, speed / 6.0);
+        return Math.max(-max, Math.min(max, a));
+    }
+
+    /** false = the lean from the yaw rate and the front wheel from the bars, as before the slide lean (probe control). */
+    public static boolean slideLean = true;
+    @Register public void setSlideLeanNow(boolean on) { slideLean = on; }
+    @Register public double slipDegreesNow() { return Math.toDegrees(slip); }
+    @Register public double lateralAccelNow() { return lateralAccel; }
+    @Register public double frontWheelSteerDegreesNow() { return Math.toDegrees(frontSteer); }
+
     private void updateLean(double delta) {
         VehicleConfig cfg = getConfig();
         double target;
         if (isEmptyOfRiders() && motionSpeed < 0.3) target = Math.toRadians(Math.min(KICKSTAND_DEG, cfg.motorcycleLeanDegrees));
         else if (footDown()) target = Math.toRadians(FOOT_LEAN_DEG);     // resting on the rider's left foot
+        else if (slideLean) target = slideLeanTarget(lateralAccel, slip, motionSpeed, cfg.motorcycleLeanDegrees);
         else target = targetLean(motionSpeed, motionYawRate, cfg.motorcycleLeanDegrees);
         lean += (target - lean) * Math.min(1.0, LEAN_RATE * delta);
         if (model != null && modelRest != null) {
@@ -192,8 +293,9 @@ public class Motorcycle extends Vehicle {
             double y = w.getPosition().getY() + holder.getPosition().getY();
             if (w.getPosition().getZ() < 0) { frontLift += y; nf++; } else { backLift += y; nb++; }
         }
+        frontSteer = frontWheelSteer(getCurrentSteerAngle(), slideLean ? slip : 0.0);
         if (wheelFront != null) {
-            Basis b = new Basis(Vector3.Companion.getUP(), getCurrentSteerAngle())
+            Basis b = new Basis(Vector3.Companion.getUP(), frontSteer)
                     .times(new Basis(Vector3.Companion.getRIGHT(), spinFront)).times(wheelFrontRest.getBasis());
             wheelFront.setTransform(new Transform3D(b, wheelOrigin(wheelFrontRest, nf > 0 ? frontLift / nf : Double.NaN)));
         }
@@ -202,6 +304,67 @@ public class Motorcycle extends Vehicle {
             wheelBack.setTransform(new Transform3D(b, wheelOrigin(wheelBackRest, nb > 0 ? backLift / nb : Double.NaN)));
         }
     }
+
+    /** The slip (deg) past which the front wheel stops following the bars and points along the slide, fully by SLIDE_STEER_FULL. */
+    static final double SLIDE_STEER_FROM = 6.0, SLIDE_STEER_FULL = 14.0;
+    /** The front wheel's own turn is capped here (deg): past it the rider has lost it. */
+    static final double FRONT_STEER_MAX = 45.0;
+    private double frontSteer;
+
+    /**
+     * The model front wheel's steer (rad, + = left): the bars' angle while the tyres grip; in a slide it turns to point
+     * where the bike is GOING (-slip, the counter-steer of a dirt-track powerslide), blended in over SLIDE_STEER_FROM ..
+     * SLIDE_STEER_FULL deg of slip. Visual only: the handling's steer is the rays'.
+     */
+    static double frontWheelSteer(double bars, double slip) {
+        double s = Math.abs(Math.toDegrees(slip));
+        double w = Math.max(0.0, Math.min(1.0, (s - SLIDE_STEER_FROM) / (SLIDE_STEER_FULL - SLIDE_STEER_FROM)));
+        w = w * w * (3.0 - 2.0 * w);
+        double max = Math.toRadians(FRONT_STEER_MAX);
+        return Math.max(-max, Math.min(max, bars + (-slip - bars) * w));
+    }
+
+    // ── Dust at the rear wheel while it slides ─────────────────────────────
+
+    /** The rear tyre's dust (a thin Binbun3D smoke at tyre scale, assets/vfx/smoke/effects/tyre_dust/). */
+    static final String DUST_VFX = "res://assets/vfx/smoke/effects/tyre_dust/tyre_dust_vfx.tscn";
+    /** It kicks up past this slip (deg) and this speed (m/s), and keeps going this long (s) after, so a wobble is one puff. */
+    static final double DUST_SLIP_DEG = 10.0, DUST_SPEED = 3.0, DUST_KEEP = 0.25;
+    private com.openworld.vfx.SmokeVfx dust;
+    private double dustLeft;
+
+    /** Read off the MOTION, like the lean: a puppet raises the same dust with no message. Built on the first slide. */
+    private void updateDust(double delta) {
+        boolean sliding = slideLean && isAlive() && !isDummy() && motionSpeed > DUST_SPEED
+                && Math.abs(Math.toDegrees(slip)) > DUST_SLIP_DEG && onTheGround();
+        dustLeft = sliding ? DUST_KEEP : Math.max(0.0, dustLeft - delta);
+        boolean on = dustLeft > 0.0;
+        if (on && dust == null) dust = buildDust();
+        if (dust != null && dust.emittingNow() != on) dust.setEmitting(on);
+    }
+
+    private boolean onTheGround() {
+        if (isFreezeEnabled()) return lastMotionVel != null;            // a puppet: its rays do not run
+        for (VehicleWheel w : getWheels()) if (w.grounded()) return true;
+        return false;
+    }
+
+    private com.openworld.vfx.SmokeVfx buildDust() {
+        if (!(GD.load(DUST_VFX) instanceof godot.api.PackedScene ps)
+                || !(ps.instantiate() instanceof com.openworld.vfx.SmokeVfx d)) return null;
+        // on the ground under the rear wheel: the model's origin is the ground under mid-wheelbase
+        Vector3 at = new Vector3(0.0, 0.05, 0.6);
+        if (modelRest != null && wheelBackRest != null) {
+            Vector3 o = wheelBackRest.getOrigin();
+            at = modelRest.times(new Vector3(o.getX(), 0.05, o.getZ()));      // times(Vector3) is a pure xform
+        }
+        d.setPosition(at);
+        d.setName("TyreDust");
+        addChild(d);
+        return d;
+    }
+
+    @Register public boolean dustNow() { return dust != null && dust.emittingNow(); }
 
     /** The model wheel's centre, at the height the rays' wheels are at (body space -> model space). */
     private Vector3 wheelOrigin(Transform3D rest, double bodyY) {

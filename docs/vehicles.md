@@ -16,6 +16,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - Engine sound profiles: one recording pitched per class now, a folder per class later (2026-10-16)
 - Hands on the bars, the rider triangle, the bike drift and the SSB1 hop (PLAN.md 3.1b, 2026-10-16)
 - The helmet: an artist's model, put on by the right hand; TwoBoneIK's bend axis (PLAN.md 3.1b, 2026-10-16)
+- The bike leans into a slide; the two-peer bike run (PLAN.md 3.1b, 2026-10-16)
 
 ---
 
@@ -732,8 +733,8 @@ yaw inertia; the bike rows set it (`build_vehicle_scenes.py` `drift`, MY PICKS: 
 the loosest, SSB1 3.5 the tightest, PMB1 4.0). Now 56-66 deg in 1.5 s, settling within 1 s of letting go. No car row
 changed. Gate `probe_bike_handling.gd [-- --control]` (straight + drift, the five bikes and SPC1 as the reference):
 PASS; `--control` (drift_yaw_accel 0 through the resource cache) fails all five drift turns and POB1's spin-on.
-- Not done (BIKE DRIFT's (2)-(3) in PLAN.md): the LEAN in a slide (today the lean still follows the yaw rate, not the
-  slip), the front wheel counter-steered along the velocity, a dust puff at the rear wheel.
+- (BIKE DRIFT's (2)-(3): the lean in a slide, the counter-steered front wheel and the dust are DONE -- "The bike leans
+  into a slide" below.)
 
 ## The helmet: an artist's model, put on by the right hand; TwoBoneIK's bend axis (PLAN.md 3.1b, 2026-10-16)
 
@@ -777,4 +778,51 @@ poke through for now" -- so no hair fold, no hair gate.
   (no gear) fails them.
 - NOT done: hair under the shell (folding the HairJoint chains), a show-my-helmet check in a probe (needs a local
   Player riding), cutscenes hiding it, an authored put-on clip.
+
+## The bike leans into a slide; the two-peer bike run (PLAN.md 3.1b, 2026-10-16)
+
+User: "drift behavior with tilt toward the sliding, like the current vehicle Space". The drift's PHYSICS was the car's
+(fixed the same day: `driftYawAccel`); what was wrong was the LOOK. The lean was `atan(v x yaw rate / g)`, right in a
+turn that grips and wrong in a slide: a bike spinning on Space with its path still straight leaned to the cap while
+nothing pushed it sideways -- measured on the drift case, the yaw lean reached 50 deg on the SSB1 at 4 deg of slip.
+
+**The lean (`Motorcycle.slideLeanTarget`).** What balances a leaning bike is the tyres' sideways force, so the lean is
+`atan(a_lat / g)` with `a_lat` the acceleration along the BIKE'S OWN left -- in a gripping turn that is `v x yaw rate`
+again (so `probe_motorcycle_ride`'s turn case is unchanged, 70/70), in a slide it is the sliding tyres' drag -- plus
+`SLIP_LEAN` (1/3) of the slip angle, the dirt-track look that leans a powerslide INTO the turn with the rear stepping
+out. Capped by `motorcycleLeanDegrees` as before. The slip angle is the nose's angle left of the travel, FOLDED about
+90 deg (a slide swinging past sideways reads 80 at 100, a bike rolling backwards reads 0): unfolded, a spin past
+sideways counted as "going backwards", the slip dropped to 0 and the lean and wheel snapped back (seen on the TRB1).
+
+**Measured from MOTION, over a 0.1 s window (`MOTION_WINDOW`).** Like the lean before it, everything is read from the
+bike's place, so a kinematic puppet leans with no message. But a puppet moves in SNAPSHOT STEPS (a frame standing still,
+then a double one): the frame-to-frame second difference is +-900 m/s^2 of noise, and on two peers it leaned the
+observer's bike 20 deg the WRONG way into the slide; an eased (EMA) velocity still dipped it 12 deg. The velocity is the
+difference of the place over 0.1 s, the acceleration the difference of that velocity over 0.1 s -- each spans several
+snapshot steps, so it sees the true motion. Both peers measure alike; the cost is ~0.1 s of lag inside the lean's own
+0.17 s easing.
+
+**The front wheel** (`frontWheelSteer`): the bars' angle while the tyres grip; past 6 deg of slip it turns to point where
+the bike is GOING (`-slip`), fully by 14 deg, up to its 45 deg lock. Visual only (the model wheel), the rays steer as
+before. **The dust** (`updateDust`): `assets/vfx/smoke/effects/tyre_dust/tyre_dust_vfx.tscn`, a tyre-scale copy of the
+Binbun3D thin smoke (CC0, the pack's material and curves; 24 particles, 1.1 s, world-space, 1.4 m quads), built on the
+bike's first slide at the rear wheel's ground point, emitting past 10 deg of slip above 3 m/s on the ground, held 0.25 s.
+`Motorcycle.slideLean` false = the old yaw lean, the bars' wheel and no dust (the probes' control).
+
+**Gates.** `probe_bike_handling.gd` case 3 SLIDE (12 m/s, Space + FULL steer 1.5 s, all five bikes; read independently
+from the body's place): it slides (68-89 deg) and stays up (tilt <= 6, nobody thrown); leans INTO the slide on every
+slipping frame; the lean within 3 deg (mean) of `atan(a_lat / g) + slip / 3` eased at the bike's lean rate -- measured
+1.3-1.8 deg, the yaw lean would be 10.6-20.5; the front wheel within 6 deg of `-slip` between 14 deg and its lock; dust
+while it slides and none once braked to a stand. PASS; `-- --control-slide` fails 15 (the force, wheel and dust on
+all five). Regression: probe_motorcycle_ride 70/70, probe_rider_pose, probe_motorcycle_driveby 6/6, probe_home_bikes,
+unit tests.
+
+**Two peers: `tools/net/run_net_bike.sh [--control] [host|guest] [--bike=TRB1]`** (DebugHarness `--bike-test=<rider>`):
+the host parks the bike on DebugWorld's west ring road (x -445, z 60, facing south) and announces it; the rider's peer
+gets on (the seat request), waits 3 s for the helmet, rides 3 s, slides 1.5 s (throttle + full left + Space), brakes.
+Both print the bike every 0.1 s and the script pairs the samples by PLACE on the simulator's interpolated path (the
+puppet draws a snapshot behind). PASS for both riders on TRB1 and SSB1: the observer sees the rider seated with the
+helmet and pose built (from the seat occupancy, no message); the lean matches at the same place (host rides 39/39,
+worst 1.0 deg; guest rides 37/38, worst 6.2), the slide's peak lean agrees, the front wheel 14/14, the dust 14/15 and
+14/14. `--control` (the OBSERVER on the old lean, no counter-steer, no dust) fails 3 per case (lean worst 33-43 deg).
 
