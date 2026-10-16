@@ -45,7 +45,8 @@ public final class BindingTable {
             new Row("view", "First / third person", List.of("view")),
             new Row("shoulder", "Swap shoulder", List.of("shoulder")),
             new Row("rear_view", "Look back (vehicle)", List.of("rear_view")),
-            new Row("scope_zoom", "Scope zoom", List.of("scope_zoom")));
+            new Row("scope_zoom", "Scope zoom", List.of("scope_zoom")),
+            new Row("flashlight", "Flashlight", List.of("flashlight")));
 
     /**
      * The CONTROLLER's rebindable rows (user, 2026-10-10: "no game pad setting"). Its own table, because a pad groups
@@ -69,7 +70,8 @@ public final class BindingTable {
             new Row("scope_zoom", "Scope / detonate / car gun", List.of("scope_zoom", "detonate", "vehicle_fire")),
             new Row("holster", "Holster", List.of("holster")),
             new Row("map", "Map", List.of("map")),
-            new Row("view", "First / third person", List.of("view")));
+            new Row("view", "First / third person", List.of("view")),
+            new Row("flashlight", "Flashlight", List.of("flashlight")));
 
     /** Keys nobody may take: Esc is pause / back on every page, Start is pause on a pad. */
     public static boolean reserved(String spec) { return "key:4194305".equals(spec) || "pad:6".equals(spec); }

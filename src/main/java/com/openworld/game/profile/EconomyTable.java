@@ -22,6 +22,8 @@ public final class EconomyTable {
     public double refillFraction = 0.2;
     public final Map<String, Long> weapons = new LinkedHashMap<>();
     public final Map<String, Long> suppliesPerUnit = new LinkedHashMap<>();
+    /** Owned things (item.Gadgets), bought once: the flashlight. */
+    public final Map<String, Long> gadgets = new LinkedHashMap<>();
     public long missionDefault;
     public final Map<String, Long> missions = new LinkedHashMap<>();
     public final List<Long> raceByPlace = new ArrayList<>();
@@ -38,6 +40,7 @@ public final class EconomyTable {
         t.refillFraction = Math.max(0.0, d.num("refill_fraction", 0.2));
         readLongs(d.child("weapons"), t.weapons);
         readLongs(d.child("supplies_per_unit"), t.suppliesPerUnit);
+        readLongs(d.child("gadgets"), t.gadgets);
         DataReader r = d.child("rewards");
         if (r != null) {
             t.missionDefault = r.lng("mission_default", 0);
@@ -64,6 +67,9 @@ public final class EconomyTable {
         Long u = suppliesPerUnit.get(id);
         return u == null ? null : u * Math.max(0, units);
     }
+
+    /** A gadget's price. Null = not priced (free). */
+    public Long gadgetPrice(String id) { return gadgets.get(id); }
 
     public long missionReward(String missionId) {
         Long v = missionId == null ? null : missions.get(missionId);

@@ -40,7 +40,10 @@ Steam Deck / Xbox positions, GTA V / PUBG console practice:
 | View | first / third person | Start | pause |
 
 Not on the pad on purpose: `weapon_slot_0..6` (the wheel), `drop` (rare; the D-pad is full), `brake` (LT reverses,
-which brakes first), `scope_zoom_in/out` (RB cycles).
+which brakes first), `scope_zoom_in/out` (RB cycles). `flashlight` (PLAN.md 3.2, keyboard T) has NO pad button yet: the
+D-pad and the face buttons are full, so its default is the user's to pick; the controller page's "Flashlight" row
+binds one meanwhile (a pad row with no default reads as unbound). T, not CS 1.6's F: F is `use_carrier` here;
+`probe_rebind.gd` moved its "free key" from T to Y.
 
 **One input, two contexts, two actions.** RT is fire on foot and the throttle in a car. That is done with two actions
 (`fire`, `throttle`) each read only by its own context (PlayerController's on-foot / vehicle halves) -- never one

@@ -554,6 +554,12 @@ public class AICharacter extends Character {
      * allied gunfire. Returns null when nothing relevant is audible — PatrolState uses it to wake into
      * SearchState toward the sound. No-op (null) without the StimulusManager AutoLoad (test scenes).
      */
+    /** Probe readout of {@link #hearAlarm}: the point, or (1e9, 1e9, 1e9) for none (a registered method returns no null). */
+    @Register public Vector3 hearAlarmNow() {
+        Vector3 v = hearAlarm();
+        return v != null ? v : new Vector3(1e9, 1e9, 1e9);
+    }
+
     public Vector3 hearAlarm() {
         StimulusManager sm = StimulusManager.get();
         if (sm == null) return null;
@@ -565,7 +571,7 @@ public class AICharacter extends Character {
         for (StimulusManager.Stimulus s : sm.getStimuli()) {
             if (s.source == this) continue;
             boolean investigate = switch (s.type) {
-                case GUNSHOT                  -> Faction.areHostile(myFaction, s.sourceFaction);
+                case GUNSHOT, LIGHT_SEEN      -> Faction.areHostile(myFaction, s.sourceFaction);
                 case EXPLOSION, VEHICLE_CRASH -> true;
                 default                       -> false;
             };

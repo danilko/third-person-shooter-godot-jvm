@@ -151,6 +151,7 @@ public class NetworkController extends Controller {
             c.applyReplicatedMovementType(snapshot.movementTypeOrdinal());
             c.replicatedAirborne = snapshot.airborne();
         }
+        c.setFlashlight(snapshot.flashlight());      // the owner's word; the mount is this peer's own pick (PLAN.md 3.2)
 
         if (applyHealth) {
             godot.api.Node healthNode = c.getNodeOrNull(new godot.core.NodePath("Health"));

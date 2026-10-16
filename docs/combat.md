@@ -3,6 +3,7 @@
 Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 
 - Combat / Weapon System (incl. "The melee pack's other five are items", PLAN.md 3.2 H4)
+- The flashlight: one toggle, a gun mount and a body mount (PLAN.md 3.2, 2026-10-16)
 - Glass breaks like a car's: shops, stations, mission and gang buildings, trains (PLAN.md 1g g, 2026-10-07)
 - Platform ladders, CS 1.6 style (user 2026-10-07)
 
@@ -921,4 +922,46 @@ ladders yet). A ladder also lets a fare-dodger onto the platform, as in life. Ga
 [-- --control]` 16/16 (DebugWorld station A: up onto the platform, forward climbs while looking down, no input hangs,
 back climbs down and steps off, jump lets go, walking along the bed or the platform edge grabs nothing, interact grabs
 from the top and back climbs down, interact lets go, auto-grab off; control: no ladder, stays on the bed).
+
+## The flashlight: one toggle, a gun mount and a body mount (PLAN.md 3.2, 2026-10-16)
+
+User decisions (PLAN.md 3.2): a GADGET, not a weapon slot (CS 1.6's model, not GTA V's attachment); then Left 4 Dead's
+refinement -- on a FIREARM the light is ON THE GUN, so it sways with the walk, dips in a reload and kicks with recoil;
+on melee / fists / throwables it comes from the BODY (CS 1.6). L4D itself switches it OFF there (checked, community
+sources); `Flashlight.onMelee` (true) is that one-line rule. Owned per player, bought once.
+
+**`character.Flashlight`**: one top-level SpotLight3D per body that ever switched one on (range 30 m, 22 deg, energy 4,
+warm white -- MY PICKS), placed every frame AND again on the skeleton's `skeleton_updated`: `_process` runs before the
+frame's pose, so placed only there the beam trailed the gun by a frame -- 0.48 m on the frame a reload threw the
+magazine hand (probe_flashlight). Mounts: a firearm's `LightPoint` Marker3D if an artist placed one, else DERIVED from
+its `Muzzle` -- 4 cm IN FRONT of the bore and 3 cm under it, so the gun is behind the light and cannot shadow its own
+beam (no art pass on the 16 weapon scenes); else, local player in first person, the camera; else the chest bone
+(`spine_03`) + 0.28 m forward, aimed at the aim point. Shadows only on the local player's light (a puppet's is a plain
+cone, for cost). Off while seated in a vehicle (the car has headlights).
+
+**State and wire.** `Character.flashlightOn`; the owner's `flashlight` key (T; no pad default, see docs/input.md) is
+`UserCommand.flashlight` -> `toggleFlashlight()`, which turns it on only if `Flashlight.owned` (the profile's
+`unlocks` holds `flashlight`) and off always. A puppet takes it from the snapshot's flags word **bit 14**
+(`NetMessageCodec.SNAPSHOT_FLAG_FLASHLIGHT`; bit 15 is the last spare; the entry size is unchanged) and each peer picks
+the mount from the weapon it already sees -- no message of its own.
+
+**Owning one: a shop GADGET** (`item.Gadgets`): a third kind of stock beside weapons and supplies, owned not carried.
+`ShopCounter.stock` takes `flashlight`, priced in economy.json's `gadgets` ($40, MY PICK), granted by `WeaponGrant` as
+the profile unlock (the host's copy on the sale, the owner's own profile when MSG_SHOP_GRANT reaches it); once owned the
+counter prices it -1 and the menu says OWNED. No placed counter stocks it yet (the shop .blends are re-baked by the S18
+rebuild's buildings stage; which shops is the user's call); the console's `give flashlight` owns one meanwhile.
+
+**AI.** At night (`DayNight.lightsWanted`) the authority posts `StimulusManager.Type.LIGHT_SEEN` at the body once a
+second, radius 35 m; `AICharacter.hearAlarm` treats it like a hostile gunshot (investigate). The crowd ignores it.
+
+**Gates.** `tools/godot/probe_flashlight.gd` (a real Player at night facing a wall): not owned -> the key does nothing;
+bought at a counter -> owned, then OWNED / refused; ASR1 aimed -> mount gun, 5 cm from the muzzle, 0.00 deg off the
+bore, the axis on the wall, shadows on; through a reload the beam stays on the muzzle every frame while the muzzle moves
+0.44 m; fists -> mount body, 0.28 m from the chest, 0.0 deg off the aim; onMelee false -> dark, true -> back; 6
+LIGHT_SEEN posts and a hostile AI 25 m away hears it at the player; the key turns it off. PASS; `--control` (never
+switched on) fails 15. Under `xvfb-run` it also measures the WALL: luminance 0.444 with the beam on, 0.016 off
+(`FL_SHOT=<prefix>` saves the frames). `tools/net/run_net_flashlight.sh`: the host's light (ASR1 -> gun mount) and the
+guest's (empty hands -> body mount) each show on the other peer on the same mount, the owner's beam with shadows and the
+puppet's without, and go off after the switch -- PASS. `SnapshotFlagsTest.flashlightIsItsOwnBit`. Regression:
+probe_rebind, probe_shop_clerk, probe_holster_supply, probe_ammo_supply, run_net_shot_test, run_net_light, unit tests.
 

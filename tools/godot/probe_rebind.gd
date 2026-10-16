@@ -6,9 +6,9 @@ extends SceneTree
 ##       --path . --script tools/godot/probe_rebind.gd
 ##
 ## A real Player with the real HUD (WorldSystems.tscn):
-##  1. the PAGE: Settings -> Key bindings -> press "Use"'s button -> press T (a real key event): interact is T, E is
+##  1. the PAGE: Settings -> Key bindings -> press "Use"'s button -> press Y (a real key event): interact is Y, E is
 ##     gone from it, its pad events are kept;
-##  2. a SWAP: Use -> R (Reload's key): Reload now has T;
+##  2. a SWAP: Use -> R (Reload's key): Reload now has Y;
 ##  3. a SHARED row: forward -> Up arrow moves forward, throttle AND the movement action, and movement keeps six keys;
 ##  4. the HUD prompt follows: a "Door (E)" prompt shows the key bound now (control: before any rebind it shows E);
 ##  5. settings.cfg round trip: save, reset to defaults, reload -> the bindings come back from the file;
@@ -18,7 +18,7 @@ extends SceneTree
 const PLAYER := "res://src/main/resources/com/openworld/character/Player.tscn"
 const SYSTEMS := "res://src/main/resources/com/openworld/world/WorldSystems.tscn"
 const CFG := "user://settings.cfg"
-const KEY_T := 84
+const KEY_Y := 89      # a free key (T is the flashlight since PLAN.md 3.2)
 const KEY_R := 82
 const KEY_UP := 4194320
 
@@ -146,12 +146,12 @@ func _initialize() -> void:
 	_click(_find(page, "key_interact") as Button)
 	await _tick(2)
 	_check("pressing Use's button waits for a key", String(page.call("capturing_now")) == "key_interact")
-	await _key(KEY_T)
+	await _key(KEY_Y)
 	await _tick(2)
-	_check("T is now Use: interact = [T], E gone", _keys("interact") == [KEY_T], str(_keys("interact")))
+	_check("Y is now Use: interact = [Y], E gone", _keys("interact") == [KEY_Y], str(_keys("interact")))
 	_check("... its pad events are kept", _pads("interact") == pads_before and pads_before > 0,
 		"%d -> %d" % [pads_before, _pads("interact")])
-	_check("... the button shows it", (_find(page, "key_interact") as Button).text == "T", (_find(page, "key_interact") as Button).text)
+	_check("... the button shows it", (_find(page, "key_interact") as Button).text == "Y", (_find(page, "key_interact") as Button).text)
 
 	print("=== 4. the HUD prompt follows ===")
 	bus.emit_signal("interact_prompt_changed", door, false, "")
@@ -159,7 +159,7 @@ func _initialize() -> void:
 	await _tick(3)
 	var shown := String(hud.call("prompt_key_now"))
 	var text := _prompt_text(hud)
-	_check("the Door prompt now names T", shown == "T" or text.contains("[ T ]"), "key '%s', text '%s'" % [shown, text])
+	_check("the Door prompt now names Y", shown == "Y" or text.contains("[ Y ]"), "key '%s', text '%s'" % [shown, text])
 
 	print("=== 2. a swap ===")
 	_click(_find(page, "key_interact") as Button)
@@ -167,7 +167,7 @@ func _initialize() -> void:
 	await _key(KEY_R)
 	await _tick(2)
 	_check("Use -> R takes Reload's key", _keys("interact") == [KEY_R], str(_keys("interact")))
-	_check("... and Reload gets T (swapped, not double-bound)", _keys("reload") == [KEY_T], str(_keys("reload")))
+	_check("... and Reload gets Y (swapped, not double-bound)", _keys("reload") == [KEY_Y], str(_keys("reload")))
 
 	print("=== 3. a shared row ===")
 	var moves_before := _keys("movement").size()

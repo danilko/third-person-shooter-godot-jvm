@@ -97,4 +97,17 @@ class SnapshotFlagsTest {
         assertTrue(!NetMessageCodec.unpackAirborne(NetMessageCodec.packSnapshotFlags(true, 5, 3, 2, 4, true)),
                 "the six-argument packer must mean on the floor");
     }
+
+    /** Bit 14: the owner's flashlight is on (PLAN.md 3.2). Its own bit; the older packers mean off; bit 15 stays spare. */
+    @Test
+    void flashlightIsItsOwnBit() {
+        int widest = NetMessageCodec.packSnapshotFlags(true, 0b111, 0b111, 0b11, 0b111, true, true, true);
+        assertEquals(0b0111111111111111, widest, "unexpected bit layout: " + Integer.toBinaryString(widest));
+        int lit = NetMessageCodec.packSnapshotFlags(false, 2, 1, 1, 0, false, false, true);
+        assertTrue(NetMessageCodec.unpackFlashlight(lit));
+        assertTrue(!NetMessageCodec.unpackAirborne(lit) && !NetMessageCodec.unpackHandsDown(lit));
+        assertEquals(1, NetMessageCodec.unpackActiveSlot(lit));
+        assertTrue(!NetMessageCodec.unpackFlashlight(NetMessageCodec.packSnapshotFlags(true, 5, 3, 2, 4, true, true)),
+                "the seven-argument packer must mean off");
+    }
 }

@@ -35,7 +35,7 @@ public class ShopCounter extends Area3D implements com.openworld.control.Interac
 
     public static final String GROUP = "shop_counter";
 
-    /** Comma-separated catalog weapon ids and/or supply ids ({@code item/supplies.json}). */
+    /** Comma-separated catalog weapon ids, supply ids ({@code item/supplies.json}) and/or gadget ids ({@link Gadgets}). */
     @Export public String stock = "";
     /** The sensor box in front of the register (local X across the counter, Z toward the customer). */
     @Export public Vector3 size = new Vector3(3.0, 2.0, 1.6);
@@ -49,7 +49,7 @@ public class ShopCounter extends Area3D implements com.openworld.control.Interac
     public void _ready() {
         for (String s : stock.split(",")) {
             String id = WeaponCatalog.find(s.trim());
-            if (id == null && SupplyCatalog.find(s.trim()) != null) id = s.trim();
+            if (id == null && (SupplyCatalog.find(s.trim()) != null || Gadgets.isGadget(s.trim()))) id = s.trim();
             if (id != null) items.add(id);
             else if (!s.isBlank()) GD.INSTANCE.printErr("ShopCounter: no weapon or supply '" + s.trim() + "'");
         }
@@ -208,7 +208,10 @@ public class ShopCounter extends Area3D implements com.openworld.control.Interac
     public static long priceFor(com.openworld.character.Character who, String id) {
         com.openworld.game.profile.EconomyTable t = com.openworld.game.profile.EconomyTable.get();
         Long price;
-        if (isSupply(id)) {
+        if (Gadgets.isGadget(id)) {
+            if (owns(who, id)) return -1;                  // owned for good: nothing to sell
+            price = t.gadgetPrice(id);
+        } else if (isSupply(id)) {
             int have = who == null ? 0 : who.supplyCountNow(id);
             long units = SupplyCatalog.find(id).max() - have;
             if (units <= 0) return -1;
@@ -232,6 +235,12 @@ public class ShopCounter extends Area3D implements com.openworld.control.Interac
     }
 
     public static boolean isSupply(String id) { return SupplyCatalog.find(id) != null; }
+
+    /** Does {@code who}'s profile own gadget {@code id} (an AI owns none)? */
+    public static boolean owns(com.openworld.character.Character who, String id) {
+        com.openworld.game.profile.PlayerProfile p = who == null ? null : com.openworld.game.profile.Profiles.of(who);
+        return p != null && p.unlocks.contains(Gadgets.unlock(id));
+    }
 
     // ── probe surface ──
     @Register public boolean playerAtCounterNow() { return inside != null; }

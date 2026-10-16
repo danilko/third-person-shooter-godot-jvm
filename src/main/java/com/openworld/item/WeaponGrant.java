@@ -29,6 +29,14 @@ public final class WeaponGrant {
     }
 
     public static Result grant(Character c, String weaponId, Node anyInTree) {
+        if (c != null && Gadgets.isGadget(weaponId)) {
+            // owned, not carried (PLAN.md 3.2): the unlock in the profile -- the host's copy on a sale, the owner's own
+            // profile when MSG_SHOP_GRANT reaches it
+            com.openworld.game.profile.PlayerProfile p = com.openworld.game.profile.Profiles.of(c);
+            if (p == null) return Result.FAILED;
+            if (p.unlocks.add(Gadgets.unlock(weaponId))) p.touch();
+            return Result.GIVEN;
+        }
         if (c == null || c.weaponController == null) return Result.FAILED;
         var wc = c.weaponController;
         for (int i = 0; i < wc.slotCount(); i++) {

@@ -43,7 +43,9 @@ public class StimulusManager extends Node {
 
     /** Kinds of perceptible event. GUNSHOT/EXPLOSION/VEHICLE_CRASH are emitted in E2; DEAD_BODY and
      *  PLAYER_SPOTTED are reserved for later perception features (corpse discovery, squad sighting). */
-    public enum Type { GUNSHOT, EXPLOSION, VEHICLE_CRASH, DEAD_BODY, PLAYER_SPOTTED, WEAPON_DRAWN }
+    public enum Type { GUNSHOT, EXPLOSION, VEHICLE_CRASH, DEAD_BODY, PLAYER_SPOTTED, WEAPON_DRAWN,
+        /** A flashlight's beam at night (character.Flashlight, PLAN.md 3.2): a hostile AI near it comes to look. */
+        LIGHT_SEEN }
 
     /** One world event an AI may perceive. Immutable; {@code source}/{@code sourceFaction} let a
      *  listener ignore its own or friendly events. {@code radius} is how far the event is audible. */

@@ -85,6 +85,9 @@ public final class NetMessageCodec {
     // move_and_slide, so its own isOnFloor() is false for good, and without this bit every remote body stood
     // in the airborne blend (PLAN.md 0.11: the puppet's arms 0.2 m wider and 0.15 m higher than the host's).
     private static final int SNAPSHOT_FLAG_AIRBORNE     = 1 << 13;
+    // FLASHLIGHT: the owner's flashlight is on (character.Flashlight, PLAN.md 3.2). Each peer picks the mount (gun /
+    // body) from the weapon it already sees, so this one bit is the whole wire cost. Bit 15 is the last spare one.
+    private static final int SNAPSHOT_FLAG_FLASHLIGHT   = 1 << 14;
 
     /**
      * The flags word, packed and unpacked in ONE place so a new field cannot silently overlap an
@@ -107,6 +110,14 @@ public final class NetMessageCodec {
     public static int unpackFireStep(int flags)      { return (flags >> SNAPSHOT_FIRE_STEP_SHIFT) & SNAPSHOT_FIRE_STEP_MASK; }
     public static boolean unpackHandsDown(int flags) { return (flags & SNAPSHOT_FLAG_HANDS_DOWN) != 0; }
     public static boolean unpackAirborne(int flags)  { return (flags & SNAPSHOT_FLAG_AIRBORNE) != 0; }
+    public static boolean unpackFlashlight(int flags) { return (flags & SNAPSHOT_FLAG_FLASHLIGHT) != 0; }
+
+    /** {@link #packSnapshotFlags} plus the hands-down, airborne and flashlight bits. */
+    public static int packSnapshotFlags(boolean combat, int stanceOrdinal, int activeSlotIndex,
+            int movementTypeOrdinal, int fireStep, boolean handsDown, boolean airborne, boolean flashlight) {
+        return packSnapshotFlags(combat, stanceOrdinal, activeSlotIndex, movementTypeOrdinal, fireStep, handsDown, airborne)
+                | (flashlight ? SNAPSHOT_FLAG_FLASHLIGHT : 0);
+    }
 
     /** {@link #packSnapshotFlags} plus the hands-down and airborne bits. */
     public static int packSnapshotFlags(boolean combat, int stanceOrdinal, int activeSlotIndex,
@@ -125,12 +136,12 @@ public final class NetMessageCodec {
     public static PackedByteArray encodeSnapshot(int msgType, String characterId, long tick, Vector3 position,
             Vector3 velocity, Vector3 aimTarget, boolean combat, int stanceOrdinal, int activeSlotIndex,
             int movementTypeOrdinal, float yaw, float currentHealth, int senderTimeMs, int fireSeq,
-            int activeMagazine, int reloadSeq, int fireStep, boolean handsDown, boolean airborne) {
+            int activeMagazine, int reloadSeq, int fireStep, boolean handsDown, boolean airborne, boolean flashlight) {
         StreamPeerBuffer buf = new StreamPeerBuffer();
         buf.put8(msgType);
         putSnapshotEntry(buf, characterId, tick, position, velocity, aimTarget, combat, stanceOrdinal,
                 activeSlotIndex, movementTypeOrdinal, yaw, currentHealth, senderTimeMs, fireSeq, activeMagazine,
-                reloadSeq, fireStep, handsDown, airborne);
+                reloadSeq, fireStep, handsDown, airborne, flashlight);
         return buf.getDataArray();
     }
 
@@ -159,7 +170,7 @@ public final class NetMessageCodec {
     public record DecodedSnapshot(String characterId, long tick, Vector3 position, Vector3 velocity,
             Vector3 aimTarget, boolean combat, int stanceOrdinal, int activeSlotIndex,
             int movementTypeOrdinal, float yaw, float currentHealth, int senderTimeMs, int fireSeq,
-            int activeMagazine, int reloadSeq, int fireStep, boolean handsDown, boolean airborne) { }
+            int activeMagazine, int reloadSeq, int fireStep, boolean handsDown, boolean airborne, boolean flashlight) { }
 
     /** One tick's worth of every replicated character's state, sent as a single broadcast frame. */
     public static PackedByteArray encodeSnapshotBatch(int msgType, java.util.List<DecodedSnapshot> entries) {
@@ -170,7 +181,7 @@ public final class NetMessageCodec {
             putSnapshotEntry(buf, e.characterId(), e.tick(), e.position(), e.velocity(), e.aimTarget(),
                     e.combat(), e.stanceOrdinal(), e.activeSlotIndex(), e.movementTypeOrdinal(),
                     e.yaw(), e.currentHealth(), e.senderTimeMs(), e.fireSeq(), e.activeMagazine(), e.reloadSeq(),
-                    e.fireStep(), e.handsDown(), e.airborne());
+                    e.fireStep(), e.handsDown(), e.airborne(), e.flashlight());
         }
         return buf.getDataArray();
     }
@@ -186,13 +197,13 @@ public final class NetMessageCodec {
     private static void putSnapshotEntry(StreamPeerBuffer buf, String characterId, long tick, Vector3 position,
             Vector3 velocity, Vector3 aimTarget, boolean combat, int stanceOrdinal, int activeSlotIndex,
             int movementTypeOrdinal, float yaw, float currentHealth, int senderTimeMs, int fireSeq,
-            int activeMagazine, int reloadSeq, int fireStep, boolean handsDown, boolean airborne) {
+            int activeMagazine, int reloadSeq, int fireStep, boolean handsDown, boolean airborne, boolean flashlight) {
         buf.putUtf8String(characterId);
         buf.put64(tick);
         putVector3(buf, position);
         putVector3(buf, velocity);
         putVector3(buf, aimTarget);
-        buf.put16(packSnapshotFlags(combat, stanceOrdinal, activeSlotIndex, movementTypeOrdinal, fireStep, handsDown, airborne));
+        buf.put16(packSnapshotFlags(combat, stanceOrdinal, activeSlotIndex, movementTypeOrdinal, fireStep, handsDown, airborne, flashlight));
         buf.putFloat(yaw);
         buf.putFloat(currentHealth);
         buf.put32(senderTimeMs);
@@ -225,7 +236,7 @@ public final class NetMessageCodec {
         int reloadSeq = buf.getU8();
         return new DecodedSnapshot(characterId, tick, position, velocity, aimTarget, combat, stanceOrdinal,
                 activeSlotIndex, movementTypeOrdinal, yaw, currentHealth, senderTimeMs, fireSeq, activeMagazine,
-                reloadSeq, fireStep, unpackHandsDown(flags), unpackAirborne(flags));
+                reloadSeq, fireStep, unpackHandsDown(flags), unpackAirborne(flags), unpackFlashlight(flags));
     }
 
     // ── MSG_IDENTIFY ──────────────────────────────────────────────────────────

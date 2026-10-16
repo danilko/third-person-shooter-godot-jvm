@@ -83,6 +83,8 @@ public class UserCommand {
     public StanceName desiredStance;
     public int        desiredWeapon;
     public boolean    wantHolster;
+    /** The flashlight key was pressed this tick (a toggle: character.Flashlight, PLAN.md 3.2). */
+    public boolean    flashlight;
 
     // ── Aim ───────────────────────────────────────────────────────────────────
     /**
@@ -138,6 +140,7 @@ public class UserCommand {
         desiredStance     = null;
         desiredWeapon     = -1;
         wantHolster       = false;
+        flashlight        = false;
         aimTargetPosition = null;
         tick              = 0;
         motor = 0f;
@@ -173,6 +176,7 @@ public class UserCommand {
         c.desiredStance   = desiredStance;
         c.desiredWeapon   = desiredWeapon;
         c.wantHolster     = wantHolster;
+        c.flashlight      = flashlight;
         c.aimTargetPosition = aimTargetPosition != null
                 ? new Vector3(aimTargetPosition.getX(),
                               aimTargetPosition.getY(),

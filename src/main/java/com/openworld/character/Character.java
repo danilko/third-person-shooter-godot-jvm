@@ -921,6 +921,8 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         // this tick cannot — it is off in a driver's seat, and a car's camera is not this body's.
         if (debugSwim) updateSwimDebug(sw, waterDepth, swimming);
 
+        if (input.flashlight) toggleFlashlight();
+
         // ── Weapon switch / holster ────────────────────────────────────────
         // HOLSTER (user, 2026-09-27; controls 2026-10-06): a body walks with its hands empty until it chooses to
         // fight. The HOLSTER key (H, `wantHolster`) toggles it: a weapon in hand is put away (remembered), and with
@@ -1572,6 +1574,44 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
 
     /** A puppet's floor state, written from the owner's snapshot (a puppet never runs move_and_slide). */
     public boolean replicatedAirborne = false;
+
+    // ── The flashlight (PLAN.md 3.2): character.Flashlight draws it; this is the state ──
+
+    /** Is this body's flashlight on: the owner's toggle, or the owner's word (snapshot bit 14) on a puppet. */
+    public boolean flashlightOn = false;
+
+    /** The owner's key: on only if their profile owns one ({@link Flashlight#owned}) -- without one the key does
+     *  nothing (no HUD line: the minimal-HUD rule) --; off always works. */
+    public void toggleFlashlight() {
+        if (!flashlightOn && !Flashlight.owned(this)) return;
+        setFlashlight(!flashlightOn);
+    }
+
+    /** Set the state (the owner's toggle, a puppet's snapshot, a probe); the light node is made on first use. */
+    public void setFlashlight(boolean on) {
+        if (on == flashlightOn) return;
+        flashlightOn = on;
+        if (on) Flashlight.ensure(this);
+    }
+
+    @Register public boolean flashlightOnNow() { return flashlightOn; }
+    @Register public void setFlashlightNow(boolean on) { setFlashlight(on); }
+    @Register public void toggleFlashlightNow() { toggleFlashlight(); }
+
+    /** Own a flashlight: the unlock in this player's profile (a shop sale, the console's `give flashlight`, a probe). */
+    @Register public boolean giveFlashlightNow() {
+        com.openworld.game.profile.PlayerProfile p = com.openworld.game.profile.Profiles.of(this);
+        if (p == null) return false;
+        if (p.unlocks.add(Flashlight.UNLOCK)) p.touch();
+        return true;
+    }
+
+    /** Probe surface: give the flashlight back (a probe starts from a profile that does not own one). */
+    @Register public void forgetFlashlightNow() {
+        com.openworld.game.profile.PlayerProfile p = com.openworld.game.profile.Profiles.of(this);
+        if (p != null && p.unlocks.remove(Flashlight.UNLOCK)) p.touch();
+        setFlashlight(false);
+    }
 
     /**
      * Is this body off the floor: its own floor test where this peer simulates it, the owner's word (the

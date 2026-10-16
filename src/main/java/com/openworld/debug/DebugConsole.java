@@ -246,6 +246,7 @@ public class DebugConsole extends CanvasLayer {
                 print("markers                                level-design markers loaded now, by kind");
                 print("ledger [flag <id> [value]|dead <id>]   the world's ledger: show / set a world flag / mark dead");
                 print("give <id>                              put a weapon in your hands (the pickup path)");
+                print("give flashlight                        own a flashlight (T toggles it)");
                 print("drop <id>|all                          lay pickups in a row in front of you");
                 print("ammo                                   refill every weapon you carry");
                 print("spawn [<vehicle id>]                   park a vehicle 4 m ahead, facing your way; no id = list them");
@@ -559,6 +560,11 @@ public class DebugConsole extends CanvasLayer {
     }
 
     private void give(String[] a) {
+        if (a.length >= 2 && a[1].equalsIgnoreCase("flashlight")) {     // a gadget, not a weapon (PLAN.md 3.2)
+            Player p = localPlayer();
+            print(p != null && p.giveFlashlightNow() ? "you own a flashlight (T toggles it)" : "no player");
+            return;
+        }
         String id = weaponId(a);
         Player p = id == null ? null : spawnPlayer();
         if (p == null || p.weaponController == null) return;

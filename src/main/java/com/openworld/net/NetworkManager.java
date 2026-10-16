@@ -541,7 +541,7 @@ public class NetworkManager extends Node {
                     c.getGlobalPosition(), c.getVelocity(), c.getAimTargetPosition(), c.isCombat(),
                     c.getStanceOrdinal(), wc.getReplicatedActiveSlot(), c.getMovementTypeOrdinal(), c.getFacingYaw(),
                     health.getCurrentHealth(), nowMs(), wc.getFireSeq(), wc.getActiveMagazine(), wc.getReloadSeq(),
-                    wc.getReplicatedFireStep(), wc.isHolstered(), c.isAirborneNow()));
+                    wc.getReplicatedFireStep(), wc.isHolstered(), c.isAirborneNow(), c.flashlightOn));
         }
         broadcastSnapshotBatchChunked(entries);
         broadcastVehicleSnapshots();
@@ -1064,7 +1064,8 @@ public class NetworkManager extends Node {
             snap = new NetMessageCodec.DecodedSnapshot(snap.characterId(), snap.tick(), pos, snap.velocity(),
                     snap.aimTarget(), snap.combat(), snap.stanceOrdinal(), snap.activeSlotIndex(),
                     snap.movementTypeOrdinal(), snap.yaw(), snap.currentHealth(), snap.senderTimeMs(), snap.fireSeq(),
-                    snap.activeMagazine(), snap.reloadSeq(), snap.fireStep(), snap.handsDown(), snap.airborne());
+                    snap.activeMagazine(), snap.reloadSeq(), snap.fireStep(), snap.handsDown(), snap.airborne(),
+                    snap.flashlight());
         }
         return snap;
     }
@@ -2954,7 +2955,7 @@ public class NetworkManager extends Node {
                 body.getCurrentTick(), body.getGlobalPosition(), body.getVelocity(), body.getAimTargetPosition(),
                 body.isCombat(), body.getStanceOrdinal(), wc.getReplicatedActiveSlot(), body.getMovementTypeOrdinal(),
                 body.getFacingYaw(), health.getCurrentHealth(), nowMs(), wc.getFireSeq(), wc.getActiveMagazine(),
-                wc.getReloadSeq(), wc.getReplicatedFireStep(), wc.isHolstered(), body.isAirborneNow()));
+                wc.getReloadSeq(), wc.getReplicatedFireStep(), wc.isHolstered(), body.isAirborneNow(), body.flashlightOn));
     }
 
     /**

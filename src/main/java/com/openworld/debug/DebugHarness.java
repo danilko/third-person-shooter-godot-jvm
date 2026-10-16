@@ -647,10 +647,11 @@ public class DebugHarness extends Node {
             else if (arg.startsWith("--bike-test=")) { bikeTest = arg.substring("--bike-test=".length()); }
             else if (arg.startsWith("--bike-id=")) { bikeId = arg.substring("--bike-id=".length()); }
             else if ("--bike-test-control".equals(arg)) { bikeControl = true; }
+            else if ("--flash-test".equals(arg)) { flashTest = true; }
             else if ("--car-trace".equals(arg)) { com.openworld.net.VehicleNetworkController.TRACE = true; }
         }
         setPhysicsProcess(autoWalk || dumpCollisionDelay > 0.0 || spawnRoutesDelay > 0.0 || netDelay > 0.0 || holdAction != null
-                || coopTest || carTest != null || lightTest || bikeTest != null);
+                || coopTest || carTest != null || lightTest || bikeTest != null || flashTest);
         if (autoWalk) GD.print("DebugHarness: auto-walk enabled — touring every zone marker in zoneId order"
                 + (autoWalkStartFilter != null ? ", starting at first match of '" + autoWalkStartFilter + "'" : ""));
     }
@@ -1273,6 +1274,60 @@ public class DebugHarness extends Node {
         }
     }
 
+    /**
+     * {@code -- --flash-test} (tools/net/run_net_flashlight.sh, PLAN.md 3.2): the flashlight on two peers. Once both
+     * players are in, each peer gives its own player a flashlight; the HOST switches its on at 4 s and off at 12 s, the
+     * GUEST at 6 s and 14 s. Every peer prints each player's light every 0.25 s ("[flash] ..."): the state, the mount
+     * this peer drew it on, and whether the beam shows -- the script checks a puppet follows its owner (snapshot bit 14).
+     */
+    private boolean flashTest = false;
+    private double flashT = 0.0, flashReadyAt = -1, flashNextPrint = 0;
+    private int flashStep = 0;
+    private com.openworld.weapon.WeaponItem flashGun;
+
+    private void flashTestTick(double delta) {
+        flashT += delta;
+        NetworkManager net = getNodeOrNull("/root/NetworkManager") instanceof NetworkManager n ? n : null;
+        if (net == null || !net.isNetworked()) return;
+        boolean client = !net.isServer();
+        Player me = localPlayer();
+        if (me != null && me.getNodeOrNull("Health") instanceof com.openworld.character.Health h) h.invulnerable = true;
+        if (me == null || PlayerRegistry.getPlayers().size() < 2) return;
+        if (flashReadyAt < 0) { flashReadyAt = flashT; me.giveFlashlightNow(); }
+        double t = flashT - flashReadyAt;
+        // the host carries a rifle (the gun mount, drawn on the guest from the weapon it sees); the guest stays
+        // empty-handed (the body mount). A pickup the host spawns replicates; a client's would not.
+        if (!client && flashStep == 0 && flashGun == null && t >= 1.0) {
+            flashGun = com.openworld.weapon.WeaponCatalog.instantiate("ASR1");
+            if (flashGun != null) {
+                getTree().getCurrentScene().addChild(flashGun);
+                flashGun.setGlobalPosition(me.getGlobalPosition());
+                me.weaponController.requestEquip(flashGun);
+            }
+        }
+        if (!client && flashGun != null && t >= 2.5 && t < 3.0 && me.weaponController != null) {
+            for (int i = 1; i < me.weaponController.slotCount(); i++)
+                if (me.weaponController.getWeaponItem(i) == flashGun && me.weaponController.getWeapon() != i) {
+                    me.weaponController.setHolstered(false);
+                    me.setWeapon(i);
+                }
+        }
+        double on = client ? 6.0 : 4.0, off = client ? 14.0 : 12.0;
+        if (flashStep == 0 && t >= on) { flashStep = 1; me.toggleFlashlight(); GD.print("[flash] " + (client ? "guest" : "host") + " on"); }
+        if (flashStep == 1 && t >= off) { flashStep = 2; me.toggleFlashlight(); GD.print("[flash] " + (client ? "guest" : "host") + " off"); }
+        if (flashT < flashNextPrint) return;
+        flashNextPrint = flashT + 0.25;
+        StringBuilder sb = new StringBuilder("[flash] role=" + (client ? "guest" : "host") + " t=" + String.format(java.util.Locale.ROOT, "%.2f", t));
+        for (Player p : PlayerRegistry.getPlayers()) {
+            if (!GD.isInstanceValid(p) || p.getCharacterInfo() == null) continue;
+            com.openworld.character.Flashlight f = p.getNodeOrNull(com.openworld.character.Flashlight.NODE) instanceof com.openworld.character.Flashlight x ? x : null;
+            sb.append(" ").append(p.getCharacterInfo().ownerPeerId == 1 ? "hostp" : "guestp").append("=")
+                    .append(p.flashlightOn ? 1 : 0).append(",").append(f != null ? f.mountNow() : "off").append(",")
+                    .append(f != null && f.beamVisibleNow() ? 1 : 0).append(",").append(f != null && f.beamShadowNow() ? 1 : 0);
+        }
+        GD.print(sb.toString());
+    }
+
     private Vector3 coopGlideTo;
     private double coopArrivedAt = -1, coopNextAsk, coopSeatedAt = 1e9;
     private int coopAsks;
@@ -1307,6 +1362,7 @@ public class DebugHarness extends Node {
         if (crowdDump) crowdDumpTick(delta);
         if (lightTest) lightTestTick(delta);
         if (bikeTest != null) bikeTestTick(delta);
+        if (flashTest) flashTestTick(delta);
         if (holdAction != null) {
             holdDelay -= delta;
             if (holdDelay <= 0.0) godot.api.Input.actionPress(new StringName(holdAction));

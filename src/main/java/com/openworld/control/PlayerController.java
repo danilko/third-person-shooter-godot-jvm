@@ -393,6 +393,7 @@ public class PlayerController extends Controller {
         cmd.detonate = inp.isActionJustPressed("detonate", false);
         cmd.drop    = inp.isActionJustPressed("drop", false);
         cmd.wantHolster = inp.isActionJustPressed("holster", false);
+        cmd.flashlight  = inp.isActionJustPressed("flashlight", false);
         cmd.jump    = inp.isActionJustPressed("jump", false);
         cmd.useLadder = inp.isActionJustPressed("interact", false);
         cmd.interact  = cmd.useLadder;

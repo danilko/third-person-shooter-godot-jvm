@@ -47,6 +47,8 @@ PAD = {
     "sprint": [("button", LS)],          # the NOS / booster while driving
     "vehicle_fire": [("button", RB)], "rear_view": [("button", RS)],
     "horn": [("button", DOWN)],          # D-pad down: crawl on foot, the horn in a car (PLAN.md F11)
+    "flashlight": [],                    # PLAN.md 3.2: no pad button yet (the D-pad and face buttons are full) -- the
+                                         # pad page's "Flashlight" row binds one; the default is the user's to pick
     # menus: Godot 4.7's built-in ui_accept / ui_cancel carry NO pad event (ui_up..ui_right already carry the D-pad
     # and the left stick), so a pad could not press a focused button or back out of a menu
     "ui_accept": [("button", A)], "ui_cancel": [("button", B)],
@@ -60,6 +62,7 @@ KEYS = {
     "reverse": [("key", 83)],             # S
     "vehicle_fire": [("mouse", 1)],       # left mouse
     "horn": [("key", 72)],                # H: holster on foot, the horn in a car (PLAN.md F11)
+    "flashlight": [("key", 84)],          # T (PLAN.md 3.2; F, CS 1.6's key, is use_carrier here; T is Tarkov's tactical device)
     "pause": [("key", 4194305)],          # Escape
     "look_left": [], "look_right": [], "look_up": [], "look_down": [],
     # overriding a built-in ui_* action replaces its defaults, so they are restated (by keycode, as Godot has them)

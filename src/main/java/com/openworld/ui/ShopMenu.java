@@ -120,6 +120,12 @@ public class ShopMenu extends Control {
                 icons.add(null);
                 continue;
             }
+            if (com.openworld.item.Gadgets.isGadget(id)) {
+                ids.add(id);
+                names.add(com.openworld.item.Gadgets.name(id));
+                icons.add(GD.load(ICONS + "gadget_" + id + ".png") instanceof Texture2D gt ? gt : null);
+                continue;
+            }
             if (ShopCounter.isSupply(id)) {
                 ids.add(id);
                 names.add(com.openworld.item.SupplyCatalog.find(id).name());
@@ -237,6 +243,9 @@ public class ShopMenu extends Control {
                 boolean shortOf = com.openworld.game.profile.Profiles.balanceOf(buyer) < fee;
                 has = fee == 0 || shortOf;
                 tag = fee == 0 ? "NOTHING OWED" : (shortOf ? "SHORT " : "") + "$" + fee;
+            } else if (com.openworld.item.Gadgets.isGadget(ids.get(i))) {
+                has = ShopCounter.owns(buyer, ids.get(i));
+                tag = has ? "OWNED" : priceTag(ShopCounter.priceFor(buyer, ids.get(i)));
             } else if (ShopCounter.isSupply(ids.get(i))) {
                 int n = buyer.supplyCountNow(ids.get(i));
                 int max = com.openworld.item.SupplyCatalog.find(ids.get(i)).max();
