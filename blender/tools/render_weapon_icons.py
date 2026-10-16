@@ -25,7 +25,7 @@ Fist has neither and gets no icon.
 """
 import bpy, json, math, os, sys
 import numpy as np
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CATALOG = os.path.join(ROOT, "src/main/resources/com/openworld/weapon/weapon_catalog.json")
@@ -60,10 +60,26 @@ def weapon_objects(wid):
     return [bpy.context.object], True
 
 
+def icon_roll(wid):
+    """A weapon row's `icon_roll_deg` (weapon_models.json): roll about its length before the side view. For a model
+    whose broad face lies flat in the held pose, so the plain side view is its edge (MEW4's spade blade: 14 px)."""
+    for r in json.load(open(MODELS)).get("weapons", []):
+        if r.get("id") == wid:
+            return float(r.get("icon_roll_deg", 0.0))
+    return 0.0
+
+
 def render_icon(wid, spec):
     objs, placeholder = weapon_objects(wid)
     if not objs:
         return None
+    roll = icon_roll(wid)
+    if roll:
+        turn = Matrix.Rotation(math.radians(roll), 4, 'Y')     # Blender +Y = the weapon's forward
+        for o in objs:
+            if o.parent not in objs:
+                o.matrix_world = turn @ o.matrix_world
+        bpy.context.view_layer.update()
     W, H, pad = spec["width"], spec["height"], spec["padding"]
     scn = bpy.context.scene
     for o in scn.objects:

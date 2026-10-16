@@ -2,7 +2,7 @@
 
 Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 
-- Combat / Weapon System
+- Combat / Weapon System (incl. "The melee pack's other five are items", PLAN.md 3.2 H4)
 - Glass breaks like a car's: shops, stations, mission and gang buildings, trains (PLAN.md 1g g, 2026-10-07)
 - Platform ladders, CS 1.6 style (user 2026-10-07)
 
@@ -659,6 +659,44 @@ throwable is a scene, not a class. Each is an ordinary `ThrowableItem` weapon (`
   control) and whites out the local screen; the smoke cloud grows to 4.5+ m and blocks a line through it but not
   one 8 m beside; two charges stick, stay armed 5 s, and go off together on `detonate`, hurting an AI next to them.
   `run_net_launch_test.sh` 22/22 after the wire change. **Not gated:** a flash/smoke/charge across two processes.
+
+### The melee pack's other five are items: crowbar, spade, dagger, katana, machete (PLAN.md 3.2 H4, 2026-10-16)
+
+MEW3-7 had models since 2026-09-18 (`import_melee_pack.py`) but only an `equipment` row in `weapon_models.json`.
+Each is now a weapon like BAT1 was made (see enforcement.md "A baton at one star"): a `weapons` row (moved out of
+`equipment`), `<id>.tscn` + `stats/<id>.tres`, a catalog row, an icon, a swing sound, a price. **No Java**: the class
+picks the damage kind and the input, the scene's two `MeleeAttackStep`s pick everything else, and every clip is
+one the library already has (no new animation).
+
+| id | what | class (kind) | step 0 -> step 1 (damage, reach) | holster | price |
+|---|---|---|---|---|---|
+| MEW3 | crowbar, 0.61 m | `AxeItem` (HEAVY: dents a car) | swing_mw2 45 / 1.9 m -> chop_mw2 75 / 2.1 m, chain | short | $120 |
+| MEW4 | spade, 1.18 m | `AxeItem` (HEAVY) | swing_mw2 50 / 2.4 m -> chop_mw2 90 / 2.7 m, chain, slow | long | $80 |
+| MEW5 | dagger, 0.23 m | `KnifeItem` (BLADE) | tap stab_mw1 35 / 1.4 m, hold slash_mw1 85 / 1.8 m | short | $150 |
+| MEW6 | katana, 1.08 m | `KnifeItem` (BLADE) | tap slash_mw1 70 / 2.3 m, hold chop_mw2 140 / 2.6 m | long | $1000 |
+| MEW7 | machete, 0.52 m | `KnifeItem` (BLADE) | tap slash_mw1 55 / 1.9 m, hold chop_mw2 110 / 2.2 m | short | $250 |
+
+- **Why KnifeItem for the katana and the machete**: a blade has to be `BLADE` (deadly to a person, nothing to a
+  car's panels), and only `KnifeItem` says so; its tap / hold is also the right input for a long blade (GTA V / CS:GO).
+  The slash_mw1 / chop_mw2 clips are retargeted SWORD clips (`Sword_Regular_A`, `Sword_Attack`), so they fit a sword
+  better than the knife they were made for.
+- **Held one-handed in `SocketMelee`** like every melee weapon, the spade and the katana included. A two-handed grip
+  (a `melee_2h` archetype with a support hand on a `SupportPoint`, the rifles' IK) is the upgrade, not done.
+- The collider is each model's measured AABB (at least 8 cm thick), the pickup box 0.5 x 0.5 x (length + 0.1).
+- **Icons**: `render_weapon_icons.py` draws the side view, which is the spade blade's EDGE (14 px tall). A weapon row
+  may now carry `icon_roll_deg` (MEW4: 90) to roll the model about its length before the side view.
+- **Sounds** (`build_weapon_sfx.py` RECIPES, NOT heard): crowbar = `Seax Swing` at 0.85 pitch, spade = `Spear Swing`
+  at 0.8, dagger = `Dagger Swing` take 1, katana = `Katana Swing`, machete = `Sabre Swing`; all at the swing level.
+- **Not on any counter yet** (see "who sells what" in PLAN.md 3.2): a weapon is only bought where a placed building's
+  baked counter lists it, and the counters are the S18 rebuild's buildings stage. **Gate `tools/check_weapon_stock.py`**
+  (every catalog weapon sold by a counter of a building that is PLACED on the island; `--control` drops the konbini
+  counters) FAILS today on 11 ids: PIB1 FLA1 SMO1 REC1 BAT1 MEW2-7.
+- Gates: `probe_melee.gd` section 8b (every catalog melee weapon other than MEW1 / MEW2: its step-0 clip plays, step
+  1's plays on the chain or the hold, both swings land, swing 2 / swing 1 = the scene's step 1 / step 0 damage) PASS;
+  `probe_weapon_audio`, `probe_weapon_scale`, `_sockets`, `_archetypes`, `_world_body`, `_holster`, `_fit`,
+  `WeaponCatalogTest` PASS. MY PICKS (unreviewed): every number in the table, the classes, the sounds. Not done: a
+  light-tier (VAT crowd) weapon mesh for them (`light_weapons.json`; only needed once a loadout carries one), the
+  review sheet (`render_weapon_icons.py` with no ids re-renders every icon), a two-peer swing.
 
 ### Damage kinds: the target decides how hard a bullet or a blast hits it (2026-09-18)
 

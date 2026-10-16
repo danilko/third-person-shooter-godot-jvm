@@ -15,7 +15,7 @@ Format: `.ogg` for anything longer than ~1 s or looping, `.wav` for short one-sh
 |---|---|---|
 | `weapons/<ID>_fire.wav` | PIS1, PIS2, DUP1, REV1, SMG1, ASR1, ASR2, SHG1, SNR1 | Still North Media, *The Free Firearm Sound Effects Library*, **Prepared** edition (NEAR take of a real gun per weapon), CC0 |
 | `weapons/<ID>_reload.wav` | the same nine | the same library, **Raw** edition: mag out / in, slide, bolt, pump, cylinder takes, laid out over each weapon's reload time, CC0 |
-| `weapons/<ID>_swing.wav` | MEW1, MEW2, BAT1, Fist (`fire_audio`, played on every swing) | Still North Media, *Medieval Weapons Sound Effects Library* (Weapon Textures), CC0 |
+| `weapons/<ID>_swing.wav` | MEW1-MEW7, BAT1, Fist (`fire_audio`, played on every swing) | Still North Media, *Medieval Weapons Sound Effects Library* (Weapon Textures), CC0 |
 | `hit_marker.wav` | `Sound.HIT_MARKER` (HitMarker) | Kenney *Interface Sounds* `tick_002`, CC0 |
 | `Rifle_*.wav`, `Pistol_*.wav` | **unused since 2026-10-08** (every weapon has its own sounds now) | Johnny Rouddro, Godot TPS (Asset Library #716), MIT |
 

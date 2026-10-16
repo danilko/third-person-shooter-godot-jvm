@@ -77,6 +77,12 @@ RECIPES = {
     "MEW2": {"swing": (f"{MED}/Axe Swing.wav", 0.8, 1.0, 1.0, 0)},
     "BAT1": {"swing": (f"{MED}/Spear Swing.wav", 0.55, 0.0, 1.0, 0)},   # 0.7 ran into a second swing in the take
     "Fist": {"swing": (f"{MED}/Dagger Swing.wav", 0.4, -4.0, 1.12, 1)},
+    # PLAN.md 3.2 H4 (2026-10-16): the melee pack's other five. Picked by name and waveform, NOT heard.
+    "MEW3": {"swing": (f"{MED}/Seax Swing.wav", 0.6, 0.0, 0.85, 0)},    # crowbar: a short heavy bar, pitched down
+    "MEW4": {"swing": (f"{MED}/Spear Swing.wav", 0.8, 1.0, 0.8, 0)},    # spade: long and slow
+    "MEW5": {"swing": (f"{MED}/Dagger Swing.wav", 0.45, 0.0, 1.08, 1)}, # dagger: MEW1's take, another swing in it
+    "MEW6": {"swing": (f"{MED}/Katana Swing.wav", 0.6, 0.0, 1.0, 0)},
+    "MEW7": {"swing": (f"{MED}/Sabre Swing.wav", 0.55, 0.0, 1.0, 0)},
 }
 UI = {"hit_marker": ("kenney_cc0/interface-sounds/Audio/tick_002.ogg", 0.08, -6.0)}   # (file, length, peak dBFS)
 

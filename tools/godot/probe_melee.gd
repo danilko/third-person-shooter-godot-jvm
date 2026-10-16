@@ -28,6 +28,9 @@ extends SceneTree
 ##   fps        -- first person resolves from the same chest, so the same target is hit.
 ##   axe        -- "light first, big second": 120 / 60.
 ##   knife      -- tap stabs, hold slashes: 100 / 40.
+##   catalog    -- every OTHER melee weapon in weapon_catalog.json (BAT1, MEW3-7, PLAN.md 3.2 H4): equipped, its
+##                 own two clips play, both swings land, and the second is its scene's step 1 over step 0 (a knife
+##                 class taps then holds, any other class swings twice inside the chain).
 
 const PLAYER := "res://src/main/resources/com/openworld/character/Player.tscn"
 const AI     := "res://src/main/resources/com/openworld/character/AICharacter.tscn"
@@ -35,6 +38,7 @@ const IMPACT := "res://src/main/java/com/openworld/world/manager/ImpactManager.j
 const MEW1    := "res://src/main/resources/com/openworld/weapon/MEW1.tscn"
 const MEW2    := "res://src/main/resources/com/openworld/weapon/MEW2.tscn"
 const FIST   := "res://src/main/resources/com/openworld/weapon/Fist.tscn"
+const CATALOG := "res://src/main/resources/com/openworld/weapon/weapon_catalog.json"
 const MELEE_SLOT := 4
 const COMBO_RESET_FRAMES := 60     # > comboResetSeconds (0.6 s) at 60 Hz
 
@@ -163,6 +167,15 @@ func _equip_melee(scene: String) -> Node3D:
 	await _tick(60)                                 # holster -> draw
 	return item
 
+## Every melee scene in weapon_catalog.json (archetype "melee"), in catalog order.
+func _catalog_melee() -> Array:
+	var out := []
+	var cat = JSON.parse_string(FileAccess.get_file_as_string(CATALOG))
+	for r in cat["weapons"]:
+		if r["archetype"] == "melee":
+			out.append(r["scene"])
+	return out
+
 func _initialize() -> void:
 	world = Node3D.new()
 	root.add_child(world)
@@ -199,7 +212,7 @@ func _initialize() -> void:
 	var inputs := {}
 	for i in range(clip_node.get_input_count()):
 		inputs[clip_node.get_input_name(i)] = true
-	for scene in [FIST, MEW1, MEW2]:
+	for scene in [FIST] + _catalog_melee():
 		var w: Node = (load(scene) as PackedScene).instantiate()
 		for s in w.get("attack_steps"):
 			var a: String = s.get("animation")
@@ -353,6 +366,45 @@ func _initialize() -> void:
 	_check("axe: light clip, then heavy clip",
 		a1["states"].has("attack_swing_mw2") and a2["states"].has("attack_chop_mw2"),
 		"%s | %s" % [str(a1["states"]), str(a2["states"])])
+
+	# ── 8b. every other melee weapon in the catalog ────────────────────────────────────────────
+	print("")
+	print("=== 8b. every other catalog melee weapon -- equipped, both swings land, step 1 / step 0 ===")
+	await _clear([axe_t])
+	for scene in _catalog_melee():
+		if scene == MEW1 or scene == MEW2:
+			continue                                    # sections 7 and 8
+		var item := await _swap_melee(scene)
+		var id: String = scene.get_file().get_basename()
+		var steps: Array = item.get("attack_steps")
+		var is_knife: bool = String(item.get_script().resource_path).ends_with("KnifeItem.java")
+		var want: float = float(steps[1].get("damage")) / float(steps[0].get("damage"))
+		var ct := _target(Vector3(0, 0, -1.2))
+		await _tick(COMBO_RESET_FRAMES)
+		# A tap: step 0 for every class. Watched 40 frames, not more: the chain's step 1 must be pressed within
+		# comboResetSeconds (0.6 s) of the swing's END, and BAT1's whole swing is only 0.44 s.
+		var sw := await _press(2, 40)
+		if is_knife:
+			await _tick(COMBO_RESET_FRAMES)
+			var sw2k := await _press(40, 70)             # hold 0.67 s > chargeThreshold 0.5 s: the heavy step
+			sw["states2"] = sw2k["states"]
+		else:
+			await _tick(4)                              # inside comboResetSeconds: the chain's step 1
+			var sw2 := await _press(2, 70)
+			sw["states2"] = sw2["states"]
+		var cth: Array = _hits(ct)
+		var clip0: String = steps[0].get("animation")
+		var clip1: String = steps[1].get("animation")
+		_check("%s: equipped (its own step-0 clip plays)" % id, sw["states"].has(clip0),
+			"swing 1 clips %s, want %s" % [str(sw["states"]), clip0])
+		_check("%s: step 1's clip plays on the %s" % [id, "hold" if is_knife else "chain"], sw["states2"].has(clip1),
+			"swing 2 clips %s, want %s" % [str(sw["states2"]), clip1])
+		_check("%s: both swings land" % id, cth.size() == 2, "%d hits %s" % [cth.size(), str(cth)])
+		if cth.size() == 2:
+			_check("%s: swing 2 / swing 1 = step 1 / step 0" % id, absf(cth[1] / cth[0] - want) < 0.05,
+				"%.2f (want %.2f)" % [cth[1] / cth[0], want])
+		await _clear([ct])
+	await _swap_melee(MEW2)                             # sections 9 / 10 expect the axe's chain
 
 	# ── 9. an AI swings too ────────────────────────────────────────────────────────────────────
 	#

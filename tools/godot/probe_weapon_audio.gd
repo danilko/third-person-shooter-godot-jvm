@@ -6,7 +6,7 @@ extends SceneTree
 
 const DIR := "res://src/main/resources/com/openworld/weapon/"
 const FIREARMS := ["PIS1", "PIS2", "DUP1", "REV1", "SMG1", "ASR1", "ASR2", "SHG1", "SNR1"]
-const MELEE := ["MEW1", "MEW2", "BAT1", "Fist"]
+const MELEE := ["MEW1", "MEW2", "MEW3", "MEW4", "MEW5", "MEW6", "MEW7", "BAT1", "Fist"]
 
 var fails := 0
 var checks := 0
