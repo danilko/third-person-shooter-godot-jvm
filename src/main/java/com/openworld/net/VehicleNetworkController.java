@@ -68,6 +68,7 @@ public class VehicleNetworkController extends Controller {
     private boolean lastHandbrake  = false;
     private boolean lastBrake      = false;
     private boolean lastSlipping   = false;
+    private boolean lastHorn       = false;
     private int     lastFlatMask   = 0;
 
     // Discrete-state forward gate (same shape as NetworkController.latestDiscreteTimeMs).
@@ -89,6 +90,7 @@ public class VehicleNetworkController extends Controller {
     public boolean getLastHandbrake()  { return lastHandbrake; }
     public boolean getLastBrake()      { return lastBrake; }
     public boolean getLastSlipping()   { return lastSlipping; }
+    public boolean getLastHorn()       { return lastHorn; }
     public int     getLastFlatMask()   { return lastFlatMask; }
     public int     getLastFireSeq()    { return lastFireSeq; }
 
@@ -136,6 +138,7 @@ public class VehicleNetworkController extends Controller {
         lastHandbrake  = snap.handbrake();
         lastBrake      = snap.brake();
         lastSlipping   = snap.slipping();
+        lastHorn       = snap.horn();
         lastFlatMask   = snap.flatMask();
 
         if (!(getParent() instanceof Vehicle vehicle)) return;

@@ -350,6 +350,7 @@ public class EnforcementDispatch extends Node {
         unitDirector.assignTokens(players, demand, police);
         vehicleDirector.tickCars(players, demand, police, hunters);
         vehicleDirector.tickHelis(players, demand);
+        tickLight(demand, police, hunters);
 
         spawnIn -= TICK;
         if (spawnIn <= 0) {
@@ -364,6 +365,55 @@ public class EnforcementDispatch extends Node {
         }
         reportLoad();
     }
+
+    // ── the LIGHT reserve (PLAN.md 2.3 follow-up: the dispatch as a user of ai.light) ──
+
+    /** One light unit the dispatch sent: the tier's id, its side and player, the station it was drawn from. */
+    record LightUnit(int id, String side, String playerId, ForcePools.Station origin) { }
+    final List<LightUnit> lightUnits = new ArrayList<>();
+    /** Off = the control: no light reserve, the cap's refusals are simply not sent (as before). */
+    @godot.annotation.Visible public boolean lightReserve = true;
+    int lightSent, lightLost, lightReleased;
+
+    /** Each tick: a light unit (or the full body promoted from it) that died is lost to its station; one whose player
+     *  no longer calls for it -- the stars gone, or no light row at the stars now and the cap has room again -- is
+     *  taken back and returned. */
+    private void tickLight(Map<String, Map<String, Integer>> demand, DispatchRules police, DispatchRules hunters) {
+        if (lightUnits.isEmpty()) return;
+        com.openworld.ai.light.LightCombatants tier = com.openworld.ai.light.LightCombatants.get();
+        boolean room = bodyRoom() > 0;
+        Iterator<LightUnit> it = lightUnits.iterator();
+        while (it.hasNext()) {
+            LightUnit lu = it.next();
+            int st = tier != null ? tier.statusOf(lu.id()) : 0;
+            if (st == 0) { settle(lu.origin(), false); lightLost++; it.remove(); continue; }
+            Map<String, Integer> d = demand.get(lu.playerId());
+            int stars = d != null ? d.getOrDefault(lu.side(), 0) : 0;
+            DispatchRules r = POLICE.equals(lu.side()) ? police : hunters;
+            boolean wanted = stars > 0 && r != null && (r.lightFor(stars) > 0 || !room);
+            if (wanted && r != null) {
+                // left far behind (the player drove off): taken back, as a foot unit past despawn_far is
+                Player p = null;
+                for (Player q : PlayerRegistry.getPlayers())
+                    if (GD.isInstanceValid(q) && q.getCharacterInfo() != null && lu.playerId().equals(q.getCharacterInfo().characterId)) p = q;
+                Vector3 at = tier.positionOf(lu.id());
+                if (p != null && at != null && DispatchWorld.flat(at, p.getGlobalPosition()) > r.despawnFar) wanted = false;
+            }
+            if (wanted && lightReserve) continue;
+            tier.release(lu.id());
+            settle(lu.origin(), true);
+            lightReleased++;
+            it.remove();
+        }
+    }
+
+    /** "light units alive,sent,lost,released" (probe readout). */
+    @Register
+    public String lightReserveNow() { return lightUnits.size() + "," + lightSent + "," + lightLost + "," + lightReleased; }
+
+    /** Probe control: the light reserve on / off. */
+    @Register
+    public void setLightReserveNow(boolean on) { lightReserve = on; }
 
     // ── out of ammo, and attack tokens (PLAN.md 1g b2/b3) ─────────────────────
 

@@ -643,10 +643,11 @@ public class DebugHarness extends Node {
             else if (arg.startsWith("--car-peers=")) { carPeers = Integer.parseInt(arg.substring("--car-peers=".length())); }
             else if ("--car-test-control".equals(arg)) { com.openworld.carrier.vehicle.Vehicle.pushRemoteCars = false; }
             else if ("--crowd-dump".equals(arg)) { crowdDump = true; }
+            else if ("--light-test".equals(arg)) { lightTest = true; }
             else if ("--car-trace".equals(arg)) { com.openworld.net.VehicleNetworkController.TRACE = true; }
         }
         setPhysicsProcess(autoWalk || dumpCollisionDelay > 0.0 || spawnRoutesDelay > 0.0 || netDelay > 0.0 || holdAction != null
-                || coopTest || carTest != null);
+                || coopTest || carTest != null || lightTest);
         if (autoWalk) GD.print("DebugHarness: auto-walk enabled — touring every zone marker in zoneId order"
                 + (autoWalkStartFilter != null ? ", starting at first match of '" + autoWalkStartFilter + "'" : ""));
     }
@@ -698,6 +699,68 @@ public class DebugHarness extends Node {
         for (com.openworld.world.PedCrowd c : crowds)
             GD.print("[crowd] bucket=" + b + " clock=" + String.format(java.util.Locale.ROOT, "%.3f", clock)
                     + " zone=" + c.zoneIdNow() + " peds=" + c.dumpNow());
+    }
+
+    /**
+     * {@code -- --light-test} (tools/net/run_net_light.sh, PLAN.md 2.3 follow-up): MSG_LIGHT_BATCH on two peers. Every
+     * player is made invulnerable; at 25 s the HOST spawns a horde of 24 light hunters round its player; from 28 s to
+     * 88 s each peer prints its light tier once a second with the wall clock ("[light] unix_ms=... dump=..."), and the
+     * script pairs the two peers' dumps by time and compares them body by body.
+     */
+    private boolean lightTest = false;
+    private double lightT = 0.0;
+    private long lightSec = 0L;
+    private com.openworld.carrier.vehicle.Vehicle hornCar;
+    private int hornStep = 0;
+    private double hornNext = 8.0;
+    private boolean lightSpawned = false;
+
+    private void lightTestTick(double delta) {
+        lightT += delta;
+        Player me = localPlayer();
+        if (me != null && me.getNodeOrNull("Health") instanceof com.openworld.character.Health h) h.invulnerable = true;
+        boolean host = getNodeOrNull("/root/NetworkManager") instanceof NetworkManager net && net.isNetworked() && net.isServer();
+        // the horn's snapshot bit (PLAN.md F11): the host gets into a car at 10 s and holds the horn from 12 s to 18 s,
+        // gets out at 20 s; every peer prints whether it hears a horn from 8 s to 24 s
+        if (host && me != null && hornCar == null && lightT >= 10.0) {
+            godot.api.PackedScene ps = (godot.api.PackedScene) GD.load("res://src/main/resources/com/openworld/vehicle/SPC1.tscn");
+            hornCar = (com.openworld.carrier.vehicle.Vehicle) ps.instantiate();
+            getTree().getCurrentScene().addChild(hornCar);
+            hornCar.setGlobalPosition(me.getGlobalPosition().plus(new Vector3(4, 1, 0)));
+        }
+        if (host && hornCar != null && GD.isInstanceValid(hornCar)) {
+            if (lightT >= 11.0 && hornStep == 0) { hornStep = 1; hornCar.tryEnter(me); }
+            if (lightT >= 12.0 && hornStep == 1) { hornStep = 2; godot.api.Input.INSTANCE.actionPress("horn"); GD.print("[horn] host holds"); }
+            if (lightT >= 18.0 && hornStep == 2) { hornStep = 3; godot.api.Input.INSTANCE.actionRelease("horn"); GD.print("[horn] host released"); }
+            if (lightT >= 20.0 && hornStep == 3) { hornStep = 4; hornCar.tryExit(); }
+        }
+        if (lightT >= 8.0 && lightT <= 24.0 && lightT >= hornNext) {
+            hornNext = Math.floor(lightT) + 1.0;
+            boolean heard = false;
+            for (Node n : getTree().getNodesInGroup(new StringName("characters")))
+                if (n instanceof com.openworld.carrier.vehicle.Vehicle v && v.hornSoundingNow()) heard = true;
+            GD.print("[horn] role=" + (host ? "host" : "client") + " t=" + (int) lightT + " heard=" + heard);
+        }
+        if (host && !lightSpawned && lightT >= 25.0 && me != null) {
+            lightSpawned = true;
+            int n = com.openworld.ai.light.LightCombatants.ensure(this).hordeNow(me.getGlobalPosition(), 24, 30.0,
+                    "gang_a", "gang_member", false);
+            GD.print("[light] host spawned " + n);
+        }
+        // on each wall-clock second (both peers run on this machine: the same instant to a frame)
+        long sec = System.currentTimeMillis() / 1000L;
+        if (lightT < 28.0 || lightT > 88.0 || sec == lightSec) return;
+        lightSec = sec;
+        com.openworld.ai.light.LightCombatants tier = com.openworld.ai.light.LightCombatants.get();
+        int bodies = 0;
+        for (Node n : getTree().getNodesInGroup(new StringName("characters"))) {
+            if (n instanceof com.openworld.character.Character c && c.characterInfo != null
+                    && c.characterInfo.characterId.startsWith("light:") && c.isAlive()) bodies++;
+        }
+        GD.print("[light] role=" + (host ? "host" : "client") + " unix_ms=" + System.currentTimeMillis()
+                + " full=" + bodies + " sent=" + (tier != null ? tier.batchesSent : 0)
+                + " applied=" + (tier != null ? tier.batchesApplied : 0)
+                + " dump=" + (tier != null ? tier.dumpNow() : ""));
     }
 
     private static void collectCrowds(Node n, java.util.List<com.openworld.world.PedCrowd> out) {
@@ -1136,6 +1199,7 @@ public class DebugHarness extends Node {
         if (coopTest) coopTick(delta);
         if (carTest != null) carTestTick(delta);
         if (crowdDump) crowdDumpTick(delta);
+        if (lightTest) lightTestTick(delta);
         if (holdAction != null) {
             holdDelay -= delta;
             if (holdDelay <= 0.0) godot.api.Input.actionPress(new StringName(holdAction));

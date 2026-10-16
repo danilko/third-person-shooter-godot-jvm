@@ -553,6 +553,32 @@ public class LightCombatants extends Node3D {
         return n;
     }
 
+    /** One member's state: 0 = gone or dead, 1 = alive in the tier, 2 = a full body alive in its place. */
+    public int statusOf(int id) {
+        Extra e = extras.get(id);
+        if (e == null) return 0;
+        if (e.full != null && GD.isInstanceValid(e.full) && !e.full.isDead()) return 2;
+        return e.a.alive() ? 1 : 0;
+    }
+
+    /** Where one member stands (its full body's position when promoted), or null. */
+    public Vector3 positionOf(int id) {
+        Extra e = extras.get(id);
+        if (e == null) return null;
+        if (e.full != null && GD.isInstanceValid(e.full)) return e.full.getGlobalPosition();
+        return new Vector3(e.a.x, e.a.y, e.a.z);
+    }
+
+    /** Take one member away (light, or the full body standing in for it). */
+    public void release(int id) {
+        Extra e = extras.get(id);
+        if (e == null) return;
+        if (e.full != null && GD.isInstanceValid(e.full) && !e.full.isDead()) despawn(e.full);
+        e.full = null;
+        sim.lost(e.a);
+        sweep();
+    }
+
     /** Take away everything an owner placed: its light members and the full bodies standing in for them. */
     public void releaseOwnedBy(String owner) {
         for (Extra e : extras.values()) {
@@ -597,13 +623,15 @@ public class LightCombatants extends Node3D {
         return made;
     }
 
-    /** Probe: "id;state;x;y;z;hp;promoted" per light combatant, '|'-joined. */
+    /** Probe: "id;state;x;y;z;hp;promoted" per light combatant, '|'-joined. The id is the tier's key -- on a client the
+     *  HOST's id (its own LightSim numbers the agents locally), so two peers' dumps compare body by body. */
     @Register
     public String dumpNow() {
         StringBuilder sb = new StringBuilder();
-        for (Extra e : extras.values()) {
+        for (Map.Entry<Integer, Extra> m : extras.entrySet()) {
+            Extra e = m.getValue();
             if (sb.length() > 0) sb.append('|');
-            sb.append(e.a.id).append(';').append(e.a.state).append(';').append(String.format("%.2f;%.2f;%.2f;%.0f", e.a.x, e.a.y, e.a.z, e.a.hp))
+            sb.append(m.getKey()).append(';').append(e.a.state).append(';').append(String.format("%.2f;%.2f;%.2f;%.0f", e.a.x, e.a.y, e.a.z, e.a.hp))
                     .append(';').append(e.full != null ? 1 : 0);
         }
         return sb.toString();

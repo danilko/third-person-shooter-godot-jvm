@@ -24,6 +24,9 @@ public class Airplane extends Vehicle {
     protected boolean requiresWheels() { return false; }
 
     @Override
+    protected boolean brakesWhenUnattended() { return false; }   // the brake is the elevator (pitch down)
+
+    @Override
     protected boolean applyLocomotion(VehicleConfig cfg, double delta) {
         updateBoost(cfg, delta);
 

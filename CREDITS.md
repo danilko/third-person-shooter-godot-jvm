@@ -99,6 +99,8 @@ There is a per-folder copy of this list in `assets/terrain3d/textures/asset_lice
 | Police siren | `assets/audio/siren_police.wav` (same script, from the HQ preview) | MultiMax2121, [Police siren.mp3](https://freesound.org/s/156869/) (Freesound) | CC0 |
 | Fire engine siren | `assets/audio/siren_fire.wav` (same script, from the HQ preview) | TRP, [230222 Siren, distant to very close approach stops, firetruck engine, R-07 near TPM Toronto](https://freesound.org/s/717906/) (Freesound) | CC0 |
 | Engine start and idle | `assets/audio/engine/start.wav`, `idle.wav` (built by `tools/audio/build_engine.py` from the HQ preview) | vacuumfan7072, [toyota camry startup better](https://freesound.org/s/322552/) (Freesound) | CC0 |
+| Car horn | `assets/audio/vehicle/horn.wav` (built by `tools/audio/build_vehicle_sfx.py` from the HQ preview) | misperpodcast, [Beeping car horn from inside car, engine off](https://freesound.org/s/733553/) (Freesound) | CC0 |
+| Tyre squeal | `assets/audio/vehicle/skid.wav` (same script) | audible-edge, [Chrysler LHS tire squeal 02](https://freesound.org/s/71737/) (Freesound) | CC0 |
 | Engine running (low / mid / high) | `assets/audio/engine/low.wav`, `mid.wav`, `high.wav` (same; one dyno pull re-timed to three steady loops) | dezoris, [DynoJet Scion FR-S](https://freesound.org/s/183654/) (Freesound) | CC0 |
 | Melee contact on hard surfaces | `assets/audio/sfx/melee_hit_hard_*.wav` | Still North Media, [Medieval sound effects (weapon on weapon)](https://opengameart.org/content/medieval-sound-effects-weapon-textures) | CC0 |
 | Aldrich font | `assets/ui/Aldrich-Regular.ttf` | Matthew Desmond (MADType) | SIL Open Font License 1.1 |

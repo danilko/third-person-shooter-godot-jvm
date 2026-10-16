@@ -28,6 +28,13 @@ public enum Sound {
     ENGINE_MID("engine/mid"),
     ENGINE_HIGH("engine/high"),
 
+    // the rest of a car (carrier.vehicle.CarSounds; PLAN.md F11): the horn held and the tyres squealing are LOOPS
+    // (tools/audio/build_vehicle_sfx.py), the crashes one-shots by how hard (build_sfx.py). 3D, on the car.
+    CAR_HORN("vehicle/horn"),
+    CAR_SKID("vehicle/skid"),
+    CAR_CRASH_LIGHT("sfx/car_crash_light", 4),
+    CAR_CRASH_HEAVY("sfx/car_crash_heavy", 4),
+
     // a bullet meeting a surface (ImpactManager, by SurfaceType)
     IMPACT_FLESH("sfx/impact_flesh", 5),
     IMPACT_METAL("sfx/impact_metal", 5),

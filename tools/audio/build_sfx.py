@@ -58,6 +58,13 @@ SPECS = {
     # explosions: a crunch over a sub-bass boom
     "sfx/explosion": (-9, 2.0, 1.0, [[(f"{SCI}/explosionCrunch_00{i}.ogg", 0.0, 0),
                                       (f"{SCI}/lowFrequency_explosion_00{i % 2}.ogg", 0.0, 2)] for i in range(4)]),
+    # a car hitting something hard (Vehicle.feedCrash -> VehicleDamageModel's scored crash; PLAN.md F11): metal
+    # bodywork over a plate thump; the heavy one adds the sci-fi crunch under it for the crumple
+    "sfx/car_crash_light": (-18, 0.7, 1.0, [[(f"{IMP}/impactMetal_medium_00{i}.ogg", 0.0, 0),
+                                              (f"{IMP}/impactPlate_medium_00{i}.ogg", 0.0, -4)] for i in range(4)]),
+    "sfx/car_crash_heavy": (-12, 1.4, 0.9, [[(f"{IMP}/impactMetal_heavy_00{i}.ogg", 0.0, 0),
+                                              (f"{IMP}/impactPlate_heavy_00{i}.ogg", 0.0, -3),
+                                              (f"{SCI}/explosionCrunch_00{i}.ogg", 0.02, -9)] for i in range(4)]),
     # doors
     # water (world.Splash). Freesound HQ PREVIEWS (CC0, checked on each sound's page 2026-10-08) -- placeholders until
     # the originals are downloaded (needs a login); swap the path, the rows stay.

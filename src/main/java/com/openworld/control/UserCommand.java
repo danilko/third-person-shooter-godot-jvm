@@ -114,6 +114,8 @@ public class UserCommand {
     public boolean resetVehicle;
     /** NOS/booster held (vehicle only) — sprint action while driving. */
     public boolean boost;
+    /** The horn is held (vehicle context; PLAN.md F11). */
+    public boolean horn;
     /** Descend held (an aircraft's collective down -- the crouch key, Ctrl): Shift is the booster, so a helicopter
      *  that descended on {@code brake} (also Shift) could never boost without dropping (user 2026-10-07). */
     public boolean descend;
@@ -146,6 +148,7 @@ public class UserCommand {
         enterExit         = false;
         resetVehicle      = false;
         boost             = false;
+        horn              = false;
     }
 
     /** Shallow copy (defensive snapshot for buffering/debugging). */
@@ -181,6 +184,7 @@ public class UserCommand {
         c.steerToTarget   = steerToTarget;
         c.handbrake       = handbrake;
         c.brake           = brake;
+        c.horn            = horn;
         c.enterExit       = enterExit;
         c.resetVehicle    = resetVehicle;
         c.boost           = boost;

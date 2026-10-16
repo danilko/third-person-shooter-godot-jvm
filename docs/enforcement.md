@@ -16,6 +16,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - AI ammo, finite drops, the shared explosive cooldown, the lull on attrition (PLAN.md P1e step 1, 2026-10-15)
 - Engagement v2, steps 2-7: the dispatch split, one body cap, co-op incidents, forces per station, restricted areas,
   per-target hostility, the call-in, activity hooks, AI-vs-AI incidents, radio items (PLAN.md P1e, 2026-10-15)
+- Light units at high stars (PLAN.md 2.3 follow-up, 2026-10-16)
 
 ---
 
@@ -570,4 +571,10 @@ first (a leftover officer or crowd body nearer than the probe's civilian WAS the
 anybody else calls it in), and every non-player body is freed before the respawn case (respawned beside case 4's
 dead, the player took a gang radio again -- standing over a dead member is how a radio is taken). Two-process: `tools/net/run_net_debugworld.sh` coop checks a radio line about the
 client's player reaches it and one about somebody else does not.
+
+## Light units at high stars (PLAN.md 2.3 follow-up, 2026-10-16)
+
+The dispatch sends LIGHT combatants (ai.light) round the player at high stars (`light_by_stars` in the `dispatch` /
+`hunters` blocks) and every foot unit the global body cap refuses; drawn from and returned to the station pools. The
+whole write-up and its gate are in docs/game-systems.md, "The follow-ups (2026-10-16)".
 

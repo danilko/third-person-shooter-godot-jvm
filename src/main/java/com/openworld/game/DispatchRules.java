@@ -30,6 +30,10 @@ public final class DispatchRules {
     public List<List<String>> vehiclesByStars = new ArrayList<>();
     /** Snipers placed at range (SNR1, on a clear line, never closing in), and helicopters, by stars. */
     public int[] snipersByStars = {0}, helisByStars = {0};
+    /** LIGHT combatants (ai.light) sent round the player at this many stars, beyond the full complement (PLAN.md 2.3
+     *  follow-up: 5-star police and gang wars want 20-80 hostiles near the player, the body cap allows far fewer). Every
+     *  foot unit the global body cap refuses is sent light as well. */
+    public int[] lightByStars = {0};
     /** From this many stars a car on a call RAMS the player instead of stopping to unload (0 = never). */
     public int ramAt = 0;
     /** Armoured vehicles that fire a main gun (catalog model ids) and how: seconds between shells, range (m). */
@@ -61,6 +65,7 @@ public final class DispatchRules {
         r.vehiclesByStars = m.stringLists("vehicles_by_stars");
         if (m.has("snipers_by_stars")) r.snipersByStars = intsOr(m, "snipers_by_stars");
         if (m.has("helis_by_stars")) r.helisByStars = intsOr(m, "helis_by_stars");
+        if (m.has("light_by_stars")) r.lightByStars = intsOr(m, "light_by_stars");
         r.ramAt = m.integer("ram_at", 0);
         if (m.has("tokens_by_stars")) r.tokensByStars = intsOr(m, "tokens_by_stars");
         if (m.has("regroup_seconds_by_stars")) r.regroupByStars = intsOr(m, "regroup_seconds_by_stars");
@@ -163,6 +168,7 @@ public final class DispatchRules {
     public double supplyReach = 60.0;
 
     public int tokensFor(int stars) { return at(tokensByStars, stars); }
+    public int lightFor(int stars) { return at(lightByStars, stars); }
 
     public int regroupFor(int stars) { return at(regroupByStars, stars); }
 

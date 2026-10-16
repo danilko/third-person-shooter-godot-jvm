@@ -52,6 +52,10 @@ waveform; listen in game and change the row. Gate: `tools/godot/probe_sfx.gd`.
 | `engine/low` | `ENGINE_LOW` | the engine at ~2 850 rpm (firing 95 Hz), LOOPING, pitched 0.65-1.6 by engine speed and cross-faded with its neighbours | Freesound dezoris 183654 (CC0; HQ preview): one dyno pull, re-timed to a steady pitch by `tools/audio/build_engine.py` |
 | `engine/mid` | `ENGINE_MID` | ~4 500 rpm (150 Hz), as above | same pull |
 | `engine/high` | `ENGINE_HIGH` | ~6 600 rpm (220 Hz), as above | same pull |
+| `vehicle/horn` | `CAR_HORN` | the horn held (H / D-pad down in a car; carrier.vehicle.CarSounds), 3D, LOOPING (`smpl`): 0.145 s of a 407 Hz beep, stopped on release. Replicated (snapshot flag bit 7); heard within 120 m | Freesound misperpodcast 733553, a 2008 Fiat Panda (CC0; HQ preview, cut by `tools/audio/build_vehicle_sfx.py`) |
+| `vehicle/skid` | `CAR_SKID` | tyres squealing while they slide (sideways, a locked brake, the handbrake at speed), 3D, LOOPING (`smpl`), level and pitch by how hard; within 60 m, at most 4 cars | Freesound audible-edge 71737, a Chrysler LHS (CC0; HQ preview, same script) |
+| `sfx/car_crash_light` | `CAR_CRASH_LIGHT` | a car's scored crash of 2.5-8 m/s (VehicleDamageModel), louder with the speed; within 80 m | Kenney `impactMetal_medium` + `impactPlate_medium` layered |
+| `sfx/car_crash_heavy` | `CAR_CRASH_HEAVY` | a crash of 8 m/s and more | Kenney `impactMetal_heavy` + `impactPlate_heavy` + Sci-fi `explosionCrunch`, layered, pitched 0.9 |
 | `sfx/impact_flesh` | `IMPACT_FLESH` | a bullet into a body (ImpactManager, by SurfaceType) | Kenney `impactPunch_medium` |
 | `sfx/impact_metal` | `IMPACT_METAL` | a bullet into metal (vehicles, machinery) | Kenney `impactMetal_light` |
 | `sfx/impact_stone` | `IMPACT_STONE` | a bullet into stone / concrete / anything untagged | Kenney `impactPlate_light` |
@@ -90,8 +94,8 @@ Weapons
 
 Vehicles
 - Engine loops PER CLASS (kei, truck, motorcycle, boat, plane): today every wheeled vehicle has the one car engine (`engine/*`); gear change, turbo, exhaust pops
-- Crash impact (thud / crunch, by impact strength), scrape along a wall, tyre skid, tyre burst
-- Horn, door open / close, boost (NOS), gear change, siren (POC1, MPC1, AMB1, FIE1, LAT1)
+- Scrape along a wall, tyre burst; a crash a REMOTE peer simulates is silent here (crash sounds play where the car is simulated)
+- Door open / close, boost (NOS), gear change
 - Wreck burning loop and vehicle explosion; street pole / bollard knocked down
 
 Characters

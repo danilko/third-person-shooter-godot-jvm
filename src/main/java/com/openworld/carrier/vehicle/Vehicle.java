@@ -461,6 +461,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     @Override
     public void _exitTree() {
         engineAudio.release();
+        carSounds.release();
         SpatialEntityGrid grid = SpatialEntityGrid.get();
         if (grid != null) grid.unregister(this);
     }
@@ -490,6 +491,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         cmd.handbrake = false;
         cmd.brake     = false;
         cmd.boost     = false;
+        cmd.horn      = false;
         cmd.descend   = false;
         cmd.fire      = false;
         cmd.reload    = false;
@@ -512,6 +514,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             cmd.handbrake = currentCmd.handbrake;
             cmd.brake     = currentCmd.brake;
             cmd.boost     = currentCmd.boost;
+            cmd.horn      = currentCmd.horn && occupant != null;
             cmd.descend   = currentCmd.descend;
             cmd.fire      = currentCmd.fire;
             cmd.reload    = currentCmd.reload;
@@ -529,6 +532,24 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             cmd.boost = false;
             cmd.fire = false;
             cmd.brake = getLinearVelocity().length() > DEFEATED_BRAKE_UNTIL;
+        }
+
+        // NOBODY AT THE WHEEL (PLAN.md 2c.1): the driver got out, was dragged out, or a unit left its car -- and no
+        // brain drives it. GTA's rule: it brakes to rest instead of coasting on, after a short roll when the driver
+        // BAILED at speed (bailRoll, set in tryExit). Released at parkSpeedThreshold so it parks and sleeps, and so a
+        // nudge to a parked car (slower than that) never wakes it into a braking state.
+        autoBraking = false;
+        if (brakesWhenLeft && brakesWhenUnattended() && !hasDefeatedDriver() && isUnattended()) {
+            if (bailRoll > 0.0) {
+                bailRoll -= delta;
+            } else {
+                cmd.motor = 0;
+                cmd.boost = false;
+                cmd.brake = getLinearVelocity().length() > getConfig().parkSpeedThreshold;
+                autoBraking = cmd.brake;
+            }
+        } else if (!isUnattended()) {
+            bailRoll = 0.0;
         }
 
         if (cmd.handbrake) {
@@ -641,6 +662,10 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
                 else          vehicleWeaponController.onWeaponNotFire();
             }
         }
+        // what this car hands the next solver step, after every set above (a spawn's speed, the cap): capPersonShove
+        preStepLinear = getLinearVelocity();
+        preStepAngular = getAngularVelocity();
+        hasStepVelocity = true;
     }
 
     // ── The cockpit view sits at THIS driver's eye ─────────────────────────────
@@ -751,6 +776,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             }
         }
         expireShoves(delta);
+        expirePushOuts(delta);
         if (!knockPeople || delta <= 0.0 || !isLocallySimulated() || isFreezeEnabled() || parked) return;
         VehicleConfig cfg = getConfig();
         if (cfg == null || cfg.vehicleCollisionMinSpeed <= 0) return;
@@ -935,6 +961,32 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     /** A driverless car brakes until it is this slow, then lets go so it can park and sleep (m/s). */
     private static final double DEFEATED_BRAKE_UNTIL = 0.3;
 
+    /** A driver who gets out at or above this speed BAILS: the car rolls on for {@link #BAIL_ROLL_SECONDS} first (m/s). */
+    private static final double BAIL_ROLL_MIN_SPEED = 8.0;
+    /** How long a bailed car rolls before it brakes (GTA: the car carries on a moment after you jump). */
+    private static final double BAIL_ROLL_SECONDS = 1.0;
+    private double bailRoll = 0.0;
+    /** This tick's brake is the driverless one (not a pedal): the V4 hold still treats the car as idle. */
+    private boolean autoBraking = false;
+
+    /** Off = an empty car coasts on as it shipped (probe_car_stop --control). */
+    @Export public boolean brakesWhenLeft = true;
+    public boolean isBrakesWhenLeft() { return brakesWhenLeft; }
+    public void setBrakesWhenLeft(boolean v) { brakesWhenLeft = v; }
+
+    /**
+     * Nobody in the driver's seat and nothing else driving: no controller, or only the replication one (a co-op car a
+     * client got out of is simulated by the host under its VehicleNetworkController). A brain (traffic, dispatch) or a
+     * probe's scripted hands drive an empty seat on purpose and are left alone.
+     */
+    private boolean isUnattended() {
+        boolean driver = occupant != null && GD.isInstanceValid(occupant);
+        return !driver && (controller == null || controller instanceof VehicleNetworkController);
+    }
+
+    /** False for a carrier whose brake is not a brake (an aeroplane's is the elevator). */
+    protected boolean brakesWhenUnattended() { return true; }
+
     /**
      * The driver died in the seat. The body STAYS in the seat, slumped (GTA's model; a frozen pose, no simulation:
      * {@code CharacterRagdoll.enableSeatedDeath}), and the car BRAKES to a stop in a short slide
@@ -1022,6 +1074,10 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             applyCentralForce(getLinearVelocity().times(-cfg.aeroDragCoefficient * speed));
         }
         if (isGrounded) {
+            applyEngineBraking(cfg, delta);
+            applySideScrub(cfg, delta);
+        }
+        if (isGrounded) {
             applyFlatTirePull(cfg, speed);
             applyMomentumAlignment(cfg, delta);
             // Drift rotation (NFS-Carbon style): while the handbrake is held, steering
@@ -1035,6 +1091,37 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             }
         }
         return isGrounded;
+    }
+
+    /** {@code OW_ENGINE_BRAKE=0}: the whole-world control for 2c.1 (traffic probes have no per-car switch). */
+    private static final boolean ENGINE_BRAKE_OFF = "0".equals(System.getenv("OW_ENGINE_BRAKE"));
+
+    /**
+     * Off-throttle rolling resistance + engine braking (PLAN.md 2c.1): a constant deceleration along the car's own axis,
+     * against its rolling direction, never more than stops it this tick (so it cannot push it backwards).
+     */
+    private void applyEngineBraking(VehicleConfig cfg, double delta) {
+        if (ENGINE_BRAKE_OFF) return;
+        double decel = cfg.rollingResistance + cfg.engineBrakeDecel;
+        if (decel <= 0.0 || Math.abs(cmd.motor) >= 0.01f || cmd.brake || cmd.handbrake || delta <= 0.0) return;
+        Vector3 fwd = getGlobalBasis().getZ().times(-1);
+        double vf = fwd.dot(getLinearVelocity());
+        double dv = Math.min(decel * delta, Math.abs(vf));
+        if (dv < 1e-6) return;
+        applyCentralForce(fwd.times(-Math.signum(vf) * getMass() * dv / delta));
+    }
+
+    /** A slow car sliding SIDEWAYS stops (VehicleConfig.sideScrubDecel); never on the handbrake. */
+    private void applySideScrub(VehicleConfig cfg, double delta) {
+        if (ENGINE_BRAKE_OFF) return;
+        if (cfg.sideScrubDecel <= 0f || cmd.handbrake || delta <= 0.0) return;
+        Vector3 vel = getLinearVelocity();
+        if (Math.hypot(vel.getX(), vel.getZ()) >= cfg.sideScrubBelow) return;
+        Vector3 side = getGlobalBasis().getX();
+        double vs = side.dot(vel);
+        double dv = Math.min(cfg.sideScrubDecel * delta, Math.abs(vs));
+        if (dv < 1e-6) return;
+        applyCentralForce(side.times(-Math.signum(vs) * getMass() * dv / delta));
     }
 
     /**
@@ -1176,7 +1263,38 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         boolean local = false;
         for (Character c : seatOccupants) if (c instanceof Player p && p.isLocallyOwnedPlayer()) local = true;
         engineAudio.update(delta, engineRunningNow(), occupant instanceof Player, local, cmd.motor, getConfig().maxSpeed);
+        carSounds.update(delta, isHornOn(), local);
     }
+
+    // ── Horn, tyre squeal, crash (CarSounds; PLAN.md F11) ────────────────────────────────────────────────────
+
+    private final CarSounds carSounds = new CarSounds(this);
+
+    /** The horn is held: by the driver on this peer, or (a puppet) by the authority's snapshot. */
+    public boolean isHornOn() {
+        if (controller instanceof VehicleNetworkController vnc) return vnc.getLastHorn();
+        return cmd.horn;
+    }
+
+    /** The brake / handbrake as shown: this peer's pedal, or the authority's snapshot bits on a puppet. */
+    boolean brakeShownNow() {
+        return controller instanceof VehicleNetworkController vnc ? vnc.getLastBrake() : isBraking();
+    }
+    boolean handbrakeShownNow() {
+        return controller instanceof VehicleNetworkController vnc ? vnc.getLastHandbrake() : isHandbraking();
+    }
+    boolean slipShownNow() {
+        return controller instanceof VehicleNetworkController vnc ? vnc.getLastSlipping() : isSlipping();
+    }
+
+    /** VehicleDamageModel scored a crash of {@code dv} m/s at {@code at} (world). */
+    void crashSound(double dv, Vector3 at) { carSounds.crash(dv, at); }
+
+    /** Probes: is this car's horn sounding / its tyres squealing; crash sounds it has played. */
+    @Register public boolean hornSoundingNow() { return carSounds.hornPlaying(); }
+    @Register public boolean skidSoundingNow() { return carSounds.skidPlaying(); }
+    @Register public double skidLevelNow() { return carSounds.skidLevelNow(); }
+    @Register public int crashSoundsNow() { return carSounds.crashesNow(); }
 
     /** Is the engine running: a wheeled vehicle, not a wreck, with someone in it or a brain driving it. */
     @Register public boolean engineRunningNow() {
@@ -1777,6 +1895,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
 
         java.util.HashSet<Character> currentContacts = new java.util.HashSet<>();
         boolean touchedByBody = false;
+        Character touchPerson = null;        // a character (alive, ragdoll or corpse) in contact this step
 
         for (int i = 0; i < count; i++) {
             Object obj = state.getContactColliderObject(i);
@@ -1788,9 +1907,15 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
                 Node owner = n3d.getOwner();
                 if (owner instanceof Character c) character = c;
             }
-            if (character == null || character == occupant || !character.isAlive()) continue;
+            if (SHOVE_TRACE) shoveContacts.append(obj instanceof Node tn ? tn.getPath().getPath() + " owner "
+                    + (tn.getOwner() != null ? tn.getOwner().getName() : "-") : String.valueOf(obj)).append("; ");
+            if (character == null || isSeatedHere(character)) continue;
+            touchPerson = character;
+            if (character == occupant || !character.isAlive()) continue;
             currentContacts.add(character);
         }
+        capPersonShove(state, touchPerson, touchedByBody);
+        if (SHOVE_TRACE) shoveContacts.setLength(0);
 
         // A PERSON NEVER MOVES AN EMPTY CAR (PLAN.md V4). The park lock above holds a candidate below
         // parkSpeedThreshold; a body LANDING on the hull or jumping into its side gives it more than that in one
@@ -1799,7 +1924,8 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         // touched by a character and by no other rigid body this step -> what the touch gave it is taken back.
         // A car's ram, a blast and a slope it is rolling down are all faster or touch-free and are left alone.
         if (heldWhenEmpty && !currentContacts.isEmpty() && !touchedByBody && lastGrounded && !hasAnyOccupant()
-                && !isAiDriven() && isIdleInput() && state.getLinearVelocity().length() < HELD_EMPTY_MAX_SPEED) {
+                && !isAiDriven() && (isIdleInput() || autoBraking)
+                && state.getLinearVelocity().length() < HELD_EMPTY_MAX_SPEED) {
             state.setLinearVelocity(Vector3.Companion.getZERO());
             state.setAngularVelocity(Vector3.Companion.getZERO());
         }
@@ -1830,6 +1956,119 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         activeCollisions.clear();
         activeCollisions.addAll(currentContacts);
     }
+
+    /**
+     * A PERSON NEVER SHOVES A CAR (PLAN.md 2c.2), whatever the car is doing. A character is a kinematic capsule --
+     * infinite mass to the solver -- so wherever one is pressed into a hull (a body set down overlapping it: a
+     * respawn, a ragdoll or corpse released inside it, a stair / ladder snap, a sprint into a door) the car takes the
+     * whole overlap as speed (measured, probe_car_push --move=overlap --shove-control: an AI set down 0.15 m inside
+     * SPC1's nose threw it 4-8 m in 1-2 of 6 nose cases; the decisive step also has the FLOOR among its contacts,
+     * because the person tips the hull onto it). V4's hold above covers an EMPTY car at rest; this covers the rest
+     * (GTA: the ped is pushed, the car barely moves): a step with a person in contact that changed the car's velocity by more than
+     * {@link #PERSON_SHOVE_MAX_DV} sideways (or a spin) and no other rigid body touched it is taken back, the car stops colliding with that
+     * person, and they are moved out of the hull's nearest face until clear ({@link #expirePushOuts}). Clamping the
+     * speed alone, with the person left inside, was tried and was worse (139 m: the overlap stays and pushes again).
+     * A ram or a blast in the same step is left to the physics.
+     */
+    private void capPersonShove(PhysicsDirectBodyState3D state, Character who, boolean touchedByBody) {
+        if (!hasStepVelocity) return;
+        // Jolt calls _integrate_forces AFTER the step: the state holds what the step just did, and the change since
+        // _physicsProcess handed the car over is the step's (its own wheel, engine and gravity forces -- on the
+        // ground the springs cancel gravity -- plus every contact)
+        Vector3 v = state.getLinearVelocity();
+        Vector3 w = state.getAngularVelocity();
+        Vector3 dv = v.minus(preStepLinear);
+        Vector3 dw = w.minus(preStepAngular);
+        // sideways / along: a person's push (Jolt reports ~0 contact impulse for a kinematic overlap, so the change
+        // itself is the test); a landing or a kerb is mostly UP, and is the springs' business
+        double dvh = Math.hypot(dv.getX(), dv.getZ());
+        if (SHOVE_TRACE && (dv.length() > SHOVE_TRACE_DV || (who != null && dvh > PERSON_SHOVE_MAX_DV)))
+            GD.print("[shove] " + getName() + String.format(java.util.Locale.ROOT, " dv %.2f (flat %.2f) dw %.2f",
+                    dv.length(), dvh, dw.length()) + " by " + (who != null ? who.getName() : "-")
+                    + (touchedByBody ? " +body" : "") + " [" + traceStateNow() + "] " + shoveContacts
+                    + (capCharacterShove ? "" : " (cap off)"));
+        // a ram / another car in the same step: the physics is right, leave it
+        if (!capCharacterShove || who == null || touchedByBody) return;
+        if (dvh <= PERSON_SHOVE_MAX_DV && dw.length() <= PERSON_SHOVE_MAX_DW) return;
+        // A person pressed into the hull: the car keeps what it had (the step's own forces are a few cm/s), the
+        // person is moved out instead, and the car ignores them until they are clear (expirePushOuts)
+        state.setLinearVelocity(new Vector3(preStepLinear.getX(), v.getY(), preStepLinear.getZ()));
+        state.setAngularVelocity(preStepAngular);
+        pushOutQueue.add(who);
+    }
+
+    /** People found pressed into the hull this step (_integrateForces may not touch exceptions): handled next tick. */
+    private final java.util.List<Character> pushOutQueue = new ArrayList<>();
+    /** People the car is ignoring until they are out of its hull (seconds since they were last found inside). */
+    private final java.util.Map<Character, Double> pushingOut = new java.util.HashMap<>();
+    private int peoplePushedOut;
+    /** Probe readout: people found pressed into this car's hull and moved out of it. */
+    @Register public int peoplePushedOutNow() { return peoplePushedOut; }
+
+    /** Each tick: take in the queue, push everyone still inside the hull out of its nearest face, release the clear. */
+    private void expirePushOuts(double delta) {
+        if (pushOutQueue.isEmpty() && pushingOut.isEmpty()) return;
+        for (Character c : pushOutQueue) {
+            if (!GD.isInstanceValid(c) || pushingOut.containsKey(c)) continue;
+            pushingOut.put(c, 0.0);
+            addCollisionExceptionWith(c);
+            peoplePushedOut++;
+        }
+        pushOutQueue.clear();
+        if (hullHalfWidth < 0.0) measureHull();
+        Vector3 pos = getGlobalPosition();
+        Basis basis = getGlobalBasis();
+        Vector3 bx = basis.getColumn(0), bz = basis.getColumn(2);
+        java.util.Iterator<java.util.Map.Entry<Character, Double>> it = pushingOut.entrySet().iterator();
+        while (it.hasNext()) {
+            java.util.Map.Entry<Character, Double> e = it.next();
+            Character c = e.getKey();
+            if (!GD.isInstanceValid(c)) { it.remove(); continue; }
+            Vector3 d = c.getGlobalPosition().minus(pos);
+            double lx = d.dot(bx), lz = d.dot(bz);
+            double rx = Math.abs(lx) / (hullHalfWidth + PERSON_RADIUS), rz = Math.abs(lz) / (hullHalfLength + PERSON_RADIUS);
+            boolean inside = rx < 1.0 && rz < 1.0 && Math.abs(d.getY()) < 2.5;
+            double since = inside ? 0.0 : e.getValue() + delta;
+            if (since > PUSH_OUT_RELEASE) {
+                if (!passThrough.containsKey(c) && !shoving.containsKey(c)) removeCollisionExceptionWith(c);
+                it.remove();
+                continue;
+            }
+            e.setValue(since);
+            if (!inside || !c.isAlive()) continue;
+            // out through the face it is nearest (dead centre: one side, the same every tick)
+            Vector3 out = rx >= rz
+                    ? bx.times((float) (Math.abs(lx) > 0.05 ? Math.signum(lx) : ((c.getInstanceId() & 1L) == 0L ? 1.0 : -1.0)))
+                    : bz.times((float) Math.signum(lz));
+            com.openworld.movement.character.MovementController mc = c.movementControllerNow();
+            if (mc != null) mc.shove(new Vector3(out.getX(), 0.0, out.getZ()).normalized().times((float) SHOVE_SIDE_SPEED),
+                    SHOVE_HOLD);
+        }
+    }
+
+    /** Is {@code c} riding in one of this car's seats (its own occupants never shove it)? */
+    private boolean isSeatedHere(Character c) {
+        for (Character r : seatOccupants) if (r == c) return true;
+        return false;
+    }
+
+    private final StringBuilder shoveContacts = new StringBuilder();
+    private Vector3 preStepLinear = Vector3.Companion.getZERO();
+    private Vector3 preStepAngular = Vector3.Companion.getZERO();
+    private boolean hasStepVelocity = false;
+    /** One step's worth of the hardest thing a car does to itself (~1.5 g brakes, launch) with room: 0.6 m/s at 60 Hz. */
+    private static final double PERSON_SHOVE_MAX_DV = 0.6;
+    /** A pushed-out person is solid to the car again this long after they were last inside its hull (s). */
+    private static final double PUSH_OUT_RELEASE = 0.25;
+    private static final double PERSON_SHOVE_MAX_DW = 0.5;
+    private static final double SHOVE_TRACE_DV = 1.0;
+    /** {@code OW_SHOVE_TRACE=1}: one line per step a person-only contact changed a car's speed by > 1 m/s. */
+    static final boolean SHOVE_TRACE = System.getenv("OW_SHOVE_TRACE") != null;
+
+    /** Off = a person pressed into a car moves it as the solver says (probe_car_push --shove-control). */
+    @Export public boolean capCharacterShove = true;
+    public boolean isCapCharacterShove() { return capCharacterShove; }
+    public void setCapCharacterShove(boolean v) { capCharacterShove = v; }
 
     /** Off = an empty car a person lands on slides again (probe_car_push --park-control). */
     @Export public boolean heldWhenEmpty = true;
@@ -2627,6 +2866,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         Character c = occupant;
         occupant = null;
         seatOccupants[0] = null;
+        bailRoll = getLinearVelocity().length() >= BAIL_ROLL_MIN_SPEED ? BAIL_ROLL_SECONDS : 0.0;
         resetSeatPosture(0);
         setOccupantAimExceptions(c, false);
 

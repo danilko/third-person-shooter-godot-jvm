@@ -1273,7 +1273,7 @@ holdLeash, holdCrouch, patrolRoute, standsAtPost / postFacePoint) and gained own
   flake of probe_light_tier D) -- for 10 s, unhurt 20 s, every player beyond 40 m.
 - **Co-op.** The host sends `MSG_LIGHT_BATCH` (tag 37, channel 3 unreliable, 10 Hz, `LightBatch`: a look table and 11
   bytes a body); a client draws it eased toward the host's positions and draws nothing for a promoted one (its body
-  replicates). Not yet run on two peers.
+  replicates). Run on two peers 2026-10-16: see "The follow-ups" below.
 - **Users.** `Encounter.fullCap`: a wave's members past it are light, with the same orders, counted in `liveNow`,
   turned on the players by `engage`, taken away by `stop` / reset. Console: `horde [n] [faction] [loadout|-] [zombie]`,
   `horde clear`, `horde` (status). `game/density.json` `light_cap` / `light_full_budget` per World density level
@@ -1337,3 +1337,39 @@ fight draws in tip an already-full tick over.
 **Not done (the follow-ups):** a two-peer run of MSG_LIGHT_BATCH; the enforcement dispatch's 5-star overflow and the
 4.11 outbreak as users (phase 3 / 4); a flow field when one target is chased by many (the path budget measured fine at
 160); light bodies fire no cosmetic shots (deliberately: a tracer that cannot hurt reads as a miss).
+
+### The follow-ups (2026-10-16): two peers, the dispatch as a user, what a promotion costs
+
+- **Two peers** (`tools/net/run_net_light.sh`, DebugHarness `--light-test`): DebugWorld, host + client, both players
+  invulnerable, 24 hunters spawned by the host at 25 s; each peer prints its tier on every WALL-CLOCK second. PASS:
+  55 common seconds, 571 body-samples compared, 0 missing, 571 / 571 within 1.5 m (worst 0.76 m), 0 of 672 promoted
+  samples drawn light on the client, the client sees the `light:` full bodies in 55 / 55 seconds, no exception. Two
+  traps found on the way: `dumpNow` printed the client's LOCAL agent id (its own `LightSim` numbers agents) instead of
+  the host's id, the extras key -- fixed; and `--fixed-fps 60` lets each headless peer's game clock run faster than
+  the wall clock, so two peers' "28 s to 88 s" windows barely overlapped -- the script runs without it. The same run
+  checks the car horn's snapshot bit (docs/vehicles.md, PLAN.md 3.1).
+- **The dispatch as a user** (`EnforcementDispatch.lightUnits`, `UnitSpawner.spawnLight`, `tickLight`). Each side's
+  rules gain `light_by_stars` (crimes.json `dispatch` [0,0,0,0,6,16], gangs.json `hunters` [0,0,0,0,4,10]: UNREVIEWED
+  picks): light units sent round the player beyond the full complement, plus every foot unit the global body cap
+  refused that tick. Each is drawn from a station like a foot unit (`ed.draw`), wears its side's body, the tier's
+  uniform and a weapon from the stars' row, hunts the players with `pinnedTarget` = its player, owner `dispatch`; up to
+  4 a dispatch tick. A dead one (or the full body promoted from it) is LOST to its station; one no longer called for
+  (stars gone, or no light row at the stars now and the cap has room) or left beyond the side's `despawn_far` is taken
+  back and RETURNED. `lightReserve` off = the control. Gate `tools/godot/probe_dispatch_light.gd` (island): 5 stars
+  45 s -- 16 light at once, 7 promoted at once, dispatched full bodies never over the cap; stars cleared -- all 16 back
+  within 0.1 s; cap forced to 2 at 3 stars -- the refused foot units go light (4). Control: none sent. Seen in the run:
+  6 of 22 were lost with an invulnerable, unarmed player -- the 5-star main gun's shells (a blast damages every light
+  body in its radius, any faction) are the likely cause; not traced.
+- **The 4.11 outbreak** is the tier's other planned user; it is a phase-4 mission (PLAN.md 4.3) and was not built.
+- **What a promotion costs** (`tools/godot/bench_promote_cost.gd -- --n=40 [--off=<Class>|@<NodeName>,...]`,
+  DebugWorld headless, this PC; numbers within +-2 ms of noise from run to run). Building one body the way
+  `spawnPlacedAs` does: instantiate 0.7 ms, add to the tree (its `_ready` + the visuals) 2.4 ms, a weapon grant
+  0.4 ms -- ~3.5 ms, once a tick at most. Standing: 40 bodies add ~5.3 ms of physics and ~2-4 ms of process a frame
+  (~0.13 + ~0.08 ms a body). Switching parts off one at a time (the AnimationTree, the 7 IK modifiers, the nav agent,
+  the body's own tick, the camera rigs and their SpringArm3D, the nameplate, the weapon / animation controllers, the
+  physical-bone simulators) moved nothing beyond the noise; MovementController ~0.04 ms a body; all of the first four
+  together ~2 ms of the 5.3. So no single part dominates: the cost is spread over ~10 scripted nodes a body. A cheaper
+  promoted body is therefore a SLIMMER SCENE (a fighter without the player-only camera rigs, FPS rig and nameplate
+  viewport, fewer scripted nodes), not a switch -- and pooling bodies is out (`ZoneManager.recycleBodies`: re-attaching a
+  body subtree is a native use-after-free in godot-jvm). Not built.
+

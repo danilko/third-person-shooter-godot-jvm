@@ -94,6 +94,29 @@ public class VehicleConfig extends Resource {
     @Export public float zBrakeTraction   = 0.18f;
 
     /**
+     * OFF-THROTTLE deceleration (m/s^2) on top of the zTraction drag: rolling resistance plus engine braking (PLAN.md
+     * 2c.1). zTraction's force is proportional to speed below longFrictionSaturationSpeed, so on its own a lifted car
+     * kept a long low-speed tail (time constant ~5 s: tens of metres at walking pace); these two are CONSTANT, so it
+     * comes to rest. Applied only with no motor, no brake and no handbrake (a drift keeps its momentum), grounded.
+     * Both 0 = the car as it shipped (coasts).
+     */
+    @Export public float rollingResistance = 0.15f;
+
+    /** Engine braking (m/s^2) while the throttle is released: see {@link #rollingResistance}. */
+    @Export public float engineBrakeDecel = 0.6f;
+
+    /**
+     * Sideways scrub (m/s^2) below {@link #sideScrubBelow}: the grip curve falls to 0 at a pure sideways slide (the
+     * drift model), so a car nudged sideways at walking pace -- a person landing on it, a slow bump -- slid on for ever
+     * (measured: 0.53 m/s, constant, never parked; PLAN.md 2c.2). Tyres sliding sideways stop a slow car. Not on the
+     * handbrake (a burnout donut), so drifts are untouched. 0 = as shipped.
+     */
+    @Export public float sideScrubDecel = 4.0f;
+
+    /** Horizontal speed (m/s) under which {@link #sideScrubDecel} applies. */
+    @Export public float sideScrubBelow = 3.0f;
+
+    /**
      * Speed (m/s) at which the longitudinal friction force saturates. The zForce formula is
      * ∝ forwardSpeed — physically wrong at highway speed (rolling resistance is ~constant,
      * brakes deliver a fixed ~1.5 g, neither scales with v forever) and it is what capped

@@ -10,6 +10,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - Co-op: a car hits a car ANOTHER PEER simulates (2026-10-11, user)
 - Auto-drive to the GPS waypoint, a testing aid (2026-10-11, user)
 - Engine sound: three re-timed loops and an idle, and which cars get a voice (2026-10-12)
+- A car stops by itself; a person never shoves a car; horn, squeal and crash sounds (PLAN.md 3.1, 2026-10-16)
 
 ---
 
@@ -515,4 +516,56 @@ calls it, `_exitTree` releases it), `tools/audio/build_engine.py`, `assets/audio
 - **Not done:** one engine for every wheeled vehicle (kei, truck, bus and motorcycle sound like the FR-S); no gear
   change, tyre, crash or horn sounds; the starter is not gated by a probe; levels (`LEVEL_DB` -9, unit size 5) are
   unheard picks.
+
+## A car stops by itself; a person never shoves a car; horn, squeal and crash sounds (PLAN.md 3.1, 2026-10-16)
+
+PLAN.md phase 3.1 = P2c 2c.1 + 2c.2 + F11. Gates: `tools/godot/probe_car_stop.gd` (22, `--control` fails 20),
+`probe_car_push.gd -- --all` and `-- --all2c2 --move=sprint|jump|roof|overlap|ragdoll` (24 each),
+`probe_car_sounds.gd` (9, on SPC1 / KEC1 / LTK1 / TAX1; `OW_CAR_SOUNDS=0 ... -- --expect=off` is the control).
+
+- **2c.1, measured first** (`probe_car_stop --control`, a Player at the wheel through `Input`): the plan's "no
+  rolling resistance" was half right. `zTraction` (0.02 on 18 of 19 configs) IS a drag, but proportional to speed
+  below `longFrictionSaturationSpeed` (6 m/s), so a lifted car keeps a long low-speed tail: from 5 m/s it took 12 s
+  and 24 m to stop, from 25 m/s 28 s / 264 m; and an EXIT changed nothing (the same numbers). Now:
+  * `VehicleConfig.rollingResistance` 0.15 + `engineBrakeDecel` 0.6 m/s^2, a CONSTANT deceleration off-throttle (no
+    motor, brake or handbrake; grounded), never more than stops the car this tick. Lift from 5 / 10 / 25 / 45 m/s:
+    rest after 3.8 / 6.4 / 13.8 / 22.6 s, mean 1.4-2.0 m/s^2 (the table asserts >= 1.0 and <= 3.5).
+  * `Vehicle` brakes a car NOBODY DRIVES (`isUnattended`: no driver and no controller but the replication one; a
+    brain or a probe's scripted hands are left alone) to `parkSpeedThreshold`, where it parks. A driver who leaves at
+    >= 8 m/s BAILS: the car rolls on 1 s first (`bailRoll`, GTA), then brakes. Exit at 5 m/s: rest in 0.7 s / 2.2 m;
+    at 25 m/s: 24.5 m in the first second, rest in 3.4 s / 50 m. The same path covers a carjacked or abandoned car
+    (both drop the brain) and a co-op car a client got out of. Off: `brakesWhenLeft` (the control) and an aeroplane
+    (`brakesWhenUnattended`: its brake is the elevator). The V4 hold treats this brake as idle.
+  * `OW_ENGINE_BRAKE=0` turns the deceleration (and the side scrub below) off everywhere: the control for world
+    probes. Traffic unchanged (DebugWorld `probe_road_traffic` 2 runs each, the island census downtown / suburb 4 runs
+    each: counts and crash counts within noise; the crashes are a pre-existing side-swipe between the parallel lanes
+    of `ekimae_dori__5__x1` at x ~720 in both).
+- **2c.2, reproduced first** (`probe_car_push --shove-control`; trace `OW_SHOVE_TRACE=1`). Sprinting, jumping and
+  standing on the roof, by a player or an AI, into an asleep / vacated / OCCUPIED car: all held (0.00-0.13 m). Two
+  new shapes moved it:
+  * a body SET DOWN half inside the hull (a respawn / teleport / snap; `--move=overlap`): an AI in the nose threw
+    SPC1 4.1-7.7 m in 1-2 of 6 nose cases per run. Two traps on the way: Jolt calls `_integrate_forces` AFTER the
+    step, so the step's change is `state velocity - velocity at the end of _physicsProcess` (measuring it the
+    other way round read ~0 for every step); and Jolt reports ~0 CONTACT IMPULSE for a kinematic overlap (dv 9.7 m/s,
+    impulse 0.00), so the change itself is the test. The decisive step also has the FLOOR among its contacts (the
+    person tips the hull onto it). Rule (`capPersonShove`): a step with a person in contact, no other rigid body, and
+    a sideways change > 0.6 m/s (or a spin > 0.5 rad/s) is TAKEN BACK; the car stops colliding with that person and
+    they are pushed out through the hull's nearest face until clear (`expirePushOuts`, released 0.25 s after they
+    are out). Clamping the speed alone with the person left inside was tried: 139 m (the overlap pushes again).
+  * a player landing on an occupied car left it sliding SIDEWAYS at 0.53 m/s for ever (just over the park
+    threshold): the front grip curve is 0 at a pure sideways slide (the drift model). `sideScrubDecel` 4 m/s^2 below
+    `sideScrubBelow` 3 m/s, not on the handbrake: drifts and donuts untouched.
+  NOT covered by a probe: a ladder / stair-step snap into a hull, a door swinging into a person (a door is kinematic).
+- **F11 sounds** (`carrier.vehicle.CarSounds`, owned by `Vehicle` beside `EngineAudio`, same cost rule: a looping
+  player exists only while it sounds and the camera is near; the local player's own car always):
+  * HORN: the `horn` action (H, shared with holster; D-pad down, shared with crawl -- each read in its own context),
+    `UserCommand.horn`, a 0.145 s loop of a 407 Hz beep while held, within 120 m. Replicated as bit 7 of the vehicle
+    snapshot flags byte (the byte is now FULL: the 2c.3b siren needs another byte). Not run on two peers yet.
+  * SQUEAL: read off the car's motion (sideways > 1.5 m/s, a locked brake, the handbrake at speed), so a puppet
+    squeals from its replicated velocity and bits; level / pitch by how hard; within 60 m, at most 4 cars.
+  * CRASH: `VehicleDamageModel.flushCrash`'s scored crash, light 2.5-8 m/s, heavy above (Kenney metal + plate, the
+    heavy with the sci-fi crunch), within 80 m. Only where the car is SIMULATED: a crash another peer simulates is
+    silent here.
+  * Sources: `tools/audio/build_vehicle_sfx.py` (horn misperpodcast 733553, squeal audible-edge 71737: Freesound CC0
+    own recordings, HQ previews), `build_sfx.py` rows `car_crash_light/heavy`. NOTHING WAS HEARD: picked by spectrum.
 

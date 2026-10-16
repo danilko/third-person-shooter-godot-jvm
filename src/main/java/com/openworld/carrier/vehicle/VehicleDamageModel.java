@@ -351,6 +351,7 @@ public class VehicleDamageModel extends Node {
                     vehicle.getName(), vehicle.traceStateNow(), vehicle.crashCollider, crashDv, crashStartVel, v, impactPoints(crashDv)));
         }
         double points = impactPoints(crashDv);
+        vehicle.crashSound(crashDv, vehicle.getGlobalTransform().times(new Vector3(crashPoint[0], crashPoint[1], crashPoint[2])));
         if (points > 0.0 && vehicle.isAiDriven()) trafficCrashes++;
         if (points > 0.0) {
             for (Part p : parts) {

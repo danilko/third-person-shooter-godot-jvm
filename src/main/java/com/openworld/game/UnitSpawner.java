@@ -116,6 +116,7 @@ final class UnitSpawner {
             ed.vehicleDirector.spawnHeli(p, side);
             room = ed.bodyRoom();
         }
+        int spawnedFoot = 0;
         for (int i = Math.min(room, DispatchRules.toSpawn(r.footFor(stars), foot - snipers, ed.spawnPerTick)); i > 0; i--) {
             Vector3 at = footSpot(ed.sightlines.sendTo(p, side), r.footMin, r.footMax);
             if (at == null) break;
@@ -135,8 +136,52 @@ final class UnitSpawner {
             // unit otherwise attacked unbidden for a tick (probe_ammo_supply saw 4 attackers on 3 tokens)
             ai.attackHeld = ed.attackTokens;
             ed.units.add(u);
+            spawnedFoot++;
+        }
+        // the LIGHT reserve (PLAN.md 2.3 follow-up): light_by_stars round the player, plus every foot unit the global
+        // body cap refused this tick
+        int refused = ed.bodyRoom() <= 0 ? Math.max(0, r.footFor(stars) - (foot - snipers) - spawnedFoot) : 0;
+        spawnLight(p, side, stars, r, ws, r.lightFor(stars) + refused);
+    }
+
+    /** Light units a standing may have sent at once in one dispatch tick. */
+    static final int LIGHT_PER_TICK = 4;
+
+    /** Tops {@code p}'s light units of {@code side} up to {@code want}: each drawn from a station like a foot unit, in
+     *  its side's body, uniform and weapon, hunting the players (ai.light; promoted to a full body as it closes in). */
+    void spawnLight(Player p, String side, int stars, DispatchRules r, WantedSystem ws, int want) {
+        if (want <= 0 || !ed.lightReserve) return;
+        String pid = p.getCharacterInfo().characterId;
+        int have = 0;
+        for (LightUnit lu : ed.lightUnits) if (lu.side().equals(side) && lu.playerId().equals(pid)) have++;
+        if (have >= want) return;
+        com.openworld.ai.light.LightCombatants tier = com.openworld.ai.light.LightCombatants.ensure(ed);
+        if (tier == null) return;
+        Vector3 pp = p.getGlobalPosition();
+        for (int i = Math.min(LIGHT_PER_TICK, want - have); i > 0; i--) {
+            Vector3 at = footSpot(ed.sightlines.sendTo(p, side), r.footMin, r.footMax);
+            if (at == null) break;
+            ForcePools.Draw dr = ed.draw(p, side, stars, pp);
+            if (dr == null) break;
+            com.openworld.ai.AIBlackboard bb = new com.openworld.ai.AIBlackboard();
+            bb.huntsPlayers = true;
+            bb.pinnedTarget = pid;
+            bb.side = side;
+            bb.faction = side;
+            bb.owner = LIGHT_OWNER;
+            String[] look = ed.lookFor(side);
+            bb.body = look[0];
+            bb.outfit = dr.tier() != null && dr.tier().outfit() != null && !dr.tier().outfit().isEmpty() ? dr.tier().outfit() : look[1];
+            bb.weapon = weaponFor(side, pid, r, ws, stars);
+            int id = tier.spawn(bb, at, 100.0, com.openworld.ai.light.LightSim.HUMAN);
+            if (id <= 0) { ed.settle(dr.station(), true); break; }
+            ed.lightUnits.add(new LightUnit(id, side, pid, dr.station()));
+            ed.lightSent++;
         }
     }
+
+    /** The blackboard owner of the dispatch's light units. */
+    static final String LIGHT_OWNER = "dispatch";
 
     String weaponFor(String side, String pid, DispatchRules r, WantedSystem ws) {
         return weaponFor(side, pid, r, ws, 0);

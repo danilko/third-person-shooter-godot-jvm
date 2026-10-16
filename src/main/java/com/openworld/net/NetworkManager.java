@@ -638,6 +638,7 @@ public class NetworkManager extends Node {
             float steerAngle, throttle;
             boolean handbrake, brake, slipping;
             int flatMask;
+            boolean horn;
             if (v.getController() instanceof com.openworld.net.VehicleNetworkController vnc) {
                 steerAngle = vnc.getLastSteerAngle();
                 throttle = vnc.getLastThrottle();
@@ -645,6 +646,7 @@ public class NetworkManager extends Node {
                 brake = vnc.getLastBrake();
                 slipping = vnc.getLastSlipping();
                 flatMask = vnc.getLastFlatMask();
+                horn = vnc.getLastHorn();
             } else {
                 steerAngle = v.getCurrentSteerAngle();
                 throttle = v.getCurrentThrottle();
@@ -652,11 +654,12 @@ public class NetworkManager extends Node {
                 brake = v.isBraking();
                 slipping = v.isSlipping();
                 flatMask = v.getFlatMask();
+                horn = v.isHornOn();
             }
             entries.add(new NetMessageCodec.DecodedVehicleSnapshot(v.getCharacterInfo().characterId,
                     nowMs(), v.getGlobalPosition(), v.getGlobalBasis().getRotationQuaternion(),
                     v.getLinearVelocity(), v.getAngularVelocity(), steerAngle, throttle,
-                    handbrake, brake, slipping, flatMask, health.getCurrentHealth(), fireSeq, v.getPartMask()));
+                    handbrake, brake, slipping, flatMask, health.getCurrentHealth(), fireSeq, v.getPartMask(), horn));
         }
         broadcastVehicleBatchChunked(entries);
     }
@@ -1201,7 +1204,7 @@ public class NetworkManager extends Node {
                 snap = new NetMessageCodec.DecodedVehicleSnapshot(snap.vehicleId(), snap.senderTimeMs(), pos,
                         snap.orientation(), snap.linearVelocity(), snap.angularVelocity(), snap.steerAngle(),
                         snap.throttle(), snap.handbrake(), snap.brake(), snap.slipping(),
-                        snap.flatMask(), snap.health(), snap.fireSeq(), snap.partMask());
+                        snap.flatMask(), snap.health(), snap.fireSeq(), snap.partMask(), snap.horn());
             }
         }
         // Lazy puppet attach: scene-placed vehicles on a client have no join hook, so the
@@ -1249,7 +1252,7 @@ public class NetworkManager extends Node {
                         vehicle.getLinearVelocity(), vehicle.getAngularVelocity(),
                         vehicle.getCurrentSteerAngle(), vehicle.getCurrentThrottle(),
                         vehicle.isHandbraking(), vehicle.isBraking(), vehicle.isSlipping(),
-                        vehicle.getFlatMask(), healthValue, fireSeq, vehicle.getPartMask())));
+                        vehicle.getFlatMask(), healthValue, fireSeq, vehicle.getPartMask(), vehicle.isHornOn())));
     }
 
     /**

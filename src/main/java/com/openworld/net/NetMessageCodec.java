@@ -1007,7 +1007,7 @@ public final class NetMessageCodec {
     //
     // Entry: [vehicleId utf8][senderTimeMs i32][pos 3f][orientation quat 4f]
     //        [linVel 3f][angVel 3f][steerAngle f][throttle f]
-    //        [flags u8: bit0 handbrake, bit1 brake, bit2 slipping, bits3-6 flatMask][health f][fireSeq u8]
+    //        [flags u8: bit0 handbrake, bit1 brake, bit2 slipping, bits3-6 flatMask, bit7 horn][health f][fireSeq u8]
     //        [partMask i32: 2 bits per body part, VehicleDamageRules.SLOTS order - states only rise, peers MAX-merge]
     //
     // A parallel entry shape to the character snapshot rather than a kind-byte inside it:
@@ -1032,6 +1032,8 @@ public final class NetMessageCodec {
     // Spare bits in the existing flags u8 — the entry byte count is unchanged.
     private static final int VEHICLE_FLAG_FLAT_SHIFT = 3;
     private static final int VEHICLE_FLAG_FLAT_MASK  = 0xF;
+    /** Bit 7: the horn is held (PLAN.md F11) -- the last spare bit of the byte. */
+    private static final int VEHICLE_FLAG_HORN = 1 << 7;
 
     /** Fixed bytes per vehicle entry beyond the vehicleId text: u32 string length + i32 time + 13 floats + flags u8 + health float + fireSeq u8 + partMask i32 — see putVehicleSnapshotEntry. */
     public static final int VEHICLE_SNAPSHOT_ENTRY_FIXED_BYTES = 4 + 4 + 13 * 4 + 1 + 4 + 1 + 4;
@@ -1080,7 +1082,8 @@ public final class NetMessageCodec {
         buf.put8((e.handbrake() ? VEHICLE_FLAG_HANDBRAKE : 0)
                 | (e.brake() ? VEHICLE_FLAG_BRAKE : 0)
                 | (e.slipping() ? VEHICLE_FLAG_SLIPPING : 0)
-                | ((e.flatMask() & VEHICLE_FLAG_FLAT_MASK) << VEHICLE_FLAG_FLAT_SHIFT));
+                | ((e.flatMask() & VEHICLE_FLAG_FLAT_MASK) << VEHICLE_FLAG_FLAT_SHIFT)
+                | (e.horn() ? VEHICLE_FLAG_HORN : 0));
         buf.putFloat(e.health());
         buf.put8(e.fireSeq() & 0xFF);
         buf.put32(e.partMask());
@@ -1106,14 +1109,23 @@ public final class NetMessageCodec {
                 new Quaternion(qx, qy, qz, qw), linearVelocity, angularVelocity, steerAngle, throttle,
                 (flags & VEHICLE_FLAG_HANDBRAKE) != 0, (flags & VEHICLE_FLAG_BRAKE) != 0,
                 (flags & VEHICLE_FLAG_SLIPPING) != 0,
-                (flags >> VEHICLE_FLAG_FLAT_SHIFT) & VEHICLE_FLAG_FLAT_MASK, health, fireSeq, partMask);
+                (flags >> VEHICLE_FLAG_FLAT_SHIFT) & VEHICLE_FLAG_FLAT_MASK, health, fireSeq, partMask,
+                (flags & VEHICLE_FLAG_HORN) != 0);
     }
 
     /** Carrier for one vehicle's replicated state — see the wire-layout comment above. */
     public record DecodedVehicleSnapshot(String vehicleId, int senderTimeMs, Vector3 position,
             Quaternion orientation, Vector3 linearVelocity, Vector3 angularVelocity,
             float steerAngle, float throttle, boolean handbrake, boolean brake, boolean slipping,
-            int flatMask, float health, int fireSeq, int partMask) { }
+            int flatMask, float health, int fireSeq, int partMask, boolean horn) {
+        /** Without the horn (every caller from before PLAN.md F11). */
+        public DecodedVehicleSnapshot(String vehicleId, int senderTimeMs, Vector3 position, Quaternion orientation,
+                Vector3 linearVelocity, Vector3 angularVelocity, float steerAngle, float throttle, boolean handbrake,
+                boolean brake, boolean slipping, int flatMask, float health, int fireSeq, int partMask) {
+            this(vehicleId, senderTimeMs, position, orientation, linearVelocity, angularVelocity, steerAngle, throttle,
+                    handbrake, brake, slipping, flatMask, health, fireSeq, partMask, false);
+        }
+    }
 
     // ── MSG_VEHICLE_SEAT_REQUEST / MSG_VEHICLE_OCCUPANCY (Round 11 N3) ────────
     //

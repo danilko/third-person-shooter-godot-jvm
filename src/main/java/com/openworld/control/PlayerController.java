@@ -484,6 +484,7 @@ public class PlayerController extends Controller {
         cmd.brake        = inp.isActionPressed("brake", false);
         // Sprint doubles as the NOS/booster while driving (no extra input mapping needed).
         cmd.boost        = inp.isActionPressed("sprint", false);
+        cmd.horn         = inp.isActionPressed("horn", false);
         cmd.descend      = inp.isActionPressed("crouch", false);
         cmd.enterExit    = inp.isActionJustPressed("use_carrier", false);
         // Weapon inputs: relayed to the occupant by Vehicle when weaponMode != NONE.
