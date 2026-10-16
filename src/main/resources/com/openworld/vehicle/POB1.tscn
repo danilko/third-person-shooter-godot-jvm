@@ -7,7 +7,7 @@
 [ext_resource type="Script" path="res://src/main/java/com/openworld/carrier/motorcycle/Motorcycle.java" id="5_moto"]
 
 [sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_hull"]
-points = PackedVector3Array(-0.17, -0.48, 0.7025, 0.17, -0.48, 0.7025, -0.31, 0.03, -0.3425, 0.31, 0.03, -0.3425, -0.06, -0.46, 0.8635, 0.06, -0.46, 0.8635, -0.05, -0.48, -0.93, 0.05, -0.48, -0.93, -0.05, -0.45, -0.93, 0.05, -0.45, -0.93, -0.08, -0.41, 0.93, 0.08, -0.41, 0.93, -0.17, -0.08, -0.7825, 0.17, -0.08, -0.7825, -0.3075, -0.48, -0.3025, 0.3075, -0.48, -0.3025, -0.22, -0.085, 0.89, 0.22, -0.085, 0.89, -0.22, 0.215, 0.89, 0.22, 0.215, 0.89)
+points = PackedVector3Array(-0.17, -0.48, 0.7025, 0.17, -0.48, 0.7025, -0.31, 0.265, -0.3425, 0.31, 0.265, -0.3425, -0.06, -0.46, 0.8635, 0.06, -0.46, 0.8635, -0.05, -0.48, -0.93, 0.05, -0.48, -0.93, -0.08, -0.41, 0.93, 0.08, -0.41, 0.93, -0.17, 0.155, -0.7825, 0.17, 0.155, -0.7825, -0.3075, -0.48, -0.3025, 0.3075, -0.48, -0.3025, -0.22, -0.085, 0.89, 0.22, -0.085, 0.89, -0.22, 0.215, 0.89, 0.22, 0.215, 0.89)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_bike_entrance"]
 size = Vector3(2.4, 2.5, 3.26)
@@ -29,19 +29,19 @@ script = ExtResource("3_dm")
 paint_material = ""
 
 [node name="DriverSeat" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.437, 0.0573)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.437, -0.159)
 
 [node name="Seat0" parent="Seats"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.437, 0.0573)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.437, -0.159)
 
 [node name="Seat1" parent="Seats"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.437, 0.4735)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.437, 0.3235)
 
 [node name="Seat2" parent="Seats"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.437, 0.0573)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.437, -0.159)
 
 [node name="Seat3" parent="Seats"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.437, 0.0573)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.437, -0.159)
 
 [node name="RR" parent="Wheels"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.16, -0.4033, 0.6025)
@@ -62,7 +62,7 @@ shape = SubResource("ConvexPolygonShape3D_hull")
 shape = SubResource("BoxShape3D_bike_entrance")
 
 [node name="FPSCameraMount" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.11, -0.372)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, 0.125, -0.372)
 
 [node name="VehicleWeaponMount" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.2, -0.73)
@@ -71,7 +71,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.2, -0.73)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.45, -1.03)
 
 [node name="Nameplate" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, 0.64, 0.0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, 0.875, 0.0)
 
 [node name="DamageVfx" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.36, -0.651)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.125, -0.651)

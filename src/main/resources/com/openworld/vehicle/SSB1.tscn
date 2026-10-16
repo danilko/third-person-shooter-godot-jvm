@@ -7,7 +7,7 @@
 [ext_resource type="Script" path="res://src/main/java/com/openworld/carrier/motorcycle/Motorcycle.java" id="5_moto"]
 
 [sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_hull"]
-points = PackedVector3Array(-0.1, -0.07, 1.06, 0.1, -0.07, 1.06, -0.1, 0.17, 1.06, 0.1, 0.17, 1.06, -0.11, -0.44, 0.989, 0.11, -0.44, 0.989, -0.08, -0.39, 1.03, 0.08, -0.39, 1.03, -0.33, -0.48, -0.99, 0.33, -0.48, -0.99, -0.33, 0.14, -0.99, 0.33, 0.14, -0.99)
+points = PackedVector3Array(-0.1, -0.07, 1.06, 0.1, -0.07, 1.06, -0.1, 0.17, 1.06, 0.1, 0.17, 1.06, -0.11, -0.44, 0.989, 0.11, -0.44, 0.989, -0.08, -0.39, 1.03, 0.08, -0.39, 1.03, -0.33, -0.48, -0.99, 0.33, -0.48, -0.99, -0.33, 0.19, -0.99, 0.33, 0.19, -0.99)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_bike_entrance"]
 size = Vector3(2.4, 2.5, 3.49)
@@ -29,19 +29,19 @@ script = ExtResource("3_dm")
 paint_material = "car"
 
 [node name="DriverSeat" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.322, 0.161)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.322, -0.129)
 
 [node name="Seat0" parent="Seats"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.322, 0.161)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.322, -0.129)
 
 [node name="Seat1" parent="Seats"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.222, 0.631)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.222, 0.481)
 
 [node name="Seat2" parent="Seats"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.322, 0.161)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.322, -0.129)
 
 [node name="Seat3" parent="Seats"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.322, 0.161)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.322, -0.129)
 
 [node name="RR" parent="Wheels"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.16, -0.3745, 0.71)
@@ -62,7 +62,7 @@ shape = SubResource("ConvexPolygonShape3D_hull")
 shape = SubResource("BoxShape3D_bike_entrance")
 
 [node name="FPSCameraMount" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.03, -0.412)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.0, -0.412)
 
 [node name="VehicleWeaponMount" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.2, -0.83)
@@ -71,7 +71,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.2, -0.83)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.45, -1.13)
 
 [node name="Nameplate" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, 0.72, 0.0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, 0.75, 0.0)
 
 [node name="DamageVfx" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.28, -0.721)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.25, -0.721)

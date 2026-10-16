@@ -1103,10 +1103,18 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             if (cmd.handbrake && cfg.driftYawTorque > 0f && Math.abs(cmd.steering) > 0.01f) {
                 double authority = GD.clamp(speed / 8.0 + Math.abs(cmd.motor), 0.0, 1.0);
                 applyTorque(getGlobalBasis().getY()
-                        .times(cmd.steering * cfg.driftYawTorque * authority));
+                        .times(cmd.steering * driftTorque(cfg) * authority));
             }
         }
         return isGrounded;
+    }
+
+    /** The drift's yaw torque (N m per unit of steering): {@link VehicleConfig#driftYawAccel} x this body's yaw inertia, else the fixed torque. */
+    private double driftTorque(VehicleConfig cfg) {
+        if (cfg.driftYawAccel <= 0f) return cfg.driftYawTorque;
+        PhysicsDirectBodyState3D st = PhysicsServer3D.INSTANCE.bodyGetDirectState(getRid());
+        double inv = st != null ? st.getInverseInertia().getY() : 0.0;
+        return inv > 1e-9 ? cfg.driftYawAccel / inv : cfg.driftYawTorque;
     }
 
     /** {@code OW_ENGINE_BRAKE=0}: the whole-world control for 2c.1 (traffic probes have no per-car switch). */

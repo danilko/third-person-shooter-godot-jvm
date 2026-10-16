@@ -14,6 +14,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - Motorcycles: trying them -- the `spawn` command and the home bike row (PLAN.md 3.1b, 2026-10-16)
 - Motorcycles in traffic, the 白バイ, and the rider (PLAN.md 3.1b's rest, 2026-10-16)
 - Engine sound profiles: one recording pitched per class now, a folder per class later (2026-10-16)
+- Hands on the bars, the rider triangle, the bike drift and the SSB1 hop (PLAN.md 3.1b, 2026-10-16)
 
 ---
 
@@ -648,8 +649,7 @@ Runtime + data only (no generator or world scene touched; the S18 map session ow
   - probe_enforcement `--world=island` failed ONE check in one of two runs ("with the stars gone every officer left":
     1-2 officers standing in view 15-20 m away after 90 s) -- it fails the same way with the old dispatch numbers put
     back through a table override, so it is pre-existing and intermittent, not the 白バイ. Not chased.
-- NOT done: hands on the bar grips (the bike models have no `grip_l` / `grip_r` markers yet; the hands are where the
-  car clip holds a wheel), parked bikes at shop fronts (needs `vehicle` props in the building kits plus a rebake: the
+- NOT done: ~~hands on the bar grips~~ (done: next-but-one section), parked bikes at shop fronts (needs `vehicle` props in the building kits plus a rebake: the
   rebuild's buildings stage), the city bike, a two-peer bike run.
 
 ## Engine sound profiles: one recording pitched per class now, a folder per class later (2026-10-16)
@@ -675,4 +675,62 @@ vehicle within 45 m, at most 6). How to add a recording: `assets/audio/README.md
   probe's standing spot. Not chased.
 - Not done: real recordings for any profile (Freesound CC0 candidates go in assets/audio/SHORTLIST.md first), a
   per-vehicle tweak inside a profile, an electric / no-engine profile (the city bike will need "none").
+
+## Hands on the bars, the rider triangle, the bike drift and the SSB1 hop (PLAN.md 3.1b, 2026-10-16)
+
+**Hands on the bars** (user: IK, the back and arms moving toward the grips per bike type, an artist able to adjust it).
+- **The grips are the BIKE's.** Two Empties `grip_l` / `grip_r` in each bike `.blend` (make_placeholder_bikes.py writes
+  them a hand's width in from the bar ends); `build_vehicle.py` now KEEPS Empties named in its `GRIPS` (every other
+  Empty is still dropped), unparented with their world place, so they export as nodes of the `.glb` (`Model/grip_l`)
+  and are measured into `<ID>.vehicle.json` `grips`. Move a bar in Blender, re-run `build_vehicle.py`, and the hands
+  follow: no code, no scene edit.
+- **`character.RiderHandsModifier`** (new), LAST among the skeleton's modifiers: TwoBoneIK upperarm -> lowerarm ->
+  hand puts each hand's GRIP point (3/4 of the way from the wrist to the middle knuckle, SupportHandIK's rule) on its
+  marker, keeping the clip's hand rotation (the car clip's hands are already closed round a wheel); a grip still out of
+  reach is closed by protracting the clavicle (<= 30 deg). The right hand lets go while it holds anything but fists
+  (`Motorcycle.holdsWeapon`: the one-handed drive-by); each hand blends over ~0.25 s, so the hands reach for the bars
+  as the rider sits. The pillion keeps the clip's hands. It is LAST because a drive-by turns the torso: run before the
+  aim modifiers, the LEFT hand ended 0.35-0.6 m off its bar with a pistol up.
+- **The back follows the reach** (`RiderPoseModifier.followReach`): after the bike's own lean, while a hand reaching
+  for a bar is past 0.98 of its arm, the back leans a further degree at a time (<= 30). The lean is now a HIP HINGE
+  (pelvis 40 %, thighs turned back by the same so the legs stay, spine_01..03 20 % each): the spine bones alone are too
+  short to carry the shoulders (Shino: spine_01 5 cm over the pelvis, shoulders 0.31 m) -- 40 deg moved them ~0.13 m.
+  Measured: the scooter and Cub need 0-2 deg; the tall-barred TRB1 / PMB1 30 deg for Shino, 19 for Fumiriya.
+- **The rider triangle** (make_placeholder_bikes.py, MY PICKS from the usual figures, not measured off a bike). The
+  bars had been placed from the stated height as if it were the mirror tops: 0.09-0.10 m over the seat, and the seat
+  Empty sat halfway to the pillion -- out of BOTH bodies' reach by 0.15-0.4 m. Now the seat Empty is the rider's hip,
+  0.18-0.20 m behind the cushion's front edge; the grips rise 0.30-0.32 m over the seat on the upright bikes (0.06 on
+  the SSB1's clip-ons) and reach 0.48-0.58 m ahead of the hip, the bar ends sweeping back where the steering head is
+  further. The mirrors now stand over the stated height (bounds max 1.23 m on SCT1); the hull grew a little at the
+  top (bars are chassis). `build_vehicle_scenes.py`: a bike's seat marker puts the pelvis ON the Empty (a car's sits
+  0.15 m behind the cushion centre, toward a backrest a saddle does not have).
+- Gate `tools/godot/probe_rider_pose.gd [-- --no-hands | --control]`, five bikes x Shino + Fumiriya: both grip points
+  within 3 cm of their markers standing (worst 14 mm) and riding (in a lean), the hands modifier last, a pistol takes
+  the right hand > 0.10 m off its bar while the left stays on. PASS; `--no-hands` fails exactly the 30 hand checks.
+  PROBE TRAP: sample the grips INSIDE `skeleton_updated` like the bones -- read on the next `physics_frame` the bike
+  has stepped and the rider not yet been re-pinned, which reads as v x dt of miss (0.33 m at 20 m/s). Not a lag on
+  screen: the body's node transform syncs at the next frame's flush, so a render shows bike and rider together.
+
+**The SSB1 hop** (user: "very unstable at high speed, even in a straight line it bounces right / left"). Measured
+(`tools/godot/probe_bike_handling.gd`): above ~55 m/s all four rays left the road for 10+ ticks at a time, pitch
+swinging to -10.8 deg, yaw swinging 10.9 deg/s and 4.6 m off the line. THE CAUSE was the suspension DAMPER in
+`VehicleWheel.applyWheelPhysics`: it damped the tyre's speed along the BODY's up axis, so a body pitched nose-up by its
+own drive (applied below the centre of mass) read v sin(pitch) of its forward speed as extension and pushed back as
+LIFT -- ~5 kN at 60 m/s and 1 deg on a 1.96 kN bike (with downforce 0 the SSB1 was airborne the whole time above 50
+m/s; the downforce, which only acts while grounded, turned that into a hop). It now damps along the GROUND NORMAL, the
+direction the force is applied in and the speed the spring really compresses at. Every vehicle shares it: SPC1's yaw
+swing went 2.8 -> 0.0 deg/s too. Regression PASS: probe_component_car (SPC1, KET1), probe_hard_landing 18/18,
+probe_car_stop 22/22, probe_road_launch (the gate + `--car=SSB1`), probe_motorcycle_ride 70/70, HandlingTest.tscn.
+SSB1 now holds its line to its full 72 m/s (the hop had held it to 68).
+
+**The bike drift** (user: "even at slow speed it drifts in a continuous spin with a small press, unlike the vehicle's
+drift with Space"). The drift's yaw is a fixed TORQUE (`driftYawTorque` 9000 N m): 4.5 rad/s^2 on SPC1's 1990 kg m^2,
+110-540 on a bike's 17-82 (measured from the direct body state), so a 0.3 steer spun a bike 709-3443 deg in 1.5 s
+against the car's 46. `VehicleConfig.driftYawAccel` (rad/s^2, 0 = the torque as before) is multiplied by the body's own
+yaw inertia; the bike rows set it (`build_vehicle_scenes.py` `drift`, MY PICKS: SCT1 / POB1 4.5 = the car's, TRB1 5.5
+the loosest, SSB1 3.5 the tightest, PMB1 4.0). Now 56-66 deg in 1.5 s, settling within 1 s of letting go. No car row
+changed. Gate `probe_bike_handling.gd [-- --control]` (straight + drift, the five bikes and SPC1 as the reference):
+PASS; `--control` (drift_yaw_accel 0 through the resource cache) fails all five drift turns and POB1's spin-on.
+- Not done (BIKE DRIFT's (2)-(3) in PLAN.md): the LEAN in a slide (today the lean still follows the yaw rate, not the
+  slip), the front wheel counter-steered along the velocity, a dust puff at the rear wheel.
 

@@ -3,21 +3,30 @@ extends SceneTree
 ## car's seated clip per bike (VehicleConfig.rider*), puts the left foot on the ground at a stop, and the rider wears a
 ## helmet -- built by Motorcycle as a rider gets on, removed as they get off.
 ##
-##   stdbuf -oL godot --headless --fixed-fps 60 --path . --script tools/godot/probe_rider_pose.gd [-- --control]
+##   stdbuf -oL godot --headless --fixed-fps 60 --path . --script tools/godot/probe_rider_pose.gd [-- --control | --no-hands]
 ##   xvfb-run -a godot --fixed-fps 60 --path . --script tools/godot/probe_rider_pose.gd -- --shot=<dir>   (pictures)
-## --control: Motorcycle.riderGear off (the car's clip as it is, bare-headed) -- the pose / foot / helmet checks fail.
+## --control: Motorcycle.riderGear off (the car's clip as it is, bare-headed) -- the pose / foot / helmet / hand checks fail.
+## --no-hands: only the hand IK off (RiderPoseModifier.handsOnBars) -- the hand checks fail, the rest pass.
 ##
-## On a bare floor, each of the five bikes gets an AI rider seated the way traffic seats one:
+## On a bare floor, each of the five bikes gets an AI rider seated the way traffic seats one, once per BODY (Shino, the
+## shortest arms, and Fumiriya, the tallest):
 ##   1. the rider wears the gear (the modifier ahead of the aim modifiers, a helmet on the head bone);
 ##   2. the sport bike's rider TUCKS: head >= 0.10 m further forward of the hip than on the scooter;
 ##   3. standing still, the left foot is on the ground beside the bike (foot bone <= 0.15 m above the floor, out to
 ##      the left) and the bike leans on it a few degrees;
 ##   4. riding (a scripted throttle), the foot comes up (weight < 0.05) and goes down again at a stop;
-##   5. off the bike, the gear is gone.
+##   5. HANDS ON THE BARS (3.1b): each hand's grip point (3/4 of the way from the wrist to the middle knuckle, read from
+##      the posed bones) within 3 cm of the bike's grip_l / grip_r marker, standing and riding;
+##   6. with a pistol in hand the right hand is off the bar (> 0.10 m), the left still on it;
+##   7. off the bike, the gear is gone.
 
 const AI := "res://src/main/resources/com/openworld/character/AICharacter.tscn"
 const HELPER := "res://src/main/java/com/openworld/debug/VehicleProbeHelper.java"
 const BIKES := ["SCT1", "POB1", "TRB1", "SSB1", "PMB1"]
+const BODIES := {"shino": "res://src/main/resources/com/openworld/character/CharacterVisuals_Shino.tscn",
+		"fumiriya": "res://src/main/resources/com/openworld/character/CharacterVisuals_Fumiriya.tscn"}
+const HAND_TOL := 0.03
+const GRIP_FRACTION := 0.75
 
 var fails := 0
 var seen := {}      # rider instance id -> {head, pelvis, foot_l} world, sampled AFTER the modifiers (skeleton_updated)
@@ -39,11 +48,35 @@ func _bone_world(skel: Skeleton3D, bone: String) -> Vector3:
 
 ## Skeleton3D restores the clip's pose after its modifiers run (Godot 4.3+), so a bone read from a physics frame is the
 ## UNMODIFIED pose: the modified one is only visible inside skeleton_updated.
-func _watch(rider: Node) -> void:
+func _watch(rider: Node, bike: Node3D) -> void:
 	var skel: Skeleton3D = rider.find_child("Skeleton3D", true, false)
 	var k := rider.get_instance_id()
 	skel.skeleton_updated.connect(func():
-		seen[k] = {"head": _bone_world(skel, "head"), "pelvis": _bone_world(skel, "pelvis"), "foot_l": _bone_world(skel, "foot_l")})
+		var d := {}
+		# the bars and the bike AS THEY ARE when the modifiers ran: a bone sampled here against a marker read on a later
+		# physics frame differs by one tick of travel (0.33 m at 20 m/s), which is the probe's timing, not the pose's
+		for side in ["_l", "_r"]:
+			var g: Node3D = bike.get_node_or_null("Model/grip" + side)
+			d["grip" + side] = g.global_position if g else Vector3(1e6, 1e6, 1e6)
+		d["bike_inv"] = bike.global_transform.affine_inverse()
+		for bone in ["head", "pelvis", "foot_l", "hand_l", "hand_r", "middle_01_l", "middle_01_r", "upperarm_l"]:
+			d[bone] = _bone_world(skel, bone)
+		seen[k] = d)
+
+## Where a hand closes on a bar, from the POSED bones: 3/4 of the way from the wrist to the middle knuckle.
+func _grip_point(rider: Node, side: String) -> Vector3:
+	var d: Dictionary = seen.get(rider.get_instance_id(), {})
+	if not d.has("hand" + side):
+		return Vector3(1e6, 1e6, 1e6)
+	return d["hand" + side].lerp(d["middle_01" + side], GRIP_FRACTION)
+
+## [miss left, miss right] (m): each hand's grip point to its bar marker.
+func _hand_miss(bike: Node, rider: Node) -> Array:
+	var out := []
+	for side in ["_l", "_r"]:
+		var d: Dictionary = seen.get(rider.get_instance_id(), {})
+		out.append(_grip_point(rider, side).distance_to(d["grip" + side]) if d.has("grip" + side) else 1e6)
+	return out
 
 func _initialize() -> void:
 	_run.call_deferred()
@@ -85,34 +118,48 @@ func _run() -> void:
 	var helper: Node = load(HELPER).new()
 	w.add_child(helper)
 
+	var no_hands := "--no-hands" in args
 	var bikes := {}
 	var riders := {}
-	for i in BIKES.size():
-		var id: String = BIKES[i]
-		var bike: RigidBody3D = (load("res://src/main/resources/com/openworld/vehicle/%s.tscn" % id) as PackedScene).instantiate()
-		bike.position = Vector3(0.0, 0.6, i * 6.0)
-		w.add_child(bike)
-		bikes[id] = bike
+	var keys := []
+	var row := 0
+	for body in BODIES:
+		for i in BIKES.size():
+			var key: String = "%s@%s" % [BIKES[i], body]
+			var bike: RigidBody3D = (load("res://src/main/resources/com/openworld/vehicle/%s.tscn" % BIKES[i]) as PackedScene).instantiate()
+			bike.position = Vector3(row * 8.0, 0.6, i * 6.0)
+			w.add_child(bike)
+			bikes[key] = bike
+			keys.append(key)
+		row += 1
 	await _tick(90)
-	bikes["SCT1"].call("set_rider_gear_now", not control)
-	for id in BIKES:
+	var any_bike: Node = bikes[keys[0]]
+	any_bike.call("set_rider_gear_now", not control)
+	any_bike.call("set_hands_on_bars_now", not no_hands)
+	for key in keys:
 		var d: CharacterBody3D = (load(AI) as PackedScene).instantiate()
-		d.position = bikes[id].global_position
+		d.set("character_visuals", load(BODIES[key.split("@")[1]]))
+		d.position = bikes[key].global_position + Vector3(2.0, 0.3, 0.0)
 		w.add_child(d)
-		helper.call("seat_driver_quietly", bikes[id], d)
-		riders[id] = d
-		_watch(d)
+		helper.call("seat_driver_quietly", bikes[key], d)
+		riders[key] = d
+		_watch(d, bikes[key])
 	await _tick(120)
 
 	# 1-3. standing still
 	var fwd := {}
-	for id in BIKES:
+	for id in keys:
 		var bike: RigidBody3D = bikes[id]
 		var d: CharacterBody3D = riders[id]
 		var skel: Skeleton3D = d.find_child("Skeleton3D", true, false)
 		var mod := skel.get_node_or_null("RiderPoseModifier")
 		var aim := skel.get_node_or_null("SpineAimModifier")
 		var helmet := skel.get_node_or_null("RiderHelmet")
+		var hands := skel.get_node_or_null("RiderHandsModifier")
+		var last_mod := -1
+		for c in skel.get_children():
+			if c is SkeletonModifier3D:
+				last_mod = c.get_index()
 		var inv := bike.global_transform.affine_inverse()
 		var bones: Dictionary = seen.get(d.get_instance_id(), {"head": Vector3.ZERO, "pelvis": Vector3.ZERO, "foot_l": Vector3.ZERO})
 		var head: Vector3 = inv * bones["head"]
@@ -126,11 +173,22 @@ func _run() -> void:
 		_check("%s: the rider wears the pose modifier and a helmet" % id, mod != null and helmet != null)
 		_check("%s: ... the modifier runs before the aim modifiers" % id, mod != null and aim != null and mod.get_index() < aim.get_index(),
 				"%d < %d" % [mod.get_index() if mod else -1, aim.get_index() if aim else -1])
+		_check("%s: ... the hands modifier runs LAST, after the aim modifiers" % id, hands != null and hands.get_index() == last_mod,
+				"%d of %d" % [hands.get_index() if hands else -1, last_mod])
 		_check("%s: at a stop the left foot is on the ground beside the bike" % id, foot.y < 0.15 and foot_local.x < -0.15,
 				"%.2f m up, x %.2f" % [foot.y, foot_local.x])
 		_check("%s: ... and the bike leans on it (2-6 deg left)" % id, lean > 2.0 and lean < 6.0, "%.1f" % lean)
-	_check("the sport bike's rider tucks: head >= 0.10 m further forward than on the scooter",
-			fwd["SSB1"] - fwd["SCT1"] >= 0.10, "%.2f vs %.2f" % [fwd["SSB1"], fwd["SCT1"]])
+		var miss := _hand_miss(bike, d)
+		_check("%s: both hands on the bars at a stop (<= %.0f cm)" % [id, HAND_TOL * 100], miss[0] <= HAND_TOL and miss[1] <= HAND_TOL,
+				"left %.3f, right %.3f m (solver's own %s / %s, weights %s / %s); the reach leaned the back %s deg more" % [miss[0], miss[1],
+				str(hands.call("grip_miss_now", 0)) if hands else "-", str(hands.call("grip_miss_now", 1)) if hands else "-",
+				str(hands.call("hand_weight_now", 0)) if hands else "-", str(hands.call("hand_weight_now", 1)) if hands else "-",
+				str(mod.call("reach_lean_now")) if mod else "-"])
+	for body in BODIES:
+		var sport: String = "SSB1@" + body
+		var scoot: String = "SCT1@" + body
+		_check("%s: the sport bike's rider tucks: head >= 0.10 m further forward than on the scooter" % body,
+				fwd[sport] - fwd[scoot] >= 0.10, "%.2f vs %.2f" % [fwd[sport], fwd[scoot]])
 
 	if shot_dir != "":
 		DirAccess.make_dir_recursive_absolute(shot_dir)
@@ -139,7 +197,7 @@ func _run() -> void:
 		cam.current = true
 		cam.fov = 40
 		for id in BIKES:
-			var at: Vector3 = bikes[id].global_position
+			var at: Vector3 = bikes[id + "@shino"].global_position
 			for view in [["side", Vector3(-3.2, 0.6, 0.0)], ["front", Vector3(-1.2, 0.9, -3.0)]]:
 				cam.global_position = at + view[1]
 				cam.look_at(at + Vector3(0, 0.7, 0), Vector3.UP)
@@ -151,36 +209,64 @@ func _run() -> void:
 
 	# 4. riding lifts the foot; stopping puts it down
 	var up_w := {}
-	for id in BIKES:
-		helper.call("drive_craft", bikes[id], 0.5, 0.0, false)
+	for id in keys:
+		helper.call("drive_craft", bikes[id], 0.5, 0.25, false)     # a gentle turn, so the bike leans too
 	await _tick(120)
-	for id in BIKES:
+	for id in keys:
 		var mod := (riders[id] as Node).find_child("RiderPoseModifier", true, false)
 		up_w[id] = float(mod.call("foot_weight_now")) if mod else -1.0
-	for id in BIKES:
+		var hands := (riders[id] as Node).find_child("RiderHandsModifier", true, false)
+		var miss := _hand_miss(bikes[id], riders[id])
+		_check("%s: both hands on the bars riding (<= %.0f cm)" % [id, HAND_TOL * 100], miss[0] <= HAND_TOL and miss[1] <= HAND_TOL,
+				"left %.3f, right %.3f m at %.1f m/s, lean %.1f deg (solver's own %s / %s)" % [miss[0], miss[1], (bikes[id] as RigidBody3D).linear_velocity.length(),
+				float(bikes[id].call("lean_degrees_now")), str(hands.call("grip_miss_now", 0)) if hands else "-", str(hands.call("grip_miss_now", 1)) if hands else "-"])
+	for id in keys:
+		var dd: Dictionary = seen.get((riders[id] as Node).get_instance_id(), {})
+		print("    %s riding: pelvis in the bike's frame at the modifier pass %s (now %s)" % [id, dd["bike_inv"] * dd["pelvis"], (bikes[id] as Node3D).global_transform.affine_inverse() * dd["pelvis"]])
+	for id in keys:
 		helper.call("drive_craft", bikes[id], 0.0, 0.0, true)
 	for i in 60:                 # brought to a stop by hand (the scripted brake is not what is measured here)
-		for id in BIKES:
+		for id in keys:
 			var bk: RigidBody3D = bikes[id]
 			bk.linear_velocity = bk.linear_velocity * 0.85
 			bk.angular_velocity = Vector3.ZERO
 		await physics_frame
 	await _tick(120)
-	for id in BIKES:
+	for id in keys:
 		var mod := (riders[id] as Node).find_child("RiderPoseModifier", true, false)
 		var down_w := float(mod.call("foot_weight_now")) if mod else -1.0
 		var speed := (bikes[id] as RigidBody3D).linear_velocity.length()
 		_check("%s: riding lifts the foot, stopping puts it down again" % id, up_w[id] >= 0.0 and up_w[id] < 0.05 and down_w > 0.95,
 				"riding %.2f, stopped %.2f (%.1f m/s)" % [up_w[id], down_w, speed])
 
-	# 5. off the bike
-	for id in BIKES:
+	# 6. a pistol in the right hand: it lets go of the bar, the left keeps it
+	for id in keys:
+		helper.call("give_weapon", riders[id], "PIS1")
+	await _tick(30)
+	for id in keys:
+		var wc: Node = (riders[id] as Node).get_node("WeaponController")
+		for slot in range(1, 7):
+			wc.call("on_set_weapon", slot)
+			await _tick(2)
+			if String(wc.call("get_current_weapon_id_now")).begins_with("PIS"):
+				break
+	await _tick(90)
+	for id in keys:
+		var wc: Node = (riders[id] as Node).get_node("WeaponController")
+		var miss := _hand_miss(bikes[id], riders[id])
+		_check("%s: holding a pistol the right hand is off the bar, the left on it" % id,
+				miss[1] > 0.10 and miss[0] <= HAND_TOL, "held %s; left %.3f, right %.3f m" % [str(wc.call("get_current_weapon_id_now")), miss[0], miss[1]])
+
+	# 7. off the bike
+	for id in keys:
 		helper.call("release_driver", bikes[id], riders[id])
 	await _tick(10)
-	for id in BIKES:
+	for id in keys:
 		var skel: Skeleton3D = (riders[id] as Node).find_child("Skeleton3D", true, false)
 		_check("%s: off the bike the gear is gone" % id, skel.get_node_or_null("RiderPoseModifier") == null
+				and skel.get_node_or_null("RiderHandsModifier") == null
 				and skel.get_node_or_null("RiderHelmet") == null and int(bikes[id].call("rider_gear_now")) == 0)
-	bikes["SCT1"].call("set_rider_gear_now", true)
+	any_bike.call("set_rider_gear_now", true)
+	any_bike.call("set_hands_on_bars_now", true)
 	print("RESULT %s (%d failures)%s" % ["PASS" if fails == 0 else "FAIL", fails, "  (CONTROL)" if control else ""])
 	quit(0 if fails == 0 else 1)

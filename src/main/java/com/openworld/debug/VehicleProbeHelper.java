@@ -289,6 +289,18 @@ public class VehicleProbeHelper extends Node {
         if (car.getController() != c) car.attachController(c);
     }
 
+    /** Each wheel ray as "name grounded compression;" (probe_bike_handling: which rays lose the road at speed). */
+    @Register
+    public String wheelStates(Node v) {
+        if (!(v instanceof Vehicle car)) return "";
+        StringBuilder sb = new StringBuilder();
+        for (com.openworld.carrier.vehicle.VehicleWheel w : car.getWheels()) {
+            sb.append(w.getName()).append(w.grounded() ? " G " : " - ")
+              .append(String.format("%.3f", w.getLastCompression())).append("; ");
+        }
+        return sb.toString();
+    }
+
     /** Give {@code c} catalog weapon {@code id} through the ordinary grant path (a probe arming a body). */
     @Register
     public boolean giveWeapon(Node c, String id) {

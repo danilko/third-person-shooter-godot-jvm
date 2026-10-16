@@ -346,7 +346,13 @@ public class VehicleWheel extends RayCast3D {
         // Spring suspension force
         double springForceMag = cfg.springStrength * compression + bumpStopForce(compression);
         Vector3 tireVelocity  = getPointVelocity(contact);
-        double  dampForceMag  = cfg.springDamping * getGlobalBasis().getY().dot(tireVelocity);
+        // The damper works on the speed ALONG THE GROUND NORMAL -- the speed the spring is actually being compressed at,
+        // and the direction its force is applied in. It used to be the body's up axis: then a body pitched nose-up by
+        // its own drive (the force acts below the centre of mass) turned v * sin(pitch) of its FORWARD speed into a
+        // phantom extension, and the damper pushed back as lift. On a 200 kg motorcycle at 60 m/s, 1 deg of pitch was
+        // ~5 kN of lift against a 2 kN weight: SSB1 hopped clear of the road for 10+ ticks at a time and weaved off its
+        // line (probe_bike_handling, user 2026-10-16). Sliding along flat ground changes no spring's length.
+        double  dampForceMag  = cfg.springDamping * groundNormal.dot(tireVelocity);
         if (leadZoneHit && dampForceMag > 0.0) dampForceMag = 0.0;   // never pull toward ground
         Vector3 yForce        = groundNormal.times(springForceMag - dampForceMag);
 

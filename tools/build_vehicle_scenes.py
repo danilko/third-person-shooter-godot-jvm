@@ -101,22 +101,24 @@ TUNING = {
     # side of the two wheels (the model keeps its own wheels: Motorcycle.java), `lean` its most lean (deg), `aero` its
     # drag (a bike's frontal area is about half a car's), `rider` the rider's pose bent from the car's seated clip
 # (character.RiderPoseModifier: lean forward, thighs up / feet back, extra knee bend, deg -- 0s = the scooter's
-# feet-forward floorboard). MY PICKS, unreviewed: every speed, force, lean and pose below.
+# feet-forward floorboard), `drift` the Space drift's yaw acceleration (rad/s^2: VehicleConfig.driftYawAccel -- SPC1's
+# torque is 4.5 on its inertia; the trail bike the loosest, the sport bike the tightest). MY PICKS, unreviewed: every
+# speed, force, lean, pose and drift below.
     "SCT1": {"name": "SCT-1", "mass": 90, "rest": 0.16, "spring": 4200, "damping": 700, "over": 0.12,
              "max_speed": 17.0, "accel": 420.0, "crash_hp": 8.0, "health": 160, "paint": "car",
-             "bike": True, "lean": 35.0, "aero": 0.25, "steer": 30.0, "rider": [0.0, 0.0, 0.0]},
+             "bike": True, "lean": 35.0, "aero": 0.25, "steer": 30.0, "rider": [0.0, 0.0, 0.0], "drift": 4.5},
     "POB1": {"name": "POB-1", "mass": 100, "rest": 0.16, "spring": 4600, "damping": 760, "over": 0.12,
              "max_speed": 24.0, "accel": 520.0, "crash_hp": 8.0, "health": 180, "paint": "",
-             "bike": True, "lean": 35.0, "aero": 0.25, "steer": 30.0, "rider": [6.0, 22.0, 25.0]},
+             "bike": True, "lean": 35.0, "aero": 0.25, "steer": 30.0, "rider": [6.0, 22.0, 25.0], "drift": 4.5},
     "TRB1": {"name": "TRB-1", "mass": 135, "rest": 0.22, "spring": 5200, "damping": 900, "over": 0.15,
              "max_speed": 36.0, "accel": 980.0, "crash_hp": 7.0, "health": 200, "paint": "car",
-             "bike": True, "lean": 42.0, "aero": 0.22, "steer": 28.0, "rider": [10.0, 25.0, 30.0]},
+             "bike": True, "lean": 42.0, "aero": 0.22, "steer": 28.0, "rider": [10.0, 25.0, 30.0], "drift": 5.5},
     "SSB1": {"name": "SSB-1", "mass": 200, "rest": 0.18, "spring": 7600, "damping": 1250, "over": 0.12,
              "max_speed": 72.0, "accel": 2300.0, "crash_hp": 7.0, "health": 220, "paint": "car",
-             "bike": True, "lean": 50.0, "aero": 0.20, "steer": 24.0, "rider": [45.0, 35.0, 45.0]},
+             "bike": True, "lean": 50.0, "aero": 0.20, "steer": 24.0, "rider": [45.0, 35.0, 45.0], "drift": 3.5},
     "PMB1": {"name": "PMB-1", "mass": 280, "rest": 0.18, "spring": 10000, "damping": 1700, "over": 0.12,
              "max_speed": 55.0, "accel": 2400.0, "crash_hp": 6.0, "health": 300, "paint": "",
-             "bike": True, "lean": 42.0, "aero": 0.26, "steer": 26.0, "rider": [6.0, 22.0, 25.0]},
+             "bike": True, "lean": 42.0, "aero": 0.26, "steer": 26.0, "rider": [6.0, 22.0, 25.0], "drift": 4.0},
 }
 # ENGINE SOUND per vehicle (carrier.vehicle.EngineProfile; user 2026-10-16: "different engine sound options, replaceable
 # later, or GTA-like the same sound"): a row not listed is the car. Until a profile has its own loops in
@@ -230,6 +232,7 @@ glass_armor = {f(t.get("glass_armor", 0.0))}
     if bike:
         cfg += f"""seat_limit = {seat_limit}
 motorcycle_lean_degrees = {f(t["lean"])}
+drift_yaw_accel = {f(t["drift"])}
 aero_drag_coefficient = {f(t["aero"])}
 tire_max_turn_degrees = {f(t["steer"])}
 rider_lean_forward = {f(t.get("rider", [0, 0, 0])[0])}
@@ -267,7 +270,9 @@ script = ExtResource("3_dm")
 paint_material = "{t["paint"]}"
 """]
     for i, (x, y, z) in enumerate(seats):
-        mx, my, mz = x, y + MODEL_Y + HIP_ON_CUSHION - HIP_ABOVE, z + HIP_BACK_OF_CENTRE - HIP_BEHIND
+        # a bike's seat Empty IS the rider's hip point (a saddle has no backrest to slide back to; 3.1b hands on the bars)
+        back = 0.0 if t.get("bike") else HIP_BACK_OF_CENTRE
+        mx, my, mz = x, y + MODEL_Y + HIP_ON_CUSHION - HIP_ABOVE, z + back - HIP_BEHIND
         if i == 0:
             nodes.append(f'[node name="DriverSeat" parent="."]\ntransform = {xform(mx, my, mz)}\n')
         nodes.append(f'[node name="Seat{i}" parent="Seats"]\ntransform = {xform(mx, my, mz)}\n')

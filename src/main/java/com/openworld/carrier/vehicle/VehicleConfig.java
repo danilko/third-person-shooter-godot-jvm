@@ -163,6 +163,15 @@ public class VehicleConfig extends Resource {
      */
     @Export public float driftYawTorque = 9000f;
 
+    /**
+     * The drift's rotation as an ANGULAR ACCELERATION (rad/s^2 per unit of steering) instead of a torque; 0 = use
+     * {@link #driftYawTorque}. A torque means a different drift on every body: 9000 N m is 4.5 rad/s^2 on SPC1 (yaw
+     * inertia ~1990 kg m^2) but 110-540 on a motorcycle (17-82 kg m^2), which spun a bike 700-3400 deg in 1.5 s on a
+     * small steer (probe_bike_handling, user 2026-10-16). Vehicle multiplies this by the body's own yaw inertia, so a
+     * bike set to the car's 4.5 drifts like the car whatever it weighs.
+     */
+    @Export public float driftYawAccel = 0f;
+
     // ── Parking / idle stability ──────────────────────────────────────────
 
     /**

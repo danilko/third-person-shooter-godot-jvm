@@ -173,6 +173,11 @@ def wheels_of(names):
     return BIKE_WHEELS if "wheel_f" in names else WHEELS
 
 
+# Empties that are kept and exported: a motorcycle's two bar grips (make_placeholder_bikes.py; Motorcycle reads
+# Model/grip_l and Model/grip_r). Every other Empty is a build-time marker and is dropped.
+GRIPS = ("grip_l", "grip_r")
+
+
 def components_in_memory(vid):
     """A .blend already in component form: named parts, seat_* Empties, facing +Y on the ground."""
     OBJ = bpy.data.objects
@@ -187,7 +192,13 @@ def components_in_memory(vid):
     seats = {o.name: o.matrix_world.translation.copy() for o in OBJ if o.type == 'EMPTY' and o.name.startswith("seat_")}
     evaluate_all(meshes)
     for o in list(OBJ):
-        if o.type != 'MESH':
+        if o.type == 'EMPTY' and o.name in GRIPS:
+            # a motorcycle's grip markers SHIP, as nodes of the .glb (the runtime puts the rider's hands on them);
+            # unparented with their world place kept, so a part's origin moving onto its hinge cannot carry them
+            mw = o.matrix_world.copy()
+            o.parent = None
+            o.matrix_world = mw
+        elif o.type != 'MESH':
             bpy.data.objects.remove(o, do_unlink=True)
     return {o.name: o for o in meshes}, seats
 
@@ -488,6 +499,9 @@ def build(vid):
         "pivots": {n: godot(parts[n].location) for n in DAMAGEABLE if n in parts},
         "hull": hull,
     }
+    grips = {n: godot(bpy.data.objects[n].matrix_world.translation) for n in GRIPS if n in bpy.data.objects}
+    if grips:
+        facts["grips"] = grips
     with open(os.path.join(DIR, vid + ".vehicle.json"), "w") as f:
         json.dump(facts, f, indent=1)
     print(f"[build_vehicle] {vid}: {hi.y - lo.y:.3f} x {hi.x - lo.x:.3f} x {hi.z:.3f} m, "

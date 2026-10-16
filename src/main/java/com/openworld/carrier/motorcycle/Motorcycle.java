@@ -60,6 +60,8 @@ public class Motorcycle extends Vehicle {
     private Node3D model;
     private Transform3D modelRest;
     private MeshInstance3D wheelFront, wheelBack;
+    /** The bars' grip markers, from the model (the bike .blend's grip_l / grip_r Empties); null on a model without them. */
+    private Node3D gripLeft, gripRight;
     private Transform3D wheelFrontRest, wheelBackRest;
     private double spinFront, spinBack;
     private double lean;
@@ -79,6 +81,8 @@ public class Motorcycle extends Vehicle {
             modelRest = m.getTransform();
             if (m.getNodeOrNull("wheel_f") instanceof MeshInstance3D f) { wheelFront = f; wheelFrontRest = f.getTransform(); }
             if (m.getNodeOrNull("wheel_b") instanceof MeshInstance3D b) { wheelBack = b; wheelBackRest = b.getTransform(); }
+            if (m.getNodeOrNull("grip_l") instanceof Node3D gl) gripLeft = gl;
+            if (m.getNodeOrNull("grip_r") instanceof Node3D gr) gripRight = gr;
         }
         // the four rays draw nothing: the bike's own two wheels, in the model, are the wheels you see. Their tyre hit
         // spheres take the real tyre's size so a shot at a tyre still flattens one.
@@ -222,6 +226,7 @@ public class Motorcycle extends Vehicle {
 
     private static final class Gear {
         com.openworld.character.RiderPoseModifier pose;
+        com.openworld.character.RiderHandsModifier hands;
         Node3D helmet;
         godot.api.Skeleton3D skel;
     }
@@ -250,7 +255,7 @@ public class Motorcycle extends Vehicle {
             if (c == null || !GD.isInstanceValid(c)) continue;
             aboard.add(c);
             Gear g = gear.get(c);
-            if (g == null || !GD.isInstanceValid(g.pose)) {
+            if (g == null || !GD.isInstanceValid(g.pose) || !GD.isInstanceValid(g.hands)) {
                 g = dress(c);
                 if (g == null) continue;
                 gear.put(c, g);
@@ -259,6 +264,9 @@ public class Motorcycle extends Vehicle {
             // the pillion sits up (half the tuck) with its feet on the same pegs
             g.pose.setPose(seat == 0 ? cfg.riderLeanForward : cfg.riderLeanForward * 0.5, cfg.riderThighRaise, cfg.riderKneeBend);
             g.pose.setFootTarget(seat == 0 && footDown() ? footSpot(g.skel) : null);
+            // the rider's hands on the bars (the pillion keeps the clip's); the right lets go to hold a weapon
+            g.hands.setGrips(seat == 0 ? gripLeft : null, seat == 0 ? gripRight : null);
+            g.hands.setRightHandOnBar(!holdsWeapon(c));
         }
         if (gear.size() > aboard.size()) {
             java.util.Iterator<java.util.Map.Entry<Character, Gear>> it = gear.entrySet().iterator();
@@ -270,6 +278,17 @@ public class Motorcycle extends Vehicle {
             }
         }
     }
+
+    /** True while {@code c} has a weapon in hand (anything but bare fists): the one-handed drive-by's grip. */
+    private static boolean holdsWeapon(Character c) {
+        if (!(c.getNodeOrNull("WeaponController") instanceof com.openworld.weapon.WeaponController wc)) return false;
+        com.openworld.weapon.WeaponItem w = wc.getCurrentWeaponItem();
+        return w != null && !"fist".equals(w.weaponArchetype);
+    }
+
+    /** probe_rider_pose's control: every rider's hands left where the clip puts them. */
+    @Register public void setHandsOnBarsNow(boolean on) { com.openworld.character.RiderHandsModifier.handsOnBars = on; }
+    @Register public boolean hasGripsNow() { return gripLeft != null && gripRight != null; }
 
     /** The ground beside the bike under the rider's left hip (world). */
     private Vector3 footSpot(godot.api.Skeleton3D skel) {
@@ -293,6 +312,11 @@ public class Motorcycle extends Vehicle {
         // after the clip, BEFORE the aim modifiers: the drive-by aim corrects the bent spine, not the other way
         Node first = skel.getNodeOrNull("SpineAimModifier");
         if (first != null) skel.moveChild(g.pose, first.getIndex());
+        // the hands LAST, after the aim modifiers: a drive-by's torso turn must not carry the left hand off the bar
+        g.hands = new com.openworld.character.RiderHandsModifier();
+        g.hands.setName(new godot.core.StringName(com.openworld.character.RiderHandsModifier.NAME));
+        skel.addChild(g.hands);
+        g.pose.setHands(g.hands);
         String head = skel.findBone("head") >= 0 ? "head" : skel.findBone("head_2") >= 0 ? "head_2" : null;
         if (head != null) {
             godot.api.BoneAttachment3D at = new godot.api.BoneAttachment3D();
@@ -328,6 +352,7 @@ public class Motorcycle extends Vehicle {
 
     private static void undress(Gear g) {
         if (g.pose != null && GD.isInstanceValid(g.pose)) g.pose.queueFree();
+        if (g.hands != null && GD.isInstanceValid(g.hands)) g.hands.queueFree();
         if (g.helmet != null && GD.isInstanceValid(g.helmet)) g.helmet.queueFree();
     }
 
