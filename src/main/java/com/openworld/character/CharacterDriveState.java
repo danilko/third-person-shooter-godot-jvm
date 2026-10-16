@@ -6,6 +6,8 @@ import godot.api.Node;
 import godot.api.Node3D;
 import godot.core.Vector3;
 import com.openworld.carrier.vehicle.Vehicle;
+import com.openworld.weapon.WeaponController;
+import com.openworld.weapon.WeaponItem;
 import com.openworld.movement.character.MovementController;
 import com.openworld.movement.character.StanceName;
 import com.openworld.net.NetworkController;
@@ -129,9 +131,41 @@ final class CharacterDriveState {
         // Through Character.applySeatedAimTarget, never the marker directly: the carrier's firing
         // sector is applied there, once, for the bones and the bullet and the reticle alike.
         owner.applySeatedAimTarget(aimTargetPos);
+        // A MOTORCYCLE's rider (PLAN.md 3.1b): one hand stays on the bars, so a two-handed weapon is neither drawn nor
+        // fired from the saddle -- the switch is refused, and one already in hand is put away for the best one-handed one.
+        if (oneHandedSeat()) {
+            WeaponController wc = owner.getNodeOrNull("WeaponController") instanceof WeaponController w ? w : null;
+            if (wc != null) {
+                if (desiredWeapon >= 0 && !oneHandedSlot(wc, desiredWeapon)) desiredWeapon = -1;
+                if (!oneHandedSlot(wc, wc.getReplicatedActiveSlot())) {
+                    fire = false;
+                    reload = false;
+                    // the best one-handed weapon, or empty hands (slot 0) when there is none
+                    int best = Math.max(0, firstOneHandedSlot(wc));
+                    if (desiredWeapon < 0 && best != wc.getReplicatedActiveSlot()) desiredWeapon = best;
+                }
+            }
+        }
         if (fire) owner.fireWeapon.emit();
         else      owner.notFireWeapon.emit();
         if (reload) owner.reloadWeapon.emit();
         if (desiredWeapon >= 0) owner.setWeapon(desiredWeapon);
+    }
+
+    /** True while this body rides a seat that allows one-handed weapons only. */
+    boolean oneHandedSeat() {
+        if (!(owner.currentVehicleNode instanceof com.openworld.carrier.vehicle.Vehicle v)) return false;
+        return v.oneHandedOnly(v.findSeatOf(owner));
+    }
+
+    static boolean oneHandedSlot(WeaponController wc, int slot) {
+        WeaponItem w = wc.getWeaponItem(slot);
+        return w != null && w.oneHanded;
+    }
+
+    /** The first slot holding a one-handed weapon, or -1. */
+    static int firstOneHandedSlot(WeaponController wc) {
+        for (int i = 0; i < wc.slotCount(); i++) if (oneHandedSlot(wc, i)) return i;
+        return -1;
     }
 }

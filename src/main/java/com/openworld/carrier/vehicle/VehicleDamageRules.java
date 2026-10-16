@@ -130,6 +130,8 @@ public final class VehicleDamageRules {
         if (name.equals("bonnet")) return Kind.BONNET;
         if (name.equals("boot")) return Kind.BOOT;
         if (name.startsWith("bump_")) return Kind.BUMPER;
+        // a motorcycle's loose parts behave as bumpers do: they dent, hang and drop (make_placeholder_bikes.py)
+        if (name.equals("fairing") || name.equals("top_box") || name.startsWith("mirror_")) return Kind.BUMPER;
         if (name.startsWith("door_")) return Kind.DOOR;
         if (name.startsWith("wing_")) return Kind.WING;
         if (name.equals("windscreen")) return Kind.WINDSCREEN;
@@ -137,7 +139,15 @@ public final class VehicleDamageRules {
         return Kind.UNKNOWN;
     }
 
+    /**
+     * A motorcycle's parts ride slots a bike has no part for (the mask is full, and a slot index is on the wire): its
+     * cowl is the front bumper's, its rear box the rear bumper's, its mirrors the rear doors'.
+     */
+    private static final java.util.Map<String, String> SLOT_ALIAS = java.util.Map.of(
+            "fairing", "bump_front", "top_box", "bump_rear", "mirror_l", "door_lr", "mirror_r", "door_rr");
+
     public static int slotOf(String name) {
+        if (name != null && SLOT_ALIAS.containsKey(name)) name = SLOT_ALIAS.get(name);
         for (int i = 0; i < SLOTS.length; i++) if (SLOTS[i].equals(name)) return i;
         return -1;
     }

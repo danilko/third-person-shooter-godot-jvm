@@ -248,6 +248,8 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             }
         }
         if (seatNodes.isEmpty() && driverSeatNode != null) seatNodes.add(driverSeatNode);
+        // an inherited scene cannot delete Vehicle.tscn's four seats: a motorcycle says how many are real
+        while (cfg.seatLimit > 0 && seatNodes.size() > cfg.seatLimit) seatNodes.remove(seatNodes.size() - 1);
         if (!seatNodes.isEmpty()) driverSeatNode = seatNodes.get(0);
         seatOccupants = new Character[Math.max(1, seatNodes.size())];
         seatRearPosture = new boolean[seatOccupants.length];
@@ -642,6 +644,20 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             VehicleConfig seatCfg = getConfig();
             if (seatCfg != null && seatCfg.seatDrop != 0.0) {
                 seatPos = seatPos.plus(getGlobalTransform().getBasis().getColumn(1).times((float) -seatCfg.seatDrop));
+            }
+            // LEAN (a motorcycle): the rider rolls with the bike about its ground contact line, so the body stays on
+            // the leaning seat. Euler Z is the roll about the body's own fore-aft axis (YXZ order); tryExit's
+            // exitDriveState restores the pre-drive rotation, so nothing has to undo it.
+            double roll = seatRollRadians();
+            if (roll != 0.0) {
+                Basis b = getGlobalTransform().getBasis();
+                Vector3 fwd = b.getColumn(2);
+                Vector3 contact = getGlobalPosition().plus(b.getColumn(1).times((float) rollPivotHeight()));
+                Vector3 off = seatPos.minus(contact);
+                double along = off.dot(fwd);
+                Vector3 axisPoint = contact.plus(fwd.times((float) along));
+                seatPos = axisPoint.plus(off.minus(fwd.times((float) along)).rotated(fwd.normalized(), roll));
+                occRot.setZ((float) (getGlobalRotation().getZ() + roll));
             }
             rider.setGlobalPosition(seatPos);
             rider.setGlobalRotation(occRot);
@@ -1200,6 +1216,18 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             }
         }
     }
+
+    /** True when the rider in {@code seat} keeps a hand on the bars: one-handed weapons only (a motorcycle's rider). */
+    public boolean oneHandedOnly(int seat) { return false; }
+
+    /** How far the seated riders roll with the body this tick (radians, + = to the left): a motorcycle's lean. */
+    protected double seatRollRadians() { return 0.0; }
+
+    /** Where that roll pivots: the body-local height of the ground contact line under the origin. */
+    protected double rollPivotHeight() { return 0.0; }
+
+    /** How far beside its seat a rider steps out (m): a car's door is 1.5 m out, a bike's side half that. */
+    protected double exitSideOffset() { return 1.5; }
 
     /**
      * The up axis the keep-upright assist pulls toward. World-up for cars; {@code Motorcycle}
@@ -2938,7 +2966,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         Node3D anchor = seatIndex < seatNodes.size() ? seatNodes.get(seatIndex) : driverSeatNode;
         float side = (anchor != null && anchor.getPosition().getX() > 0f) ? 1f : -1f;
         Vector3 base = anchor != null ? anchor.getGlobalPosition() : getGlobalPosition();
-        return base.plus(right.times(1.5f * side)).plus(new Vector3(0f, 0.8f, 0f));
+        return base.plus(right.times((float) exitSideOffset() * side)).plus(new Vector3(0f, 0.8f, 0f));
     }
 
     /**

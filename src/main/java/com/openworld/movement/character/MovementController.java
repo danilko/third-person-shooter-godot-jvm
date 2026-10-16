@@ -191,6 +191,12 @@ public class MovementController extends Node {
     shoveLeft = seconds;
   }
 
+  /** Thrown: the body leaves with this velocity, vertical included (a rider coming off a crashed bike). */
+  public void launch(Vector3 v) {
+    velocity = new Vector3(v.getX(), v.getY(), v.getZ());
+    if (player != null) player.setVelocity(v);
+  }
+
   @Register
   public void clearMotion() {
     velocity = new Vector3();

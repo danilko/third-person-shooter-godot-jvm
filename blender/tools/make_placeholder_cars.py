@@ -407,4 +407,5 @@ def main():
         build(vid, CARS[vid])
 
 
-main()
+if __name__ == "__main__":
+    main()

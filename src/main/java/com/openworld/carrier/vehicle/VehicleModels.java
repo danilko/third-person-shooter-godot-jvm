@@ -41,7 +41,13 @@ public final class VehicleModels {
             DIR + "ARV1.tscn",         // 23: ARV-1 armoured riot vehicle (特型警備車), enforcement 4+ stars
             DIR + "LTK1.tscn",         // 24: LTK-1 wheeled light tank (Type 16 class), enforcement 5+ stars
             DIR + "TNK1.tscn",         // 25: TNK-1 main battle tank (Type 10 class), enforcement 6 stars
-            DIR + "HLC1.tscn");        // 26: HLC-1 police helicopter (AW139 class, Helicopter carrier)
+            DIR + "HLC1.tscn",         // 26: HLC-1 police helicopter (AW139 class, Helicopter carrier)
+            // the motorcycles (PLAN.md 3.1b, Motorcycle carrier; placeholder blocks, make_placeholder_bikes.py)
+            DIR + "SCT1.tscn",         // 27: SCT-1 原付 scooter (Dio class)
+            DIR + "POB1.tscn",         // 28: POB-1 postal Cub (Super Cub 110 class)
+            DIR + "TRB1.tscn",         // 29: TRB-1 trail bike (Serow / CRF250L class)
+            DIR + "SSB1.tscn",         // 30: SSB-1 supersport (YZF-R1 class)
+            DIR + "PMB1.tscn");        // 31: PMB-1 police 白バイ (CB1300 class)
     // 5-14 are PLACEHOLDER block models (blender/tools/make_placeholder_cars.py), 15-18 placeholder craft
     // (blender/tools/make_placeholder_craft.py + tools/build_craft_scenes.py), until an artist models them.
 

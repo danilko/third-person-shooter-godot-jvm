@@ -96,8 +96,33 @@ TUNING = {
     "LAT1": {"name": "LAT-1", "mass": 13000, "rest": 0.48, "spring": 100000, "damping": 36000, "over": 0.25,
              "max_speed": 24.0, "accel": 70000.0, "crash_hp": 2.5, "health": 2000, "paint": "",
              "extra_seats": [[-0.50, 3.10, 1.55], [0.50, 3.10, 1.55]]},
+    # MOTORCYCLES (PLAN.md 3.1b / 2c.7, the bike set of 2026-10-15): placeholder blocks from
+    # blender/tools/make_placeholder_bikes.py, real masses. `bike` = the Motorcycle script, four rays BIKE_TRACK either
+    # side of the two wheels (the model keeps its own wheels: Motorcycle.java), `lean` its most lean (deg), `aero` its
+    # drag (a bike's frontal area is about half a car's). MY PICKS, unreviewed: every speed, force and lean below.
+    "SCT1": {"name": "SCT-1", "mass": 90, "rest": 0.16, "spring": 4200, "damping": 700, "over": 0.12,
+             "max_speed": 17.0, "accel": 420.0, "crash_hp": 8.0, "health": 160, "paint": "car",
+             "bike": True, "lean": 35.0, "aero": 0.25, "steer": 30.0},
+    "POB1": {"name": "POB-1", "mass": 100, "rest": 0.16, "spring": 4600, "damping": 760, "over": 0.12,
+             "max_speed": 24.0, "accel": 520.0, "crash_hp": 8.0, "health": 180, "paint": "",
+             "bike": True, "lean": 35.0, "aero": 0.25, "steer": 30.0},
+    "TRB1": {"name": "TRB-1", "mass": 135, "rest": 0.22, "spring": 5200, "damping": 900, "over": 0.15,
+             "max_speed": 36.0, "accel": 980.0, "crash_hp": 7.0, "health": 200, "paint": "car",
+             "bike": True, "lean": 42.0, "aero": 0.22, "steer": 28.0},
+    "SSB1": {"name": "SSB-1", "mass": 200, "rest": 0.18, "spring": 7600, "damping": 1250, "over": 0.12,
+             "max_speed": 72.0, "accel": 2300.0, "crash_hp": 7.0, "health": 220, "paint": "car",
+             "bike": True, "lean": 50.0, "aero": 0.20, "steer": 24.0},
+    "PMB1": {"name": "PMB-1", "mass": 280, "rest": 0.18, "spring": 10000, "damping": 1700, "over": 0.12,
+             "max_speed": 55.0, "accel": 2400.0, "crash_hp": 6.0, "health": 300, "paint": "",
+             "bike": True, "lean": 42.0, "aero": 0.26, "steer": 26.0},
 }
 WHEELS = {"RR": "wheel_rb", "RL": "wheel_lb", "FR": "wheel_rf", "FL": "wheel_lf"}
+# a motorcycle's four rays: each axle's pair stands BIKE_TRACK either side of its one wheel, inside the tyre's
+# footprint plus a hand's width -- wide enough to stand, narrow enough that a kerb meets both rays of an axle together
+BIKE_TRACK = 0.16
+BIKE_WHEELS = {"RR": ("wheel_b", 1), "RL": ("wheel_b", -1), "FR": ("wheel_f", 1), "FL": ("wheel_f", -1)}
+BIKE_SEATS = ["seat_front_l", "seat_rear_l"]
+MOTORCYCLE = "res://src/main/java/com/openworld/carrier/motorcycle/Motorcycle.java"
 SEAT_ORDER = ["seat_front_l", "seat_front_r", "seat_rear_l", "seat_rear_r"]   # Seat0 = the driver, left
 
 
@@ -129,11 +154,19 @@ def build(vid):
     t = TUNING[vid]
     d = json.load(open(os.path.join(ROOT, "assets", "vehicles", vid + ".vehicle.json")))
     lo, hi = d["bounds"]["min"], d["bounds"]["max"]
-    radius = d["wheels"]["wheel_lf"]["radius"]
+    bike = t.get("bike", False)
+    radius = d["wheels"]["wheel_b" if bike else "wheel_lf"]["radius"]
     spring_eq = t["rest"] - t["mass"] * G / (4.0 * t["spring"])
     if spring_eq <= 0.02:
         raise SystemExit(f"{vid}: the spring bottoms out at rest (equilibrium {spring_eq:.3f} m): stiffen it")
     seats = [d["seats"][n] for n in SEAT_ORDER if n in d["seats"]] + t.get("extra_seats", [])
+    seat_limit = 0
+    if bike:
+        # the real seats (the rider, a pillion if the model has one); the rest of Vehicle.tscn's four sit on the
+        # rider's and are cut by VehicleConfig.seatLimit
+        seats = [d["seats"][n] for n in BIKE_SEATS if n in d["seats"]]
+        seat_limit = len(seats)
+        seats += [seats[0]] * (4 - len(seats))
     if len(seats) != 4:
         raise SystemExit(f"{vid}: {len(seats)} seats; Vehicle.tscn has 4 and an inherited scene cannot remove one - "
                          f"add extra_seats to its TUNING row")
@@ -183,6 +216,16 @@ taillight_offset = Vector3({f(tail[0])}, {f(tail[1])}, {f(tail[2])})
 seat_drop = {f(t.get("seat_drop", 0.0))}
 glass_armor = {f(t.get("glass_armor", 0.0))}
 """
+    if bike:
+        cfg += f"""seat_limit = {seat_limit}
+motorcycle_lean_degrees = {f(t["lean"])}
+aero_drag_coefficient = {f(t["aero"])}
+tire_max_turn_degrees = {f(t["steer"])}
+"""
+    bike_script = '\nscript = ExtResource("5_moto")' if bike else ""
+    # a bike's get-on box hugs the bike: Vehicle.tscn's 4 x 7 m one would catch the next bike along a parked row
+    entrance_res = (f'\n[sub_resource type="BoxShape3D" id="BoxShape3D_bike_entrance"]\n'
+                    f'size = Vector3(2.4, 2.5, {f(hi[2] - lo[2] + 1.4)})\n') if bike else ""
     hull = ", ".join(f"{f(x)}, {f(y + MODEL_Y)}, {f(z)}" for x, y, z in d["hull"])
     nodes = [f"""[gd_scene format=3]
 
@@ -190,12 +233,12 @@ glass_armor = {f(t.get("glass_armor", 0.0))}
 [ext_resource type="PackedScene" path="res://assets/vehicles/{vid}.glb" id="2_model"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/carrier/vehicle/VehicleDamageModel.java" id="3_dm"]
 [ext_resource type="Resource" path="res://src/main/resources/com/openworld/vehicle/{vid}Config.tres" id="4_cfg"]
-
+{'[ext_resource type="Script" path="' + MOTORCYCLE + '" id="5_moto"]' + chr(10) if bike else ""}
 [sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_hull"]
 points = PackedVector3Array({hull})
-
+{entrance_res}
 ; GENERATED by tools/build_vehicle_scenes.py from assets/vehicles/{vid}.vehicle.json - do not hand-edit.
-[node name="{vid}" instance=ExtResource("1_base")]
+[node name="{vid}" instance=ExtResource("1_base")]{bike_script}
 mass = {f(t["mass"])}
 vehicle_config = ExtResource("4_cfg")
 
@@ -215,11 +258,19 @@ paint_material = "{t["paint"]}"
             nodes.append(f'[node name="DriverSeat" parent="."]\ntransform = {xform(mx, my, mz)}\n')
         nodes.append(f'[node name="Seat{i}" parent="Seats"]\ntransform = {xform(mx, my, mz)}\n')
     for k, mesh in WHEELS.items():
+        if bike:
+            src, side = BIKE_WHEELS[k]
+            cx, cy, cz = d["wheels"][src]["centre"]
+            nodes.append(f'[node name="{k}" parent="Wheels"]\n'
+                         f'transform = {xform(cx + side * BIKE_TRACK, cy + MODEL_Y + spring_eq, cz)}\n')
+            continue
         cx, cy, cz = d["wheels"][mesh]["centre"]
         nodes.append(f'[node name="{k}" parent="Wheels"]\ntransform = {xform(cx, cy + MODEL_Y + spring_eq, cz)}\n'
                      f'model_mesh = "{mesh}"\n')
     nodes += [
         '[node name="CollisionShape3D" parent="."]\nshape = SubResource("ConvexPolygonShape3D_hull")\n',
+        *(['[node name="EntranceShape" parent="EntranceArea"]\nshape = SubResource("BoxShape3D_bike_entrance")\n']
+          if bike else []),
         f'[node name="FPSCameraMount" parent="."]\ntransform = {xform(0, top_y - 0.35, front_z * 0.4)}\n',
         f'[node name="VehicleWeaponMount" parent="."]\ntransform = {xform(0, -0.2, front_z + 0.2)}\n',
         f'[node name="ObstacleRay" parent="."]\ntransform = {xform(0, -0.45, front_z - 0.1)}\n',

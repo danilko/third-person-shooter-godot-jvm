@@ -316,8 +316,20 @@ public class VehicleConfig extends Resource {
 
     // ── Carrier stubs — motorcycle / boat / airplane (drivable prototypes) ─
 
-    /** Motorcycle: max lean (deg) into a full-lock turn at speed (banks via the upright assist). */
-    @Export public float motorcycleLeanDegrees = 28f;
+    /**
+     * Motorcycle: the most the bike LEANS in a turn (deg). The lean is visual (Motorcycle.java): the model and the
+     * rider roll by atan(v * yaw rate / g), the angle a real bike holds through that turn, capped here.
+     */
+    @Export public float motorcycleLeanDegrees = 40f;
+
+    /** Motorcycle: a crash that changes the bike's velocity by this much in one step THROWS its riders (m/s). */
+    @Export public float motorcycleEjectDv = 7f;
+
+    /** Motorcycle: a thrown rider's damage, per m/s of that change past {@link #motorcycleEjectDv}, plus a floor of 8. */
+    @Export public float motorcycleEjectDamagePerDv = 6f;
+
+    /** Real seats (0 = every seat the scene has): a bike's scene inherits Vehicle.tscn's four and keeps one or two. */
+    @Export public int seatLimit = 0;
 
     /** Boat: hull buoyancy-probe half extents (m) — 4 corner probes at ±width/±length. */
     @Export public float hullHalfWidth  = 1.0f;

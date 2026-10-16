@@ -198,6 +198,12 @@ public class WeaponItem extends Pickup implements WeaponAction {
 
   @Export public String holdSocket = "";
 
+  /**
+   * Usable in ONE hand: the only weapons a motorcycle's rider may draw and fire (PLAN.md 3.1b -- the pistols, the
+   * dual pistols and SMG1, as GTA's bike drive-by). The other hand is on the bars; a pillion may use anything.
+   */
+  @Export public boolean oneHanded = false;
+
   // Names of Marker3D sockets to try (in order) when parking this weapon in inventory.
   // Each name must match a node registered in WeaponController.socketPaths.
   // The first socket with no other weapon in it is used. Empty array = hide when inactive.

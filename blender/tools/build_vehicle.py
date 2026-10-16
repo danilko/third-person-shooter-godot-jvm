@@ -63,13 +63,16 @@ OPTIONAL_SOURCE = {"exhaust", "back.side.exhaust", "FrontBackGlass"}
 PLACEHOLDER_PLANES = ("front_grill_down", "front_grill_top")
 
 DAMAGEABLE = ["chassis", "bonnet", "boot", "bump_front", "bump_rear", "door_lf", "door_rf", "door_lr", "door_rr",
-              "wing_lf", "wing_rf", "windscreen"]
+              "wing_lf", "wing_rf", "windscreen",
+              # a motorcycle's (make_placeholder_bikes.py): the cowl, the rear box, the mirrors
+              "fairing", "top_box", "mirror_l", "mirror_r"]
 REQUIRED = ["chassis"]                   # every other damageable part is optional: a pickup has no boot
 # Vehicles whose .blend is an artist's AUTHORING layout, split by the tables above. Any other vehicle's .blend is
 # already in component form (named parts + seat_* Empties, e.g. the placeholders from make_placeholder_cars.py).
 SOURCE_LAYOUT = {"SPC1"}
 WHEELS = ["wheel_lf", "wheel_rf", "wheel_lb", "wheel_rb"]
-HULL_EXCLUDE = WHEELS + ["windscreen"]
+BIKE_WHEELS = ["wheel_f", "wheel_b"]          # a motorcycle: a .blend with these two instead of the four
+HULL_EXCLUDE = WHEELS + BIKE_WHEELS + ["windscreen", "mirror_l", "mirror_r"]
 HULL_FLOOR = 0.32            # m above the ground: the hull's lowest points (a kerb is 0.15 m, plus compression and roll)
 
 # (outward direction of the part's exposed side, inward push there, noise amplitude) - metres
@@ -80,6 +83,8 @@ CRUMPLE = {
     "door_lr": ((-1, 0, 0), 0.12, 0.045),  "door_rr": ((1, 0, 0), 0.12, 0.045),
     "wing_lf": ((-1, 0.5, 0), 0.12, 0.05), "wing_rf": ((1, 0.5, 0), 0.12, 0.05),
     "windscreen": ((0, 0, 1), 0.03, 0.015), "chassis": (None, 0.0, 0.04),
+    "fairing": ((0, 1, 0), 0.10, 0.04), "top_box": ((0, -1, 0), 0.10, 0.04),
+    "mirror_l": ((-1, 0, 0), 0.03, 0.01), "mirror_r": ((1, 0, 0), 0.03, 0.01),
 }
 SEED = Vector((13.7, 5.1, 2.9))
 
@@ -163,13 +168,19 @@ def evaluate_all(objs):
         bm.to_mesh(me); bm.free()
 
 
+def wheels_of(names):
+    """The wheel set a model uses: a motorcycle's two, else a car's four."""
+    return BIKE_WHEELS if "wheel_f" in names else WHEELS
+
+
 def components_in_memory(vid):
     """A .blend already in component form: named parts, seat_* Empties, facing +Y on the ground."""
     OBJ = bpy.data.objects
     meshes = [o for o in OBJ if o.type == 'MESH']
-    known = set(DAMAGEABLE) | set(WHEELS)
+    wheel_names = wheels_of({o.name for o in meshes})
+    known = set(DAMAGEABLE) | set(wheel_names)
     unknown = sorted(o.name for o in meshes if o.name not in known)
-    missing = sorted(n for n in REQUIRED + WHEELS if n not in OBJ)
+    missing = sorted(n for n in REQUIRED + wheel_names if n not in OBJ)
     if unknown or missing:
         fail(vid, f"component names: missing {missing}, unknown {unknown}. A part is found BY NAME at runtime "
                   f"(VEHICLE_AUTHORING.md lists them); an unknown mesh would ship but never break.")
@@ -365,6 +376,12 @@ def finish(vid, parts):
             p = Vector((hi.x - 0.08, mid.y, hi.z - 0.05))
         elif name == "bump_rear":
             p = Vector((lo.x + 0.08, mid.y, hi.z - 0.05))
+        elif name == "fairing":                                    # hangs from the steering head: its top rear edge
+            p = Vector((0.0, lo.y, hi.z - 0.03))
+        elif name == "top_box":                                    # on its rack: the front bottom edge
+            p = Vector((0.0, hi.y - 0.03, lo.z))
+        elif name.startswith("mirror_"):                           # its stalk's foot on the bar
+            p = Vector((mid.x, mid.y, lo.z))
         elif name == "chassis":
             p = Vector()
         else:
@@ -414,7 +431,7 @@ def build(vid):
     world = lambda o: [o.matrix_world @ v.co for v in o.data.vertices]
     lo, hi = box([p for o in parts.values() for p in world(o)])
     wheels = {}
-    for n in WHEELS:
+    for n in wheels_of(set(parts)):
         a, b = box(world(parts[n]))
         wheels[n] = {"centre": godot((a + b) / 2), "radius": round((b.z - a.z) / 2, 4)}
 
@@ -474,7 +491,7 @@ def build(vid):
     with open(os.path.join(DIR, vid + ".vehicle.json"), "w") as f:
         json.dump(facts, f, indent=1)
     print(f"[build_vehicle] {vid}: {hi.y - lo.y:.3f} x {hi.x - lo.x:.3f} x {hi.z:.3f} m, "
-          f"wheel r {wheels['wheel_lf']['radius']:.3f}, {sum(len(o.data.vertices) for o in parts.values())} verts, "
+          f"wheel r {next(iter(wheels.values()))['radius']:.3f}, {sum(len(o.data.vertices) for o in parts.values())} verts, "
           f"hull {len(hull)} points, wrote {os.path.basename(out)} ({os.path.getsize(out)} bytes)")
 
 
