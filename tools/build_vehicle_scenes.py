@@ -99,22 +99,24 @@ TUNING = {
     # MOTORCYCLES (PLAN.md 3.1b / 2c.7, the bike set of 2026-10-15): placeholder blocks from
     # blender/tools/make_placeholder_bikes.py, real masses. `bike` = the Motorcycle script, four rays BIKE_TRACK either
     # side of the two wheels (the model keeps its own wheels: Motorcycle.java), `lean` its most lean (deg), `aero` its
-    # drag (a bike's frontal area is about half a car's). MY PICKS, unreviewed: every speed, force and lean below.
+    # drag (a bike's frontal area is about half a car's), `rider` the rider's pose bent from the car's seated clip
+# (character.RiderPoseModifier: lean forward, thighs up / feet back, extra knee bend, deg -- 0s = the scooter's
+# feet-forward floorboard). MY PICKS, unreviewed: every speed, force, lean and pose below.
     "SCT1": {"name": "SCT-1", "mass": 90, "rest": 0.16, "spring": 4200, "damping": 700, "over": 0.12,
              "max_speed": 17.0, "accel": 420.0, "crash_hp": 8.0, "health": 160, "paint": "car",
-             "bike": True, "lean": 35.0, "aero": 0.25, "steer": 30.0},
+             "bike": True, "lean": 35.0, "aero": 0.25, "steer": 30.0, "rider": [0.0, 0.0, 0.0]},
     "POB1": {"name": "POB-1", "mass": 100, "rest": 0.16, "spring": 4600, "damping": 760, "over": 0.12,
              "max_speed": 24.0, "accel": 520.0, "crash_hp": 8.0, "health": 180, "paint": "",
-             "bike": True, "lean": 35.0, "aero": 0.25, "steer": 30.0},
+             "bike": True, "lean": 35.0, "aero": 0.25, "steer": 30.0, "rider": [6.0, 22.0, 25.0]},
     "TRB1": {"name": "TRB-1", "mass": 135, "rest": 0.22, "spring": 5200, "damping": 900, "over": 0.15,
              "max_speed": 36.0, "accel": 980.0, "crash_hp": 7.0, "health": 200, "paint": "car",
-             "bike": True, "lean": 42.0, "aero": 0.22, "steer": 28.0},
+             "bike": True, "lean": 42.0, "aero": 0.22, "steer": 28.0, "rider": [10.0, 25.0, 30.0]},
     "SSB1": {"name": "SSB-1", "mass": 200, "rest": 0.18, "spring": 7600, "damping": 1250, "over": 0.12,
              "max_speed": 72.0, "accel": 2300.0, "crash_hp": 7.0, "health": 220, "paint": "car",
-             "bike": True, "lean": 50.0, "aero": 0.20, "steer": 24.0},
+             "bike": True, "lean": 50.0, "aero": 0.20, "steer": 24.0, "rider": [45.0, 35.0, 45.0]},
     "PMB1": {"name": "PMB-1", "mass": 280, "rest": 0.18, "spring": 10000, "damping": 1700, "over": 0.12,
              "max_speed": 55.0, "accel": 2400.0, "crash_hp": 6.0, "health": 300, "paint": "",
-             "bike": True, "lean": 42.0, "aero": 0.26, "steer": 26.0},
+             "bike": True, "lean": 42.0, "aero": 0.26, "steer": 26.0, "rider": [6.0, 22.0, 25.0]},
 }
 WHEELS = {"RR": "wheel_rb", "RL": "wheel_lb", "FR": "wheel_rf", "FL": "wheel_lf"}
 # a motorcycle's four rays: each axle's pair stands BIKE_TRACK either side of its one wheel, inside the tyre's
@@ -221,6 +223,9 @@ glass_armor = {f(t.get("glass_armor", 0.0))}
 motorcycle_lean_degrees = {f(t["lean"])}
 aero_drag_coefficient = {f(t["aero"])}
 tire_max_turn_degrees = {f(t["steer"])}
+rider_lean_forward = {f(t.get("rider", [0, 0, 0])[0])}
+rider_thigh_raise = {f(t.get("rider", [0, 0, 0])[1])}
+rider_knee_bend = {f(t.get("rider", [0, 0, 0])[2])}
 """
     bike_script = '\nscript = ExtResource("5_moto")' if bike else ""
     # a bike's get-on box hugs the bike: Vehicle.tscn's 4 x 7 m one would catch the next bike along a parked row

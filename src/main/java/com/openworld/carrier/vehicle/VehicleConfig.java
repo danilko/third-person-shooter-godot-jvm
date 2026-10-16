@@ -328,6 +328,15 @@ public class VehicleConfig extends Resource {
     /** Motorcycle: a thrown rider's damage, per m/s of that change past {@link #motorcycleEjectDv}, plus a floor of 8. */
     @Export public float motorcycleEjectDamagePerDv = 6f;
 
+    /**
+     * Motorcycle: the RIDER's pose, bent from the car's seated clip by character.RiderPoseModifier (deg): the spine
+     * toward the bars (the sport tuck), the thighs up / feet back (pegs under the hips), the knees' extra bend. 0, 0, 0
+     * = the clip as it is (the scooter: feet forward on the floorboard).
+     */
+    @Export public float riderLeanForward = 0f;
+    @Export public float riderThighRaise = 0f;
+    @Export public float riderKneeBend = 0f;
+
     /** Real seats (0 = every seat the scene has): a bike's scene inherits Vehicle.tscn's four and keeps one or two. */
     @Export public int seatLimit = 0;
 

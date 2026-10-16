@@ -1,23 +1,20 @@
 {
- "note": "Ambient traffic by REGION (user, 2026-10-10): which vehicles drive there and how much of the car budget the region gets. A region is a box of the places record (world.Places.regionAt, the same boxes the buildings were placed by); its row here is the one whose key is the longest PREFIX of the region's name ('residential_north' -> 'residential', 'light_industry_w' -> 'light_industry'), else `default`. `mix`: catalog vehicle id -> weight (any positive numbers; a car is drawn in proportion). `scale`: the share of ZoneManager.trafficBudget kept while the busiest player stands in that region (1 = all of it). Used by the simulated cars (host-decided, the same for every peer) and by the far tier's placeholder cars (local).",
- "default": {
-  "scale": 1.0,
-  "mix": { "KEC1": 6, "SPC1": 4, "KET1": 3, "TAX1": 3, "CLC1": 2, "CRT1": 1, "POV1": 1 }
- },
+ "note": "Ambient traffic by REGION (user, 2026-10-10): which vehicles drive there and how much of the car budget the region gets. A region is a box of the places record (world.Places.regionAt, the same boxes the buildings were placed by); its row here is the one whose key is the longest PREFIX of the region's name ('residential_north' -> 'residential', 'light_industry_w' -> 'light_industry'), else `default`. `mix`: catalog vehicle id -> weight (any positive numbers; a car is drawn in proportion). `scale`: the share of ZoneManager.trafficBudget kept while the busiest player stands in that region (1 = all of it). Used by the simulated cars (host-decided, the same for every peer) and by the far tier's placeholder cars (local). MOTORCYCLES (PLAN.md 3.1b, 2026-10-16): SCT1 scooter / POB1 postal Cub / SSB1 supersport / TRB1 trail are civilian traffic like any car and take a car's slot of the budget (a bike is a full body + a seated rider, a car's cost); PMB1 (白バイ) is police-only. Their weights here are UNREVIEWED picks (~8-12 % of a row; the farm trail bikes, the city scooters).",
+ "default": { "scale": 1.0, "mix": { "KEC1": 6, "SPC1": 4, "KET1": 3, "TAX1": 3, "CLC1": 2, "CRT1": 1, "POV1": 1, "SCT1": 1.5, "POB1": 0.5, "SSB1": 0.3, "TRB1": 0.2 } },
  "regions": {
-  "downtown": { "scale": 1.0, "mix": { "KEC1": 5, "SPC1": 5, "TAX1": 5, "CLC1": 2, "POV1": 1, "POT1": 1, "KET1": 1 } },
-  "akiba": { "scale": 1.0, "mix": { "KEC1": 5, "SPC1": 4, "TAX1": 4, "POV1": 2, "POT1": 2, "CLC1": 1 } },
-  "nightlife": { "scale": 1.0, "mix": { "TAX1": 7, "KEC1": 4, "SPC1": 4, "CLC1": 3, "POV1": 1 } },
-  "ekimae": { "scale": 1.0, "mix": { "TAX1": 6, "KEC1": 5, "SPC1": 4, "POV1": 1, "POT1": 1 } },
-  "city": { "scale": 1.0, "mix": { "KEC1": 6, "SPC1": 4, "TAX1": 3, "KET1": 2, "CLC1": 2, "POT1": 2, "POV1": 1 } },
-  "west_": { "scale": 1.0, "mix": { "KEC1": 6, "SPC1": 4, "TAX1": 3, "KET1": 2, "CLC1": 2, "POT1": 1, "POV1": 1 } },
-  "residential": { "scale": 0.9, "mix": { "KEC1": 8, "SPC1": 3, "KET1": 2, "CLC1": 2, "TAX1": 1, "POV1": 1 } },
-  "suburb": { "scale": 0.9, "mix": { "KEC1": 8, "SPC1": 4, "KET1": 2, "CLC1": 2, "TAX1": 1, "POV1": 1 } },
-  "industry": { "scale": 0.9, "mix": { "BOT1": 4, "CRT1": 4, "KET1": 4, "POT1": 3, "KEC1": 2, "SPC1": 1 } },
-  "light_industry": { "scale": 0.9, "mix": { "KET1": 5, "POT1": 4, "BOT1": 3, "CRT1": 2, "KEC1": 3, "SPC1": 1 } },
-  "bay_processing": { "scale": 0.9, "mix": { "KET1": 5, "POT1": 4, "BOT1": 3, "CRT1": 2, "KEC1": 2 } },
-  "harbour": { "scale": 0.8, "mix": { "CRT1": 5, "BOT1": 4, "KET1": 3, "POT1": 2, "KEC1": 2 } },
+  "downtown": { "scale": 1.0, "mix": { "KEC1": 5, "SPC1": 5, "TAX1": 5, "CLC1": 2, "POV1": 1, "POT1": 1, "KET1": 1, "SCT1": 1.5, "POB1": 0.5, "SSB1": 0.5 } },
+  "akiba": { "scale": 1.0, "mix": { "KEC1": 5, "SPC1": 4, "TAX1": 4, "POV1": 2, "POT1": 2, "CLC1": 1, "SCT1": 1.5, "SSB1": 1, "POB1": 0.5 } },
+  "nightlife": { "scale": 1.0, "mix": { "TAX1": 7, "KEC1": 4, "SPC1": 4, "CLC1": 3, "POV1": 1, "SCT1": 1, "SSB1": 0.5 } },
+  "ekimae": { "scale": 1.0, "mix": { "TAX1": 6, "KEC1": 5, "SPC1": 4, "POV1": 1, "POT1": 1, "SCT1": 2, "POB1": 0.5 } },
+  "city": { "scale": 1.0, "mix": { "KEC1": 6, "SPC1": 4, "TAX1": 3, "KET1": 2, "CLC1": 2, "POT1": 2, "POV1": 1, "SCT1": 2, "POB1": 1, "SSB1": 0.5, "TRB1": 0.3 } },
+  "west_": { "scale": 1.0, "mix": { "KEC1": 6, "SPC1": 4, "TAX1": 3, "KET1": 2, "CLC1": 2, "POT1": 1, "POV1": 1, "SCT1": 2, "POB1": 0.5, "SSB1": 0.5, "TRB1": 0.3 } },
+  "residential": { "scale": 0.9, "mix": { "KEC1": 8, "SPC1": 3, "KET1": 2, "CLC1": 2, "TAX1": 1, "POV1": 1, "SCT1": 2, "POB1": 1 } },
+  "suburb": { "scale": 0.9, "mix": { "KEC1": 8, "SPC1": 4, "KET1": 2, "CLC1": 2, "TAX1": 1, "POV1": 1, "SCT1": 1.5, "POB1": 1, "TRB1": 0.5 } },
+  "industry": { "scale": 0.9, "mix": { "BOT1": 4, "CRT1": 4, "KET1": 4, "POT1": 3, "KEC1": 2, "SPC1": 1, "SCT1": 0.5 } },
+  "light_industry": { "scale": 0.9, "mix": { "KET1": 5, "POT1": 4, "BOT1": 3, "CRT1": 2, "KEC1": 3, "SPC1": 1, "SCT1": 1 } },
+  "bay_processing": { "scale": 0.9, "mix": { "KET1": 5, "POT1": 4, "BOT1": 3, "CRT1": 2, "KEC1": 2, "SCT1": 0.5 } },
+  "harbour": { "scale": 0.8, "mix": { "CRT1": 5, "BOT1": 4, "KET1": 3, "POT1": 2, "KEC1": 2, "SCT1": 0.5 } },
   "airport": { "scale": 0.7, "mix": { "TAX1": 6, "KEC1": 3, "SPC1": 3, "POT1": 2, "BOT1": 1 } },
-  "farm": { "scale": 0.6, "mix": { "KET1": 8, "KEC1": 4, "SPC1": 1, "CRT1": 1 } }
+  "farm": { "scale": 0.6, "mix": { "KET1": 8, "KEC1": 4, "SPC1": 1, "CRT1": 1, "TRB1": 1, "POB1": 0.5 } }
  }
 }

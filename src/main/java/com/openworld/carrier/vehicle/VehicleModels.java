@@ -72,15 +72,17 @@ public final class VehicleModels {
 
     /**
      * Civilian traffic, a Japanese street's mix (one entry = one twentieth): kei cars are the biggest share, then the
-     * coupe, kei trucks, taxis, a few classics, the odd crate truck and a postal van.
+     * coupe, kei trucks, taxis, a few classics, the odd crate truck, a postal van and a scooter. Only the fallback when
+     * game/traffic.json has no usable row.
      */
     private static final String[] CIVILIAN = {
             DIR + "KEC1.tscn", DIR + "KEC1.tscn", DIR + "KEC1.tscn", DIR + "KEC1.tscn", DIR + "KEC1.tscn",
-            DIR + "KEC1.tscn", DIR + "SPC1.tscn", DIR + "SPC1.tscn", DIR + "SPC1.tscn", DIR + "SPC1.tscn",
+            DIR + "SCT1.tscn", DIR + "SPC1.tscn", DIR + "SPC1.tscn", DIR + "SPC1.tscn", DIR + "SPC1.tscn",
             DIR + "KET1.tscn", DIR + "KET1.tscn", DIR + "KET1.tscn", DIR + "TAX1.tscn", DIR + "TAX1.tscn",
             DIR + "TAX1.tscn", DIR + "CLC1.tscn", DIR + "CLC1.tscn", DIR + "CRT1.tscn", DIR + "POV1.tscn"};
-    /** Police: patrol cars, and one in four a mini patrol car. */
-    private static final String[] POLICE = {DIR + "POC1.tscn", DIR + "POC1.tscn", DIR + "POC1.tscn", DIR + "MPC1.tscn"};
+    /** Police: patrol cars, one in five a mini patrol car and one in five a 白バイ (PLAN.md 3.1b). */
+    private static final String[] POLICE = {DIR + "POC1.tscn", DIR + "POC1.tscn", DIR + "POC1.tscn", DIR + "MPC1.tscn",
+            DIR + "PMB1.tscn"};
 
     /**
      * The car an ambient driver of {@code faction} gets, from {@code roll} in [0, 1): the police drive the police car,

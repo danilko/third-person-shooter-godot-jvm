@@ -5,7 +5,8 @@ extends SceneTree
 ## A real Player on the bike, driven through `Input` (throttle, left), on a flat strip. Per bike:
 ##   rest     -- dropped on the floor it settles upright (body tilt < 2 deg), its model wheels on the ground (< 4 cm),
 ##               and empty it rests on its side stand (lean 4-10 deg to the left);
-##   seated   -- with the rider on, it stands up straight (|lean| < 1.5 deg) and the rider is in the seat;
+##   seated   -- with the rider on and standing still, it rests on the rider's left foot (lean 2-6 deg to the left:
+##               Motorcycle FOOT_LEAN_DEG, 3.1b's rider) and the rider is in the seat;
 ##   2 m/s    -- held at walking pace for 3 s it stays up (body tilt < 3 deg);
 ##   turn     -- full left at speed: the bike LEANS left (> 8 deg, and within 25 % of atan(v w / g)), the body stays
 ##               level (< 6 deg), and the rider rolls with it (within 3 deg of the bike's lean);
@@ -154,7 +155,7 @@ func _bike(w: Node3D, helper: Node, id: String, x: float) -> void:
 	var seated: bool = helper.call("occupant_of", bike) == p
 	if not stub:
 		var lean_s: float = bike.call("lean_degrees_now")
-		_check(id + " seated: stands up straight", seated and absf(lean_s) < 1.5, "lean %.2f deg, seated %s" % [lean_s, seated])
+		_check(id + " seated: rests on the rider's foot", seated and lean_s > 2.0 and lean_s < 6.0, "lean %.2f deg, seated %s" % [lean_s, seated])
 	else:
 		_check(id + " seated", seated, "")
 

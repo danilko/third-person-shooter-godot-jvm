@@ -180,14 +180,16 @@ final class VehicleDirector {
             }
             c0.setPlan(route.laneIds());
         }
-        // its crew is drawn from the stations (P1e step 3): the driver and every partner, by the car's own spot
+        // its crew is drawn from the stations (P1e step 3): the driver and every partner, by the car's own spot. A
+        // motorcycle (the 白バイ, PLAN.md 3.1b) carries its rider alone: its pillion seat is a passenger's.
+        int crewSize = v instanceof com.openworld.carrier.motorcycle.Motorcycle ? 1 : Math.max(1, Math.min(r.carCrew, v.getSeatCount()));
         List<ForcePools.Draw> crew = new ArrayList<>();
-        for (int k = 0; k < Math.max(1, Math.min(r.carCrew, v.getSeatCount())); k++) {
+        for (int k = 0; k < crewSize; k++) {
             ForcePools.Draw dr = ed.draw(p, side, stars, v.getGlobalPosition());
             if (dr == null) break;
             crew.add(dr);
         }
-        if (crew.size() < Math.max(1, Math.min(r.carCrew, v.getSeatCount()))) {
+        if (crew.size() < crewSize) {
             for (ForcePools.Draw dr : crew) ed.settle(dr.station(), true);
             z.freeServiceCar(v);
             return;
@@ -205,7 +207,7 @@ final class VehicleDirector {
             // a traffic driver is seated with empty hands (Vehicle.seatQuietly); one on a call rides ready
             drv.setSeatedCombat(true);
         }
-        for (int seat = 1; seat < Math.min(r.carCrew, v.getSeatCount()); seat++) {
+        for (int seat = 1; seat < crewSize; seat++) {
             ed.outfitOverride = crew.get(Math.min(seat, crew.size() - 1)).tier() != null
                     ? crew.get(Math.min(seat, crew.size() - 1)).tier().outfit() : "";
             AICharacter mate = ed.spawner.spawnBody(side, v.getGlobalPosition(), ed.spawner.weaponFor(side, pid, r, ws, stars));

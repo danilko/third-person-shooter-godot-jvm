@@ -182,6 +182,23 @@ public class VehicleProbeHelper extends Node {
                 ? car.getOccupant() : null;
     }
 
+    /** Why an AI-driven vehicle stands (VehicleAIController.standingReason), or "no-brain". */
+    @Register
+    public String standingReasonOf(Node v) {
+        return v instanceof Vehicle car && car.getController() instanceof com.openworld.ai.vehicle.VehicleAIController ai
+                ? ai.standingReason() : "no-brain";
+    }
+
+    /** How many seats are taken (driver included). */
+    @Register
+    public int seatedCount(Node v) {
+        if (!(v instanceof Vehicle car)) return 0;
+        int n = 0;
+        for (int s = 0; s < car.getSeatCount(); s++)
+            if (car.getSeatOccupant(s) != null && GD.isInstanceValid(car.getSeatOccupant(s))) n++;
+        return n;
+    }
+
     @Register
     public boolean nameplateIsNeutral(Node v) {
         if (!(v instanceof Vehicle car)) return false;

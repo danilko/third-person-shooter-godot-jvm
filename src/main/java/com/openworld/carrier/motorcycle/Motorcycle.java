@@ -102,6 +102,7 @@ public class Motorcycle extends Vehicle {
         updateLean(delta);              // before the seat pin (super), so the rider rolls with THIS tick's lean
         super._physicsProcess(delta);
         animateWheels(delta);
+        updateRiders();
         lastVel = getLinearVelocity();
         haveLastVel = true;
     }
@@ -140,6 +141,7 @@ public class Motorcycle extends Vehicle {
         VehicleConfig cfg = getConfig();
         double target;
         if (isEmptyOfRiders() && motionSpeed < 0.3) target = Math.toRadians(Math.min(KICKSTAND_DEG, cfg.motorcycleLeanDegrees));
+        else if (footDown()) target = Math.toRadians(FOOT_LEAN_DEG);     // resting on the rider's left foot
         else target = targetLean(motionSpeed, motionYawRate, cfg.motorcycleLeanDegrees);
         lean += (target - lean) * Math.min(1.0, LEAN_RATE * delta);
         if (model != null && modelRest != null) {
@@ -203,6 +205,141 @@ public class Motorcycle extends Vehicle {
         if (Double.isNaN(bodyY) || modelRest == null) return o;
         return new Vector3(o.getX(), bodyY - modelRest.getOrigin().getY(), o.getZ());
     }
+
+    // ── The rider: a pose per bike, a foot down at a stop, a helmet ─────────
+
+    /** Below this speed (m/s) the rider puts the left foot down and the bike rests on it. */
+    static final double FOOT_DOWN_SPEED = 1.0;
+    /** The lean (deg, to the left) of a bike held up by its rider's foot. */
+    private static final double FOOT_LEAN_DEG = 4.0;
+    /** The foot goes down this far left of the bike's centre line (m). */
+    private static final double FOOT_OUT = 0.32;
+    /** Helmet shells: a 白バイ's is white, a civilian's one of these, by the rider. */
+    private static final godot.core.Color[] HELMETS = {
+            new godot.core.Color(0.08, 0.08, 0.09, 1), new godot.core.Color(0.85, 0.85, 0.82, 1),
+            new godot.core.Color(0.62, 0.10, 0.10, 1), new godot.core.Color(0.12, 0.22, 0.48, 1),
+            new godot.core.Color(0.75, 0.62, 0.12, 1)};
+
+    private static final class Gear {
+        com.openworld.character.RiderPoseModifier pose;
+        Node3D helmet;
+        godot.api.Skeleton3D skel;
+    }
+
+    private final java.util.Map<Character, Gear> gear = new java.util.HashMap<>();
+
+    private boolean footDown() {
+        Character drv = getSeatOccupant(0);
+        return drv != null && motionSpeed < FOOT_DOWN_SPEED && getConfig() != null;
+    }
+
+    /** The rider pose + helmet on (probe_rider_pose's control turns it off: the car's clip, bare-headed). */
+    public static boolean riderGear = true;
+    @Register public void setRiderGearNow(boolean on) { riderGear = on; }
+
+    /** Every rider aboard wears its gear; one who got off loses it. Visual, every peer, from the seat occupancy. */
+    private void updateRiders() {
+        java.util.Set<Character> aboard = new java.util.HashSet<>();
+        if (!riderGear) {
+            for (Gear g : gear.values()) undress(g);
+            gear.clear();
+            return;
+        }
+        for (int seat = 0; seat < getSeatCount(); seat++) {
+            Character c = getSeatOccupant(seat);
+            if (c == null || !GD.isInstanceValid(c)) continue;
+            aboard.add(c);
+            Gear g = gear.get(c);
+            if (g == null || !GD.isInstanceValid(g.pose)) {
+                g = dress(c);
+                if (g == null) continue;
+                gear.put(c, g);
+            }
+            VehicleConfig cfg = getConfig();
+            // the pillion sits up (half the tuck) with its feet on the same pegs
+            g.pose.setPose(seat == 0 ? cfg.riderLeanForward : cfg.riderLeanForward * 0.5, cfg.riderThighRaise, cfg.riderKneeBend);
+            g.pose.setFootTarget(seat == 0 && footDown() ? footSpot(g.skel) : null);
+        }
+        if (gear.size() > aboard.size()) {
+            java.util.Iterator<java.util.Map.Entry<Character, Gear>> it = gear.entrySet().iterator();
+            while (it.hasNext()) {
+                java.util.Map.Entry<Character, Gear> e = it.next();
+                if (aboard.contains(e.getKey())) continue;
+                undress(e.getValue());
+                it.remove();
+            }
+        }
+    }
+
+    /** The ground beside the bike under the rider's left hip (world). */
+    private Vector3 footSpot(godot.api.Skeleton3D skel) {
+        if (skel == null || modelRest == null) return null;
+        int hip = skel.findBone("thigh_l");
+        if (hip < 0) return null;
+        Vector3 hipWorld = skel.getGlobalTransform().times(skel.getBoneGlobalPose(hip).getOrigin());
+        Vector3 hipLocal = getGlobalTransform().affineInverse().times(hipWorld);
+        // the model's origin is the ground under the bike: the foot stands on that plane, out to the left
+        Vector3 local = new Vector3(-FOOT_OUT, modelRest.getOrigin().getY() + 0.02, hipLocal.getZ());
+        return getGlobalTransform().times(local);
+    }
+
+    private Gear dress(Character c) {
+        if (!(c.findChild("Skeleton3D", true, false) instanceof godot.api.Skeleton3D skel)) return null;
+        Gear g = new Gear();
+        g.skel = skel;
+        g.pose = new com.openworld.character.RiderPoseModifier();
+        g.pose.setName(new godot.core.StringName(com.openworld.character.RiderPoseModifier.NAME));
+        skel.addChild(g.pose);
+        // after the clip, BEFORE the aim modifiers: the drive-by aim corrects the bent spine, not the other way
+        Node first = skel.getNodeOrNull("SpineAimModifier");
+        if (first != null) skel.moveChild(g.pose, first.getIndex());
+        String head = skel.findBone("head") >= 0 ? "head" : skel.findBone("head_2") >= 0 ? "head_2" : null;
+        if (head != null) {
+            godot.api.BoneAttachment3D at = new godot.api.BoneAttachment3D();
+            at.setName(new godot.core.StringName("RiderHelmet"));
+            at.setBoneName(head);
+            skel.addChild(at);
+            MeshInstance3D shell = new MeshInstance3D();
+            godot.api.SphereMesh m = new godot.api.SphereMesh();
+            m.setRadius(HELMET_RADIUS);
+            m.setHeight(HELMET_RADIUS * 2.0f);
+            godot.api.StandardMaterial3D mat = new godot.api.StandardMaterial3D();
+            mat.setAlbedo(helmetColour(c));
+            mat.setRoughness(0.35f);
+            m.setMaterial(mat);
+            shell.setMesh(m);
+            shell.setPosition(HELMET_OFFSET);
+            shell.setCastShadowsSetting(godot.api.GeometryInstance3D.ShadowCastingSetting.OFF);
+            at.addChild(shell);
+            g.helmet = at;
+        }
+        return g;
+    }
+
+    /** A helmet shell's radius (m) and its centre from the head bone (bone space, m): the MY PICKS of 3.1b. */
+    static final float HELMET_RADIUS = 0.155f;
+    static final Vector3 HELMET_OFFSET = new Vector3(0.0, 0.10, 0.01);
+
+    private godot.core.Color helmetColour(Character c) {
+        if ("PMB1".equals(modelId())) return new godot.core.Color(0.95, 0.95, 0.95, 1);
+        String id = c.getCharacterInfo() != null ? c.getCharacterInfo().characterId : c.getName().toString();
+        return HELMETS[Math.floorMod(id.hashCode(), HELMETS.length)];
+    }
+
+    private static void undress(Gear g) {
+        if (g.pose != null && GD.isInstanceValid(g.pose)) g.pose.queueFree();
+        if (g.helmet != null && GD.isInstanceValid(g.helmet)) g.helmet.queueFree();
+    }
+
+    @Register
+    @Override
+    public void _exitTree() {
+        for (Gear g : gear.values()) undress(g);
+        gear.clear();
+        super._exitTree();
+    }
+
+    @Register public int riderGearNow() { return gear.size(); }
 
     // ── A hard crash throws the riders ───────────────────────────────────────
 

@@ -12,6 +12,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - Engine sound: three re-timed loops and an idle, and which cars get a voice (2026-10-12)
 - A car stops by itself; a person never shoves a car; horn, squeal and crash sounds (PLAN.md 3.1, 2026-10-16)
 - Motorcycles: trying them -- the `spawn` command and the home bike row (PLAN.md 3.1b, 2026-10-16)
+- Motorcycles in traffic, the 白バイ, and the rider (PLAN.md 3.1b's rest, 2026-10-16)
 
 ---
 
@@ -598,3 +599,55 @@ throw, one-handed drive-by) are recorded in PLAN.md 3.1b until their own write-u
   `spawn nope` / `spawn ssb1`. 12/12 shipped, 21/21 with `OW_TEST_BIKES=1`, also on DebugWorld; the two runs are
   each other's control. Regression: probe_parked_vehicles, probe_garage, probe_helicopter_pad, probe_debug_weapons
   PASS.
+
+## Motorcycles in traffic, the 白バイ, and the rider (PLAN.md 3.1b's rest, 2026-10-16)
+
+Runtime + data only (no generator or world scene touched; the S18 map session owned those).
+
+- **Traffic.** `game/traffic.json` gives every region row bike weights -- SCT1 scooters most, POB1 postal Cubs in the
+  city / residential / suburb / farm, a few SSB1 in the city and Akiba, TRB1 trail bikes on the farm and the suburb
+  edge, none at the airport. ~8-12 % of a row (the farm's kei trucks stay above 50 %: `TrafficMixTest`). A bike takes
+  a car's slot of the budget -- it is a full body plus a seated rider, a car's cost -- so the budget did not grow.
+  `VehicleModels.CIVILIAN` (the fallback when the table has no row) swapped one kei car for a scooter. The FAR tier
+  draws the same mix, so its MultiMesh draws bikes from `assets/vehicles/<ID>.glb` with no code change.
+  The bikes ride on the unchanged traffic brain: rails, lazy drivers, signals, the throw rule (which needs a HULL
+  contact, so going from rails to real never throws anyone).
+- **The 白バイ.** `crimes.json` dispatch: one star now sends one vehicle, `PMB1`; two stars draw from POC1 / MPC1 /
+  PMB1. A motorcycle on a call carries ONE officer (`VehicleDirector.spawnCar`: its pillion seat is a passenger's).
+  Ambient police traffic is one in five a PMB1 (`VehicleModels.POLICE`), and sitting on one takes the police scanner
+  (`forces.json radio.police_vehicles`). At one star the officer carries the baton like the foot units.
+- **The rider** (option (b) of the rider-pose question: no ride clip exists). `character.RiderPoseModifier`, a
+  SkeletonModifier3D that `Motorcycle` adds to each rider's skeleton as they get on (moved in front of
+  `SpineAimModifier`, so the drive-by aim corrects the bent spine) and frees as they get off. It bends the car's
+  `drive_idle-loop` by the bike's `VehicleConfig.riderLeanForward / riderThighRaise / riderKneeBend`
+  (`build_vehicle_scenes.py` `rider` rows: SCT1 0/0/0 = the scooter's feet-forward floorboard, POB1 and PMB1 6/22/25,
+  TRB1 10/25/30, SSB1 45/35/45 = the tuck); the neck and head take 75 % of the lean back so the eyes stay on the road.
+  Below 1 m/s the driver's LEFT FOOT goes to the ground 0.32 m out (TwoBoneIK on thigh_l -> foot_l, blended over
+  ~0.3 s) and the bike leans 4 deg onto it. A placeholder HELMET (a 0.155 m sphere on the head bone; white on a PMB1,
+  one of five shells by rider otherwise) -- back-face culled, so a first-person rider does not see it from inside.
+  All of it is visual and built on every peer from the replicated seat occupancy: no message.
+  TRAP: since Godot 4.3 a Skeleton3D restores the clip's pose after its modifiers run, so a bone read from a physics
+  frame is the UNMODIFIED pose. A probe must sample inside `skeleton_updated` (probe_rider_pose's `_watch`).
+- Gates:
+  - `tools/godot/probe_traffic_bikes.gd [-- --world=island] [--control]`: a bikes-heavy mix forced through a table
+    override (`user://test/overrides_bikes/`). Island: 52 of 56 vehicles bikes, median ride 148 m in 100 s (the cars'
+    median in the control is 112 m), 0 stuck other than at a red, 0 tipped, 0 throws, a driver aboard in 1007 of 1009
+    near samples, the far tier drawing bikes; one star sends a PMB1, lights on, crew 1. The control (shipped mix: 3 of
+    47 bikes) fails the many-bikes checks. DebugWorld keeps 3 cars, so its ride median is noise (three bikes at one
+    red can be the whole sample, and a 3-4 group junction's red is up to ~80 s).
+  - `tools/godot/probe_rider_pose.gd [-- --control] [--shot=<dir> under xvfb-run]`: each bike with a seated AI. The gear
+    is on and ahead of the aim modifiers, the foot is on the floor at a stop (0.01-0.11 m: the tall TRB1 / SSB1 reach
+    it on tiptoe), the bike leans 4 deg, the SSB1 head is 0.21 m further forward than the scooter's, the foot comes up
+    riding and goes down again at a stop, and the gear is gone after getting off. PASS; the control fails 21.
+  - Regression (all PASS): probe_enforcement (DebugWorld), probe_dispatch_light, probe_dispatch_cap,
+    probe_far_traffic, probe_lazy_driver_seat (SPC1 and SCT1), probe_engagement_v2, probe_motorcycle_ride,
+    probe_home_bikes, probe_traffic_census (bikes in every region's mix, 1 crash in 16.4 car-min), TrafficMixTest;
+    after the rider: probe_motorcycle_ride 70/70 (its "seated" case now expects the 4 deg lean onto the foot, no longer
+    upright; --control still fails 15), probe_motorcycle_driveby 6/6, probe_home_bikes, probe_traffic_bikes both worlds.
+  - probe_enforcement `--world=island` failed ONE check in one of two runs ("with the stars gone every officer left":
+    1-2 officers standing in view 15-20 m away after 90 s) -- it fails the same way with the old dispatch numbers put
+    back through a table override, so it is pre-existing and intermittent, not the 白バイ. Not chased.
+- NOT done: hands on the bar grips (the bike models have no `grip_l` / `grip_r` markers yet; the hands are where the
+  car clip holds a wheel), parked bikes at shop fronts (needs `vehicle` props in the building kits plus a rebake: the
+  rebuild's buildings stage), the city bike, a two-peer bike run.
+
