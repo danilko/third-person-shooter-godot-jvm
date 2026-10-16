@@ -67,6 +67,7 @@ public final class FakeActivityHost implements ActivityHost {
 
     public final Map<String, Integer> doorsHeld = new LinkedHashMap<>();
     public final Map<String, List<Plan.Relation>> relations = new LinkedHashMap<>();
+    public final Map<String, Plan.Enforcement> enforcement = new LinkedHashMap<>();
     public final Map<String, List<Requirement>> staged = new LinkedHashMap<>();
     public final Map<String, String> marks = new LinkedHashMap<>();
     /** "activity<player" for every offer made and not yet taken by the test. */
@@ -152,6 +153,7 @@ public final class FakeActivityHost implements ActivityHost {
     }
 
     @Override public void relations(String instanceId, List<Plan.Relation> rows) { relations.put(instanceId, rows); }
+    @Override public void enforcement(String instanceId, String activityId, Plan.Enforcement hooks) { enforcement.put(instanceId, hooks); }
     @Override public boolean canStage(Requirement need) { return stageable.contains(need.toString()); }
     @Override public void stage(String instanceId, List<Requirement> needs) { staged.put(instanceId, needs); }
 
@@ -159,6 +161,7 @@ public final class FakeActivityHost implements ActivityHost {
         lockedDoors += doorsHeld.getOrDefault(instanceId, 0);
         doorsHeld.remove(instanceId);
         relations.remove(instanceId);
+        enforcement.remove(instanceId);
         staged.remove(instanceId);
         marks.remove(instanceId);
         released.add(instanceId);

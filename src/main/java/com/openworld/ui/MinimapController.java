@@ -246,6 +246,15 @@ public class MinimapController extends Control {
             }
         }
 
+        // INCIDENTS THIS PLAYER'S RADIO TOLD OF (PLAN.md P1e step 7, game.RadioMarkers): a ring where it happened,
+        // while it lasts -- the line in the status feed says what it was
+        for (com.openworld.game.RadioMarkers.Marker m : com.openworld.game.RadioMarkers.live()) {
+            Vector2 c = RoadOverlay.clampToClip(worldToScreen(new Vector3(m.x(), origin.getY(), m.z()), origin, center, scale, rot),
+                    cx, cy, radiusPx, 4f);
+            drawCircle(c, 5f, searchRingColor, false, 2f, true);
+            drawCircle(c, 2f, searchRingColor, true, -1f, true);
+        }
+
         // Nearby entities as faction-coloured blips (skip self; skip out-of-range).
         SpatialEntityGrid grid = SpatialEntityGrid.get();
         if (grid != null) {

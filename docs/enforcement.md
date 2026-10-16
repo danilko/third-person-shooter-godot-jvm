@@ -14,6 +14,8 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 - Breaching units walk round the BLOCK, on a baked walk grid (PLAN.md 1g f, 2026-10-07)
 - Losing the police (and a gang's hunters): sight is a line, and the lost are SEARCHED for (2026-10-10, user-reported)
 - AI ammo, finite drops, the shared explosive cooldown, the lull on attrition (PLAN.md P1e step 1, 2026-10-15)
+- Engagement v2, steps 2-7: the dispatch split, one body cap, co-op incidents, forces per station, restricted areas,
+  per-target hostility, the call-in, activity hooks, AI-vs-AI incidents, radio items (PLAN.md P1e, 2026-10-15)
 
 ---
 
@@ -445,3 +447,97 @@ User (playtest): "AI run dry far too easily". Data: `item/ammo_supply.json` `ai_
   145 s from the first (3.7/min, 14 held); control 18 in 84 s (12.9/min, still rising as armour arrived).
   probe_enforcement (both worlds), probe_breach, probe_lose_police, probe_recovery PASS. Seen once in 4 runs:
   probe_ammo_supply's token case read 4 attackers against 3 tokens (not reproduced in the next 3).
+
+## Engagement v2, steps 2-7 (PLAN.md P1e, 2026-10-15)
+
+**Step 2 -- the split, one ceiling, one incident for players together.**
+- `EnforcementDispatch` (1.85k lines) is now the STATE and every registered readout; its code is in five
+  package-private parts, a MOVE-ONLY split checked mechanically (every method body text-identical once the `ed.`
+  prefixes are stripped; the only 3 differences are `this` -> `ed`, the same Node): `DispatchWorld` (rays, ground, a
+  building's walk round), `DispatchSight` (seen / lost / last known), `UnitSpawner` (what a standing calls for, bodies,
+  squads), `UnitDirector` (units on foot each tick), `VehicleDirector` (cars, helicopters). Later steps added
+  `IncidentResponders` and `RadioNet` the same way. (The split was a one-off script, not kept.)
+- **The global body cap** (`crimes.json dispatch.body_cap` 48, all sides; `EnforcementDispatch.bodyRoom`): units on
+  foot, crews of cars on their way, helicopter crews and incident responders; guards and hangout members are not the
+  dispatch's load. Before it, per-player tables put ~150 bodies round 4 co-op players at 5 stars with two gangs.
+- **Co-op players together are one incident** (`merge_radius` 120 m, police and hunters; `UnitSpawner.sameIncident`):
+  what is already on any player within it counts toward each one's call. Units stay keyed by their player (sight,
+  squads, tokens are per player as before).
+- Gate **`tools/godot/probe_dispatch_cap.gd [-- --control]`** (DebugWorld, a second Player body 8 m away): two players at
+  3 stars peak 10 police bodies (control 17); a cap of 6 at 5 stars holds at 6 (control 24).
+
+**Step 3 -- forces held PER STATION** (user, during the step: "simplify that entire pool for now -- at each station";
+it replaced the planned island-wide total). `game.ForcePools` (engine-free, `ForcePoolsTest`), data `game/forces.json`.
+- Each place whose KIND a tier lists is a station of that tier: police tier = Koban 4 / PoliceStation 18; special
+  forces (outfit `special_force`, from 5 stars) = PoliceStation 10; military (outfit `military`, a new placeholder in
+  `outfits.json`; `min_stars` 6 = only by escalation) = the Air Base 30; each gang = its own places (GangOffice 14,
+  any other 8, `own_places_only`). The island binds 16 + 2 + 1 police stations (142 bodies) and 5 + 4 gang places.
+- A unit is DRAWN from the nearest station of its tier with one on hand; one that leaves alive goes BACK; a dead one is
+  gone until its station regenerates (one per `regen_seconds`). Car crews, helicopter crews, snipers, incident
+  responders and hangout members all draw (a spent gang shows as thinner hangouts); guards do not. An empty tier
+  ESCALATES (police -> special forces -> military); an empty ladder = "no units available" and nobody is sent for
+  `empty_lull_seconds` (75 police, 90 gangs) while the stations regenerate. A body drawn from a tier with an outfit
+  wears it whatever the stars' row says (`EnforcementDispatch.outfitOverride`, set round a draw like `bodyStars`).
+- A side with NO station in a world is unlimited (DebugWorld: no places record), so every DebugWorld probe is unchanged.
+- Not built (the user's "simplify for now"): a unit does not come FROM its station's direction, and there is no
+  travel delay; units appear out of view round the player as before.
+- **Restricted areas** (`game.RestrictedAreas`, `forces.json restricted`): the three military reserves as BOXES
+  (copied from `tools/island_plan.py` RESERVES -- region data, edit them there). Inside one: the area warning at once
+  (`ui.AreaWarning`, read on every peer from the local character: "RESTRICTED AREA -- Air Base: turn back (N s)");
+  still inside after `warn_seconds` 8, or more than `inner` m in, is the crime `trespass` (crimes.json, 4 stars), once
+  a visit, published as `GameplayEvent.Trespassed` so an activity can sanction it.
+- Console `pools [off|on]`: per side and tier, on hand / full, drawn, lost, and the empty-ladder lulls.
+- Gate **`tools/godot/probe_force_pools.gd [-- --control]`** (island, `--fixed-fps 60`): stations bound (142 police);
+  3 stars for 30 s draw 9; a killed unit is LOST and the living go back (141 of 142 once they left); every police
+  station emptied = nobody comes for 20 s and the police rest; set down inside the Air Base fence = the warning at once,
+  no star, then 4 stars after the warning (control: units still come with every station empty).
+
+**Step 4 -- per-target hostility, the call-in, the radio on the right screen.**
+- `game.Hostility.mayTarget` (asked by `AICharacter`'s target scan and the squad's shared target): a faction hostile
+  to players ONLY by a flip (`FactionFlips.flipped`) may target a player only when THAT player's standing calls for it
+  -- police: `policeShoot`; a gang: `GangSystem.attacksPlayer` (standing at attack_at, or its escaping captive).
+  Hostility from a faction table (a mission's own, the inherent rule) is never narrowed (the konbini mission's
+  player<->gang_a HOSTILE still holds).
+- **The call-in** (`crimes.json call_in_seconds` 4): a WITNESSED crime by a player with no stars waits for its
+  witness (the nearest living non-player within witness_radius; a police officer sees it at once) to call it in, and
+  dies with the witness. The police then know where it HAPPENED (`EnforcementDispatch.reportedAt`: the sight starts
+  lost at the crime spot), so units go there and search. Already-wanted players are reported at once.
+- **Radio lines go to the player they are about** (`EnforcementDispatch.say`): shown here when that is this peer's
+  player (or everyone), sent to every other peer as `WORLD_EVENT_RADIO` (17) and shown only by the peer whose player it
+  is; the 4 s throttle is per player (it was one global throttle on the host).
+- The incident board for PLAYER acts is `game.IncidentBoard` (step 6 below); a player's hurt / kill of an officer,
+  a civilian or a gang member is put on it for the radio.
+
+**Step 5 -- an activity's hold on the enforcement, DECLARED on its Plan** (like `relation()`, so `ActivityLint` sees it
+and `ActivityHost.release` undoes it at every end): `noDispatch(sides...)`, `wantedLock()`, `wantedAtLeast(n)`,
+`wantedAtMost(n)`, `wantedSet(n)`, `wantedClear()`, `squad(force, stars)` (a force hunts the participants as if at
+those stars), `reserve(force, n)` (n bodies taken from the stations nearest the anchor for the run), `incident(type)`
+(raised at the anchor). `game.EnforcementHooks` holds the running ones; a PARTICIPANT is whoever the director says
+takes part now (a joiner is held, a leaver let go). The lint: stars in 0..5, bounds that can both hold, set + clear,
+known forces, a force both sent and kept away, a reserve over the force's capacity in this world. Tests
+`EnforcementHooksTest`, `ActivityDirectorTest` (handed to the host, released at the end; the lint).
+
+**Step 6 -- AI-vs-AI incidents near players.** `Actors.byId` now carries the faction the hit itself carries (an AI
+attacker had an EMPTY faction). `IncidentResponders` (OBSERVER phase): an AI hurting an AI of another faction, within
+`incidents.near_players` 150 m of a player, never a police act or a dispatched / responding unit's, is an incident;
+acts merge by area (60 m) while it is fresh (45 s after its last act), at most 6 new a minute. A NEW one is answered
+(`incidents.responders`: an attack on a gang member -> THAT gang, 3 units -- user: "by a player OR another gang"; an
+officer or a civilian attacked -> police), drawn from that force's stations and the body cap, set down out of view
+25-55 m round the place, patrolling there with the ordinary FSM; they leave once it is over and nobody sees them.
+Measured on DebugWorld: a gang_b hit on a gang_a member 15 m from the player = one incident of 2 acts; the same pair
+400 m from every player = none; gang_a answered, and the victim and its responders firing back was gang_b's own
+incident (answered too) -- the escalation the rate limit and the pools cap.
+
+**Step 7 -- radio items** (`RadioNet`, `forces.json radio`): sitting in a POC1 / MPC1 / ARV1 takes its POLICE SCANNER;
+standing over a dead gang member takes that gang's radio; a player whose faction IS a force hears it while they are
+one. A radio tells of the force's OTHER incidents (not the ones from that player) as a line and a minimap ring
+(`game.RadioMarkers`, `MinimapController`) for 45 s; the host sends them only for the players who have the channel
+(`WORLD_EVENT_INCIDENT` 18). `RespawnSystem.respawn` takes every radio (death, arrest, abduction). Session-only.
+
+Gate for 4-7: **`tools/godot/probe_engagement_v2.gd [-- --control]`** (DebugWorld, `--fixed-fps 60`) 17/17: B beside a
+3-star A unhurt (control: 1000 -> 184); no star at 1 s, a star at 5 s, the police told the crime spot after the player
+left (control: the star at once); a witness killed first = no star; `holdNow` holds B at 2 stars with no police sent;
+the AI-vs-AI case above (control: none); no radio = nothing heard, gang_a's radio = a line and a ring, a patrol car =
+the scanner, a respawn = no radio. Two-process: `tools/net/run_net_debugworld.sh` coop checks a radio line about the
+client's player reaches it and one about somebody else does not.
+

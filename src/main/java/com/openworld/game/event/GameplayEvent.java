@@ -13,7 +13,7 @@ package com.openworld.game.event;
  */
 public sealed interface GameplayEvent permits GameplayEvent.Damaged, GameplayEvent.Killed, GameplayEvent.WeaponFired,
         GameplayEvent.Threatened, GameplayEvent.Theft, GameplayEvent.ZoneEntered, GameplayEvent.BalanceChanged,
-        GameplayEvent.FlagChanged, GameplayEvent.ActivityOutcome {
+        GameplayEvent.FlagChanged, GameplayEvent.ActivityOutcome, GameplayEvent.Trespassed {
 
     /** Who did it ({@link Actor#NONE} when nobody did: a balance change, a flag). */
     Actor actor();
@@ -40,6 +40,10 @@ public sealed interface GameplayEvent permits GameplayEvent.Damaged, GameplayEve
     /** {@code actor} took {@code amount} dollars that was not theirs ({@code what}: "till"). {@code gang}: the gang whose
      *  place it was, "" none. */
     record Theft(Actor actor, Spot at, String what, long amount, String gang) implements GameplayEvent {}
+
+    /** {@code actor} stayed in (or went deep into) a restricted area ({@code area}: its name in forces.json) after
+     *  the warning -- PLAN.md P1e step 3. An activity can sanction it (a mission into the base). */
+    record Trespassed(Actor actor, Spot at, String area) implements GameplayEvent {}
 
     /** {@code actor} walked into a trigger zone ({@code zoneId}: the ZoneTrigger's beat id). */
     record ZoneEntered(Actor actor, Spot at, String zoneId) implements GameplayEvent {}

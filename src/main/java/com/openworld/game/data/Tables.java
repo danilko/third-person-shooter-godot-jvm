@@ -91,6 +91,19 @@ public final class Tables {
     public static final DataTable<AmmoSupplies> AMMO_SUPPLY = DataTable.define("ammo_supply",
             ROOT + "item/ammo_supply.json", AmmoSupplies::read, () -> new AmmoSupplies(2.2, 2.0, Map.of(), AiAmmo.DEFAULT));
 
+    /** game/forces.json: the forces' stations and ladders, and the restricted areas (PLAN.md P1e step 3). */
+    public record Forces(Map<String, com.openworld.game.ForcePools.Side> sides, List<com.openworld.game.RestrictedAreas.Area> restricted,
+                         com.openworld.game.IncidentBoard.Rules incidents, java.util.Set<String> radioVehicles) {}
+
+    public static final DataTable<Forces> FORCES = DataTable.define("forces", ROOT + "game/forces.json",
+            d -> {
+                DataReader radio = d.child("radio");
+                return new Forces(com.openworld.game.ForcePools.read(d), com.openworld.game.RestrictedAreas.read(d),
+                        com.openworld.game.IncidentBoard.Rules.read(d.child("incidents")),
+                        radio == null ? null : java.util.Set.copyOf(radio.strings("police_vehicles")));
+            },
+            () -> new Forces(Map.of(), List.of(), com.openworld.game.IncidentBoard.Rules.DEFAULT, null));
+
     public static final DataTable<Map<com.openworld.game.WorldDensity, com.openworld.game.WorldDensity.Row>> DENSITY =
             DataTable.define("density", ROOT + "game/density.json", com.openworld.game.WorldDensity::read, Map::of);
 

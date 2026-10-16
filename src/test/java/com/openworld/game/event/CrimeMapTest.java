@@ -46,6 +46,7 @@ class CrimeMapTest {
         assertEquals("threaten_clerk", CrimeMap.police(new GameplayEvent.Threatened(P, Actor.ai("k", "civilian"), AT, "")));
         assertEquals("rob_store", CrimeMap.police(new GameplayEvent.Theft(P, AT, "till", 30000, "")));
         assertEquals("", CrimeMap.police(new GameplayEvent.ZoneEntered(P, AT, "beat")));
+        assertEquals("trespass", CrimeMap.police(new GameplayEvent.Trespassed(P, AT, "Air Base")));
         assertEquals("", CrimeMap.police(new GameplayEvent.BalanceChanged("", "p", 10, "REWARD")));
     }
 

@@ -11,6 +11,8 @@
  "calm_per_star": 6.0,
  "decay_per_second": 18.0,
  "witness_radius": 45.0,
+ "call_in_note": "PLAN.md P1e step 4 (2026-10-15): a WITNESSED crime by a player with no stars yet is CALLED IN: it counts only after call_in_seconds, and only if the witness (the nearest living non-player within witness_radius; a police officer sees it at once) is still alive then. The police then know where it HAPPENED, not where the player is now: units go there and search. 0 = at once (the old rule).",
+ "call_in_seconds": 4.0,
  "crimes": {
   "gunfire": {
    "heat": 10,
@@ -72,6 +74,12 @@
    "witness": false,
    "lethal": false
   },
+  "trespass": {
+   "heat": 560,
+   "min_stars": 4,
+   "witness": false,
+   "lethal": false
+  },
   "rob_store": {
    "heat": 220,
    "min_stars": 2,
@@ -108,6 +116,9 @@
    8
   ],
   "supply_reach": 60.0,
+  "body_cap_note": "PLAN.md P1e step 2 (2026-10-15): body_cap = the ISLAND-WIDE ceiling on dispatched bodies, police and every gang together (units on foot, crews of cars on their way, helicopter crews; guards and hangout members are not counted). Without it 4 co-op players at 5 stars with two gangs drew ~150 bodies. merge_radius = players of one side within this many metres are ONE incident: units already on any of them count toward each one's call, so two players side by side do not draw a double complement. 0 = off.",
+  "body_cap": 48,
+  "merge_radius": 120.0,
   "note": "The police dispatch (game.EnforcementDispatch, PLAN.md W5). Index = stars (0..5). Officers on foot appear between foot_min and foot_max metres from the wanted player out of view; patrol cars (POC1/MPC1, a crew of car_crew) on a lane between car_min and car_max and drive the road route to the player, the crew bailing out within arrive_dist. From shoot_at stars (1: police HUNT the player down, user 2026-10-07) police are hostile and shoot; there is no arrest by proximity -- a wanted player who goes down is arrested (RecoveryRules). Units are freed out of view past despawn_far, or once the stars are gone. While police can see the player the calm clock does not run (seen_reach).",
   "bodies_note": "PLAN.md 1g c: who an officer IS. body = CharacterVisuals_<Body>, outfit = character/outfits.json, weight among the rows sent at that many stars (min_stars..max_stars, 0 = no upper bound). Fumiriya is the only male body; special forces (outfit special_force) from 5 stars. extra_weapons: carried besides the star row's weapon (special forces' MEW1 knife, used in the reload / close-quarters fallback).",
   "bodies": [

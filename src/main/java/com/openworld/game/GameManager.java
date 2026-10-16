@@ -1329,6 +1329,12 @@ public class GameManager extends Node {
     public static final int WORLD_EVENT_PICKUP_CLEARED = 15;
     /** A player's shown standing (key characterId, value police stars, args lethal / worst gang / its stars). */
     public static final int WORLD_EVENT_WANTED = 16;
+    /** A line of police / gang radio for one player's screen (key its characterId, "" = everyone; args[0] the line)
+     *  -- PLAN.md P1e step 4. */
+    public static final int WORLD_EVENT_RADIO = 17;
+    /** An incident a player's radio told of, for their minimap (key characterId, value seconds, args type / x / z)
+     *  -- PLAN.md P1e step 7. */
+    public static final int WORLD_EVENT_INCIDENT = 18;
 
     /** Routes a decoded MSG_WORLD_EVENT to the owning system. Extend the switch as networked world state is added. */
     public void onWorldEvent(int eventType, String key, float value, java.util.List<String> args) {
@@ -1357,10 +1363,33 @@ public class GameManager extends Node {
                 WantedSystem w = WantedSystem.get();
                 if (w != null) w.applyRemote(key, value, args);
             }
+            case WORLD_EVENT_RADIO -> {
+                boolean mine = key == null || key.isEmpty();
+                for (com.openworld.character.Player p : PlayerRegistry.getPlayers())
+                    if (GD.isInstanceValid(p) && p.getCharacterInfo() != null && key != null
+                            && key.equals(p.getCharacterInfo().characterId) && p.isLocallyOwnedPlayer()) mine = true;
+                if (mine && getNodeOrNull("/root/EventBus") instanceof EventBus bus) bus.radioChatter.emit(arg(args, 0));
+                if (mine) {
+                    radioReceived++;
+                    radioShown.add(arg(args, 0));
+                    if (radioShown.size() > 16) radioShown.remove(0);
+                }
+            }
+            case WORLD_EVENT_INCIDENT -> RadioMarkers.applyRemote(key, value, args);
             // case WORLD_EVENT_DOOR -> applyDoorState(key, value);
             default -> GD.print("GameManager: unhandled world event type " + eventType + " key=" + key);
         }
     }
+
+    /** Radio lines from the host shown on THIS peer (its own player's, or everyone's), and the last few of them
+     *  (probe readout; the co-op harness). */
+    private int radioReceived;
+    private final java.util.List<String> radioShown = new java.util.ArrayList<>();
+
+    @Register public int radioReceivedNow() { return radioReceived; }
+
+    /** Was this line shown here? */
+    public boolean radioShownHere(String line) { return radioShown.contains(line); }
 
     /** Safe positional read from a world-event args list — empty string for a missing index (a client must never index past a short/garbage frame). */
     private static String arg(java.util.List<String> args, int index) {

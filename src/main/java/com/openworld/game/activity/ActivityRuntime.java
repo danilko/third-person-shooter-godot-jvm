@@ -606,6 +606,22 @@ public class ActivityRuntime extends Node implements ActivityHost, ActivityDirec
         return n;
     }
 
+    /** The run's enforcement hooks (P1e step 5): registered for the wanted level and the dispatch to read, its
+     *  reserved bodies taken from the stations nearest its anchor, its incidents raised there. */
+    @Override public void enforcement(String instanceId, String activityId, Plan.Enforcement hooks) {
+        com.openworld.game.EnforcementHooks.participant = (inst, pid) -> {
+            ActivityInstance a = director == null ? null : director.of(pid);
+            return a != null && a.instanceId.equals(inst);
+        };
+        com.openworld.game.EnforcementHooks.register(instanceId, hooks);
+        com.openworld.game.EnforcementDispatch ed = com.openworld.game.EnforcementDispatch.get();
+        Spot at = anchor(activityId);
+        if (ed != null) {
+            ed.reserveFor(instanceId, hooks.reserves, at == Spot.NOWHERE ? null : Actors.vec(at));
+            for (String type : hooks.incidents) ed.raiseIncident(type, at == Spot.NOWHERE ? null : Actors.vec(at), instanceId);
+        }
+    }
+
     @Override public void relations(String instanceId, List<Plan.Relation> rows) {
         if (!(getNodeOrNull("/root/FactionManager") instanceof FactionManager fm)) return;
         List<String[]> out = new ArrayList<>();
@@ -623,6 +639,8 @@ public class ActivityRuntime extends Node implements ActivityHost, ActivityDirec
         List<Door> held = doors.remove(instanceId);
         if (held != null) for (Door d : held) if (GD.isInstanceValid(d)) d.setLocked(true);
         if (getNodeOrNull("/root/FactionManager") instanceof FactionManager fm) fm.setActivityOverlay(instanceId, List.of());
+        com.openworld.game.EnforcementHooks.release(instanceId);
+        if (com.openworld.game.EnforcementDispatch.get() != null) com.openworld.game.EnforcementDispatch.get().releaseReserve(instanceId);
         marks.remove(instanceId);
         clearMarker(instanceId);
     }

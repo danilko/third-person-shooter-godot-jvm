@@ -165,13 +165,18 @@ func _initialize() -> void:
 		helper.call("kill", victim)
 		await _tick(30)
 		var stamped := int(String(ed.call("ai_ammo_counts_now")).split(",")[2]) - stamped0
-		var worst := -1
+		# every dropped firearm in the world (this unit's, and any dead earlier) against ITS OWN magazine
+		var drops := 0
+		var over := 0
 		for n in _all(root):
-			if n.has_meta("dropped_at_ms") and n.get("reserve") != null:
-				worst = max(worst, int(n.get("reserve")))
-		print("  killed a unit: %d drops stamped, highest dropped reserve %d (largest magazine %d)" % [stamped, worst, mag_size])
+			if n.has_meta("dropped_at_ms") and n.get("reserve") != null and n.get("magazine_size") != null:
+				drops += 1
+				if int(n.get("reserve")) > int(n.get("magazine_size")):
+					over += 1
+					print("    over: %s reserve %d magazine %d" % [n.name, int(n.get("reserve")), int(n.get("magazine_size"))])
+		print("  killed a unit (largest magazine %d): %d drops stamped, %d dropped weapons, %d keep more than one spare magazine" % [mag_size, stamped, drops, over])
 		_check(stamped >= 1, "the dead unit's firearm was made finite as it dropped")
-		_check(worst >= 0 and worst <= mag_size, "a dropped AI firearm keeps at most one spare magazine (%d <= %d)" % [worst, mag_size])
+		_check(drops >= 1 and over == 0, "every dropped AI firearm keeps at most one spare magazine (%d of %d over)" % [over, drops])
 	ws.call("clear_now", pid)
 	print("RESULT %s (%d failures)" % ["PASS" if fails == 0 else "FAIL", fails])
 	quit(0 if fails == 0 else 1)

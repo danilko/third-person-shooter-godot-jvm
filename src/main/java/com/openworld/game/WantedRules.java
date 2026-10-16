@@ -24,6 +24,9 @@ public final class WantedRules {
     public final double[] starsAt;
     public final double calmSeconds, calmPerStar, decayPerSecond, witnessRadius;
     public final Map<String, Crime> crimes;
+    /** A WITNESSED crime by a player who is not wanted yet reaches the police only after the witness has called it
+     *  in -- this long -- and only if the witness is still alive then (PLAN.md P1e step 4); 0 = at once. */
+    public double callInSeconds = 0.0;
     /** What responding police carry: ordinary, and once the player is lethal-wanted (heavy). */
     public List<String> normalWeapons = List.of(), lethalWeapons = List.of();
 
@@ -52,6 +55,7 @@ public final class WantedRules {
         }
         WantedRules w = new WantedRules(starsAt, doc.num("calm_seconds", 12.0), doc.num("calm_per_star", 6.0),
                 doc.num("decay_per_second", 18.0), doc.num("witness_radius", 45.0), crimes);
+        w.callInSeconds = doc.num("call_in_seconds", 0.0);
         DataReader pw = doc.child("police_weapons");
         if (pw != null) {
             w.normalWeapons = pw.strings("normal");

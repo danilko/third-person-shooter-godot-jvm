@@ -20,6 +20,9 @@ final class FactionFlips {
 
     private final Map<String, String> before = new HashMap<>();
 
+    /** Is {@code faction} hostile to players right now BECAUSE of this flip (not by its own table)? */
+    boolean flipped(String faction) { return before.containsKey(faction); }
+
     void apply(FactionManager fm, Set<String> want) {
         if (fm == null) return;
         for (String f : want) {

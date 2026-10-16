@@ -166,6 +166,7 @@ public final class ActivityDirector implements GameplayEvents.Subscriber {
             if (!stage.isEmpty()) host.stage(a.instanceId, stage);
         }
         if (!plan.relations.isEmpty()) host.relations(a.instanceId, List.copyOf(plan.relations));
+        if (plan.enforcement.any()) host.enforcement(a.instanceId, activityId, plan.enforcement);
         host.log("activity '" + activityId + "' started by " + ownerId + " (" + mode + (from == null ? "" : ", from checkpoint " + from.stageId()) + ")");
         for (Listener l : listeners) l.started(a);
         enter(a, first);

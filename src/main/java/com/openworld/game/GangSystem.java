@@ -121,6 +121,19 @@ public class GangSystem extends Node {
                 || !net.isNetworked() || net.isServer();
     }
 
+    /** Is {@code gang} hostile to players only by this system's flip (Hostility narrows it per player)? */
+    public boolean flippedHostile(String gang) { return flips.flipped(gang); }
+
+    /** Does {@code gang} go for THIS player: their standing with it is at attack_at, or they are its captive running
+     *  (or fighting back) -- the per-player half of {@link #applyFlips} (PLAN.md P1e step 4). */
+    public boolean attacksPlayer(String gang, String playerId) {
+        if (rules == null || playerId == null) return false;
+        Captivity c = captive.get(playerId);
+        if (c != null && gang.equals(c.gang)) return c.escaping;
+        GangRules.State s = states.get(playerId + "|" + gang);
+        return s != null && rules.attacks(s);
+    }
+
     public boolean isGang(String faction) { return rules != null && faction != null && rules.gangs.containsKey(faction); }
 
     /** A gang crime by a player. True when it counted. */

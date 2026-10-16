@@ -473,7 +473,7 @@ public class AICharacter extends Character {
             if (shared != null && shared != this && shared.currentVehicleNode == null) {
                 String tf = (shared.characterInfo != null && shared.characterInfo.faction != null)
                         ? shared.characterInfo.faction : "";
-                if (Faction.areHostile(myFaction, tf)) return shared;
+                if (Faction.areHostile(myFaction, tf) && com.openworld.game.Hostility.mayTarget(myFaction, shared)) return shared;
             }
         }
 
@@ -519,6 +519,7 @@ public class AICharacter extends Character {
             String tf = (c.characterInfo != null && c.characterInfo.faction != null)
                     ? c.characterInfo.faction : "";
             if (!Faction.areHostile(myFaction, tf)) return null;
+            if (!com.openworld.game.Hostility.mayTarget(myFaction, c)) return null;   // per target (P1e step 4)
             if (c.currentVehicleNode != null) return null;   // vehicle entry handles this
             candidateDist = (float) myPos.distanceTo(c.getGlobalPosition());
             return c;
@@ -528,6 +529,7 @@ public class AICharacter extends Character {
             String tf = (occ.characterInfo != null && occ.characterInfo.faction != null)
                     ? occ.characterInfo.faction : "";
             if (!Faction.areHostile(myFaction, tf)) return null;
+            if (!com.openworld.game.Hostility.mayTarget(myFaction, occ)) return null;
             candidateDist = (float) myPos.distanceTo(v.getGlobalPosition());
             return occ;
         }

@@ -281,6 +281,8 @@ public class RespawnSystem extends Node {
     }
 
     private void respawn(Job j) {
+        // every radio the player had is gone with the body -- death, arrest and abduction alike (PLAN.md P1e step 7)
+        if (EnforcementDispatch.get() != null && j.id != null) EnforcementDispatch.get().loseRadios(j.id);
         Player dead = j.dead != null && GD.isInstanceValid(j.dead) ? j.dead : null;
         Vector3 deathAt = dead != null ? dead.getGlobalPosition() : new Vector3();
         // ARRESTED: the nearest police station; HOSPITALIZED: the nearest hospital or clinic -- each woken OUTSIDE, on

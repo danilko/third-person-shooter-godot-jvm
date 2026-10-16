@@ -46,6 +46,14 @@ class ActivityDirectorTest {
         }
     }
 
+    /** A heist that keeps the gangs away and holds the stars at two at least (PLAN.md P1e step 5). */
+    static final class Heist extends Activity {
+        @Override protected void define(Plan p) {
+            p.noDispatch("gang_a").wantedAtLeast(2).reserve("police", 3).incident("bank_alarm");
+            p.stage("RUN").after(2, a -> a.complete("DONE"));
+        }
+    }
+
     static final class Job extends Activity {
         @Override protected void define(Plan p) {
             p.closed();
@@ -77,6 +85,7 @@ class ActivityDirectorTest {
         b.flag(GATE_OPEN);
         b.activity("undercover").runs(() -> { Undercover u = new Undercover(); u.real = real; return u; })
                 .variant("DELIVERED", Effect.set(GATE_OPEN));
+        b.activity("heist").runs(Heist::new).variant("DONE");
         b.activity("job").kind(com.openworld.game.campaign.ActivityDef.Kind.JOB).runs(Job::new).variant("DONE");
         b.activity("bad_variant").runs(() -> new Broken("variant")).variant("OK");
         b.activity("bad_stage").runs(() -> new Broken("stage")).variant("OK");
@@ -278,5 +287,33 @@ class ActivityDirectorTest {
         assertTrue(all.contains("'y' declares no stage"), all);
         assertTrue(all.contains("starts on zone 'z', which already starts 'x'"), all);
         assertTrue(r.notes().stream().anyMatch(n -> n.contains("'z' has no class")), r.notes().toString());
+    }
+
+    @Test
+    void enforcementHooksGoToTheHostAndAreReleasedAtTheEnd() {
+        ActivityInstance a = d.start("heist", "host", Activity.Mode.STORY).instance();
+        Plan.Enforcement e = w.enforcement.get(a.instanceId());
+        assertTrue(e != null && e.noDispatch.contains("gang_a") && e.wantedAtLeast == 2, "handed to the host as it starts");
+        assertEquals(3, e.reserves.get("police"));
+        d.abort(a.instanceId(), "test");
+        assertNull(w.enforcement.get(a.instanceId()), "released at its end, whatever the end");
+    }
+
+    @Test
+    void theLintReadsTheHooks() {
+        com.openworld.util.DataTable.setSource(com.openworld.util.DataTable.DISK);
+        List<String> problems = new ArrayList<>();
+        Plan p = new Plan();
+        p.wantedAtLeast(4).wantedAtMost(2).squad("gang_a", 3).noDispatch("gang_a").reserve("yakuza", 2).wantedSet(9);
+        ActivityLint.enforcement("activity 'x'", p.enforcement(), problems);
+        assertTrue(problems.stream().anyMatch(s -> s.contains("both cannot hold")), problems.toString());
+        assertTrue(problems.stream().anyMatch(s -> s.contains("both sends 'gang_a' and keeps it")), problems.toString());
+        assertTrue(problems.stream().anyMatch(s -> s.contains("'yakuza', which is not a force")), problems.toString());
+        assertTrue(problems.stream().anyMatch(s -> s.contains("9 stars")), problems.toString());
+        List<String> clean = new ArrayList<>();
+        Plan hp = new Plan();
+        new Heist().define(hp);
+        ActivityLint.enforcement("activity 'y'", hp.enforcement(), clean);
+        assertTrue(clean.isEmpty(), clean.toString());
     }
 }

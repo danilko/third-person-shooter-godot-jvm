@@ -219,7 +219,7 @@ public class Health extends Node {
         // the wanted level (PLAN.md W5): a player hurting a police officer or a civilian is a crime
         // -- and so is anything else that follows from a hit: ONE event, heard by whoever cares (PLAN.md 2.0 / AR3)
         if (getOwner() instanceof Character victim) {
-            com.openworld.game.event.Actor by = com.openworld.game.event.Actors.byId(attackerId, attackerName);
+            com.openworld.game.event.Actor by = com.openworld.game.event.Actors.byId(attackerId, attackerName, attackerFaction);
             com.openworld.game.event.Actor to = com.openworld.game.event.Actors.of(victim);
             com.openworld.game.event.Spot at = com.openworld.game.event.Actors.at(victim.getGlobalPosition());
             com.openworld.game.event.GameplayEvents.publish(killed

@@ -93,6 +93,11 @@ check("coop: a HOST purchase reaches the client within 1 s", lag is not None and
       ("%.2f s" % lag) if lag is not None else ("host bought: %s, client saw: %s" % (bool(mb), bool(ms))))
 m = re.search(r"\[coop\] client hud stars=(-?\d+)", cclient)
 check("coop: the host's wanted stars reach the client's HUD", m is not None and m.group(1) == "2", m.group(0) if m else "no line")
+m = re.search(r"\[coop\] client radio mine=(\w+) other=(\w+)", cclient)
+check("coop: a radio line about the client's player reaches the client (P1e step 4)", m is not None and m.group(1) == "true",
+      m.group(0) if m else "no line")
+check("coop: a radio line about somebody else does not show there", m is not None and m.group(2) == "false",
+      m.group(0) if m else "no line")
 m = re.search(r"\[coop\] respawn alive=(\w+) owned=(\w+) pos=(.*?) respawns=(-?\d+)", cclient)
 check("coop: the client is respawned, alive and owned", m is not None and m.group(1) == "true" and m.group(2) == "true"
       and int(m.group(4)) >= 1, m.group(0) if m else "")

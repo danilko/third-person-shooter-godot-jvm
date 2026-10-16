@@ -32,6 +32,7 @@ public final class CrimeMap {
         if (e instanceof GameplayEvent.WeaponFired) return "gunfire";
         if (e instanceof GameplayEvent.Threatened) return "threaten_clerk";
         if (e instanceof GameplayEvent.Theft) return "rob_store";
+        if (e instanceof GameplayEvent.Trespassed) return "trespass";
         return "";
     }
 

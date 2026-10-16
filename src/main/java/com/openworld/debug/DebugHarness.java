@@ -845,6 +845,13 @@ public class DebugHarness extends Node {
             for (Player p : PlayerRegistry.getPlayers())
                 if (p != me && p.getCharacterInfo() != null) ws.setStars(p.getCharacterInfo().characterId, 2, false);
             GD.print("[coop] host set remote stars 2");
+            // radio lines go to the player they are about (PLAN.md P1e step 4): one for the client, one for nobody
+            var ed = com.openworld.game.EnforcementDispatch.get();
+            if (ed != null) {
+                for (Player p : PlayerRegistry.getPlayers())
+                    if (p != me && p.getCharacterInfo() != null) ed.radioToNow(p.getCharacterInfo().characterId, "COOP RADIO: for you");
+                ed.radioToNow("not-a-player", "COOP RADIO: for somebody else");
+            }
         }
         if (!client && coopStarsSet && !coopStarsCleared && coopT >= 23.6 && ws != null) {
             coopStarsCleared = true;
@@ -859,6 +866,9 @@ public class DebugHarness extends Node {
             coopStep = 4;
             coopDamageAt = coopT;
             if (client) GD.print("[coop] client hud stars=" + coopStarsMax + " cleared=" + (hud == 0));
+            if (client && getNodeOrNull("/root/GameManager") instanceof com.openworld.game.GameManager gm)
+                GD.print("[coop] client radio mine=" + gm.radioShownHere("COOP RADIO: for you")
+                        + " other=" + gm.radioShownHere("COOP RADIO: for somebody else"));
             if (client && me != null && me.getNodeOrNull("Health") instanceof com.openworld.character.Health h) {
                 // a request is capped at 500 (DamageRequestPolicy); send enough to empty the bar
                 int n = (int) Math.ceil(h.maxHealth / 400.0) + 1;

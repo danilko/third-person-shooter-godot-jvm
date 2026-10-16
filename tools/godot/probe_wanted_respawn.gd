@@ -51,6 +51,9 @@ func _initialize() -> void:
 	await _tick(120)
 	var gm: Node = root.get_node("GameManager")
 	var ws: Node = gm.get_node_or_null("WantedSystem")
+	# the witness call-in (P1e step 4) is probe_engagement_v2's: here a crime counts at once, as it did
+	if ws != null:
+		ws.call("set_call_in_now", 0.0)
 	var rs: Node = gm.get_node_or_null("RespawnSystem")
 	_check(ws != null and rs != null, "GameManager built the WantedSystem and the RespawnSystem")
 	if ws == null or rs == null:

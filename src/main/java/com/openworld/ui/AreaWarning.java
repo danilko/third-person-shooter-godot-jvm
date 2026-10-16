@@ -76,6 +76,16 @@ public class AreaWarning extends Control {
     @Register
     public boolean warningShown() { return isVisible(); }
 
+    /** A RESTRICTED AREA the local character is in (PLAN.md P1e step 3, game.RestrictedAreas): its name, and the
+     *  seconds left before staying is a trespass. Read here on every peer from the character's own position -- the
+     *  host's dispatch reports the crime itself. */
+    private String restricted = "";
+    private double restrictedFor, restrictedLeft;
+
+    /** True while the restricted-area warning is on screen (probe readout). */
+    @Register
+    public boolean restrictedShown() { return isVisible() && !restricted.isEmpty(); }
+
     @Register
     @Override
     public void _process(double delta) {
@@ -85,7 +95,19 @@ public class AreaWarning extends Control {
             float band = Math.max(1f, wb.warnMargin);
             strength = (float) Math.max(0.0, Math.min(1.0, 1.0 - distance / band));
         }
-        boolean show = warned;
+        com.openworld.game.RestrictedAreas.Area ra = null;
+        if (character != null && godot.global.GD.isInstanceValid(character) && character.isAlive()) {
+            var at = character.getGlobalPosition();
+            ra = com.openworld.game.RestrictedAreas.at(com.openworld.game.RestrictedAreas.all(), at.getX(), at.getZ());
+        }
+        if (ra == null) { restricted = ""; restrictedFor = 0; }
+        else {
+            restricted = ra.name();
+            restrictedFor += delta;
+            restrictedLeft = Math.max(0.0, ra.warnSeconds() - restrictedFor);
+            if (!warned) strength = (float) Math.min(1.0, restrictedFor / Math.max(0.1, ra.warnSeconds()));
+        }
+        boolean show = warned || !restricted.isEmpty();
         if (show != isVisible()) setVisible(show);
         if (show) queueRedraw();
     }
@@ -113,7 +135,10 @@ public class AreaWarning extends Control {
         if (font == null) return;
         float scale = h / 1080f;
         int fs = Math.max(10, Math.round(fontSize * scale));
-        String line = "LEAVING THE AREA — turn back (" + Math.max(0L, Math.round(distance)) + " m)";
+        String line = !restricted.isEmpty() && !warned
+                ? (restrictedLeft > 0 ? "RESTRICTED AREA — " + restricted + ": turn back (" + (long) Math.ceil(restrictedLeft) + " s)"
+                        : "RESTRICTED AREA — " + restricted + ": trespassing")
+                : "LEAVING THE AREA — turn back (" + Math.max(0L, Math.round(distance)) + " m)";
         // Drawn text gets the same thin outline the game theme gives every Label (HudPalette.OUTLINE).
         drawStringOutline(font, new Vector2(0f, h * 0.22f), line, HorizontalAlignment.CENTER, w, fs,
                 Math.max(HudPalette.OUTLINE_PX, Math.round(HudPalette.OUTLINE_PX * scale)), HudPalette.OUTLINE);

@@ -105,6 +105,8 @@ public class WantedSystem extends Node {
         now += delta;
         if (rules == null) return;
         for (WantedRules.State s : states.values()) rules.tick(s, now, delta);
+        if (!callIns.isEmpty()) tickCallIns();
+        if (EnforcementHooks.any()) applyHolds();
         toggleIn -= delta;
         if (toggleIn <= 0) {
             toggleIn = 0.5;
@@ -208,7 +210,58 @@ public class WantedSystem extends Node {
         if (who == null) return false;
         WantedRules.Crime c = rules.crimes.get(crimeId);
         if (c == null) return false;
-        boolean witnessed = !c.witness() || witnessed(where, who);
+        // CALLED IN (P1e step 4): a witnessed crime by a player nobody is after yet waits for the witness to phone it
+        // in -- and dies with the witness. A police officer in reach sees it at once; a wanted player is already hunted
+        if (c.witness() && rules.callInSeconds > 0 && starsOf(playerId) == 0) {
+            Character w = witnessOf(where, who);
+            if (w == null) return false;
+            if (w != who && !(w.getCharacterInfo() != null && com.openworld.character.Faction.POLICE.equals(w.getCharacterInfo().faction))) {
+                callIns.add(new CallIn(crimeId, where, playerId, w, now + rules.callInSeconds));
+                return true;
+            }
+        }
+        return apply(crimeId, where, playerId, who, !c.witness() || witnessed(where, who));
+    }
+
+    /** A running activity's hold on its participants' stars (P1e step 5): set / clear once, lock, at least / most. */
+    private void applyHolds() {
+        for (Player p : PlayerRegistry.getPlayers()) {
+            if (!GD.isInstanceValid(p) || p.getCharacterInfo() == null) continue;
+            String id = p.getCharacterInfo().characterId;
+            int have = starsOf(id), want = EnforcementHooks.wanted(id, have);
+            if (want != have) setStars(id, want, isLethal(id) && want > 0);
+        }
+    }
+
+    /** A crime waiting for its witness to call it in. */
+    private record CallIn(String crimeId, Vector3 where, String playerId, Character witness, double due) {}
+    private final List<CallIn> callIns = new ArrayList<>();
+    private int calledIn, silenced;
+
+    /** Due call-ins: counted if the witness still lives (the police then know only WHERE it happened). */
+    private void tickCallIns() {
+        for (java.util.Iterator<CallIn> it = callIns.iterator(); it.hasNext(); ) {
+            CallIn ci = it.next();
+            if (now < ci.due()) continue;
+            it.remove();
+            Character who = findPlayer(ci.playerId());
+            if (who == null) continue;
+            if (!GD.isInstanceValid(ci.witness()) || !ci.witness().isAlive()) { silenced++; continue; }
+            if (apply(ci.crimeId(), ci.where(), ci.playerId(), who, true)) {
+                calledIn++;
+                EnforcementDispatch ed = EnforcementDispatch.get();
+                if (ed != null) ed.reportedAt(ci.playerId(), com.openworld.character.Faction.POLICE, ci.where());
+            }
+        }
+    }
+
+    /** Probe control: the call-in delay in seconds (0 = at once, the old rule). */
+    @Register public void setCallInNow(double seconds) { if (rules != null) rules.callInSeconds = seconds; }
+
+    /** "called in,silenced,pending" (probe readout). */
+    @Register public String callInsNow() { return calledIn + "," + silenced + "," + callIns.size(); }
+
+    private boolean apply(String crimeId, Vector3 where, String playerId, Character who, boolean witnessed) {
         WantedRules.State s = states.computeIfAbsent(playerId, k -> new WantedRules.State());
         int before = rules.starsFor(s.heat);
         boolean ok = rules.report(s, crimeId, witnessed, now);
@@ -227,6 +280,22 @@ public class WantedSystem extends Node {
     }
 
     /** Anyone but the offender within the witness radius saw it (a living, non-player character). */
+    /** The nearest living non-player within witness_radius of a crime, or null. */
+    private Character witnessOf(Vector3 where, Character offender) {
+        SpatialEntityGrid grid = SpatialEntityGrid.get();
+        if (grid == null) return offender;          // no grid (a bare test scene): anyone saw it, at once
+        scratch.clear();
+        grid.queryRadius(where, (float) rules.witnessRadius, scratch);
+        Character best = null;
+        double bd = Double.MAX_VALUE;
+        for (Node n : scratch) {
+            if (n == offender || n instanceof Player || !(n instanceof Character c) || !c.isAlive()) continue;
+            double d = c.getGlobalPosition().distanceTo(where);
+            if (d < bd) { bd = d; best = c; }
+        }
+        return best;
+    }
+
     private boolean witnessed(Vector3 where, Character offender) {
         SpatialEntityGrid grid = SpatialEntityGrid.get();
         if (grid == null) return true;
@@ -256,6 +325,9 @@ public class WantedSystem extends Node {
     public DispatchRules dispatchRules() { return dispatch; }
 
     /** Do police shoot this player now (lethal, or at the shoot_at stars)? */
+    /** Is {@code faction} hostile to players only by this system's flip (Hostility narrows it per player)? */
+    public boolean flippedHostile(String faction) { return flips.flipped(faction); }
+
     public boolean policeShoot(String playerId) {
         WantedRules.State s = states.get(playerId);
         if (s == null || rules == null) return false;

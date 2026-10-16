@@ -165,6 +165,8 @@ public class GangHangouts extends Node {
     }
 
     private void release(AICharacter m) {
+        // alive and taken away: back to its place's count (game.ForcePools, P1e step 3)
+        if (EnforcementDispatch.get() != null) EnforcementDispatch.get().hangoutLeft(m);
         if (getNodeOrNull("/root/NetworkManager") instanceof com.openworld.net.NetworkManager net
                 && m.getCharacterInfo() != null) net.announceDespawn(m.getCharacterInfo().characterId);
         m.queueFree();

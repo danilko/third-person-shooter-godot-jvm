@@ -54,6 +54,9 @@ func _initialize() -> void:
 	var saves: Node = root.get_node_or_null("SaveSystem")
 	var director: Node = root.get_node_or_null("MissionDirector")
 	var wanted: Node = gm.get_node_or_null("WantedSystem") if gm else null
+	# the witness call-in (P1e step 4) is probe_engagement_v2's: here a crime counts at once, as it did
+	if wanted != null:
+		wanted.call("set_call_in_now", 0.0)
 	var gangs: Node = gm.get_node_or_null("GangSystem") if gm else null
 	if gm == null or saves == null or director == null or wanted == null or gangs == null:
 		print("RESULT FAIL (GameManager / SaveSystem / MissionDirector / WantedSystem / GangSystem missing)")

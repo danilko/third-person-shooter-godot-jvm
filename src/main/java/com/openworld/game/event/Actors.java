@@ -22,11 +22,15 @@ public final class Actors {
 
     /** An attacker known only by id (damage carries the id, not the body): a live player's body if it is one, else an
      *  AI of unknown faction; {@link Actor#NONE} for no id (the world: a fall, a fire). */
-    public static Actor byId(String characterId, String name) {
+    public static Actor byId(String characterId, String name) { return byId(characterId, name, ""); }
+
+    /** {@link #byId} with the faction the hit itself carries (PLAN.md P1e step 6: an AI attacker had an EMPTY faction,
+     *  so a gang-on-gang attack could not be read). */
+    public static Actor byId(String characterId, String name, String faction) {
         if (characterId == null || characterId.isEmpty()) return Actor.NONE;
         for (Player p : PlayerRegistry.getPlayers())
             if (p.getCharacterInfo() != null && characterId.equals(p.getCharacterInfo().characterId)) return of(p);
-        return new Actor(characterId, "", Actor.Kind.AI, name, "");
+        return new Actor(characterId, faction == null ? "" : faction, Actor.Kind.AI, name, "");
     }
 
     public static Spot at(Vector3 p) { return p == null ? Spot.NOWHERE : new Spot(p.getX(), p.getY(), p.getZ()); }

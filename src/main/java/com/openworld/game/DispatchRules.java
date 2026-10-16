@@ -65,6 +65,8 @@ public final class DispatchRules {
         if (m.has("tokens_by_stars")) r.tokensByStars = intsOr(m, "tokens_by_stars");
         if (m.has("regroup_seconds_by_stars")) r.regroupByStars = intsOr(m, "regroup_seconds_by_stars");
         r.supplyReach = m.num("supply_reach", 60.0);
+        r.bodyCap = m.integer("body_cap", 0);
+        r.mergeRadius = m.num("merge_radius", 0.0);
         r.bodies = readBodies(m.items("bodies"));
         DataReader g = m.child("gun");
         if (g != null) {
@@ -155,6 +157,11 @@ public final class DispatchRules {
     public int[] tokensByStars = {0};
     /** The regroup lull (1g b3): seconds no new unit is sent after half a squad ran dry; 0 = no lull. */
     public int[] regroupByStars = {0};
+    /** The island-wide ceiling on dispatched bodies, ALL sides together (read from the police block; 0 = none). */
+    public int bodyCap = 0;
+    /** Players of one side within this many metres of each other are ONE incident: what is already on any of them
+     *  counts toward each one's call (0 = every player is their own incident, the old rule). */
+    public double mergeRadius = 0.0;
     /** How far a unit out of ammo walks back to a vehicle's spare ammunition (else it leaves the fight). */
     public double supplyReach = 60.0;
 

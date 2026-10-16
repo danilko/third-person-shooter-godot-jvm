@@ -1,0 +1,57 @@
+{
+ "note": "FINITE FORCES, HELD PER STATION (PLAN.md P1e step 3; user 2026-10-15: 'simplify that entire pool for now -- at each station'). game.ForcePools. Each place in the places record whose KIND a tier lists is a STATION of that tier holding `pool` bodies; a unit is drawn from the nearest station of its tier with one on hand, goes back there if it leaves the fight alive, and a dead one is gone until the station regenerates one body every `regen_seconds`. No island-wide total. `tiers` are the side's ladder in escalation order: at N stars the side draws from the LAST tier whose min_stars <= N; an empty tier escalates to the next one up; when the top is empty too the side sends nobody for `empty_lull_seconds` ('no units available') while its stations regenerate. `outfit` (character/outfits.json) dresses a body drawn from that tier whatever the stars' body row says. own_places_only: the side's stations are only places whose `gang` is the side id ('*' = any such place). A side with no station in a world (DebugWorld) is unlimited. Pools are session-only on the host, never saved.",
+ "forces": {
+  "police": {
+   "tiers": [
+    {"id": "police", "min_stars": 1, "places": {
+     "Koban": {"pool": 4, "regen_seconds": 90.0},
+     "PoliceStation": {"pool": 18, "regen_seconds": 40.0}}},
+    {"id": "special_forces", "min_stars": 5, "outfit": "special_force", "places": {
+     "PoliceStation": {"pool": 10, "regen_seconds": 90.0}}},
+    {"id": "military", "min_stars": 6, "outfit": "military", "places": {
+     "Reserve_military_base": {"pool": 30, "regen_seconds": 60.0}}}
+   ],
+   "empty_lull_seconds": 75.0
+  },
+  "gang_a": {
+   "own_places_only": true,
+   "tiers": [
+    {"id": "members", "min_stars": 0, "places": {
+     "GangOffice": {"pool": 14, "regen_seconds": 90.0},
+     "*": {"pool": 8, "regen_seconds": 120.0}}}
+   ],
+   "empty_lull_seconds": 90.0
+  },
+  "gang_b": {
+   "own_places_only": true,
+   "tiers": [
+    {"id": "members", "min_stars": 0, "places": {
+     "GangOffice": {"pool": 14, "regen_seconds": 90.0},
+     "*": {"pool": 8, "regen_seconds": 120.0}}}
+   ],
+   "empty_lull_seconds": 90.0
+  }
+ },
+ "incidents_note": "THE INCIDENT BOARD (PLAN.md P1e steps 4-7, game.IncidentBoard). Acts of one type against one victim within merge_radius m merge into one incident while it is fresh; it ends expire_seconds after its last act; at most max_per_minute NEW incidents a minute (with the station pools, the guard against an AI-vs-AI feedback loop). An AI attacking an AI counts only within near_players m of a player (nothing happens off-screen), never a lawful or on-duty act (police, and any dispatched unit). responders: who answers each type -- force 'victim' = the attacked gang itself (user 2026-10-15: gangs answer any attack on their members, by a player OR another gang), 'police', or a gang id -- with how many units, drawn from that force's stations.",
+ "incidents": {
+  "merge_radius": 60.0,
+  "expire_seconds": 45.0,
+  "max_per_minute": 6,
+  "near_players": 150.0,
+  "responders": {
+   "gang_attack": {"force": "victim", "units": 3},
+   "police_attacked": {"force": "police", "units": 3},
+   "civilian_attacked": {"force": "police", "units": 2}
+  }
+ },
+ "radio_note": "RADIO ITEMS (PLAN.md P1e step 7): a player who sits in one of police_vehicles takes its POLICE SCANNER; one who stands over a dead gang member takes that gang's radio; a player whose faction IS a force hears it while they are one. A radio tells of the force's OTHER incidents (a line + a minimap marker while the incident lasts); it is LOST on respawn -- death, arrest, abduction -- and must be taken again. Session-only, never saved.",
+ "radio": {
+  "police_vehicles": ["POC1", "MPC1", "ARV1"]
+ },
+ "restricted_note": "GTA V-style restricted areas (PLAN.md P1e step 3). `box` = x0, z0, x1, z1 in the world frame (Godot x, z) -- the military reserves of tools/island_plan.py RESERVES, copied here as REGION DATA, not derived: move or resize them here. A player inside a box is WARNED (the area warning: 'RESTRICTED AREA -- turn back'); still inside after `warn_seconds`, or more than `inner` m in from every edge at any time, commits the crime `trespass` (crimes.json: at least 4 stars) once per visit.",
+ "restricted": [
+  {"name": "Air Base", "box": [-760.0, 1250.0, -475.0, 1444.4], "inner": 40.0, "warn_seconds": 8.0},
+  {"name": "Air Base Runway", "box": [-1015.0, 1443.0, -475.0, 1491.0], "inner": 15.0, "warn_seconds": 8.0},
+  {"name": "Base Harbour Terminal", "box": [-1020.0, 1301.0, -740.0, 1371.0], "inner": 20.0, "warn_seconds": 8.0}
+ ]
+}

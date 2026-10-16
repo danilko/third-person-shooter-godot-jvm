@@ -87,13 +87,17 @@ public interface ActivityHost {
     /** The run's faction overlay (empty = none). */
     void relations(String instanceId, List<Plan.Relation> rows);
 
+    /** The run's hold on the police and the gangs (Plan's noDispatch / wanted* / squad / reserve / incident, PLAN.md
+     *  P1e step 5), for its participants until {@link #release}. */
+    void enforcement(String instanceId, String activityId, Plan.Enforcement hooks);
+
     /** Can this world requirement, which does not hold, be staged as a temporary overlay for a REPLAY? */
     boolean canStage(Requirement need);
 
     void stage(String instanceId, List<Requirement> needs);
 
-    /** Undo everything the run took of the world: its doors, its faction overlay, its marker, a staged replay
-     *  world. Called once at its end, whatever the end. */
+    /** Undo everything the run took of the world: its doors, its faction overlay, its enforcement hooks and
+     *  reserved bodies, its marker, a staged replay world. Called once at its end, whatever the end. */
     void release(String instanceId);
 
     // ── telling the player ──

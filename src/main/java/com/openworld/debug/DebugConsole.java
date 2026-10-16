@@ -252,6 +252,7 @@ public class DebugConsole extends CanvasLayer {
                 print("load [slot]                            restore it (default 1)");
                 print("hud [0-3]                              debug HUD: off / FPS / perf + graph / + game state");
                 print("traffic                                cars round you now: by distance, by side, budget, region mix");
+                print("pools [off|on]                         each force's bodies on hand per tier (station pools), drawn, lost");
                 print("engine [0|1]                           engine sound on / off, and how many cars have a voice");
                 print("activity [start|replay|retry|abort|why <id>]   the running activities; start / replay / retry one");
                 print("where                                  the bug-report line (postal code, position, zone, road)");
@@ -354,6 +355,13 @@ public class DebugConsole extends CanvasLayer {
                 print("hud level " + hud.levelNow());
             }
             case "traffic" -> traffic();
+            case "pools" -> {
+                // the forces' station pools (PLAN.md P1e step 3, game.ForcePools): on hand / full per side and tier
+                com.openworld.game.EnforcementDispatch ed = com.openworld.game.EnforcementDispatch.get();
+                if (ed == null) { print("no dispatch (a client: the pools are the host's)"); break; }
+                if (a.length >= 2) ed.forcePools = !a[1].equals("off");
+                for (String line : ed.poolsNow().split("\n")) print(line);
+            }
             case "engine" -> {
                 // engine sound on / off (carrier.vehicle.EngineAudio): `engine`, `engine 0`, `engine 1`
                 if (a.length >= 2) com.openworld.carrier.vehicle.Vehicle.setEngineAudio(!a[1].equals("0"));
