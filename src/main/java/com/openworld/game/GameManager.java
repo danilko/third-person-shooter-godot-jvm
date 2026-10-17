@@ -239,6 +239,11 @@ public class GameManager extends Node {
             wj.setName(new godot.core.StringName("WorldJanitor"));
             addChild(wj);
         }
+        if (getNodeOrNull("PickupHighlight") == null) {        // a dropped weapon's glint + the focus rim (local)
+            com.openworld.ui.PickupHighlight ph = new com.openworld.ui.PickupHighlight();
+            ph.setName(new godot.core.StringName("PickupHighlight"));
+            addChild(ph);
+        }
         if (getNodeOrNull("GangHangouts") == null) {
             GangHangouts gh = new GangHangouts();
             gh.setName(new godot.core.StringName("GangHangouts"));

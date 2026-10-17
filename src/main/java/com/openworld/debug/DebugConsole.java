@@ -249,6 +249,7 @@ public class DebugConsole extends CanvasLayer {
                 print("give flashlight                        own a flashlight (T toggles it)");
                 print("drop <id>|all                          lay pickups in a row in front of you");
                 print("ammo                                   refill every weapon you carry");
+                print("glint [0|1]                            dropped weapons' glint + the E-focus rim off / on");
                 print("spawn [<vehicle id>]                   park a vehicle 4 m ahead, facing your way; no id = list them");
                 print("save [slot]                            write the campaign save (default 1)");
                 print("load [slot]                            restore it (default 1)");
@@ -353,6 +354,13 @@ public class DebugConsole extends CanvasLayer {
             case "spawn" -> spawn(a);
             case "drop" -> drop(a);
             case "ammo" -> ammo();
+            case "glint" -> {
+                godot.api.Node gm = getNodeOrNull("/root/GameManager");
+                godot.api.Node n = gm == null ? null : gm.getNodeOrNull("PickupHighlight");
+                if (!(n instanceof com.openworld.ui.PickupHighlight ph)) { print("no PickupHighlight"); return; }
+                if (a.length >= 2) ph.setEnabledNow(!"0".equals(a[1]));
+                print("glint " + (ph.isEnabledNow() ? "on" : "off") + ", " + ph.dressedCount() + " item(s) dressed");
+            }
             case "hud" -> {
                 PerfDebugOverlay hud = hud();
                 if (a.length >= 2) hud.setLevel(Integer.parseInt(a[1]));

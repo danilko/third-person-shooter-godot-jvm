@@ -88,10 +88,12 @@ public class Pickup extends Node3D implements com.openworld.control.Interactable
   @Export public String pickupId = "";
 
   /**
-   * Continuous collision detection for this item's world body. A small, light item thrown hard —
-   * a grenade — can tunnel through a thin floor in one step without it; a rifle dropped at the
-   * player's feet does not need the cost. Authored on the ITEM because it is a fact about the item,
-   * and applied to the {@link PickupBody} each time one is built.
+   * RETIRED (2026-10-16): every world body has continuous collision detection now, whatever this says -- kept only so
+   * the scenes that still author it load. It was "a rifle dropped at the player's feet does not need the cost", and a
+   * DEATH drop is not that: thrown 3-6 m/s up from 1.5 m it lands at ~8 m/s, 13 cm a 60 Hz step, and 15 of 92 passed
+   * a one-face mesh deck (a road / floor plate) to lie on the ground under it -- the "sunk" weapon
+   * (tools/godot/probe_pickup_rest.gd). The authored {@code true} on the grenades never reached the body either (0 of
+   * the 92 had CCD). A resting or sleeping body does no CCD work, so the cost is the few frames an item flies.
    */
   @Export public boolean worldBodyContinuousCd = false;
 
@@ -204,7 +206,7 @@ public class Pickup extends Node3D implements com.openworld.control.Interactable
     // Orthonormalised: a scaled rigid body is a physics hazard, and any scale the item carries
     // stays on the item (reparent below keeps its global transform, so it absorbs the residual).
     body.setGlobalTransform(new Transform3D(at.getBasis().orthonormalized(), at.getOrigin()));
-    if (worldBodyContinuousCd) body.setUseContinuousCollisionDetection(true);
+    body.setUseContinuousCollisionDetection(true);     // always: see worldBodyContinuousCd
     reparent(body, true);
     lendShapesTo(body);
     worldBody = body;

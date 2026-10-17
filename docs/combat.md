@@ -4,6 +4,7 @@ Moved out of `CLAUDE.md` verbatim on 2026-10-09 (PLAN.md 0.5 / F12). Sections:
 
 - Combat / Weapon System (incl. "The melee pack's other five are items", PLAN.md 3.2 H4)
 - The flashlight: one toggle, a gun mount and a body mount (PLAN.md 3.2, 2026-10-16)
+- A dropped weapon: the glint, the focus rim, and why some sank (user, 2026-10-16)
 - Glass breaks like a car's: shops, stations, mission and gang buildings, trains (PLAN.md 1g g, 2026-10-07)
 - Platform ladders, CS 1.6 style (user 2026-10-07)
 
@@ -965,3 +966,39 @@ guest's (empty hands -> body mount) each show on the other peer on the same moun
 puppet's without, and go off after the switch -- PASS. `SnapshotFlagsTest.flashlightIsItsOwnBit`. Regression:
 probe_rebind, probe_shop_clerk, probe_holster_supply, probe_ammo_supply, run_net_shot_test, run_net_light, unit tests.
 
+
+## A dropped weapon: the glint, the focus rim, and why some sank (user, 2026-10-16)
+
+User: "drop weapon fall ground or barely able to see", "weapon seem sometime sink to ground". The design survey (asked
+first): arcade open worlds make loot obvious (GTA III-SA float + glow; GTA IV / V a shimmer on a gun lying flat;
+Fortnite / Apex rarity glow + a focus outline), tactical games deliberately do not (CS, Tarkov; PUBG answers with a
+UI vicinity list, not a glow), and Left 4 Dead's outline is a FOCUS cue -- which item E takes -- not a finder. Taken:
+GTA V's glint to find one, L4D's rim to say which one E takes; no through-wall glow, nothing floats.
+
+- **Why some SANK -- tunnelling, not the shapes.** `tools/godot/probe_pickup_rest.gd` drops every catalog weapon onto
+  a box floor in three attitudes: every model rests within Jolt's 2-2.5 cm contact slop (the 10.9 cm it first read on
+  each firearm on its side was the muzzle flash's `Glow` quad, a visible mesh under `Muzzle` -- measure `Model` only).
+  Its section 2 is the DEATH drop (`WeaponController.returnWeaponToWorldOnDeath`: from 1.5 m, 3-6 m/s up, a 2.5 m/s
+  scatter, so it lands at ~8 m/s = 13 cm a 60 Hz step, more than a pistol's 3-4 cm box) onto a one-face trimesh deck
+  with ground 0.5 m under it, as road decks and floor slabs are baked: **15 of 92 passed the deck** and lay on the
+  ground under it. `Pickup.worldBodyContinuousCd` (default false: "a rifle dropped at the player's feet does not need
+  the cost") is RETIRED -- every `PickupBody` gets CCD now (0 of 92 pass); a resting / sleeping body does no CCD
+  work. The `true` the grenades authored never reached the body either (0 of 92 had CCD). Gate: `probe_pickup_rest.gd`
+  PASS; control `-- --ccd=off` fails 15.
+- **The GLINT** (`ui.PickupHighlight`, a child GameManager builds in code; `assets/vfx/outline/pickup_glint.gdshader`):
+  every WeaponItem lying in the world within 26 m of the camera wears it as `material_overlay` -- additive, so it adds
+  nothing between sweeps; every 1.9 s a band sweeps once across the item (0.6 s) and the whole item brightens, more at
+  distance where the band is under a pixel; the phase comes from the resting position so neighbours flash apart; it
+  fades 18-26 m in the shader.
+- **The FOCUS rim**: the item `control.Interactions.newestOffer()` names (what the "[E] Pick up" prompt says E takes)
+  wears `pickup_focus.tres` -- the target outline's inverted hull, warm white, 1.2 cm -- instead of the glint. It reads
+  unbroken on the rifle's hard edges (picture: `probe_pickup_highlight.gd -- --shot` under xvfb-run).
+- Local and cosmetic: no network, no group, no per-weapon setup. Only the item's `Model` is dressed (never the Glow
+  quad); the scan of the `pickups` group runs every 0.15 s and a dressed item that stops lying in the world (picked up,
+  hidden) is undressed the same frame, so nothing glints in a hand. Cost: one overlay draw per mesh of each weapon in
+  range. Console `glint 0|1`.
+- Gate `tools/godot/probe_pickup_highlight.gd` 8/8 (a rifle at 6 m glints, a pistol at 40 m does not, the gun on offer
+  at the feet wears the rim, the Glow quad never, a picked-up gun wears nothing, `glint 0` undresses all); `--control`
+  (switched off) fails 6. Regression: probe_weapon_world_body, probe_interact, probe_holster_supply PASS.
+- MY PICKS (unreviewed): 26 m reach, 1.9 s period, the warm-white colours, the 1.2 cm rim. Food and medkits glint too
+  (a SupplyItem is a WeaponItem); ammo stations (AmmoRefill, an Area3D) do not.

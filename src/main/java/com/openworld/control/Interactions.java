@@ -41,6 +41,13 @@ public final class Interactions {
         return true;
     }
 
+    /** The newest live offer -- what E would use now -- or null (ui.PickupHighlight rims it when it is a pickup). */
+    public static Node newestOffer() {
+        Node newest = null;
+        for (Node n : OFFERS.values()) if (GD.isInstanceValid(n) && n.isInsideTree()) newest = n;
+        return newest;
+    }
+
     /** Probe readouts. */
     public static int offersNow() {
         OFFERS.values().removeIf(n -> !GD.isInstanceValid(n) || !n.isInsideTree());
